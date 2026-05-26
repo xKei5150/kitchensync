@@ -63,5 +63,11 @@ dev_dependencies:
   flutter_native_splash: ^2.4.1
   flutter_launcher_icons: ^0.14.1
 
+dependency_overrides:
+  # analyzer_plugin 0.12.x is broken against analyzer 7.x (Element/Element2 API
+  # split). 0.13.0+ restores compatibility. Remove this override when transitive
+  # constraints in riverpod_lint / custom_lint catch up.
+  analyzer_plugin: ^0.13.0
+
 flutter:
   uses-material-design: true
