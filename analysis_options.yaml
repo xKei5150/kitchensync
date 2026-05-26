@@ -5,6 +5,7 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.freezed.dart"
     - "lib/firebase_options_*.dart"
+    - "build/**"
   errors:
     invalid_annotation_target: ignore
 
@@ -12,3 +13,9 @@ linter:
   rules:
     public_member_api_docs: false
     avoid_classes_with_only_static_members: false
+    # Abstract classes used as DI seams (Clock, IdGenerator, UseCase, ...)
+    one_member_abstracts: false
+    # Keep explicit generic type annotations in tests for readability.
+    omit_local_variable_types: false
+    # Pubspec ordering grouped by concern (state, models, firebase, ...).
+    sort_pub_dependencies: false
