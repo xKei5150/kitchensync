@@ -13,13 +13,14 @@ class ConnectivityBanner extends StatefulWidget {
 }
 
 class _ConnectivityBannerState extends State<ConnectivityBanner> {
+  final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _sub;
   bool _offline = false;
 
   @override
   void initState() {
     super.initState();
-    _sub = Connectivity().onConnectivityChanged.listen((results) {
+    _sub = _connectivity.onConnectivityChanged.listen((results) {
       final offline = !results.any(_isOnline);
       if (mounted && offline != _offline) {
         setState(() => _offline = offline);
@@ -29,7 +30,7 @@ class _ConnectivityBannerState extends State<ConnectivityBanner> {
   }
 
   Future<void> _initialCheck() async {
-    final results = await Connectivity().checkConnectivity();
+    final results = await _connectivity.checkConnectivity();
     if (mounted) {
       setState(() => _offline = !results.any(_isOnline));
     }

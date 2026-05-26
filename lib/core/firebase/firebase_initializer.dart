@@ -18,7 +18,19 @@ class FirebaseInitializer {
       AppEnv.prod => prod.DefaultFirebaseOptions.currentPlatform,
     };
 
-    await Firebase.initializeApp(options: options);
+    try {
+      await Firebase.initializeApp(options: options);
+    } on FirebaseException catch (e) {
+      // Most common failure: stub firebase_options_*.dart left in place —
+      // surface an actionable message rather than a raw platform stack.
+      debugPrint(
+        'Firebase.initializeApp failed (env=${env.name}, code=${e.code}). '
+        'Did you run '
+        '`flutterfire configure --project=kitchensync-${env.name}`? '
+        'See tools/README.md.',
+      );
+      rethrow;
+    }
 
     await FirebaseCrashlytics.instance
         .setCrashlyticsCollectionEnabled(!kDebugMode);
@@ -33,6 +45,10 @@ class FirebaseInitializer {
     await FirebaseCrashlytics.instance
         .setCustomKey('app_check_enforced', false);
 
+    // App Check — scaffolded only. Both envs use debug providers in Plan 1.
+    // TODO(plan-3): switch prod to AndroidProvider.playIntegrity and
+    // AppleProvider.deviceCheck once platform attestation is provisioned,
+    // then flip the app_check_enforced custom key to true.
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.debug,
       appleProvider: AppleProvider.debug,
