@@ -57,7 +57,18 @@ class FirebaseInitializer {
     await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
 
     if (FirebaseAuth.instance.currentUser == null) {
-      await FirebaseAuth.instance.signInAnonymously();
+      try {
+        await FirebaseAuth.instance.signInAnonymously();
+      } on FirebaseAuthException catch (e) {
+        // Anonymous Auth must be enabled in the Firebase Console
+        // (Authentication → Sign-in method → Anonymous). The app shell
+        // still renders without a session — downstream Firestore calls
+        // will be denied by rules until a user is signed in.
+        debugPrint(
+          'Anonymous sign-in failed (code=${e.code}). Enable Anonymous Auth '
+          'in the Firebase Console for kitchensync-${env.name}.',
+        );
+      }
     }
   }
 
