@@ -43,3 +43,23 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# KitchenSync
+# Firebase configs (per-env, contain sensitive identifiers)
+lib/firebase_options_dev.dart
+lib/firebase_options_prod.dart
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+ios/Runner/GoogleService-Info-dev.plist
+ios/Runner/GoogleService-Info-prod.plist
+
+# Service account credentials (NEVER commit)
+tools/seed_uploader/service-account*.json
+!tools/seed_uploader/service-account.example.json
+
+# Coverage
+coverage/
+
+# Generated code
+**/*.freezed.dart
+**/*.g.dart
