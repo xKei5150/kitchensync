@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:kitchensync/firebase_options_dev.dart' as dev;
 import 'package:kitchensync/firebase_options_prod.dart' as prod;
@@ -32,18 +34,27 @@ class FirebaseInitializer {
       rethrow;
     }
 
-    await FirebaseCrashlytics.instance
-        .setCrashlyticsCollectionEnabled(!kDebugMode);
-    FlutterError.onError =
-        FirebaseCrashlytics.instance.recordFlutterFatalError;
+    const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+    if (useEmulator) {
+      FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
+      await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
+      await FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
+    }
+
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+      !kDebugMode,
+    );
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
     PlatformDispatcher.instance.onError = (error, stack) {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
       return true;
     };
 
     await FirebaseCrashlytics.instance.setCustomKey('env', env.name);
-    await FirebaseCrashlytics.instance
-        .setCustomKey('app_check_enforced', false);
+    await FirebaseCrashlytics.instance.setCustomKey(
+      'app_check_enforced',
+      false,
+    );
 
     // App Check — scaffolded only. Both envs use debug providers in Plan 1.
     // TODO(plan-3): switch prod to AndroidProvider.playIntegrity and
