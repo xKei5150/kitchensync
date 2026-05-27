@@ -1,9 +1,5 @@
-import {
-  initializeApp,
-  cert,
-  applicationDefault,
-  App,
-} from "firebase-admin/app";
+import { initializeApp, cert, applicationDefault } from "firebase-admin/app";
+import type { App } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
