@@ -73,12 +73,9 @@ class _ConnectivityBannerState extends State<ConnectivityBanner> {
                     Expanded(
                       child: Text(
                         'Offline — changes will sync when you reconnect',
-                        style:
-                            Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onErrorContainer,
-                                ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
                       ),
                     ),
                   ],

@@ -9,23 +9,12 @@ abstract class PantryRepository {
     PantrySection section,
   );
   Stream<PantryItem?> watchById(String householdId, String itemId);
-  Future<PantryItem?> findByIngredient(
-    String householdId,
-    String ingredientId,
-  );
+  Future<PantryItem?> findByIngredient(String householdId, String ingredientId);
   Future<void> add(PantryItem item);
   Future<void> update(PantryItem item);
-  Future<void> setQuantity(
-    String householdId,
-    String itemId,
-    double newQty,
-  );
+  Future<void> setQuantity(String householdId, String itemId, double newQty);
   Future<void> delete(String householdId, String itemId);
-  Future<String> uploadPhoto(
-    String householdId,
-    String itemId,
-    File file,
-  );
+  Future<String> uploadPhoto(String householdId, String itemId, File file);
   Future<void> markAsWasteAtomic({
     required String householdId,
     required String pantryItemId,

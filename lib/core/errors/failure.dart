@@ -9,10 +9,8 @@ sealed class Failure with _$Failure {
     required String message,
   }) = ValidationFailure;
 
-  const factory Failure.notFound({
-    required String entity,
-    required String id,
-  }) = NotFoundFailure;
+  const factory Failure.notFound({required String entity, required String id}) =
+      NotFoundFailure;
 
   const factory Failure.conflict({required String reason}) = ConflictFailure;
 
