@@ -13,21 +13,20 @@ Ingredient _ing(
   String? parent,
   IngredientScope scope = IngredientScope.global,
   String? hid,
-}) =>
-    Ingredient(
-      id: id,
-      name: name,
-      displayNames: {'en': name},
-      parentIngredientId: parent,
-      category: IngredientCategory.produce,
-      defaultUnit: Unit.piece,
-      allowedUnits: const [Unit.piece],
-      searchTokens: name.split(' '),
-      scope: scope,
-      householdId: hid,
-      createdAt: DateTime.utc(2026),
-      updatedAt: DateTime.utc(2026),
-    );
+}) => Ingredient(
+  id: id,
+  name: name,
+  displayNames: {'en': name},
+  parentIngredientId: parent,
+  category: IngredientCategory.produce,
+  defaultUnit: Unit.piece,
+  allowedUnits: const [Unit.piece],
+  searchTokens: name.split(' '),
+  scope: scope,
+  householdId: hid,
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026),
+);
 
 void main() {
   late FakeFirebaseFirestore db;
@@ -46,7 +45,11 @@ void main() {
     await db
         .collection('ingredients')
         .doc('red-onion')
-        .set(IngredientMapper.toMap(_ing('red-onion', 'red onion', parent: 'onion')));
+        .set(
+          IngredientMapper.toMap(
+            _ing('red-onion', 'red onion', parent: 'onion'),
+          ),
+        );
     await db
         .collection('households')
         .doc('h1')
@@ -78,7 +81,12 @@ void main() {
         .doc('onion')
         .set(
           IngredientMapper.toMap(
-            _ing('onion', 'onion', scope: IngredientScope.householdCustom, hid: 'h1'),
+            _ing(
+              'onion',
+              'onion',
+              scope: IngredientScope.householdCustom,
+              hid: 'h1',
+            ),
           ),
         );
     final r = await repo.search(query: 'onion', householdId: 'h1');
@@ -115,4 +123,21 @@ void main() {
     final snap = await db.collection('ingredients').get();
     expect(snap.docs.length, greaterThanOrEqualTo(2));
   });
+
+  test(
+    'search strips diacritics so accented queries match stored tokens',
+    () async {
+      // Stored tokens are diacritic-stripped, as SearchTokenizer produces them.
+      final creme = _ing(
+        'creme-fraiche',
+        'creme fraiche',
+      ).copyWith(searchTokens: const ['creme', 'fraiche']);
+      await db
+          .collection('ingredients')
+          .doc('creme-fraiche')
+          .set(IngredientMapper.toMap(creme));
+      final r = await repo.search(query: 'Crème', householdId: 'h1');
+      expect(r.map((e) => e.id), contains('creme-fraiche'));
+    },
+  );
 }

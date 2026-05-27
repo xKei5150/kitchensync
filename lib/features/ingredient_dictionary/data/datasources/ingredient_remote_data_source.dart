@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
 import 'package:kitchensync/features/ingredient_dictionary/data/dtos/ingredient_dto.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/search_tokenizer.dart';
 
 class IngredientRemoteDataSource {
   IngredientRemoteDataSource(this._refs);
@@ -23,12 +24,10 @@ class IngredientRemoteDataSource {
     required String query,
     required int limit,
   }) async {
-    final tokens = query
-        .toLowerCase()
-        .split(RegExp(r'\s+'))
-        .where((t) => t.isNotEmpty)
-        .take(10)
-        .toList();
+    // Match the diacritic-stripping tokenization used to build searchTokens
+    // so accented queries ("crème") hit stored tokens ("creme"). Firestore
+    // arrayContainsAny accepts at most 10 values.
+    final tokens = SearchTokenizer.tokenize(query).take(10).toList();
     if (tokens.isEmpty) return const [];
     final snap = await _refs
         .ingredients()
@@ -45,12 +44,7 @@ class IngredientRemoteDataSource {
     required String query,
     required int limit,
   }) async {
-    final tokens = query
-        .toLowerCase()
-        .split(RegExp(r'\s+'))
-        .where((t) => t.isNotEmpty)
-        .take(10)
-        .toList();
+    final tokens = SearchTokenizer.tokenize(query).take(10).toList();
     if (tokens.isEmpty) return const [];
     final snap = await _refs
         .customIngredients(householdId)
