@@ -2,7 +2,22 @@
 
 Uploads `assets/seed/ingredients.json` to Firestore via the Firebase Admin SDK.
 
-## Service account
+## Authentication
+
+Two options — the uploader prefers a key file, then falls back to ADC.
+
+### Option A (recommended): Application Default Credentials — no key file
+
+`flutterfire`/`firebase login` do **not** provide an Admin SDK key. Instead,
+authenticate with gcloud once (this writes ADC to `~/.config/gcloud`):
+
+```bash
+gcloud auth application-default login
+```
+
+The uploader then uses ADC automatically (project id is baked in per env).
+
+### Option B: service-account key file
 
 Per env:
 1. Firebase Console -> kitchensync-dev (or prod) -> Project Settings -> Service Accounts
