@@ -17,6 +17,12 @@ class HomeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             FilledButton.icon(
+              icon: const Icon(Icons.kitchen),
+              label: const Text('Pantry'),
+              onPressed: () => context.push('/pantry'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
               icon: const Icon(Icons.search),
               label: const Text('Pick an ingredient'),
               onPressed: () => context.push('/ingredient/pick'),
