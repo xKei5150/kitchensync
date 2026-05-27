@@ -1,0 +1,19 @@
+{
+  "name": "seed_uploader",
+  "version": "1.0.0",
+  "description": "Upload curated ingredient seed JSON via Firebase Admin SDK.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "upload:dev": "ts-node upload-seed.ts --env=dev",
+    "upload:prod": "ts-node upload-seed.ts --env=prod"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.7.4"
+  }
+}
