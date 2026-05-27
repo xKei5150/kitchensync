@@ -1,4 +1,4 @@
-import '../entities/purchase_record.dart';
+import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 
 abstract class PurchaseHistoryRepository {
   Stream<List<PurchaseRecord>> watchByIngredient(

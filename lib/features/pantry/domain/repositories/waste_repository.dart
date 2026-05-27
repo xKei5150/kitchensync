@@ -1,4 +1,4 @@
-import '../entities/waste_event.dart';
+import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 
 abstract class WasteRepository {
   Stream<List<WasteEvent>> watchByHousehold(

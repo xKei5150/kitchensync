@@ -12,8 +12,8 @@ void main() {
       quantity: 2.5,
       unit: Unit.kg,
       section: PantrySection.food,
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
     );
     expect(PantryItem.fromJson(p.toJson()), p);
   });

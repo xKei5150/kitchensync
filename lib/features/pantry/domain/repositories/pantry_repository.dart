@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import '../entities/enums.dart';
-import '../entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 
 abstract class PantryRepository {
   Stream<List<PantryItem>> watchBySection(

@@ -1,7 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
-
-import 'enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 
 part 'waste_event.freezed.dart';
 part 'waste_event.g.dart';
