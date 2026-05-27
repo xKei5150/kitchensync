@@ -1,27 +1,58 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() { return request.auth != null; }
-
-    // Plan 2 dev-rule: signed-in users may read and write /ingredients
-    // for the in-app seed UI. Tightened in Plan 3.
-    match /ingredients/{id} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isHouseholdMember(hid) {
+      return isSignedIn() && (
+        hid == 'solo-household' ||
+        exists(/databases/$(database)/documents/households/$(hid)/members/$(request.auth.uid))
+      );
+    }
+    function householdRole(hid) {
+      return get(/databases/$(database)/documents/households/$(hid)/members/$(request.auth.uid)).data.role;
+    }
+    function isHouseholdAdmin(hid) {
+      return hid == 'solo-household' || householdRole(hid) == 'admin';
+    }
+    function isHouseholdMutator(hid) {
+      let role = hid == 'solo-household' ? 'admin' : householdRole(hid);
+      return role in ['admin', 'cook', 'shopper'];
     }
 
-    // Household-scoped writes (custom ingredients in this plan).
-    match /households/{hid}/customIngredients/{id} {
+    match /ingredients/{ingredientId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn()
+      allow write: if false;
+    }
+
+    match /households/{hid}/customIngredients/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create, update: if isHouseholdMutator(hid)
         && request.resource.data.scope == 'householdCustom'
         && request.resource.data.householdId == hid;
-      allow delete: if isSignedIn() && resource.data.householdId == hid;
+      allow delete: if isHouseholdAdmin(hid);
     }
 
-    // Everything else still denied. Plan 3 fills in pantryItems, etc.
-    match /{document=**} {
-      allow read, write: if false;
+    match /households/{hid}/pantryItems/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create, update: if isHouseholdMutator(hid)
+        && request.resource.data.householdId == hid;
+      allow delete: if isHouseholdAdmin(hid);
+    }
+
+    match /households/{hid}/wasteEvents/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create: if isHouseholdMutator(hid)
+        && request.resource.data.householdId == hid;
+      allow update, delete: if false;
+    }
+
+    match /households/{hid}/purchases/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create: if isHouseholdMutator(hid)
+        && request.resource.data.householdId == hid;
+      allow update, delete: if false;
     }
   }
 }
