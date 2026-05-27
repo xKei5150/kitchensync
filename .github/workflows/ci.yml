@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
+
+      - name: Install deps
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Verify formatting
+        run: dart format --set-exit-if-changed lib test integration_test
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test --coverage
+
+      - name: Enforce 80% coverage
+        run: |
+          sudo apt-get install -y lcov
+          lcov --summary coverage/lcov.info | tee coverage_summary.txt
+          PCT=$(grep -oP 'lines\.\.\.\.\.\.: \K[0-9.]+' coverage_summary.txt)
+          PCT_INT=${PCT%.*}
+          if [ "$PCT_INT" -lt 80 ]; then
+            echo "Coverage $PCT% < 80%" >&2
+            exit 1
+          fi
+
+  rules-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Firebase tools
+        run: npm install -g firebase-tools
+      - name: Install rules-tests deps
+        working-directory: tools/rules_tests
+        run: npm install
+      - name: Run rules tests
+        working-directory: tools/rules_tests
+        run: npm test
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Firebase tools
+        run: npm install -g firebase-tools
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - name: Start emulators (background) and run integration tests
+        run: |
+          firebase emulators:start --only firestore,auth,storage --project=kitchensync-dev &
+          EMU_PID=$!
+          sleep 15
+          flutter test integration_test --dart-define=USE_EMULATOR=true --dart-define=ENV=dev
+          kill $EMU_PID
