@@ -12,8 +12,8 @@ void main() {
       defaultUnit: Unit.piece,
       allowedUnits: const [Unit.piece, Unit.g, Unit.kg],
       scope: IngredientScope.global,
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
     );
     final round = Ingredient.fromJson(ing.toJson());
     expect(round, ing);

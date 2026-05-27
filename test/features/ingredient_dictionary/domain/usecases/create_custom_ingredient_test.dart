@@ -54,7 +54,7 @@ void main() {
     useCase = CreateCustomIngredient(
       repo,
       idGenerator: FakeIdGenerator(['new-id']),
-      clock: FakeClock(DateTime.utc(2026, 1, 1)),
+      clock: FakeClock(DateTime.utc(2026)),
     );
     when(
       () => repo.search(
@@ -70,12 +70,12 @@ void main() {
 
   test('valid input persists with householdCustom scope and tokens', () async {
     final r = await useCase(
-      CreateCustomIngredientParams(
+      const CreateCustomIngredientParams(
         householdId: 'h1',
-        displayNames: const {'en': 'Mangosteen'},
+        displayNames: {'en': 'Mangosteen'},
         category: IngredientCategory.produce,
         defaultUnit: Unit.piece,
-        allowedUnits: const [Unit.piece],
+        allowedUnits: [Unit.piece],
       ),
     );
     expect(r, isA<Success<Ingredient>>());
@@ -90,12 +90,12 @@ void main() {
 
   test('empty displayNames.en -> validation failure', () async {
     final r = await useCase(
-      CreateCustomIngredientParams(
+      const CreateCustomIngredientParams(
         householdId: 'h1',
-        displayNames: const {'en': '  '},
+        displayNames: {'en': '  '},
         category: IngredientCategory.produce,
         defaultUnit: Unit.piece,
-        allowedUnits: const [Unit.piece],
+        allowedUnits: [Unit.piece],
       ),
     );
     expect(r, isA<ResultFailure<Ingredient>>());
@@ -106,12 +106,12 @@ void main() {
 
   test('defaultUnit not in allowedUnits -> validation failure', () async {
     final r = await useCase(
-      CreateCustomIngredientParams(
+      const CreateCustomIngredientParams(
         householdId: 'h1',
-        displayNames: const {'en': 'X'},
+        displayNames: {'en': 'X'},
         category: IngredientCategory.produce,
         defaultUnit: Unit.g,
-        allowedUnits: const [Unit.piece],
+        allowedUnits: [Unit.piece],
       ),
     );
     expect(r, isA<ResultFailure<Ingredient>>());
@@ -129,12 +129,12 @@ void main() {
       (_) async => [_parent().copyWith(name: 'mangosteen', id: 'existing')],
     );
     final r = await useCase(
-      CreateCustomIngredientParams(
+      const CreateCustomIngredientParams(
         householdId: 'h1',
-        displayNames: const {'en': 'Mangosteen'},
+        displayNames: {'en': 'Mangosteen'},
         category: IngredientCategory.produce,
         defaultUnit: Unit.piece,
-        allowedUnits: const [Unit.piece],
+        allowedUnits: [Unit.piece],
       ),
     );
     expect(r, isA<ResultFailure<Ingredient>>());
@@ -148,12 +148,12 @@ void main() {
         () => repo.getById('red-onion'),
       ).thenAnswer((_) async => _variantParent());
       final r = await useCase(
-        CreateCustomIngredientParams(
+        const CreateCustomIngredientParams(
           householdId: 'h1',
-          displayNames: const {'en': 'Heirloom red onion'},
+          displayNames: {'en': 'Heirloom red onion'},
           category: IngredientCategory.produce,
           defaultUnit: Unit.piece,
-          allowedUnits: const [Unit.piece],
+          allowedUnits: [Unit.piece],
           parentIngredientId: 'red-onion',
         ),
       );
@@ -189,12 +189,12 @@ void main() {
   test('searchTokens include parent name tokens', () async {
     when(() => repo.getById('onion-parent')).thenAnswer((_) async => _parent());
     final r = await useCase(
-      CreateCustomIngredientParams(
+      const CreateCustomIngredientParams(
         householdId: 'h1',
-        displayNames: const {'en': 'Heirloom variety'},
+        displayNames: {'en': 'Heirloom variety'},
         category: IngredientCategory.produce,
         defaultUnit: Unit.piece,
-        allowedUnits: const [Unit.piece],
+        allowedUnits: [Unit.piece],
         parentIngredientId: 'onion-parent',
       ),
     );

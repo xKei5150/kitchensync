@@ -34,9 +34,10 @@ void main(List<String> args) {
   final output = _arg(args, '--output') ?? 'assets/seed/ingredients.json';
   final usdaCsv = _arg(args, '--usda-foundation-csv');
 
-  final existing = jsonDecode(File(input).readAsStringSync())
-      as Map<String, dynamic>;
-  final ingredients = (existing['ingredients'] as List).cast<Map<String, dynamic>>();
+  final existing =
+      jsonDecode(File(input).readAsStringSync()) as Map<String, dynamic>;
+  final ingredients = (existing['ingredients'] as List)
+      .cast<Map<String, dynamic>>();
   final seenIds = ingredients.map((e) => e['id'] as String).toSet();
 
   if (usdaCsv != null) {
@@ -68,10 +69,9 @@ void main(List<String> args) {
     }
   }
 
-  final out = JsonEncoder.withIndent('  ').convert({
-    'version': existing['version'] ?? 1,
-    'ingredients': ingredients,
-  });
+  final out = const JsonEncoder.withIndent(
+    '  ',
+  ).convert({'version': existing['version'] ?? 1, 'ingredients': ingredients});
   File(output).writeAsStringSync('$out\n');
   stdout.writeln('Wrote ${ingredients.length} ingredients to $output.');
 }
@@ -84,5 +84,5 @@ String? _arg(List<String> args, String name) {
 
 String _slug(String s) => s
     .toLowerCase()
-    .replaceAll(RegExp(r"[^a-z0-9]+"), '-')
+    .replaceAll(RegExp('[^a-z0-9]+'), '-')
     .replaceAll(RegExp(r'(^-+|-+$)'), '');
