@@ -1,6 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+
+    // Plan 2 dev-rule: signed-in users may read and write /ingredients
+    // for the in-app seed UI. Tightened in Plan 3.
+    match /ingredients/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Household-scoped writes (custom ingredients in this plan).
+    match /households/{hid}/customIngredients/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn()
+        && request.resource.data.scope == 'householdCustom'
+        && request.resource.data.householdId == hid;
+      allow delete: if isSignedIn();
+    }
+
+    // Everything else still denied. Plan 3 fills in pantryItems, etc.
     match /{document=**} {
       allow read, write: if false;
     }
