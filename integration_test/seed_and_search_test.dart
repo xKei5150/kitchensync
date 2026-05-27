@@ -19,14 +19,18 @@ void main() {
     addTearDown(container.dispose);
 
     // Seed the global dictionary.
-    final seedResult = await container.read(seedGlobalDictionaryProvider)(
-      const NoParams(),
+    final seedResult = await withTimeout(
+      'seedGlobalDictionary',
+      () => container.read(seedGlobalDictionaryProvider)(const NoParams()),
     );
     expect(seedResult, isA<Success<int>>());
 
     // Search for 'onion'.
-    final searchResult = await container.read(searchIngredientsProvider)(
-      const SearchIngredientsParams(query: 'onion'),
+    final searchResult = await withTimeout(
+      'searchIngredients',
+      () => container.read(searchIngredientsProvider)(
+        const SearchIngredientsParams(query: 'onion'),
+      ),
     );
     expect(searchResult, isA<Success<List<Ingredient>>>());
 

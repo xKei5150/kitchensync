@@ -36,36 +36,48 @@ class FirebaseInitializer {
 
     const useEmulator = bool.fromEnvironment('USE_EMULATOR');
     if (useEmulator) {
-      FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
-      await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
-      await FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
+      // Emulator / integration-test path. Wire the local emulators and STOP.
+      // Crashlytics, App Check, and Analytics have no emulators and must not
+      // run here:
+      //   * App Check's debug provider fetches a token from the real backend
+      //     on the first Firestore request; with no network/registration in a
+      //     test, that fetch never completes and every Firestore write blocks.
+      //   * The Crashlytics FlutterError.onError override hijacks the
+      //     integration_test binding's error handling.
+      // Use 127.0.0.1, not 'localhost': on the iOS simulator 'localhost' can
+      // resolve to ::1 (IPv6) while the emulator binds 127.0.0.1 (IPv4), which
+      // makes Firestore writes hang on a connection that never establishes.
+      FirebaseFirestore.instance.useFirestoreEmulator('127.0.0.1', 8080);
+      await FirebaseAuth.instance.useAuthEmulator('127.0.0.1', 9099);
+      await FirebaseStorage.instance.useStorageEmulator('127.0.0.1', 9199);
+    } else {
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+        !kDebugMode,
+      );
+      FlutterError.onError =
+          FirebaseCrashlytics.instance.recordFlutterFatalError;
+      PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
+
+      await FirebaseCrashlytics.instance.setCustomKey('env', env.name);
+      await FirebaseCrashlytics.instance.setCustomKey(
+        'app_check_enforced',
+        false,
+      );
+
+      // App Check — scaffolded only. Both envs use debug providers in Plan 1.
+      // TODO(plan-3): switch prod to AndroidProvider.playIntegrity and
+      // AppleProvider.deviceCheck once platform attestation is provisioned,
+      // then flip the app_check_enforced custom key to true.
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.debug,
+        appleProvider: AppleProvider.debug,
+      );
+
+      await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
     }
-
-    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
-      !kDebugMode,
-    );
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-    PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
-
-    await FirebaseCrashlytics.instance.setCustomKey('env', env.name);
-    await FirebaseCrashlytics.instance.setCustomKey(
-      'app_check_enforced',
-      false,
-    );
-
-    // App Check — scaffolded only. Both envs use debug providers in Plan 1.
-    // TODO(plan-3): switch prod to AndroidProvider.playIntegrity and
-    // AppleProvider.deviceCheck once platform attestation is provisioned,
-    // then flip the app_check_enforced custom key to true.
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.debug,
-      appleProvider: AppleProvider.debug,
-    );
-
-    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
 
     if (FirebaseAuth.instance.currentUser == null) {
       try {
