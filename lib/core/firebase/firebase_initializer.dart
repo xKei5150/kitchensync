@@ -44,12 +44,16 @@ class FirebaseInitializer {
       //     test, that fetch never completes and every Firestore write blocks.
       //   * The Crashlytics FlutterError.onError override hijacks the
       //     integration_test binding's error handling.
-      // Use 127.0.0.1, not 'localhost': on the iOS simulator 'localhost' can
-      // resolve to ::1 (IPv6) while the emulator binds 127.0.0.1 (IPv4), which
-      // makes Firestore writes hang on a connection that never establishes.
-      FirebaseFirestore.instance.useFirestoreEmulator('127.0.0.1', 8080);
-      await FirebaseAuth.instance.useAuthEmulator('127.0.0.1', 9099);
-      await FirebaseStorage.instance.useStorageEmulator('127.0.0.1', 9199);
+      // Host differs by platform: the Android emulator reaches the host
+      // machine via 10.0.2.2, while iOS simulators / desktop use the loopback
+      // address. Use 127.0.0.1 rather than 'localhost' so iOS doesn't resolve
+      // to ::1 (IPv6) and stall on a connection the emulator never accepts.
+      final emulatorHost = defaultTargetPlatform == TargetPlatform.android
+          ? '10.0.2.2'
+          : '127.0.0.1';
+      FirebaseFirestore.instance.useFirestoreEmulator(emulatorHost, 8080);
+      await FirebaseAuth.instance.useAuthEmulator(emulatorHost, 9099);
+      await FirebaseStorage.instance.useStorageEmulator(emulatorHost, 9199);
     } else {
       await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
         !kDebugMode,
