@@ -38,4 +38,4 @@ build-prod:
 	flutter build appbundle --dart-define=ENV=prod --release
 
 emulator:
-	firebase emulators:start --import=./tools/emulator-data --export-on-exit=./tools/emulator-data
+	firebase --config firebase.dev.json emulators:start --import=./tools/emulator-data --export-on-exit=./tools/emulator-data
