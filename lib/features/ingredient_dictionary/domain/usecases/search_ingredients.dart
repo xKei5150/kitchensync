@@ -25,9 +25,7 @@ class SearchIngredients
   final IngredientRepository _repo;
 
   @override
-  Future<Result<List<Ingredient>>> call(
-    SearchIngredientsParams params,
-  ) async {
+  Future<Result<List<Ingredient>>> call(SearchIngredientsParams params) async {
     if (params.query.trim().isEmpty) {
       return const Result.success(<Ingredient>[]);
     }

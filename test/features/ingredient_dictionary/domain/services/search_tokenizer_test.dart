@@ -4,10 +4,16 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/services/searc
 void main() {
   group('SearchTokenizer', () {
     test('lowercases and splits on whitespace', () {
-      expect(SearchTokenizer.tokenize('Red Onion'), containsAll(<String>['red', 'onion']));
+      expect(
+        SearchTokenizer.tokenize('Red Onion'),
+        containsAll(<String>['red', 'onion']),
+      );
     });
     test('strips diacritics', () {
-      expect(SearchTokenizer.tokenize('Crème fraîche'), containsAll(<String>['creme', 'fraiche']));
+      expect(
+        SearchTokenizer.tokenize('Crème fraîche'),
+        containsAll(<String>['creme', 'fraiche']),
+      );
     });
     test('deduplicates tokens', () {
       final tokens = SearchTokenizer.tokenize('tomato Tomato TOMATO');
@@ -23,7 +29,10 @@ void main() {
         aliases: const ['Spanish onion'],
         parentTokens: const ['onion'],
       );
-      expect(tokens, containsAll(<String>['red', 'onion', 'pulang', 'sibuyas', 'spanish']));
+      expect(
+        tokens,
+        containsAll(<String>['red', 'onion', 'pulang', 'sibuyas', 'spanish']),
+      );
     });
   });
 }

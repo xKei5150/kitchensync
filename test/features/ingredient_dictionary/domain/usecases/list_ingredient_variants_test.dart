@@ -39,8 +39,7 @@ void main() {
   test('repo throws -> UnknownFailure via ExceptionMapper', () async {
     final repo = _MockRepo();
     final useCase = ListIngredientVariants(repo);
-    when(() => repo.listVariantsOf(any()))
-        .thenThrow(StateError('db error'));
+    when(() => repo.listVariantsOf(any())).thenThrow(StateError('db error'));
     final r = await useCase('onion');
     expect(r, isA<ResultFailure<List<Ingredient>>>());
     expect(

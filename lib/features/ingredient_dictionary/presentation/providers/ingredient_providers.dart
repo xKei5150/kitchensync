@@ -63,6 +63,6 @@ CreateCustomIngredient createCustomIngredient(Ref ref) =>
 
 @riverpod
 SeedGlobalDictionary seedGlobalDictionary(Ref ref) => SeedGlobalDictionary(
-      ref.watch(ingredientRepositoryProvider),
-      loader: () => ref.read(ingredientSeedDataSourceProvider).load(),
-    );
+  ref.watch(ingredientRepositoryProvider),
+  loader: () => ref.read(ingredientSeedDataSourceProvider).load(),
+);

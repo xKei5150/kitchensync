@@ -36,9 +36,7 @@ class _DevToolsScreenState extends ConsumerState<DevToolsScreen> {
   Widget build(BuildContext context) {
     if (!kDebugMode) {
       return const Scaffold(
-        body: Center(
-          child: Text('Dev tools are unavailable in this build.'),
-        ),
+        body: Center(child: Text('Dev tools are unavailable in this build.')),
       );
     }
     return Scaffold(

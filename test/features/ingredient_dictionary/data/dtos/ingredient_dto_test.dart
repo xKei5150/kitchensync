@@ -7,14 +7,20 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingre
 void main() {
   test('domain -> Firestore map -> domain round trip', () {
     final ing = Ingredient(
-      id: 'x', name: 'red onion',
+      id: 'x',
+      name: 'red onion',
       displayNames: const {'en': 'Red onion', 'tl': 'Pulang sibuyas'},
-      parentIngredientId: 'onion', category: IngredientCategory.produce,
-      defaultUnit: Unit.piece, allowedUnits: const [Unit.piece, Unit.g],
-      defaultShelfLifeDays: 30, allergens: const [Allergen.gluten],
-      dietaryTags: const [DietaryTag.vegan], searchTokens: const ['red', 'onion'],
+      parentIngredientId: 'onion',
+      category: IngredientCategory.produce,
+      defaultUnit: Unit.piece,
+      allowedUnits: const [Unit.piece, Unit.g],
+      defaultShelfLifeDays: 30,
+      allergens: const [Allergen.gluten],
+      dietaryTags: const [DietaryTag.vegan],
+      searchTokens: const ['red', 'onion'],
       scope: IngredientScope.global,
-      createdAt: DateTime.utc(2026, 1, 1, 12), updatedAt: DateTime.utc(2026, 1, 1, 12),
+      createdAt: DateTime.utc(2026, 1, 1, 12),
+      updatedAt: DateTime.utc(2026, 1, 1, 12),
     );
     final map = IngredientMapper.toMap(ing);
     expect(map['category'], 'produce');

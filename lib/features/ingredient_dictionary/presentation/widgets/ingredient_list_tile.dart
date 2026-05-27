@@ -39,8 +39,7 @@ class IngredientListTile extends StatelessWidget {
                 )
               : Container(
                   decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surfaceContainerHigh,
+                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.local_grocery_store, size: 20),

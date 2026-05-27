@@ -101,7 +101,8 @@ class CreateCustomIngredient
           return const Result.failure(
             Failure.validation(
               field: 'parentIngredientId',
-              message: 'Parent must be a top-level ingredient'
+              message:
+                  'Parent must be a top-level ingredient'
                   ' (two-level hierarchy).',
             ),
           );

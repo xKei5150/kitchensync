@@ -12,22 +12,22 @@ import 'package:mocktail/mocktail.dart';
 class _MockRepo extends Mock implements IngredientRepository {}
 
 Ingredient _parent() => Ingredient(
-      id: 'onion-parent',
-      name: 'onion',
-      displayNames: const {'en': 'Onion'},
-      category: IngredientCategory.produce,
-      defaultUnit: Unit.piece,
-      allowedUnits: const [Unit.piece],
-      scope: IngredientScope.global,
-      createdAt: DateTime.utc(2026),
-      updatedAt: DateTime.utc(2026),
-    );
+  id: 'onion-parent',
+  name: 'onion',
+  displayNames: const {'en': 'Onion'},
+  category: IngredientCategory.produce,
+  defaultUnit: Unit.piece,
+  allowedUnits: const [Unit.piece],
+  scope: IngredientScope.global,
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026),
+);
 
 Ingredient _variantParent() => _parent().copyWith(
-      id: 'red-onion',
-      name: 'red onion',
-      parentIngredientId: 'onion-parent',
-    );
+  id: 'red-onion',
+  name: 'red onion',
+  parentIngredientId: 'onion-parent',
+);
 
 void main() {
   late _MockRepo repo;
@@ -144,8 +144,9 @@ void main() {
   test(
     'parent is itself a variant -> validation failure (two-level rule)',
     () async {
-      when(() => repo.getById('red-onion'))
-          .thenAnswer((_) async => _variantParent());
+      when(
+        () => repo.getById('red-onion'),
+      ).thenAnswer((_) async => _variantParent());
       final r = await useCase(
         CreateCustomIngredientParams(
           householdId: 'h1',
@@ -167,8 +168,9 @@ void main() {
     final parentWithTokens = _parent().copyWith(
       searchTokens: const ['onion', 'allium'],
     );
-    when(() => repo.getById('onion-parent'))
-        .thenAnswer((_) async => parentWithTokens);
+    when(
+      () => repo.getById('onion-parent'),
+    ).thenAnswer((_) async => parentWithTokens);
     final r = await useCase(
       const CreateCustomIngredientParams(
         householdId: 'h1',
@@ -185,8 +187,7 @@ void main() {
   });
 
   test('searchTokens include parent name tokens', () async {
-    when(() => repo.getById('onion-parent'))
-        .thenAnswer((_) async => _parent());
+    when(() => repo.getById('onion-parent')).thenAnswer((_) async => _parent());
     final r = await useCase(
       CreateCustomIngredientParams(
         householdId: 'h1',
@@ -210,70 +211,56 @@ void main() {
   // 'defaultUnit'. The allowedUnits isEmpty branch (line 77) is only
   // reachable if allowedUnits is empty AND contains the default unit —
   // a logical impossibility — making it dead code.
-  test(
-    'empty allowedUnits -> ValidationFailure on defaultUnit '
-    '(isEmpty guard is unreachable)',
-    () async {
-      final r = await useCase(
-        const CreateCustomIngredientParams(
-          householdId: 'h1',
-          displayNames: {'en': 'Garlic'},
-          category: IngredientCategory.produce,
-          defaultUnit: Unit.piece,
-          allowedUnits: [],
-        ),
-      );
-      expect(r, isA<ResultFailure<Ingredient>>());
-      final f = (r as ResultFailure<Ingredient>).failure;
-      expect(f, isA<ValidationFailure>());
-      expect((f as ValidationFailure).field, 'defaultUnit');
-    },
-  );
+  test('empty allowedUnits -> ValidationFailure on defaultUnit '
+      '(isEmpty guard is unreachable)', () async {
+    final r = await useCase(
+      const CreateCustomIngredientParams(
+        householdId: 'h1',
+        displayNames: {'en': 'Garlic'},
+        category: IngredientCategory.produce,
+        defaultUnit: Unit.piece,
+        allowedUnits: [],
+      ),
+    );
+    expect(r, isA<ResultFailure<Ingredient>>());
+    final f = (r as ResultFailure<Ingredient>).failure;
+    expect(f, isA<ValidationFailure>());
+    expect((f as ValidationFailure).field, 'defaultUnit');
+  });
 
-  test(
-    'parent id given but getById returns null -> NotFoundFailure',
-    () async {
-      when(() => repo.getById('ghost'))
-          .thenAnswer((_) async => null);
-      final r = await useCase(
-        const CreateCustomIngredientParams(
-          householdId: 'h1',
-          displayNames: {'en': 'Ghost pepper'},
-          category: IngredientCategory.produce,
-          defaultUnit: Unit.piece,
-          allowedUnits: [Unit.piece],
-          parentIngredientId: 'ghost',
-        ),
-      );
-      expect(r, isA<ResultFailure<Ingredient>>());
-      final f = (r as ResultFailure<Ingredient>).failure;
-      expect(f, isA<NotFoundFailure>());
-      expect((f as NotFoundFailure).entity, 'parentIngredient');
-    },
-  );
+  test('parent id given but getById returns null -> NotFoundFailure', () async {
+    when(() => repo.getById('ghost')).thenAnswer((_) async => null);
+    final r = await useCase(
+      const CreateCustomIngredientParams(
+        householdId: 'h1',
+        displayNames: {'en': 'Ghost pepper'},
+        category: IngredientCategory.produce,
+        defaultUnit: Unit.piece,
+        allowedUnits: [Unit.piece],
+        parentIngredientId: 'ghost',
+      ),
+    );
+    expect(r, isA<ResultFailure<Ingredient>>());
+    final f = (r as ResultFailure<Ingredient>).failure;
+    expect(f, isA<NotFoundFailure>());
+    expect((f as NotFoundFailure).entity, 'parentIngredient');
+  });
 
-  test(
-    'repo.getById throws during parent lookup -> UnknownFailure',
-    () async {
-      when(() => repo.getById('bad-parent'))
-          .thenThrow(StateError('db error'));
-      final r = await useCase(
-        const CreateCustomIngredientParams(
-          householdId: 'h1',
-          displayNames: {'en': 'Variant'},
-          category: IngredientCategory.produce,
-          defaultUnit: Unit.piece,
-          allowedUnits: [Unit.piece],
-          parentIngredientId: 'bad-parent',
-        ),
-      );
-      expect(r, isA<ResultFailure<Ingredient>>());
-      expect(
-        (r as ResultFailure<Ingredient>).failure,
-        isA<UnknownFailure>(),
-      );
-    },
-  );
+  test('repo.getById throws during parent lookup -> UnknownFailure', () async {
+    when(() => repo.getById('bad-parent')).thenThrow(StateError('db error'));
+    final r = await useCase(
+      const CreateCustomIngredientParams(
+        householdId: 'h1',
+        displayNames: {'en': 'Variant'},
+        category: IngredientCategory.produce,
+        defaultUnit: Unit.piece,
+        allowedUnits: [Unit.piece],
+        parentIngredientId: 'bad-parent',
+      ),
+    );
+    expect(r, isA<ResultFailure<Ingredient>>());
+    expect((r as ResultFailure<Ingredient>).failure, isA<UnknownFailure>());
+  });
 
   test(
     'repo.search throws during uniqueness check -> UnknownFailure',
@@ -296,32 +283,22 @@ void main() {
         ),
       );
       expect(r, isA<ResultFailure<Ingredient>>());
-      expect(
-        (r as ResultFailure<Ingredient>).failure,
-        isA<UnknownFailure>(),
-      );
+      expect((r as ResultFailure<Ingredient>).failure, isA<UnknownFailure>());
     },
   );
 
-  test(
-    'repo.createCustom throws -> UnknownFailure',
-    () async {
-      when(() => repo.createCustom(any()))
-          .thenThrow(StateError('write error'));
-      final r = await useCase(
-        const CreateCustomIngredientParams(
-          householdId: 'h1',
-          displayNames: {'en': 'Cilantro'},
-          category: IngredientCategory.produce,
-          defaultUnit: Unit.piece,
-          allowedUnits: [Unit.piece],
-        ),
-      );
-      expect(r, isA<ResultFailure<Ingredient>>());
-      expect(
-        (r as ResultFailure<Ingredient>).failure,
-        isA<UnknownFailure>(),
-      );
-    },
-  );
+  test('repo.createCustom throws -> UnknownFailure', () async {
+    when(() => repo.createCustom(any())).thenThrow(StateError('write error'));
+    final r = await useCase(
+      const CreateCustomIngredientParams(
+        householdId: 'h1',
+        displayNames: {'en': 'Cilantro'},
+        category: IngredientCategory.produce,
+        defaultUnit: Unit.piece,
+        allowedUnits: [Unit.piece],
+      ),
+    );
+    expect(r, isA<ResultFailure<Ingredient>>());
+    expect((r as ResultFailure<Ingredient>).failure, isA<UnknownFailure>());
+  });
 }

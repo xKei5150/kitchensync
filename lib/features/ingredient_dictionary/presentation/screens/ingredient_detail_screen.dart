@@ -95,6 +95,5 @@ class IngredientDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _chip(BuildContext context, String label) =>
-      Chip(label: Text(label));
+  Widget _chip(BuildContext context, String label) => Chip(label: Text(label));
 }

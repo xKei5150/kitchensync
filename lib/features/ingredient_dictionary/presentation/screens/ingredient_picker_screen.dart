@@ -52,8 +52,7 @@ class _IngredientPickerScreenState
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _results =
-          r is Success<List<Ingredient>> ? r.value : const [];
+      _results = r is Success<List<Ingredient>> ? r.value : const [];
     });
   }
 

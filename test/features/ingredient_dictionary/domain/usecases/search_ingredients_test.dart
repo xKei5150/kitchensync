@@ -9,17 +9,17 @@ import 'package:mocktail/mocktail.dart';
 class _MockRepo extends Mock implements IngredientRepository {}
 
 Ingredient _ing(String id, String name, {String? parentId}) => Ingredient(
-      id: id,
-      name: name,
-      displayNames: {'en': name},
-      category: IngredientCategory.produce,
-      defaultUnit: Unit.piece,
-      allowedUnits: const [Unit.piece],
-      parentIngredientId: parentId,
-      scope: IngredientScope.global,
-      createdAt: DateTime.utc(2026),
-      updatedAt: DateTime.utc(2026),
-    );
+  id: id,
+  name: name,
+  displayNames: {'en': name},
+  category: IngredientCategory.produce,
+  defaultUnit: Unit.piece,
+  allowedUnits: const [Unit.piece],
+  parentIngredientId: parentId,
+  scope: IngredientScope.global,
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026),
+);
 
 void main() {
   late _MockRepo repo;
@@ -39,15 +39,13 @@ void main() {
         startAfterId: any(named: 'startAfterId'),
       ),
     ).thenAnswer((_) async => [_ing('1', 'onion')]);
-    final result =
-        await useCase(const SearchIngredientsParams(query: 'onion'));
+    final result = await useCase(const SearchIngredientsParams(query: 'onion'));
     expect(result, isA<Success<List<Ingredient>>>());
     expect((result as Success<List<Ingredient>>).value, hasLength(1));
   });
 
   test('empty query returns empty list without hitting repo', () async {
-    final result =
-        await useCase(const SearchIngredientsParams(query: '  '));
+    final result = await useCase(const SearchIngredientsParams(query: '  '));
     expect(result, isA<Success<List<Ingredient>>>());
     expect((result as Success<List<Ingredient>>).value, isEmpty);
     verifyNever(
@@ -69,8 +67,7 @@ void main() {
         startAfterId: any(named: 'startAfterId'),
       ),
     ).thenThrow(StateError('boom'));
-    final result =
-        await useCase(const SearchIngredientsParams(query: 'onion'));
+    final result = await useCase(const SearchIngredientsParams(query: 'onion'));
     expect(result, isA<ResultFailure<List<Ingredient>>>());
   });
 }

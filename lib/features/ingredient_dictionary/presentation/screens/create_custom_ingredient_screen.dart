@@ -21,8 +21,9 @@ class CreateCustomIngredientScreen extends ConsumerStatefulWidget {
 class _CreateCustomIngredientScreenState
     extends ConsumerState<CreateCustomIngredientScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _name =
-      TextEditingController(text: widget.initialName ?? '');
+  late final TextEditingController _name = TextEditingController(
+    text: widget.initialName ?? '',
+  );
   final _aliases = TextEditingController();
   IngredientCategory _category = IngredientCategory.produce;
   Unit _defaultUnit = Unit.piece;
@@ -97,9 +98,7 @@ class _CreateCustomIngredientScreenState
               initialValue: _category,
               decoration: const InputDecoration(labelText: 'Category'),
               items: IngredientCategory.values
-                  .map(
-                    (c) => DropdownMenuItem(value: c, child: Text(c.name)),
-                  )
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c.name)))
                   .toList(),
               onChanged: (c) => setState(() => _category = c!),
             ),
@@ -108,9 +107,7 @@ class _CreateCustomIngredientScreenState
               initialValue: _defaultUnit,
               decoration: const InputDecoration(labelText: 'Default unit'),
               items: Unit.values
-                  .map(
-                    (u) => DropdownMenuItem(value: u, child: Text(u.name)),
-                  )
+                  .map((u) => DropdownMenuItem(value: u, child: Text(u.name)))
                   .toList(),
               onChanged: (u) => setState(() {
                 _defaultUnit = u!;

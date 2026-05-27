@@ -34,8 +34,7 @@ void main() {
       ),
     ];
     when(() => repo.upsertSeed(any())).thenAnswer((_) async => 1);
-    final useCase =
-        SeedGlobalDictionary(repo, loader: () async => seed);
+    final useCase = SeedGlobalDictionary(repo, loader: () async => seed);
     final r = await useCase(const NoParams());
     expect(r, isA<Success<int>>());
     expect((r as Success<int>).value, 1);
@@ -59,35 +58,32 @@ void main() {
     );
     final r = await useCase(const NoParams());
     expect(r, isA<ResultFailure<int>>());
-    expect(
-      (r as ResultFailure<int>).failure,
-      isA<UnknownFailure>(),
-    );
+    expect((r as ResultFailure<int>).failure, isA<UnknownFailure>());
   });
 
-  test('repo.upsertSeed throws -> UnknownFailure via ExceptionMapper',
-      () async {
-    final seed = [
-      Ingredient(
-        id: 's2',
-        name: 'pepper',
-        displayNames: const {'en': 'Pepper'},
-        category: IngredientCategory.spice,
-        defaultUnit: Unit.g,
-        allowedUnits: const [Unit.g],
-        scope: IngredientScope.global,
-        createdAt: DateTime.utc(2026),
-        updatedAt: DateTime.utc(2026),
-      ),
-    ];
-    when(() => repo.upsertSeed(any()))
-        .thenThrow(StateError('firestore error'));
-    final useCase = SeedGlobalDictionary(repo, loader: () async => seed);
-    final r = await useCase(const NoParams());
-    expect(r, isA<ResultFailure<int>>());
-    expect(
-      (r as ResultFailure<int>).failure,
-      isA<UnknownFailure>(),
-    );
-  });
+  test(
+    'repo.upsertSeed throws -> UnknownFailure via ExceptionMapper',
+    () async {
+      final seed = [
+        Ingredient(
+          id: 's2',
+          name: 'pepper',
+          displayNames: const {'en': 'Pepper'},
+          category: IngredientCategory.spice,
+          defaultUnit: Unit.g,
+          allowedUnits: const [Unit.g],
+          scope: IngredientScope.global,
+          createdAt: DateTime.utc(2026),
+          updatedAt: DateTime.utc(2026),
+        ),
+      ];
+      when(
+        () => repo.upsertSeed(any()),
+      ).thenThrow(StateError('firestore error'));
+      final useCase = SeedGlobalDictionary(repo, loader: () async => seed);
+      final r = await useCase(const NoParams());
+      expect(r, isA<ResultFailure<int>>());
+      expect((r as ResultFailure<int>).failure, isA<UnknownFailure>());
+    },
+  );
 }
