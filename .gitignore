@@ -64,3 +64,6 @@ coverage/
 # Generated code
 **/*.freezed.dart
 **/*.g.dart
+
+# Seed builder: transient USDA dataset (downloaded, not committed)
+tools/seed_builder/food.csv

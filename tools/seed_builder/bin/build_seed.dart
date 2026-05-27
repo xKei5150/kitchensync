@@ -3,30 +3,47 @@
 //   dart run tools/seed_builder/bin/build_seed.dart \
 //       --input ../../assets/seed/ingredients.json \
 //       --output ../../assets/seed/ingredients.json \
-//       --usda-foundation-csv ./usda_foundation_foods.csv
+//       --usda-foundation-csv ./food.csv
 //
 // Download the USDA Foundation Foods CSV from
 // https://fdc.nal.usda.gov/download-datasets.html (the "FoodData Central
 // Foundation Foods" ZIP). Extract `food.csv` into this directory.
+//
+// `food.csv` columns:
+//   fdc_id, data_type, description, food_category_id, publication_date
+//
+// Only `data_type == foundation_food` rows are curated, single-ingredient
+// foods; everything else (sub_sample_food, market_acquisition, ...) is lab or
+// acquisition metadata and is skipped. `food_category_id` is the standard USDA
+// food-group number, mapped coarsely to `IngredientCategory` below — refine by
+// hand after the first run (entries are tagged `_source: usda-foundation`).
 
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:csv/csv.dart';
 
-const _category = {
-  // Coarse mapping — refine manually after first run.
-  'Vegetables and Vegetable Products': 'produce',
-  'Fruits and Fruit Juices': 'produce',
-  'Beef Products': 'meat',
-  'Pork Products': 'meat',
-  'Poultry Products': 'meat',
-  'Finfish and Shellfish Products': 'seafood',
-  'Dairy and Egg Products': 'dairy',
-  'Cereal Grains and Pasta': 'grain',
-  'Baked Products': 'bakery',
-  'Spices and Herbs': 'spice',
-  'Beverages': 'beverage',
+// USDA food-group id -> IngredientCategory. Coarse; refine manually.
+const _categoryById = <int, String>{
+  1: 'dairy', // Dairy and Egg Products
+  2: 'spice', // Spices and Herbs
+  4: 'condiment', // Fats and Oils
+  5: 'meat', // Poultry Products
+  6: 'condiment', // Soups, Sauces, and Gravies
+  7: 'meat', // Sausages and Luncheon Meats
+  8: 'grain', // Breakfast Cereals
+  9: 'produce', // Fruits and Fruit Juices
+  10: 'meat', // Pork Products
+  11: 'produce', // Vegetables and Vegetable Products
+  12: 'other', // Nut and Seed Products
+  13: 'meat', // Beef Products
+  14: 'beverage', // Beverages
+  15: 'seafood', // Finfish and Shellfish Products
+  16: 'produce', // Legumes and Legume Products
+  17: 'meat', // Lamb, Veal, and Game Products
+  18: 'bakery', // Baked Products
+  19: 'baking', // Sweets
+  20: 'grain', // Cereal Grains and Pasta
 };
 
 void main(List<String> args) {
@@ -40,32 +57,39 @@ void main(List<String> args) {
       .cast<Map<String, dynamic>>();
   final seenIds = ingredients.map((e) => e['id'] as String).toSet();
 
+  var added = 0;
   if (usdaCsv != null) {
-    final rows = const CsvToListConverter().convert(
-      File(usdaCsv).readAsStringSync(),
+    final rows = const CsvToListConverter(
       eol: '\n',
-    );
+      shouldParseNumbers: false,
+    ).convert(File(usdaCsv).readAsStringSync());
     final header = rows.first.cast<String>();
+    final typeIdx = header.indexOf('data_type');
     final descIdx = header.indexOf('description');
-    final catIdx = header.indexOf('food_category_label');
+    final catIdx = header.indexOf('food_category_id');
+    if (typeIdx == -1 || descIdx == -1 || catIdx == -1) {
+      stderr.writeln('Unexpected CSV header: $header');
+      exit(1);
+    }
 
     for (final row in rows.skip(1)) {
+      if ((row[typeIdx] as String).trim() != 'foundation_food') continue;
       final description = (row[descIdx] as String).trim();
-      final catLabel = (row[catIdx] as String).trim();
-      final cat = _category[catLabel];
-      if (cat == null) continue;
+      final categoryId = int.tryParse((row[catIdx] as String).trim());
+      final category = _categoryById[categoryId] ?? 'other';
       final id = _slug(description);
-      if (seenIds.contains(id)) continue;
+      if (id.isEmpty || seenIds.contains(id)) continue;
       seenIds.add(id);
       ingredients.add({
         'id': id,
         'displayNames': {'en': description},
-        'category': cat,
+        'category': category,
         'defaultUnit': 'g',
         'allowedUnits': ['g', 'kg'],
         'defaultShelfLifeDays': null,
         '_source': 'usda-foundation',
       });
+      added++;
     }
   }
 
@@ -73,7 +97,10 @@ void main(List<String> args) {
     '  ',
   ).convert({'version': existing['version'] ?? 1, 'ingredients': ingredients});
   File(output).writeAsStringSync('$out\n');
-  stdout.writeln('Wrote ${ingredients.length} ingredients to $output.');
+  stdout.writeln(
+    'Added $added USDA entries; wrote ${ingredients.length} ingredients '
+    'to $output.',
+  );
 }
 
 String? _arg(List<String> args, String name) {
