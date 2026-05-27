@@ -47,6 +47,15 @@ class UpdatePantryItem extends UseCase<PantryItem, PantryItem> {
         );
       }
 
+      if (!ing.isNonFood && item.section == PantrySection.nonFood) {
+        return const Result.failure(
+          Failure.validation(
+            field: 'section',
+            message: 'Food ingredient cannot use the nonFood section.',
+          ),
+        );
+      }
+
       await _pantry.update(item);
       return Result.success(item);
     } catch (e) {

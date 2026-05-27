@@ -85,4 +85,17 @@ void main() {
     expect(f, isA<ValidationFailure>());
     expect((f as ValidationFailure).field, 'quantity');
   });
+
+  test(
+    'food ingredient in nonFood section returns ValidationFailure',
+    () async {
+      final item = _item(section: PantrySection.nonFood);
+      final result = await makeUc().call(item);
+      expect(result, isA<ResultFailure<PantryItem>>());
+      final f = (result as ResultFailure<PantryItem>).failure;
+      expect(f, isA<ValidationFailure>());
+      expect((f as ValidationFailure).field, 'section');
+      verifyNever(() => pantry.update(any()));
+    },
+  );
 }

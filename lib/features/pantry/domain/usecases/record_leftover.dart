@@ -39,7 +39,7 @@ class RecordLeftover extends UseCase<PantryItem, RecordLeftoverParams> {
     if (params.servings <= 0 || params.quantity <= 0) {
       return const Result.failure(
         Failure.validation(
-          field: 'servings',
+          field: 'servings/quantity',
           message: 'Servings and quantity must be greater than zero.',
         ),
       );
