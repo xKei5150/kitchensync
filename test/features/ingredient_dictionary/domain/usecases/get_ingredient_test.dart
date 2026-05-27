@@ -43,4 +43,15 @@ void main() {
     expect(f, isA<NotFoundFailure>());
     expect((f as NotFoundFailure).id, 'missing');
   });
+
+  test('repo throws -> UnknownFailure via ExceptionMapper', () async {
+    when(() => repo.getById('err'))
+        .thenThrow(StateError('boom'));
+    final r = await useCase('err');
+    expect(r, isA<ResultFailure<Ingredient>>());
+    expect(
+      (r as ResultFailure<Ingredient>).failure,
+      isA<UnknownFailure>(),
+    );
+  });
 }

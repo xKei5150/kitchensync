@@ -163,6 +163,27 @@ void main() {
     },
   );
 
+  test('uses parent.searchTokens when non-empty', () async {
+    final parentWithTokens = _parent().copyWith(
+      searchTokens: const ['onion', 'allium'],
+    );
+    when(() => repo.getById('onion-parent'))
+        .thenAnswer((_) async => parentWithTokens);
+    final r = await useCase(
+      const CreateCustomIngredientParams(
+        householdId: 'h1',
+        displayNames: {'en': 'Crispy onion'},
+        category: IngredientCategory.produce,
+        defaultUnit: Unit.piece,
+        allowedUnits: [Unit.piece],
+        parentIngredientId: 'onion-parent',
+      ),
+    );
+    expect(r, isA<Success<Ingredient>>());
+    final ing = (r as Success<Ingredient>).value;
+    expect(ing.searchTokens, containsAll(<String>['onion', 'allium']));
+  });
+
   test('searchTokens include parent name tokens', () async {
     when(() => repo.getById('onion-parent'))
         .thenAnswer((_) async => _parent());
@@ -178,6 +199,129 @@ void main() {
     );
     expect(r, isA<Success<Ingredient>>());
     final ing = (r as Success<Ingredient>).value;
-    expect(ing.searchTokens, containsAll(<String>['heirloom', 'variety', 'onion']));
+    expect(
+      ing.searchTokens,
+      containsAll(<String>['heirloom', 'variety', 'onion']),
+    );
   });
+
+  // When allowedUnits is empty the `contains(defaultUnit)` guard fires
+  // first (line 69 in create_custom_ingredient.dart), so the field is
+  // 'defaultUnit'. The allowedUnits isEmpty branch (line 77) is only
+  // reachable if allowedUnits is empty AND contains the default unit —
+  // a logical impossibility — making it dead code.
+  test(
+    'empty allowedUnits -> ValidationFailure on defaultUnit '
+    '(isEmpty guard is unreachable)',
+    () async {
+      final r = await useCase(
+        const CreateCustomIngredientParams(
+          householdId: 'h1',
+          displayNames: {'en': 'Garlic'},
+          category: IngredientCategory.produce,
+          defaultUnit: Unit.piece,
+          allowedUnits: [],
+        ),
+      );
+      expect(r, isA<ResultFailure<Ingredient>>());
+      final f = (r as ResultFailure<Ingredient>).failure;
+      expect(f, isA<ValidationFailure>());
+      expect((f as ValidationFailure).field, 'defaultUnit');
+    },
+  );
+
+  test(
+    'parent id given but getById returns null -> NotFoundFailure',
+    () async {
+      when(() => repo.getById('ghost'))
+          .thenAnswer((_) async => null);
+      final r = await useCase(
+        const CreateCustomIngredientParams(
+          householdId: 'h1',
+          displayNames: {'en': 'Ghost pepper'},
+          category: IngredientCategory.produce,
+          defaultUnit: Unit.piece,
+          allowedUnits: [Unit.piece],
+          parentIngredientId: 'ghost',
+        ),
+      );
+      expect(r, isA<ResultFailure<Ingredient>>());
+      final f = (r as ResultFailure<Ingredient>).failure;
+      expect(f, isA<NotFoundFailure>());
+      expect((f as NotFoundFailure).entity, 'parentIngredient');
+    },
+  );
+
+  test(
+    'repo.getById throws during parent lookup -> UnknownFailure',
+    () async {
+      when(() => repo.getById('bad-parent'))
+          .thenThrow(StateError('db error'));
+      final r = await useCase(
+        const CreateCustomIngredientParams(
+          householdId: 'h1',
+          displayNames: {'en': 'Variant'},
+          category: IngredientCategory.produce,
+          defaultUnit: Unit.piece,
+          allowedUnits: [Unit.piece],
+          parentIngredientId: 'bad-parent',
+        ),
+      );
+      expect(r, isA<ResultFailure<Ingredient>>());
+      expect(
+        (r as ResultFailure<Ingredient>).failure,
+        isA<UnknownFailure>(),
+      );
+    },
+  );
+
+  test(
+    'repo.search throws during uniqueness check -> UnknownFailure',
+    () async {
+      when(
+        () => repo.search(
+          query: any(named: 'query'),
+          householdId: any(named: 'householdId'),
+          limit: any(named: 'limit'),
+          startAfterId: any(named: 'startAfterId'),
+        ),
+      ).thenThrow(StateError('search error'));
+      final r = await useCase(
+        const CreateCustomIngredientParams(
+          householdId: 'h1',
+          displayNames: {'en': 'Basil'},
+          category: IngredientCategory.produce,
+          defaultUnit: Unit.piece,
+          allowedUnits: [Unit.piece],
+        ),
+      );
+      expect(r, isA<ResultFailure<Ingredient>>());
+      expect(
+        (r as ResultFailure<Ingredient>).failure,
+        isA<UnknownFailure>(),
+      );
+    },
+  );
+
+  test(
+    'repo.createCustom throws -> UnknownFailure',
+    () async {
+      when(() => repo.createCustom(any()))
+          .thenThrow(StateError('write error'));
+      final r = await useCase(
+        const CreateCustomIngredientParams(
+          householdId: 'h1',
+          displayNames: {'en': 'Cilantro'},
+          category: IngredientCategory.produce,
+          defaultUnit: Unit.piece,
+          allowedUnits: [Unit.piece],
+        ),
+      );
+      expect(r, isA<ResultFailure<Ingredient>>());
+      expect(
+        (r as ResultFailure<Ingredient>).failure,
+        isA<UnknownFailure>(),
+      );
+    },
+  );
 }

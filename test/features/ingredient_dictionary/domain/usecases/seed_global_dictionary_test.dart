@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kitchensync/core/errors/failure.dart';
 import 'package:kitchensync/core/usecases/usecase.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
@@ -49,5 +50,44 @@ void main() {
     final r = await useCase(const NoParams());
     expect((r as Success<int>).value, 0);
     verifyNever(() => repo.upsertSeed(any()));
+  });
+
+  test('loader throws -> UnknownFailure via ExceptionMapper', () async {
+    final useCase = SeedGlobalDictionary(
+      repo,
+      loader: () async => throw StateError('load failed'),
+    );
+    final r = await useCase(const NoParams());
+    expect(r, isA<ResultFailure<int>>());
+    expect(
+      (r as ResultFailure<int>).failure,
+      isA<UnknownFailure>(),
+    );
+  });
+
+  test('repo.upsertSeed throws -> UnknownFailure via ExceptionMapper',
+      () async {
+    final seed = [
+      Ingredient(
+        id: 's2',
+        name: 'pepper',
+        displayNames: const {'en': 'Pepper'},
+        category: IngredientCategory.spice,
+        defaultUnit: Unit.g,
+        allowedUnits: const [Unit.g],
+        scope: IngredientScope.global,
+        createdAt: DateTime.utc(2026),
+        updatedAt: DateTime.utc(2026),
+      ),
+    ];
+    when(() => repo.upsertSeed(any()))
+        .thenThrow(StateError('firestore error'));
+    final useCase = SeedGlobalDictionary(repo, loader: () async => seed);
+    final r = await useCase(const NoParams());
+    expect(r, isA<ResultFailure<int>>());
+    expect(
+      (r as ResultFailure<int>).failure,
+      isA<UnknownFailure>(),
+    );
   });
 }
