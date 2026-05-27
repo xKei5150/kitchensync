@@ -1,6 +1,8 @@
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/core/utils/result.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/data/datasources/pantry_image_storage.dart';
 import 'package:kitchensync/features/pantry/data/datasources/pantry_remote_data_source.dart';
@@ -142,3 +144,14 @@ Stream<List<WasteEvent>> wasteHistoryStream(Ref ref) {
   final hid = ref.watch(activeHouseholdIdProvider);
   return ref.watch(watchWasteHistoryProvider).watch(hid);
 }
+
+@riverpod
+Stream<PantryItem?> pantryItemStream(
+  Ref ref,
+  String householdId,
+  String itemId,
+) => ref.watch(pantryRepositoryProvider).watchById(householdId, itemId);
+
+@riverpod
+Future<Result<Ingredient>> pantryIngredient(Ref ref, String ingredientId) =>
+    ref.watch(getIngredientProvider)(ingredientId);

@@ -59,6 +59,7 @@ class PantryHomeScreen extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final item = items[index];
                   return PantryItemTile(
+                    key: ValueKey(item.id),
                     item: item,
                     onTap: () => context.push('/pantry/${item.id}'),
                   );

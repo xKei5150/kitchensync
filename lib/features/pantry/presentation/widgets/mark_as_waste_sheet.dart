@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
@@ -61,7 +62,7 @@ class _MarkAsWasteSheetState extends ConsumerState<MarkAsWasteSheet> {
 
     switch (result) {
       case Success():
-        Navigator.of(context).pop();
+        context.pop();
       case ResultFailure(:final failure):
         setState(() {
           _submitting = false;

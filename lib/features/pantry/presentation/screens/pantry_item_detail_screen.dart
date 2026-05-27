@@ -22,18 +22,16 @@ class PantryItemDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hid = ref.watch(activeHouseholdIdProvider);
+    final itemAsync = ref.watch(pantryItemStreamProvider(hid, itemId));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Item detail')),
-      body: StreamBuilder<PantryItem?>(
-        stream: ref.watch(pantryRepositoryProvider).watchById(hid, itemId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final item = snapshot.data;
+      body: itemAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const Center(child: Text('Item not found.')),
+        data: (item) {
           if (item == null) {
-            return const Center(child: Text('Item not found'));
+            return const Center(child: Text('Item not found.'));
           }
           return _Body(item: item);
         },
@@ -118,28 +116,34 @@ class _BodyState extends ConsumerState<_Body> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Photo area — 16:9
-          GestureDetector(
-            onTap: _uploadingPhoto ? null : _pickAndUpload,
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: _uploadingPhoto
-                  ? const Center(child: CircularProgressIndicator())
-                  : item.imageUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: item.imageUrl!,
-                      fit: BoxFit.cover,
-                    )
-                  : ColoredBox(
-                      color: Colors.grey.shade200,
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_photo_alternate, size: 48),
-                          SizedBox(height: 8),
-                          Text('Tap to add a photo'),
-                        ],
+          Semantics(
+            button: true,
+            label: item.imageUrl != null ? 'Change photo' : 'Add photo',
+            child: GestureDetector(
+              onTap: _uploadingPhoto ? null : _pickAndUpload,
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: _uploadingPhoto
+                    ? const Center(child: CircularProgressIndicator())
+                    : item.imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: item.imageUrl!,
+                        fit: BoxFit.cover,
+                      )
+                    : ColoredBox(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHigh,
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate, size: 48),
+                            SizedBox(height: 8),
+                            Text('Tap to add a photo'),
+                          ],
+                        ),
                       ),
-                    ),
+              ),
             ),
           ),
 

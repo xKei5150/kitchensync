@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/utils/quantity_formatter.dart';
 import 'package:kitchensync/core/utils/result.dart';
-import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 
 class PantryItemTile extends ConsumerWidget {
   const PantryItemTile({required this.item, this.onTap, super.key});
@@ -14,30 +14,32 @@ class PantryItemTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return FutureBuilder(
-      future: ref.read(getIngredientProvider)(item.ingredientId),
-      builder: (context, snapshot) {
-        final name = switch (snapshot.data) {
-          Success(:final value) =>
-            value.displayNames['en'] ?? item.ingredientId,
-          _ => item.ingredientId,
-        };
+    final ingredientAsync = ref.watch(
+      pantryIngredientProvider(item.ingredientId),
+    );
 
-        final qty = QuantityFormatter.format(item.quantity);
-        final unit = item.unit.name;
-        final semanticLabel = '$name $qty $unit';
-
-        return Semantics(
-          label: semanticLabel,
-          button: onTap != null,
-          child: ListTile(
-            leading: _LeadingImage(imageUrl: item.imageUrl),
-            title: Text(name),
-            subtitle: _buildSubtitle(context, qty, unit),
-            onTap: onTap,
-          ),
-        );
+    final name = ingredientAsync.when(
+      data: (result) => switch (result) {
+        Success(:final value) => value.displayNames['en'] ?? item.ingredientId,
+        ResultFailure() => item.ingredientId,
       },
+      loading: () => item.ingredientId,
+      error: (_, __) => item.ingredientId,
+    );
+
+    final qty = QuantityFormatter.format(item.quantity);
+    final unit = item.unit.name;
+    final semanticLabel = '$name $qty $unit';
+
+    return Semantics(
+      label: semanticLabel,
+      button: onTap != null,
+      child: ListTile(
+        leading: _LeadingImage(imageUrl: item.imageUrl),
+        title: Text(name),
+        subtitle: _buildSubtitle(context, qty, unit),
+        onTap: onTap,
+      ),
     );
   }
 
@@ -70,20 +72,20 @@ class _LeadingImage extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          placeholder: (_, __) => _placeholder(size),
-          errorWidget: (_, __, ___) => _placeholder(size),
+          placeholder: (ctx, __) => _placeholder(ctx, size),
+          errorWidget: (ctx, __, ___) => _placeholder(ctx, size),
         ),
       );
     }
-    return _placeholder(size);
+    return _placeholder(context, size);
   }
 
-  Widget _placeholder(double size) {
+  Widget _placeholder(BuildContext context, double size) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: const BorderRadius.all(Radius.circular(8)),
       ),
       child: const Icon(Icons.kitchen),
