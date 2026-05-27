@@ -24,10 +24,19 @@ class IngredientSeedDataSource {
     return list.map((m) => _fromSeed(m, now)).toList(growable: false);
   }
 
+  static T _enumByName<T extends Enum>(List<T> values, Object? name) {
+    return values.firstWhere(
+      (v) => v.name == name,
+      orElse: () => throw FormatException(
+        'Unknown ${values.first.runtimeType} in seed JSON: "$name"',
+      ),
+    );
+  }
+
   Ingredient _fromSeed(Map<String, dynamic> m, DateTime now) {
     final allowedUnits = (m['allowedUnits'] as List)
         .cast<String>()
-        .map((s) => Unit.values.firstWhere((u) => u.name == s))
+        .map((s) => _enumByName(Unit.values, s))
         .toList();
     final aliases = ((m['aliases'] as List?) ?? const []).cast<String>();
     final parentTokens = ((m['parentTokens'] as List?) ?? const [])
@@ -43,10 +52,8 @@ class IngredientSeedDataSource {
       name: displayNames['en']!.toLowerCase(),
       displayNames: displayNames,
       parentIngredientId: m['parentIngredientId'] as String?,
-      category: IngredientCategory.values.firstWhere(
-        (c) => c.name == m['category'],
-      ),
-      defaultUnit: Unit.values.firstWhere((u) => u.name == m['defaultUnit']),
+      category: _enumByName(IngredientCategory.values, m['category']),
+      defaultUnit: _enumByName(Unit.values, m['defaultUnit']),
       allowedUnits: allowedUnits,
       defaultShelfLifeDays: m['defaultShelfLifeDays'] as int?,
       isBulkCandidate: (m['isBulkCandidate'] as bool?) ?? false,
@@ -57,11 +64,11 @@ class IngredientSeedDataSource {
       searchTokens: tokens,
       allergens: ((m['allergens'] as List?) ?? const [])
           .cast<String>()
-          .map((s) => Allergen.values.firstWhere((a) => a.name == s))
+          .map((s) => _enumByName(Allergen.values, s))
           .toList(),
       dietaryTags: ((m['dietaryTags'] as List?) ?? const [])
           .cast<String>()
-          .map((s) => DietaryTag.values.firstWhere((d) => d.name == s))
+          .map((s) => _enumByName(DietaryTag.values, s))
           .toList(),
       imageAttribution: m['imageAttribution'] == null
           ? null

@@ -6,6 +6,9 @@ class IngredientRepositoryImpl implements IngredientRepository {
   IngredientRepositoryImpl(this._remote);
   final IngredientRemoteDataSource _remote;
 
+  // NOTE(plan-2): resolves global /ingredients only. Household-custom
+  // ingredients are not fetchable by id here. Plan 3 (pantry) will plumb
+  // householdId through and fall back to the custom subcollection.
   @override
   Future<Ingredient?> getById(String id) => _remote.getGlobal(id);
 
@@ -14,6 +17,8 @@ class IngredientRepositoryImpl implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
+    // TODO(plan-3): implement cursor pagination. startAfterId is accepted to
+    // keep the interface stable but is not yet applied to the Firestore query.
     String? startAfterId,
   }) async {
     final futures = <Future<List<Ingredient>>>[

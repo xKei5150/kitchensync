@@ -69,6 +69,11 @@ class IngredientMapper {
   );
 
   static T _enumFromName<T extends Enum>(List<T> values, Object name) {
-    return values.firstWhere((v) => v.name == name);
+    return values.firstWhere(
+      (v) => v.name == name,
+      orElse: () => throw FormatException(
+        'Unknown ${values.first.runtimeType} value in Firestore doc: "$name"',
+      ),
+    );
   }
 }

@@ -30,4 +30,23 @@ void main() {
     final back = IngredientMapper.fromMap(ing.id, map);
     expect(back, ing);
   });
+
+  test('fromMap throws FormatException on unknown enum value', () {
+    final ing = Ingredient(
+      id: 'x',
+      name: 'onion',
+      displayNames: const {'en': 'Onion'},
+      category: IngredientCategory.produce,
+      defaultUnit: Unit.piece,
+      allowedUnits: const [Unit.piece],
+      scope: IngredientScope.global,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final map = IngredientMapper.toMap(ing)..['category'] = 'notACategory';
+    expect(
+      () => IngredientMapper.fromMap('x', map),
+      throwsA(isA<FormatException>()),
+    );
+  });
 }

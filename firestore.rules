@@ -16,7 +16,7 @@ service cloud.firestore {
       allow create, update: if isSignedIn()
         && request.resource.data.scope == 'householdCustom'
         && request.resource.data.householdId == hid;
-      allow delete: if isSignedIn();
+      allow delete: if isSignedIn() && resource.data.householdId == hid;
     }
 
     // Everything else still denied. Plan 3 fills in pantryItems, etc.
