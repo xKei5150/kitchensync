@@ -1,1 +1,465 @@
-{"version": 1, "ingredients": []}
+{
+  "version": 1,
+  "ingredients": [
+    {
+      "id": "onion",
+      "displayNames": {"en": "Onion"},
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": ["piece", "g", "kg"],
+      "defaultShelfLifeDays": 30,
+      "aliases": ["bulb onion"]
+    },
+    {
+      "id": "onion-red",
+      "displayNames": {"en": "Red onion"},
+      "parentIngredientId": "onion",
+      "parentTokens": ["onion"],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": ["piece", "g", "kg"],
+      "defaultShelfLifeDays": 30
+    },
+    {
+      "id": "onion-white",
+      "displayNames": {"en": "White onion"},
+      "parentIngredientId": "onion",
+      "parentTokens": ["onion"],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": ["piece", "g", "kg"],
+      "defaultShelfLifeDays": 30
+    },
+    {
+      "id": "onion-yellow",
+      "displayNames": {"en": "Yellow onion"},
+      "parentIngredientId": "onion",
+      "parentTokens": ["onion"],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": ["piece", "g", "kg"],
+      "defaultShelfLifeDays": 30
+    },
+    {
+      "id": "onion-shallot",
+      "displayNames": {"en": "Shallot"},
+      "parentIngredientId": "onion",
+      "parentTokens": ["onion"],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": ["piece", "g"],
+      "defaultShelfLifeDays": 30,
+      "aliases": ["sibuyas tagalog"]
+    },
+    {
+      "id": "onion-spring",
+      "displayNames": {"en": "Spring onion", "tl": "Sibuyas-na-mura"},
+      "parentIngredientId": "onion",
+      "parentTokens": ["onion"],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": ["piece", "g"],
+      "defaultShelfLifeDays": 10,
+      "aliases": ["green onion", "scallion"]
+    },
+
+    {
+      "id": "sugar",
+      "displayNames": {"en": "Sugar"},
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 730,
+      "isBulkCandidate": true
+    },
+    {
+      "id": "sugar-white",
+      "displayNames": {"en": "White sugar"},
+      "parentIngredientId": "sugar",
+      "parentTokens": ["sugar"],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "sugar-brown",
+      "displayNames": {"en": "Brown sugar"},
+      "parentIngredientId": "sugar",
+      "parentTokens": ["sugar"],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "sugar-powdered",
+      "displayNames": {"en": "Powdered sugar"},
+      "parentIngredientId": "sugar",
+      "parentTokens": ["sugar"],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "cup", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 730,
+      "aliases": ["icing sugar", "confectioner's sugar"]
+    },
+
+    {
+      "id": "salt",
+      "displayNames": {"en": "Salt"},
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1825,
+      "isBulkCandidate": true
+    },
+    {
+      "id": "salt-table",
+      "displayNames": {"en": "Table salt"},
+      "parentIngredientId": "salt",
+      "parentTokens": ["salt"],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1825
+    },
+    {
+      "id": "salt-sea",
+      "displayNames": {"en": "Sea salt"},
+      "parentIngredientId": "salt",
+      "parentTokens": ["salt"],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1825
+    },
+    {
+      "id": "salt-kosher",
+      "displayNames": {"en": "Kosher salt"},
+      "parentIngredientId": "salt",
+      "parentTokens": ["salt"],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1825
+    },
+
+    {
+      "id": "rice",
+      "displayNames": {"en": "Rice"},
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 365,
+      "isBulkCandidate": true
+    },
+    {
+      "id": "rice-jasmine",
+      "displayNames": {"en": "Jasmine rice"},
+      "parentIngredientId": "rice",
+      "parentTokens": ["rice"],
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 365
+    },
+    {
+      "id": "rice-basmati",
+      "displayNames": {"en": "Basmati rice"},
+      "parentIngredientId": "rice",
+      "parentTokens": ["rice"],
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 365
+    },
+    {
+      "id": "rice-brown",
+      "displayNames": {"en": "Brown rice"},
+      "parentIngredientId": "rice",
+      "parentTokens": ["rice"],
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 180
+    },
+    {
+      "id": "rice-glutinous",
+      "displayNames": {"en": "Glutinous rice", "tl": "Malagkit"},
+      "parentIngredientId": "rice",
+      "parentTokens": ["rice"],
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 365,
+      "aliases": ["sticky rice"]
+    },
+
+    {
+      "id": "soy-sauce",
+      "displayNames": {"en": "Soy sauce", "tl": "Toyo"},
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1095,
+      "allergens": ["soy"]
+    },
+    {
+      "id": "soy-sauce-light",
+      "displayNames": {"en": "Light soy sauce"},
+      "parentIngredientId": "soy-sauce",
+      "parentTokens": ["soy", "sauce", "toyo"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1095,
+      "allergens": ["soy"]
+    },
+    {
+      "id": "soy-sauce-dark",
+      "displayNames": {"en": "Dark soy sauce"},
+      "parentIngredientId": "soy-sauce",
+      "parentTokens": ["soy", "sauce", "toyo"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1095,
+      "allergens": ["soy"]
+    },
+    {
+      "id": "soy-sauce-sweet",
+      "displayNames": {"en": "Sweet soy sauce"},
+      "parentIngredientId": "soy-sauce",
+      "parentTokens": ["soy", "sauce", "toyo"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1095,
+      "allergens": ["soy"],
+      "aliases": ["kecap manis"]
+    },
+
+    {
+      "id": "flour",
+      "displayNames": {"en": "Flour"},
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 365,
+      "isBulkCandidate": true,
+      "allergens": ["gluten"]
+    },
+    {
+      "id": "flour-all-purpose",
+      "displayNames": {"en": "All-purpose flour"},
+      "parentIngredientId": "flour",
+      "parentTokens": ["flour"],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 365,
+      "allergens": ["gluten"]
+    },
+    {
+      "id": "flour-bread",
+      "displayNames": {"en": "Bread flour"},
+      "parentIngredientId": "flour",
+      "parentTokens": ["flour"],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 365,
+      "allergens": ["gluten"]
+    },
+    {
+      "id": "flour-cake",
+      "displayNames": {"en": "Cake flour"},
+      "parentIngredientId": "flour",
+      "parentTokens": ["flour"],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 365,
+      "allergens": ["gluten"]
+    },
+    {
+      "id": "flour-whole-wheat",
+      "displayNames": {"en": "Whole-wheat flour"},
+      "parentIngredientId": "flour",
+      "parentTokens": ["flour"],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 180,
+      "allergens": ["gluten"]
+    },
+
+    {
+      "id": "oil",
+      "displayNames": {"en": "Oil"},
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp", "cup"],
+      "defaultShelfLifeDays": 365,
+      "isBulkCandidate": true
+    },
+    {
+      "id": "oil-vegetable",
+      "displayNames": {"en": "Vegetable oil"},
+      "parentIngredientId": "oil",
+      "parentTokens": ["oil"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp", "cup"],
+      "defaultShelfLifeDays": 365
+    },
+    {
+      "id": "oil-olive",
+      "displayNames": {"en": "Olive oil"},
+      "parentIngredientId": "oil",
+      "parentTokens": ["oil"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp", "cup"],
+      "defaultShelfLifeDays": 540
+    },
+    {
+      "id": "oil-canola",
+      "displayNames": {"en": "Canola oil"},
+      "parentIngredientId": "oil",
+      "parentTokens": ["oil"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp", "cup"],
+      "defaultShelfLifeDays": 365
+    },
+    {
+      "id": "oil-sesame",
+      "displayNames": {"en": "Sesame oil"},
+      "parentIngredientId": "oil",
+      "parentTokens": ["oil"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 365,
+      "allergens": ["sesame"]
+    },
+    {
+      "id": "oil-coconut",
+      "displayNames": {"en": "Coconut oil"},
+      "parentIngredientId": "oil",
+      "parentTokens": ["oil"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp", "cup"],
+      "defaultShelfLifeDays": 730
+    },
+
+    {
+      "id": "vinegar",
+      "displayNames": {"en": "Vinegar", "tl": "Suka"},
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp", "cup"],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "vinegar-white",
+      "displayNames": {"en": "White vinegar"},
+      "parentIngredientId": "vinegar",
+      "parentTokens": ["vinegar", "suka"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp", "cup"],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "vinegar-apple-cider",
+      "displayNames": {"en": "Apple cider vinegar"},
+      "parentIngredientId": "vinegar",
+      "parentTokens": ["vinegar", "suka"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "tsp", "tbsp", "cup"],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "vinegar-balsamic",
+      "displayNames": {"en": "Balsamic vinegar"},
+      "parentIngredientId": "vinegar",
+      "parentTokens": ["vinegar", "suka"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1095
+    },
+    {
+      "id": "vinegar-rice",
+      "displayNames": {"en": "Rice vinegar"},
+      "parentIngredientId": "vinegar",
+      "parentTokens": ["vinegar", "suka"],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 730
+    },
+
+    {
+      "id": "tomato",
+      "displayNames": {"en": "Tomato", "tl": "Kamatis"},
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": ["piece", "g", "kg"],
+      "defaultShelfLifeDays": 10
+    },
+    {
+      "id": "tomato-cherry",
+      "displayNames": {"en": "Cherry tomato"},
+      "parentIngredientId": "tomato",
+      "parentTokens": ["tomato", "kamatis"],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": ["piece", "g"],
+      "defaultShelfLifeDays": 7
+    },
+    {
+      "id": "tomato-roma",
+      "displayNames": {"en": "Roma tomato"},
+      "parentIngredientId": "tomato",
+      "parentTokens": ["tomato", "kamatis"],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": ["piece", "g"],
+      "defaultShelfLifeDays": 10
+    },
+
+    {
+      "id": "pepper",
+      "displayNames": {"en": "Pepper"},
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1095
+    },
+    {
+      "id": "pepper-black",
+      "displayNames": {"en": "Black pepper"},
+      "parentIngredientId": "pepper",
+      "parentTokens": ["pepper"],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1095
+    },
+    {
+      "id": "pepper-white",
+      "displayNames": {"en": "White pepper"},
+      "parentIngredientId": "pepper",
+      "parentTokens": ["pepper"],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "tsp", "tbsp"],
+      "defaultShelfLifeDays": 1095
+    }
+  ]
+}
