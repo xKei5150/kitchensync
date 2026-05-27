@@ -5,11 +5,14 @@ import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/mark_as_waste.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockRepo extends Mock implements PantryRepository {}
+
+class _FakeWasteEvent extends Fake implements WasteEvent {}
 
 PantryItem _item(double qty) => PantryItem(
   id: 'p1',
@@ -23,6 +26,8 @@ PantryItem _item(double qty) => PantryItem(
 );
 
 void main() {
+  setUpAll(() => registerFallbackValue(_FakeWasteEvent()));
+
   late _MockRepo repo;
   final clock = FakeClock(DateTime.utc(2026, 7));
   final idGen = FakeIdGenerator(['waste-id']);
@@ -34,8 +39,7 @@ void main() {
         householdId: any(named: 'householdId'),
         pantryItemId: any(named: 'pantryItemId'),
         newPantryQuantity: any(named: 'newPantryQuantity'),
-        wasteEventDoc: any(named: 'wasteEventDoc'),
-        wasteEventId: any(named: 'wasteEventId'),
+        wasteEvent: any(named: 'wasteEvent'),
       ),
     ).thenAnswer((_) async {});
   });
@@ -61,15 +65,19 @@ void main() {
         ),
       );
       expect(result, isA<Success<void>>());
-      verify(
-        () => repo.markAsWasteAtomic(
-          householdId: 'h1',
-          pantryItemId: 'p1',
-          newPantryQuantity: 1,
-          wasteEventDoc: any(named: 'wasteEventDoc'),
-          wasteEventId: 'waste-id',
-        ),
-      ).called(1);
+      final event =
+          verify(
+                () => repo.markAsWasteAtomic(
+                  householdId: 'h1',
+                  pantryItemId: 'p1',
+                  newPantryQuantity: 1,
+                  wasteEvent: captureAny(named: 'wasteEvent'),
+                ),
+              ).captured.single
+              as WasteEvent;
+      expect(event.id, 'waste-id');
+      expect(event.quantity, 2);
+      expect(event.reason, WasteReason.spoiled);
     },
   );
 
@@ -93,8 +101,7 @@ void main() {
         householdId: 'h1',
         pantryItemId: 'p1',
         newPantryQuantity: 0,
-        wasteEventDoc: any(named: 'wasteEventDoc'),
-        wasteEventId: 'waste-id',
+        wasteEvent: any(named: 'wasteEvent'),
       ),
     ).called(1);
   });

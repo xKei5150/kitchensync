@@ -4,6 +4,7 @@ import 'package:kitchensync/features/pantry/data/datasources/pantry_image_storag
 import 'package:kitchensync/features/pantry/data/datasources/pantry_remote_data_source.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 
 class PantryRepositoryImpl implements PantryRepository {
@@ -50,13 +51,11 @@ class PantryRepositoryImpl implements PantryRepository {
     required String householdId,
     required String pantryItemId,
     required double newPantryQuantity,
-    required Map<String, dynamic> wasteEventDoc,
-    required String wasteEventId,
+    required WasteEvent wasteEvent,
   }) => _remote.markAsWasteAtomic(
     householdId: householdId,
     pantryItemId: pantryItemId,
     newPantryQuantity: newPantryQuantity,
-    wasteEventDoc: wasteEventDoc,
-    wasteEventId: wasteEventId,
+    wasteEvent: wasteEvent,
   );
 }

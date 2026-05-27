@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_storage_mocks/firebase_storage_mocks.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,8 +67,7 @@ void main() {
           householdId: 'h1',
           pantryItemId: 'p1',
           newPantryQuantity: 1,
-          wasteEventDoc: WasteEventMapper.toMap(testWasteEvent),
-          wasteEventId: 'w1',
+          wasteEvent: testWasteEvent,
         );
 
         // Assert — pantry quantity updated
@@ -92,6 +92,16 @@ void main() {
         expect(wasteSnap.exists, isTrue);
         expect(wasteSnap.data()!['pantryItemId'], equals('p1'));
         expect(wasteSnap.data()!['reason'], equals('spoiled'));
+        // Regression guard: the event must be written via WasteEventMapper so
+        // `date` is a Timestamp (not an ISO String from freezed toJson) and
+        // round-trips back through fromMap without a type-cast error.
+        expect(wasteSnap.data()!['date'], isA<Timestamp>());
+        final roundTripped = WasteEventMapper.fromMap(
+          wasteSnap.id,
+          wasteSnap.data()!,
+        );
+        expect(roundTripped.reason, equals(WasteReason.spoiled));
+        expect(roundTripped.date, equals(now));
       },
     );
   });

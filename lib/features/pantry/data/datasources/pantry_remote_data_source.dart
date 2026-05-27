@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
 import 'package:kitchensync/features/pantry/data/dtos/pantry_item_dto.dart';
+import 'package:kitchensync/features/pantry/data/dtos/waste_event_dto.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 
 class PantryRemoteDataSource {
   PantryRemoteDataSource(this._refs);
@@ -65,8 +67,7 @@ class PantryRemoteDataSource {
     required String householdId,
     required String pantryItemId,
     required double newPantryQuantity,
-    required Map<String, dynamic> wasteEventDoc,
-    required String wasteEventId,
+    required WasteEvent wasteEvent,
   }) async {
     final db = _refs.pantryItems(householdId).firestore;
     final batch = db.batch()
@@ -74,7 +75,10 @@ class PantryRemoteDataSource {
         'quantity': newPantryQuantity,
         'updatedAt': FieldValue.serverTimestamp(),
       })
-      ..set(_refs.wasteEvents(householdId).doc(wasteEventId), wasteEventDoc);
+      ..set(
+        _refs.wasteEvents(householdId).doc(wasteEvent.id),
+        WasteEventMapper.toMap(wasteEvent),
+      );
     await batch.commit();
   }
 }

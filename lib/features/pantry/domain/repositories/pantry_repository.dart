@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 
 abstract class PantryRepository {
   Stream<List<PantryItem>> watchBySection(
@@ -19,7 +20,6 @@ abstract class PantryRepository {
     required String householdId,
     required String pantryItemId,
     required double newPantryQuantity,
-    required Map<String, dynamic> wasteEventDoc,
-    required String wasteEventId,
+    required WasteEvent wasteEvent,
   });
 }

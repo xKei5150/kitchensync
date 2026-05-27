@@ -73,8 +73,7 @@ class MarkAsWaste extends UseCase<void, MarkAsWasteParams> {
         householdId: params.householdId,
         pantryItemId: params.pantryItemId,
         newPantryQuantity: clamped,
-        wasteEventDoc: event.toJson(),
-        wasteEventId: wasteId,
+        wasteEvent: event,
       );
 
       return const Result.success(null);
