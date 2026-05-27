@@ -1,0 +1,8 @@
+name: seed_builder
+description: One-time builder that enriches assets/seed/ingredients.json from USDA FoodData Central and Open Food Facts.
+publish_to: 'none'
+environment:
+  sdk: ^3.12.0
+dependencies:
+  http: ^1.2.2
+  csv: ^6.0.0
