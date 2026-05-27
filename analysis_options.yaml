@@ -19,3 +19,5 @@ linter:
     omit_local_variable_types: false
     # Pubspec ordering grouped by concern (state, models, firebase, ...).
     sort_pub_dependencies: false
+    # freezed factory constructors group fields by semantic area, not required-first.
+    always_put_required_named_parameters_first: false

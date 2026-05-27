@@ -1,4 +1,4 @@
-import '../entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 
 abstract class IngredientRepository {
   Stream<List<Ingredient>> watchByIds(List<String> ids);
