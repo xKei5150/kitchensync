@@ -3,17 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/features/home/home_screen.dart';
 
 void main() {
-  testWidgets('HomeScreen renders bootstrap milestone copy', (tester) async {
+  testWidgets('HomeScreen shows ingredient-picker entry', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
-    expect(find.text('Bootstrap milestone complete'), findsOneWidget);
+    expect(find.text('Pick an ingredient'), findsOneWidget);
+    expect(find.text('Create custom ingredient'), findsOneWidget);
     expect(find.text('Force a test crash'), findsOneWidget);
-  });
-
-  testWidgets('HomeScreen exposes Semantics header', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
-    final semantics = tester.getSemantics(
-      find.text('Bootstrap milestone complete'),
-    );
-    expect(semantics.label, 'Bootstrap milestone complete');
   });
 }
