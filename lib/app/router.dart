@@ -28,8 +28,9 @@ GoRouter router(Ref ref) {
           GoRoute(
             path: 'ingredient/create',
             name: 'ingredientCreate',
-            builder: (context, state) =>
-                CreateCustomIngredientScreen(initialName: state.extra as String?),
+            builder: (context, state) => CreateCustomIngredientScreen(
+              initialName: state.extra as String?,
+            ),
           ),
           GoRoute(
             path: 'ingredient/:id',

@@ -29,7 +29,7 @@ IngredientRemoteDataSource ingredientRemoteDataSource(Ref ref) =>
 
 @Riverpod(keepAlive: true)
 IngredientSeedDataSource ingredientSeedDataSource(Ref ref) =>
-    IngredientSeedDataSource(clock: const SystemClock());
+    IngredientSeedDataSource();
 
 @Riverpod(keepAlive: true)
 IngredientRepository ingredientRepository(Ref ref) =>

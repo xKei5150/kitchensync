@@ -46,7 +46,9 @@ class _IngredientPickerScreenState
     });
     final useCase = ref.read(searchIngredientsProvider);
     final hid = ref.read(activeHouseholdIdProvider);
-    final r = await useCase(SearchIngredientsParams(query: query, householdId: hid));
+    final r = await useCase(
+      SearchIngredientsParams(query: query, householdId: hid),
+    );
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -112,13 +114,16 @@ class _IngredientPickerScreenState
             FilledButton.icon(
               icon: const Icon(Icons.add),
               label: const Text('Add to dictionary'),
-              onPressed: () => context
-                  .push<Ingredient>('/ingredient/create', extra: _query)
-                  .then((created) {
+              onPressed: () async {
+                final created = await context.push<Ingredient>(
+                  '/ingredient/create',
+                  extra: _query,
+                );
                 if (created != null && mounted) {
+                  // ignore: use_build_context_synchronously
                   context.pop<Ingredient>(created);
                 }
-              }),
+              },
             ),
           ],
         ),

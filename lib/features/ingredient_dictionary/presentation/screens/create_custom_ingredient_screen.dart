@@ -94,7 +94,7 @@ class _CreateCustomIngredientScreenState
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<IngredientCategory>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(labelText: 'Category'),
               items: IngredientCategory.values
                   .map(
@@ -105,7 +105,7 @@ class _CreateCustomIngredientScreenState
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<Unit>(
-              value: _defaultUnit,
+              initialValue: _defaultUnit,
               decoration: const InputDecoration(labelText: 'Default unit'),
               items: Unit.values
                   .map(
