@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/image_attribution.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient_curation.dart';
 
 class IngredientMapper {
   const IngredientMapper._();
@@ -19,6 +20,9 @@ class IngredientMapper {
     'imageUrl': i.imageUrl,
     'barcode': i.barcode,
     'aliases': i.aliases,
+    'taxonomyTags': i.taxonomyTags,
+    'formTags': i.formTags,
+    'curation': i.curation?.toJson(),
     'searchTokens': i.searchTokens,
     'allergens': i.allergens.map((a) => a.name).toList(),
     'dietaryTags': i.dietaryTags.map((d) => d.name).toList(),
@@ -47,6 +51,13 @@ class IngredientMapper {
     imageUrl: m['imageUrl'] as String?,
     barcode: m['barcode'] as String?,
     aliases: ((m['aliases'] as List?) ?? const []).cast<String>(),
+    taxonomyTags: ((m['taxonomyTags'] as List?) ?? const []).cast<String>(),
+    formTags: ((m['formTags'] as List?) ?? const []).cast<String>(),
+    curation: m['curation'] == null
+        ? null
+        : IngredientCuration.fromJson(
+            Map<String, dynamic>.from(m['curation'] as Map),
+          ),
     searchTokens: ((m['searchTokens'] as List?) ?? const []).cast<String>(),
     allergens: ((m['allergens'] as List?) ?? const [])
         .map((e) => _enumFromName(Allergen.values, e as String))

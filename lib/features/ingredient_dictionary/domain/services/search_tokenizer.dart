@@ -16,6 +16,8 @@ class SearchTokenizer {
     required Map<String, String> displayNames,
     List<String> aliases = const [],
     List<String> parentTokens = const [],
+    List<String> taxonomyTags = const [],
+    List<String> formTags = const [],
   }) {
     final all = <String>{};
     for (final name in displayNames.values) {
@@ -24,7 +26,9 @@ class SearchTokenizer {
     for (final a in aliases) {
       all.addAll(tokenize(a));
     }
-    all.addAll(parentTokens);
+    all.addAll(parentTokens.expand(tokenize));
+    all.addAll(taxonomyTags.expand(tokenize));
+    all.addAll(formTags.expand(tokenize));
     return all.toList();
   }
 }

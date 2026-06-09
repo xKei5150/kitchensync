@@ -5,13 +5,15 @@ import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/image_attribution.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient_curation.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/services/search_tokenizer.dart';
 
 class IngredientSeedDataSource {
   IngredientSeedDataSource({
-    this._clock = const SystemClock(),
-    this._assetPath = 'assets/seed/ingredients.json',
-  });
+    Clock clock = const SystemClock(),
+    String assetPath = 'assets/seed/ingredients.json',
+  })  : _clock = clock,
+        _assetPath = assetPath;
 
   final Clock _clock;
   final String _assetPath;
@@ -41,10 +43,14 @@ class IngredientSeedDataSource {
     final aliases = ((m['aliases'] as List?) ?? const []).cast<String>();
     final parentTokens = ((m['parentTokens'] as List?) ?? const [])
         .cast<String>();
+    final taxonomyTags = ((m['taxonomyTags'] as List?) ?? const []).cast<String>();
+    final formTags = ((m['formTags'] as List?) ?? const []).cast<String>();
     final tokens = SearchTokenizer.buildIndex(
       displayNames: Map<String, String>.from(m['displayNames'] as Map),
       aliases: aliases,
       parentTokens: parentTokens,
+      taxonomyTags: taxonomyTags,
+      formTags: formTags,
     );
     final displayNames = Map<String, String>.from(m['displayNames'] as Map);
     return Ingredient(
@@ -61,6 +67,13 @@ class IngredientSeedDataSource {
       imageUrl: m['imageUrl'] as String?,
       barcode: m['barcode'] as String?,
       aliases: aliases,
+      taxonomyTags: taxonomyTags,
+      formTags: formTags,
+      curation: m['curation'] == null
+          ? null
+          : IngredientCuration.fromJson(
+              Map<String, dynamic>.from(m['curation'] as Map),
+            ),
       searchTokens: tokens,
       allergens: ((m['allergens'] as List?) ?? const [])
           .cast<String>()

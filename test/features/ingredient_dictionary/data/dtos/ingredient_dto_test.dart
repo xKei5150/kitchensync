@@ -18,6 +18,8 @@ void main() {
       allergens: const [Allergen.gluten],
       dietaryTags: const [DietaryTag.vegan],
       searchTokens: const ['red', 'onion'],
+      taxonomyTags: const ['allium'],
+      formTags: const ['fresh'],
       scope: IngredientScope.global,
       createdAt: DateTime.utc(2026, 1, 1, 12),
       updatedAt: DateTime.utc(2026, 1, 1, 12),
@@ -26,6 +28,8 @@ void main() {
     expect(map['category'], 'produce');
     expect(map['defaultUnit'], 'piece');
     expect(map['allergens'], ['gluten']);
+    expect(map['taxonomyTags'], ['allium']);
+    expect(map['formTags'], ['fresh']);
     expect(map['createdAt'], isA<Timestamp>());
     final back = IngredientMapper.fromMap(ing.id, map);
     expect(back, ing);
@@ -48,5 +52,29 @@ void main() {
       () => IngredientMapper.fromMap('x', map),
       throwsA(isA<FormatException>()),
     );
+  });
+
+  test('fromMap defaults missing curation fields for existing Firestore docs', () {
+    final ing = Ingredient(
+      id: 'x',
+      name: 'onion',
+      displayNames: const {'en': 'Onion'},
+      category: IngredientCategory.produce,
+      defaultUnit: Unit.piece,
+      allowedUnits: const [Unit.piece],
+      scope: IngredientScope.global,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final map = IngredientMapper.toMap(ing)
+      ..remove('taxonomyTags')
+      ..remove('formTags')
+      ..remove('curation');
+
+    final back = IngredientMapper.fromMap('x', map);
+
+    expect(back.taxonomyTags, isEmpty);
+    expect(back.formTags, isEmpty);
+    expect(back.curation, isNull);
   });
 }
