@@ -83,5 +83,36 @@ void main() {
         'needsReview',
       );
     });
+
+    test('keeps existing display name when proposal name is blank', () {
+      final seed = IngredientSeed.fromMap({
+        'version': 1,
+        'ingredients': [
+          {
+            'id': 'onion',
+            'displayNames': {'en': 'Onion'},
+            'category': 'produce',
+            'defaultUnit': 'piece',
+            'allowedUnits': ['piece'],
+          },
+        ],
+      });
+
+      final updated = seed.applyProposals([
+        const IngredientCurationProposal(
+          id: 'onion',
+          displayNameEn: '   ',
+          category: 'produce',
+          aliases: [],
+          taxonomyTags: [],
+          formTags: [],
+          isNonFood: false,
+          confidence: 0.95,
+          reason: 'No better name.',
+        ),
+      ]);
+
+      expect(updated.ingredients.single['displayNames'], {'en': 'Onion'});
+    });
   });
 }

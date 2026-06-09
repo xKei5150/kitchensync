@@ -28,40 +28,44 @@ class AnthropicIngredientClassifier implements IngredientClassifier {
   AnthropicIngredientClassifier({
     required this.apiKey,
     required this.model,
+    this.timeout = const Duration(minutes: 5),
     http.Client? client,
   }) : _client = client ?? http.Client();
 
   final String apiKey;
   final String model;
+  final Duration timeout;
   final http.Client _client;
 
   @override
   Future<List<IngredientCurationProposal>> classify(
     List<Map<String, Object?>> ingredients,
   ) async {
-    final response = await _client.post(
-      Uri.parse('https://api.anthropic.com/v1/messages'),
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: jsonEncode({
-        'model': model,
-        'max_tokens': 8192,
-        'system': _systemPrompt,
-        'messages': [
-          {
-            'role': 'user',
-            'content': jsonEncode({
-              'ingredients': ingredients,
-              'allowedTaxonomyTags': allowedTaxonomyTags.toList()..sort(),
-              'allowedFormTags': allowedFormTags.toList()..sort(),
-            }),
+    final response = await _client
+        .post(
+          Uri.parse('https://api.anthropic.com/v1/messages'),
+          headers: {
+            'content-type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
           },
-        ],
-      }),
-    );
+          body: jsonEncode({
+            'model': model,
+            'max_tokens': 8192,
+            'system': _systemPrompt,
+            'messages': [
+              {
+                'role': 'user',
+                'content': jsonEncode({
+                  'ingredients': ingredients,
+                  'allowedTaxonomyTags': allowedTaxonomyTags.toList()..sort(),
+                  'allowedFormTags': allowedFormTags.toList()..sort(),
+                }),
+              },
+            ],
+          }),
+        )
+        .timeout(timeout);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw HttpException(

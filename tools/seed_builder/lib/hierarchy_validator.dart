@@ -168,20 +168,28 @@ class HierarchyValidator {
 
   static List<ValidationError> _cycleErrors(Map<String, String> parentById) {
     final errors = <ValidationError>[];
-    for (final id in parentById.keys) {
-      final seen = <String>{};
-      var current = id;
-      while (parentById.containsKey(current)) {
-        if (!seen.add(current)) {
+    // Nodes already attributed to a reported cycle; prevents emitting one
+    // error per member of the same cycle.
+    final reported = <String>{};
+    for (final start in parentById.keys) {
+      if (reported.contains(start)) continue;
+      final path = <String>[];
+      final onPath = <String>{};
+      var current = start;
+      while (parentById.containsKey(current) && !reported.contains(current)) {
+        if (!onPath.add(current)) {
+          final members = path.sublist(path.indexOf(current));
+          reported.addAll(members);
           errors.add(
             ValidationError(
               code: 'cycle',
-              ingredientId: id,
-              message: 'Hierarchy cycle detected at $current.',
+              ingredientId: members.first,
+              message: 'Hierarchy cycle detected: ${members.join(' -> ')}.',
             ),
           );
           break;
         }
+        path.add(current);
         current = parentById[current]!;
       }
     }

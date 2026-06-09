@@ -17,4 +17,24 @@ void main() {
       expect(metadata.notes, 'Grouped under onion.');
     });
   });
+
+  group('IngredientCurationProposal', () {
+    test('clamps out-of-range confidence from untrusted LLM output', () {
+      final high = IngredientCurationProposal.fromMap({
+        'id': 'x',
+        'displayNameEn': 'X',
+        'category': 'produce',
+        'confidence': 1.5,
+      });
+      final low = IngredientCurationProposal.fromMap({
+        'id': 'y',
+        'displayNameEn': 'Y',
+        'category': 'produce',
+        'confidence': -0.4,
+      });
+
+      expect(high.confidence, 1.0);
+      expect(low.confidence, 0.0);
+    });
+  });
 }

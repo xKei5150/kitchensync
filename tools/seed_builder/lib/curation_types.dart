@@ -95,7 +95,8 @@ class IngredientCurationProposal {
       taxonomyTags: ((map['taxonomyTags'] as List?) ?? const []).cast<String>(),
       formTags: ((map['formTags'] as List?) ?? const []).cast<String>(),
       isNonFood: map['isNonFood'] as bool? ?? false,
-      confidence: (map['confidence'] as num? ?? 0).toDouble(),
+      // LLM output is untrusted: clamp confidence into the documented range.
+      confidence: (map['confidence'] as num? ?? 0).toDouble().clamp(0.0, 1.0),
       reason: map['reason'] as String? ?? '',
     );
   }

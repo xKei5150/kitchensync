@@ -38,9 +38,11 @@ class IngredientSeed {
           final existingDisplayNames = Map<String, Object?>.from(
             ingredient['displayNames'] as Map,
           );
+          // Never let a blank LLM name clobber a good seed name.
           final displayNames = {
             ...existingDisplayNames,
-            'en': proposal.displayNameEn,
+            if (proposal.displayNameEn.trim().isNotEmpty)
+              'en': proposal.displayNameEn,
           };
           final curation = CurationMetadata(
             status: proposal.confidence >= lowConfidenceThreshold
