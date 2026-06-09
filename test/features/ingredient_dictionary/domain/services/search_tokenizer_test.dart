@@ -23,15 +23,25 @@ void main() {
     test('drops empty / whitespace-only inputs', () {
       expect(SearchTokenizer.tokenize('   '), isEmpty);
     });
-    test('buildIndex unions display, aliases, and parent tokens', () {
+    test('buildIndex unions display, aliases, parent tokens, taxonomy tags, and form tags', () {
       final tokens = SearchTokenizer.buildIndex(
         displayNames: const {'en': 'Red onion', 'tl': 'Pulang sibuyas'},
         aliases: const ['Spanish onion'],
         parentTokens: const ['onion'],
+        taxonomyTags: const ['allium'],
+        formTags: const ['fresh'],
       );
       expect(
         tokens,
-        containsAll(<String>['red', 'onion', 'pulang', 'sibuyas', 'spanish']),
+        containsAll(<String>[
+          'red',
+          'onion',
+          'pulang',
+          'sibuyas',
+          'spanish',
+          'allium',
+          'fresh',
+        ]),
       );
     });
   });

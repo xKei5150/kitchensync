@@ -1,6 +1,7 @@
 import 'package:kitchensync/features/ingredient_dictionary/data/datasources/ingredient_remote_data_source.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_hierarchy_sorter.dart';
 
 class IngredientRepositoryImpl implements IngredientRepository {
   IngredientRepositoryImpl(this._remote);
@@ -51,7 +52,7 @@ class IngredientRepositoryImpl implements IngredientRepository {
         if (aPrefix != bPrefix) return aPrefix - bPrefix;
         return a.name.compareTo(b.name);
       });
-    return list.take(limit).toList();
+    return IngredientHierarchySorter.parentBeforeChildren(list).take(limit).toList();
   }
 
   @override
