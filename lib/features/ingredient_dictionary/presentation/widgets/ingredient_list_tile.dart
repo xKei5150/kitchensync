@@ -46,12 +46,41 @@ class IngredientListTile extends StatelessWidget {
                 ),
         ),
         title: Text(name),
-        subtitle: Text(
-          ingredient.category.name,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
+        subtitle: _Subtitle(ingredient: ingredient, indent: indent),
         onTap: onTap,
       ),
+    );
+  }
+}
+
+class _Subtitle extends StatelessWidget {
+  const _Subtitle({required this.ingredient, required this.indent});
+
+  final Ingredient ingredient;
+  final bool indent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final categoryText = Text(
+      ingredient.category.name,
+      style: theme.textTheme.bodySmall,
+    );
+    if (!indent) return categoryText;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Variant',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.secondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(' · ', style: theme.textTheme.bodySmall),
+        Flexible(child: categoryText),
+      ],
     );
   }
 }
