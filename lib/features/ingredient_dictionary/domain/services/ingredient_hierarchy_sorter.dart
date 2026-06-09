@@ -4,14 +4,18 @@ class IngredientHierarchySorter {
   const IngredientHierarchySorter._();
 
   static List<Ingredient> parentBeforeChildren(List<Ingredient> ingredients) {
-    final byId = {for (final ingredient in ingredients) ingredient.id: ingredient};
+    final byId = {
+      for (final ingredient in ingredients) ingredient.id: ingredient,
+    };
     final childrenByParent = <String, List<Ingredient>>{};
     final roots = <Ingredient>[];
 
     for (final ingredient in ingredients) {
       final parentId = ingredient.parentIngredientId;
       if (parentId != null && byId.containsKey(parentId)) {
-        childrenByParent.putIfAbsent(parentId, () => <Ingredient>[]).add(ingredient);
+        childrenByParent
+            .putIfAbsent(parentId, () => <Ingredient>[])
+            .add(ingredient);
       } else {
         roots.add(ingredient);
       }
@@ -27,7 +31,8 @@ class IngredientHierarchySorter {
     void emit(Ingredient ingredient) {
       if (!emitted.add(ingredient.id)) return;
       output.add(ingredient);
-      for (final child in childrenByParent[ingredient.id] ?? const <Ingredient>[]) {
+      for (final child
+          in childrenByParent[ingredient.id] ?? const <Ingredient>[]) {
         emit(child);
       }
     }

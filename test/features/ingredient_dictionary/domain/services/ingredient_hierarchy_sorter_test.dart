@@ -4,17 +4,17 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingre
 import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_hierarchy_sorter.dart';
 
 Ingredient _ingredient(String id, String name, {String? parent}) => Ingredient(
-      id: id,
-      name: name,
-      displayNames: {'en': name},
-      parentIngredientId: parent,
-      category: IngredientCategory.produce,
-      defaultUnit: Unit.piece,
-      allowedUnits: const [Unit.piece],
-      scope: IngredientScope.global,
-      createdAt: DateTime.utc(2026),
-      updatedAt: DateTime.utc(2026),
-    );
+  id: id,
+  name: name,
+  displayNames: {'en': name},
+  parentIngredientId: parent,
+  category: IngredientCategory.produce,
+  defaultUnit: Unit.piece,
+  allowedUnits: const [Unit.piece],
+  scope: IngredientScope.global,
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026),
+);
 
 void main() {
   group('IngredientHierarchySorter', () {
@@ -38,7 +38,10 @@ void main() {
         _ingredient('apple', 'apple'),
       ]);
 
-      expect(sorted.map((ingredient) => ingredient.id), ['apple', 'white-onion']);
+      expect(sorted.map((ingredient) => ingredient.id), [
+        'apple',
+        'white-onion',
+      ]);
     });
   });
 }

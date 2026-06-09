@@ -38,7 +38,11 @@ void main() {
       ],
     });
 
-    final report = CurationReport.build(before: before, after: after, validationWarnings: const []);
+    final report = CurationReport.build(
+      before: before,
+      after: after,
+      validationWarnings: const [],
+    );
 
     expect(report, contains('Processed: 1'));
     expect(report, contains('Renamed: 1'));

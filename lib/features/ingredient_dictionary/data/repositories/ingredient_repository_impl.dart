@@ -52,7 +52,9 @@ class IngredientRepositoryImpl implements IngredientRepository {
         if (aPrefix != bPrefix) return aPrefix - bPrefix;
         return a.name.compareTo(b.name);
       });
-    return IngredientHierarchySorter.parentBeforeChildren(list).take(limit).toList();
+    return IngredientHierarchySorter.parentBeforeChildren(
+      list,
+    ).take(limit).toList();
   }
 
   @override

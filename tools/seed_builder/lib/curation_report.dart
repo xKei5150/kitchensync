@@ -9,8 +9,12 @@ class CurationReport {
     required IngredientSeed after,
     required List<ValidationError> validationWarnings,
   }) {
-    final beforeById = {for (final ingredient in before.ingredients) ingredient['id']: ingredient};
-    final afterById = {for (final ingredient in after.ingredients) ingredient['id']: ingredient};
+    final beforeById = {
+      for (final ingredient in before.ingredients) ingredient['id']: ingredient,
+    };
+    final afterById = {
+      for (final ingredient in after.ingredients) ingredient['id']: ingredient,
+    };
     final renamed = <String>[];
     final parentLinks = <String>[];
     var tagChanges = 0;
@@ -90,7 +94,9 @@ class CurationReport {
       buffer.writeln('- None');
     } else {
       for (final warning in validationWarnings) {
-        buffer.writeln('- `${warning.ingredientId}` ${warning.code}: ${warning.message}');
+        buffer.writeln(
+          '- `${warning.ingredientId}` ${warning.code}: ${warning.message}',
+        );
       }
     }
 

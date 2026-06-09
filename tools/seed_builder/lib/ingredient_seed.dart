@@ -26,51 +26,55 @@ class IngredientSeed {
   }
 
   IngredientSeed applyProposals(List<IngredientCurationProposal> proposals) {
-    final proposalById = {for (final proposal in proposals) proposal.id: proposal};
-    final updated = ingredients.map((ingredient) {
-      final id = ingredient['id'] as String;
-      final proposal = proposalById[id];
-      if (proposal == null) return Map<String, Object?>.from(ingredient);
+    final proposalById = {
+      for (final proposal in proposals) proposal.id: proposal,
+    };
+    final updated = ingredients
+        .map((ingredient) {
+          final id = ingredient['id'] as String;
+          final proposal = proposalById[id];
+          if (proposal == null) return Map<String, Object?>.from(ingredient);
 
-      final existingDisplayNames = Map<String, Object?>.from(
-        ingredient['displayNames'] as Map,
-      );
-      final displayNames = {
-        ...existingDisplayNames,
-        'en': proposal.displayNameEn,
-      };
-      final curation = CurationMetadata(
-        status: proposal.confidence >= lowConfidenceThreshold
-            ? CurationStatus.accepted
-            : CurationStatus.needsReview,
-        confidence: proposal.confidence,
-        source: 'llm-assisted',
-        notes: proposal.reason,
-      );
+          final existingDisplayNames = Map<String, Object?>.from(
+            ingredient['displayNames'] as Map,
+          );
+          final displayNames = {
+            ...existingDisplayNames,
+            'en': proposal.displayNameEn,
+          };
+          final curation = CurationMetadata(
+            status: proposal.confidence >= lowConfidenceThreshold
+                ? CurationStatus.accepted
+                : CurationStatus.needsReview,
+            confidence: proposal.confidence,
+            source: 'llm-assisted',
+            notes: proposal.reason,
+          );
 
-      return <String, Object?>{
-        ...ingredient,
-        'displayNames': displayNames,
-        if (proposal.parentIngredientId == null)
-          'parentIngredientId': null
-        else
-          'parentIngredientId': proposal.parentIngredientId,
-        'category': proposal.category,
-        'aliases': proposal.aliases,
-        'taxonomyTags': proposal.taxonomyTags,
-        'formTags': proposal.formTags,
-        'isNonFood': proposal.isNonFood,
-        'curation': curation.toMap(),
-      };
-    }).toList(growable: false);
+          return <String, Object?>{
+            ...ingredient,
+            'displayNames': displayNames,
+            if (proposal.parentIngredientId == null)
+              'parentIngredientId': null
+            else
+              'parentIngredientId': proposal.parentIngredientId,
+            'category': proposal.category,
+            'aliases': proposal.aliases,
+            'taxonomyTags': proposal.taxonomyTags,
+            'formTags': proposal.formTags,
+            'isNonFood': proposal.isNonFood,
+            'curation': curation.toMap(),
+          };
+        })
+        .toList(growable: false);
 
     return IngredientSeed(version: version, ingredients: updated);
   }
 
   Map<String, Object?> toMap() => {
-        'version': version,
-        'ingredients': ingredients,
-      };
+    'version': version,
+    'ingredients': ingredients,
+  };
 
   void save(String path) {
     const encoder = JsonEncoder.withIndent('  ');

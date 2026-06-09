@@ -58,7 +58,7 @@ class AnthropicIngredientClassifier implements IngredientClassifier {
               'allowedTaxonomyTags': allowedTaxonomyTags.toList()..sort(),
               'allowedFormTags': allowedFormTags.toList()..sort(),
             }),
-          }
+          },
         ],
       }),
     );
@@ -73,7 +73,8 @@ class AnthropicIngredientClassifier implements IngredientClassifier {
     final content = decoded['content'] as List;
     final textBlock = content.cast<Map>().firstWhere(
       (block) => block['type'] == 'text',
-      orElse: () => throw const FormatException('No text block in classifier response.'),
+      orElse: () =>
+          throw const FormatException('No text block in classifier response.'),
     );
     return parseClassifierResponse(textBlock['text'] as String);
   }
@@ -83,9 +84,11 @@ List<IngredientCurationProposal> parseClassifierResponse(String raw) {
   final decoded = jsonDecode(raw) as Map<String, Object?>;
   final proposals = ((decoded['proposals'] as List?) ?? const []);
   return proposals
-      .map((proposal) => IngredientCurationProposal.fromMap(
-            Map<String, Object?>.from(proposal as Map),
-          ))
+      .map(
+        (proposal) => IngredientCurationProposal.fromMap(
+          Map<String, Object?>.from(proposal as Map),
+        ),
+      )
       .toList(growable: false);
 }
 

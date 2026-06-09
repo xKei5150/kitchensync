@@ -78,7 +78,8 @@ void main() {
       ]);
 
       expect(
-        (updated.ingredients.single['curation'] as Map<String, Object?>)['status'],
+        (updated.ingredients.single['curation']
+            as Map<String, Object?>)['status'],
         'needsReview',
       );
     });

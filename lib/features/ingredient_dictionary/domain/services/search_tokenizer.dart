@@ -26,9 +26,10 @@ class SearchTokenizer {
     for (final a in aliases) {
       all.addAll(tokenize(a));
     }
-    all.addAll(parentTokens.expand(tokenize));
-    all.addAll(taxonomyTags.expand(tokenize));
-    all.addAll(formTags.expand(tokenize));
+    all
+      ..addAll(parentTokens.expand(tokenize))
+      ..addAll(taxonomyTags.expand(tokenize))
+      ..addAll(formTags.expand(tokenize));
     return all.toList();
   }
 }

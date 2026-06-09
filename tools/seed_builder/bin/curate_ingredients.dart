@@ -10,7 +10,8 @@ Future<void> main(List<String> args) async {
   final output = _arg(args, '--output') ?? input;
   final reportPath = _arg(args, '--report') ?? 'reports/ingredient-curation.md';
   final fixturePath = _arg(args, '--fixture');
-  final model = _arg(args, '--model') ??
+  final model =
+      _arg(args, '--model') ??
       Platform.environment['ANTHROPIC_MODEL'] ??
       'claude-sonnet-4-6';
 

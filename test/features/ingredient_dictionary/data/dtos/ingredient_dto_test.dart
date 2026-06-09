@@ -54,27 +54,30 @@ void main() {
     );
   });
 
-  test('fromMap defaults missing curation fields for existing Firestore docs', () {
-    final ing = Ingredient(
-      id: 'x',
-      name: 'onion',
-      displayNames: const {'en': 'Onion'},
-      category: IngredientCategory.produce,
-      defaultUnit: Unit.piece,
-      allowedUnits: const [Unit.piece],
-      scope: IngredientScope.global,
-      createdAt: DateTime.utc(2026),
-      updatedAt: DateTime.utc(2026),
-    );
-    final map = IngredientMapper.toMap(ing)
-      ..remove('taxonomyTags')
-      ..remove('formTags')
-      ..remove('curation');
+  test(
+    'fromMap defaults missing curation fields for existing Firestore docs',
+    () {
+      final ing = Ingredient(
+        id: 'x',
+        name: 'onion',
+        displayNames: const {'en': 'Onion'},
+        category: IngredientCategory.produce,
+        defaultUnit: Unit.piece,
+        allowedUnits: const [Unit.piece],
+        scope: IngredientScope.global,
+        createdAt: DateTime.utc(2026),
+        updatedAt: DateTime.utc(2026),
+      );
+      final map = IngredientMapper.toMap(ing)
+        ..remove('taxonomyTags')
+        ..remove('formTags')
+        ..remove('curation');
 
-    final back = IngredientMapper.fromMap('x', map);
+      final back = IngredientMapper.fromMap('x', map);
 
-    expect(back.taxonomyTags, isEmpty);
-    expect(back.formTags, isEmpty);
-    expect(back.curation, isNull);
-  });
+      expect(back.taxonomyTags, isEmpty);
+      expect(back.formTags, isEmpty);
+      expect(back.curation, isNull);
+    },
+  );
 }

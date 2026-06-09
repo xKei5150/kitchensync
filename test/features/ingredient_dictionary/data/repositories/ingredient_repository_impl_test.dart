@@ -76,7 +76,10 @@ void main() {
   test('search returns parent before matching variants', () async {
     final r = await repo.search(query: 'onion', householdId: 'h1');
 
-    expect(r.map((ingredient) => ingredient.id).take(2), ['onion', 'red-onion']);
+    expect(r.map((ingredient) => ingredient.id).take(2), [
+      'onion',
+      'red-onion',
+    ]);
   });
 
   test('search dedupes by id', () async {

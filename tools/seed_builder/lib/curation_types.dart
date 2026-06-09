@@ -53,11 +53,11 @@ class CurationMetadata {
   }
 
   Map<String, Object?> toMap() => {
-        'status': status.name,
-        'confidence': confidence,
-        'source': source,
-        'notes': notes,
-      };
+    'status': status.name,
+    'confidence': confidence,
+    'source': source,
+    'notes': notes,
+  };
 }
 
 class IngredientCurationProposal {

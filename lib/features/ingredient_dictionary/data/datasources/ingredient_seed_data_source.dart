@@ -12,8 +12,8 @@ class IngredientSeedDataSource {
   IngredientSeedDataSource({
     Clock clock = const SystemClock(),
     String assetPath = 'assets/seed/ingredients.json',
-  })  : _clock = clock,
-        _assetPath = assetPath;
+  }) : _clock = clock, // ignore: prefer_initializing_formals
+       _assetPath = assetPath; // ignore: prefer_initializing_formals
 
   final Clock _clock;
   final String _assetPath;
@@ -43,7 +43,8 @@ class IngredientSeedDataSource {
     final aliases = ((m['aliases'] as List?) ?? const []).cast<String>();
     final parentTokens = ((m['parentTokens'] as List?) ?? const [])
         .cast<String>();
-    final taxonomyTags = ((m['taxonomyTags'] as List?) ?? const []).cast<String>();
+    final taxonomyTags = ((m['taxonomyTags'] as List?) ?? const [])
+        .cast<String>();
     final formTags = ((m['formTags'] as List?) ?? const []).cast<String>();
     final tokens = SearchTokenizer.buildIndex(
       displayNames: Map<String, String>.from(m['displayNames'] as Map),

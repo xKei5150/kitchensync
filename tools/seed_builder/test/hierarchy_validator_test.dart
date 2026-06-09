@@ -9,61 +9,70 @@ void main() {
 
   group('HierarchyValidator', () {
     test('rejects missing parent references', () {
-      final errors = HierarchyValidator.validate(seed([
-        {
-          'id': 'white-onion',
-          'displayNames': {'en': 'White onion'},
-          'parentIngredientId': 'onion',
-          'category': 'produce',
-          'defaultUnit': 'piece',
-          'allowedUnits': ['piece'],
-        },
-      ]));
+      final errors = HierarchyValidator.validate(
+        seed([
+          {
+            'id': 'white-onion',
+            'displayNames': {'en': 'White onion'},
+            'parentIngredientId': 'onion',
+            'category': 'produce',
+            'defaultUnit': 'piece',
+            'allowedUnits': ['piece'],
+          },
+        ]),
+      );
 
       expect(errors.map((error) => error.code), contains('missing_parent'));
     });
 
     test('rejects hierarchy cycles', () {
-      final errors = HierarchyValidator.validate(seed([
-        {
-          'id': 'onion',
-          'displayNames': {'en': 'Onion'},
-          'parentIngredientId': 'white-onion',
-          'category': 'produce',
-          'defaultUnit': 'piece',
-          'allowedUnits': ['piece'],
-        },
-        {
-          'id': 'white-onion',
-          'displayNames': {'en': 'White onion'},
-          'parentIngredientId': 'onion',
-          'category': 'produce',
-          'defaultUnit': 'piece',
-          'allowedUnits': ['piece'],
-        },
-      ]));
+      final errors = HierarchyValidator.validate(
+        seed([
+          {
+            'id': 'onion',
+            'displayNames': {'en': 'Onion'},
+            'parentIngredientId': 'white-onion',
+            'category': 'produce',
+            'defaultUnit': 'piece',
+            'allowedUnits': ['piece'],
+          },
+          {
+            'id': 'white-onion',
+            'displayNames': {'en': 'White onion'},
+            'parentIngredientId': 'onion',
+            'category': 'produce',
+            'defaultUnit': 'piece',
+            'allowedUnits': ['piece'],
+          },
+        ]),
+      );
 
       expect(errors.map((error) => error.code), contains('cycle'));
     });
 
     test('rejects invalid tags and categories', () {
-      final errors = HierarchyValidator.validate(seed([
-        {
-          'id': 'x',
-          'displayNames': {'en': 'X'},
-          'category': 'badCategory',
-          'defaultUnit': 'piece',
-          'allowedUnits': ['piece'],
-          'taxonomyTags': ['fakeFamily'],
-          'formTags': ['fakeForm'],
-        },
-      ]));
+      final errors = HierarchyValidator.validate(
+        seed([
+          {
+            'id': 'x',
+            'displayNames': {'en': 'X'},
+            'category': 'badCategory',
+            'defaultUnit': 'piece',
+            'allowedUnits': ['piece'],
+            'taxonomyTags': ['fakeFamily'],
+            'formTags': ['fakeForm'],
+          },
+        ]),
+      );
 
-      expect(errors.map((error) => error.code), containsAll([
-        'invalid_category',
-        'invalid_taxonomy_tag',
-        'invalid_form_tag',
-      ]));
+      expect(
+        errors.map((error) => error.code),
+        containsAll([
+          'invalid_category',
+          'invalid_taxonomy_tag',
+          'invalid_form_tag',
+        ]),
+      );
     });
   });
 }

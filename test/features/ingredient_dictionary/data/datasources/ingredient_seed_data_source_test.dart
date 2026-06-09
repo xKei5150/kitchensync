@@ -9,7 +9,7 @@ class _FixedClock implements Clock {
   const _FixedClock();
 
   @override
-  DateTime now() => DateTime.utc(2026, 1, 1);
+  DateTime now() => DateTime.utc(2026);
 }
 
 void main() {
@@ -38,20 +38,20 @@ void main() {
             'status': 'accepted',
             'confidence': 0.91,
             'source': 'llm-assisted',
-            'notes': 'Common onion variant.'
-          }
-        }
-      ]
+            'notes': 'Common onion variant.',
+          },
+        },
+      ],
     });
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMessageHandler(channel, (message) async {
-      final key = const StringCodec().decodeMessage(message);
-      if (key == 'test_assets/ingredients.json') {
-        return const StringCodec().encodeMessage(seed);
-      }
-      return null;
-    });
+          final key = const StringCodec().decodeMessage(message);
+          if (key == 'test_assets/ingredients.json') {
+            return const StringCodec().encodeMessage(seed);
+          }
+          return null;
+        });
 
     final dataSource = IngredientSeedDataSource(
       clock: const _FixedClock(),
@@ -64,6 +64,9 @@ void main() {
     expect(ingredient.taxonomyTags, ['allium']);
     expect(ingredient.formTags, ['fresh']);
     expect(ingredient.curation?.status, 'accepted');
-    expect(ingredient.searchTokens, containsAll(['white', 'onion', 'allium', 'fresh']));
+    expect(
+      ingredient.searchTokens,
+      containsAll(['white', 'onion', 'allium', 'fresh']),
+    );
   });
 }
