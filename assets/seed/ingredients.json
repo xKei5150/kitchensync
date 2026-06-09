@@ -897,7 +897,7 @@
     {
       "id": "grape-tomato",
       "displayNames": {
-        "en": "Grape Tomato"
+        "en": "Grape tomato"
       },
       "category": "produce",
       "defaultUnit": "g",
@@ -906,7 +906,20 @@
         "kg",
         "piece"
       ],
-      "defaultShelfLifeDays": null
+      "defaultShelfLifeDays": null,
+      "parentIngredientId": "tomato",
+      "aliases": [],
+      "taxonomyTags": [],
+      "formTags": [
+        "fresh"
+      ],
+      "isNonFood": false,
+      "curation": {
+        "status": "accepted",
+        "confidence": 0.88,
+        "source": "llm-assisted",
+        "notes": "Grape tomato is a tomato variant."
+      }
     },
     {
       "id": "iodized-table-salt",
@@ -981,7 +994,7 @@
     {
       "id": "whole-milk",
       "displayNames": {
-        "en": "Whole Milk"
+        "en": "Whole milk"
       },
       "category": "dairy",
       "defaultUnit": "ml",
@@ -990,7 +1003,20 @@
         "l",
         "cup"
       ],
-      "defaultShelfLifeDays": null
+      "defaultShelfLifeDays": null,
+      "parentIngredientId": "milk",
+      "aliases": [],
+      "taxonomyTags": [],
+      "formTags": [
+        "fresh"
+      ],
+      "isNonFood": false,
+      "curation": {
+        "status": "accepted",
+        "confidence": 0.9,
+        "source": "llm-assisted",
+        "notes": "Whole milk is a milk variant."
+      }
     },
     {
       "id": "beef-frankfurter",

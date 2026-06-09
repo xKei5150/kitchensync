@@ -1,0 +1,28 @@
+{
+  "proposals": [
+    {
+      "id": "grape-tomato",
+      "displayNameEn": "Grape tomato",
+      "parentIngredientId": "tomato",
+      "category": "produce",
+      "aliases": [],
+      "taxonomyTags": [],
+      "formTags": ["fresh"],
+      "isNonFood": false,
+      "confidence": 0.88,
+      "reason": "Grape tomato is a tomato variant."
+    },
+    {
+      "id": "whole-milk",
+      "displayNameEn": "Whole milk",
+      "parentIngredientId": "milk",
+      "category": "dairy",
+      "aliases": [],
+      "taxonomyTags": [],
+      "formTags": ["fresh"],
+      "isNonFood": false,
+      "confidence": 0.90,
+      "reason": "Whole milk is a milk variant."
+    }
+  ]
+}
