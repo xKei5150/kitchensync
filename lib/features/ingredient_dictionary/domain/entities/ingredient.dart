@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/image_attribution.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient_curation.dart';
 
 part 'ingredient.freezed.dart';
 part 'ingredient.g.dart';
@@ -21,6 +22,9 @@ class Ingredient with _$Ingredient {
     String? imageUrl,
     String? barcode,
     @Default(<String>[]) List<String> aliases,
+    @Default(<String>[]) List<String> taxonomyTags,
+    @Default(<String>[]) List<String> formTags,
+    IngredientCuration? curation,
     @Default(<String>[]) List<String> searchTokens,
     @Default(<Allergen>[]) List<Allergen> allergens,
     @Default(<DietaryTag>[]) List<DietaryTag> dietaryTags,
