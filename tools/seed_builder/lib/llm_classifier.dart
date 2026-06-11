@@ -114,7 +114,7 @@ class AnthropicIngredientClassifier implements IngredientClassifier {
 }
 
 List<IngredientCurationProposal> parseClassifierResponse(String raw) {
-  final decoded = jsonDecode(raw) as Map<String, Object?>;
+  final decoded = jsonDecode(_stripCodeFence(raw)) as Map<String, Object?>;
   final proposals = ((decoded['proposals'] as List?) ?? const []);
   return proposals
       .map(
@@ -123,6 +123,20 @@ List<IngredientCurationProposal> parseClassifierResponse(String raw) {
         ),
       )
       .toList(growable: false);
+}
+
+/// Strips a Markdown code fence (```` ``` ```` or ```` ```json ````) that some
+/// models wrap JSON output in, so the payload can be decoded directly.
+String _stripCodeFence(String raw) {
+  var text = raw.trim();
+  if (!text.startsWith('```')) return text;
+  final firstNewline = text.indexOf('\n');
+  if (firstNewline == -1) return text;
+  text = text.substring(firstNewline + 1).trimRight();
+  if (text.endsWith('```')) {
+    text = text.substring(0, text.length - 3);
+  }
+  return text.trim();
 }
 
 const _systemPrompt = '''
