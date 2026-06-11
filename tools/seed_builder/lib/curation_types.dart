@@ -1,5 +1,14 @@
 enum CurationStatus { accepted, needsReview }
 
+/// AGROVOC released under CC-BY 3.0 IGO (attribute FAO).
+const agrovocCoreLangs = <String>['en', 'fr', 'es', 'ru', 'ar', 'zh'];
+
+/// Extra app-target languages; AGROVOC coverage is uneven and licensing is
+/// non-core, so missing extras are reported, never gated.
+const agrovocExtraLangs = <String>['ja', 'vi', 'th', 'ko'];
+
+const agrovocTargetLangs = <String>[...agrovocCoreLangs, ...agrovocExtraLangs];
+
 const allowedTaxonomyTags = <String>{
   'allium',
   'berry',
@@ -32,12 +41,16 @@ class CurationMetadata {
     required this.confidence,
     required this.source,
     required this.notes,
+    this.agrovocConfidence,
+    this.agrovocStatus,
   });
 
   final CurationStatus status;
   final double confidence;
   final String source;
   final String notes;
+  final double? agrovocConfidence;
+  final String? agrovocStatus;
 
   factory CurationMetadata.fromMap(Map<String, Object?> map) {
     final statusName = map['status'] as String? ?? 'needsReview';
@@ -49,6 +62,8 @@ class CurationMetadata {
       confidence: (map['confidence'] as num? ?? 0).toDouble(),
       source: map['source'] as String? ?? 'unknown',
       notes: map['notes'] as String? ?? '',
+      agrovocConfidence: (map['agrovocConfidence'] as num?)?.toDouble(),
+      agrovocStatus: map['agrovocStatus'] as String?,
     );
   }
 
@@ -57,6 +72,8 @@ class CurationMetadata {
     'confidence': confidence,
     'source': source,
     'notes': notes,
+    if (agrovocConfidence != null) 'agrovocConfidence': agrovocConfidence,
+    if (agrovocStatus != null) 'agrovocStatus': agrovocStatus,
   };
 }
 
@@ -72,6 +89,8 @@ class IngredientCurationProposal {
     required this.isNonFood,
     required this.confidence,
     required this.reason,
+    this.agrovocUri,
+    this.agrovocConfidence = 0.0,
   });
 
   final String id;
@@ -84,6 +103,8 @@ class IngredientCurationProposal {
   final bool isNonFood;
   final double confidence;
   final String reason;
+  final String? agrovocUri;
+  final double agrovocConfidence;
 
   factory IngredientCurationProposal.fromMap(Map<String, Object?> map) {
     return IngredientCurationProposal(
@@ -98,6 +119,11 @@ class IngredientCurationProposal {
       // LLM output is untrusted: clamp confidence into the documented range.
       confidence: (map['confidence'] as num? ?? 0).toDouble().clamp(0.0, 1.0),
       reason: map['reason'] as String? ?? '',
+      agrovocUri: map['agrovocUri'] as String?,
+      agrovocConfidence: (map['agrovocConfidence'] as num? ?? 0)
+          .toDouble()
+          .clamp(0.0, 1.0)
+          .toDouble(),
     );
   }
 }
