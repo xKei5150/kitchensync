@@ -73,7 +73,8 @@ class IngredientSeed {
           double? agrovocConfidence;
           if (agrovocEnabled) {
             agrovocConfidence = proposal.agrovocConfidence;
-            if (proposal.agrovocUri == null || proposal.agrovocUri!.isEmpty) {
+            final agrovocUri = proposal.agrovocUri;
+            if (agrovocUri == null || agrovocUri.isEmpty) {
               agrovocStatus = 'unmatched';
             } else {
               final missingCore = agrovocCoreLangs.where((lang) {
