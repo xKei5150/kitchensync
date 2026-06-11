@@ -8,6 +8,7 @@ import 'package:seed_builder/curation_types.dart';
 abstract interface class AgrovocSource {
   Future<List<AgrovocCandidate>> search(String query, {int maxHits});
   Future<AgrovocLabels> labels(String uri, Set<String> langs);
+  void close();
 }
 
 class RestAgrovocClient implements AgrovocSource {
@@ -49,6 +50,9 @@ class RestAgrovocClient implements AgrovocSource {
       altLabelsEn: parseAltLabels(decoded, uri, 'en'),
     );
   }
+
+  @override
+  void close() => _client.close();
 
   Future<Map<String, Object?>> _getJson(Uri url, File cacheFile) async {
     if (cacheFile.existsSync()) {
@@ -95,6 +99,9 @@ class FixtureAgrovocSource implements AgrovocSource {
       altLabelsEn: parseAltLabels(decoded, uri, 'en'),
     );
   }
+
+  @override
+  void close() {}
 }
 
 /// One search per ingredient, keyed by id. Ingredients with a blank English

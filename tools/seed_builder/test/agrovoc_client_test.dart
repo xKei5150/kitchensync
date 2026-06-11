@@ -100,6 +100,17 @@ void main() {
     expect(candidates['milk']!.single.uri, 'http://x/c_1');
   });
 
+  test('RestAgrovocClient.close() releases the injected http client', () {
+    final client = MockClient((request) async => http.Response('', 200));
+    final rest = RestAgrovocClient(cacheDir: tempDir.path, client: client);
+    expect(rest.close, returnsNormally);
+  });
+
+  test('FixtureAgrovocSource.close() is a no-op and does not throw', () {
+    final source = FixtureAgrovocSource();
+    expect(source.close, returnsNormally);
+  });
+
   test('fetchAgrovocLabels only fetches proposals with a URI', () async {
     const uri = 'http://x/c_1';
     final source = FixtureAgrovocSource(
