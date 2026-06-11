@@ -110,7 +110,12 @@ void main() {
         client: client,
       );
 
-      await classifier.classify(const []);
+      await classifier.classify([
+        {
+          'id': 'milk',
+          'displayNames': {'en': 'Milk'},
+        },
+      ]);
 
       expect(seen.url.toString(), 'https://api.anthropic.com/v1/messages');
       expect(seen.headers['x-api-key'], 'sk-test');
@@ -141,7 +146,12 @@ void main() {
       client: client,
     );
 
-    await classifier.classify(const []);
+    await classifier.classify([
+      {
+        'id': 'milk',
+        'displayNames': {'en': 'Milk'},
+      },
+    ]);
 
     expect(
       seen.url.toString(),
@@ -174,7 +184,12 @@ void main() {
       client: client,
     );
 
-    await classifier.classify(const []);
+    await classifier.classify([
+      {
+        'id': 'milk',
+        'displayNames': {'en': 'Milk'},
+      },
+    ]);
 
     expect(
       seen.url.toString(),
@@ -210,6 +225,123 @@ void main() {
           '```\n';
       expect(parseClassifierResponse(raw), isEmpty);
     });
+  });
+
+  test('batches ingredients across multiple calls and concatenates', () async {
+    final batchSizes = <int>[];
+    var call = 0;
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, Object?>;
+      final content =
+          jsonDecode((body['messages'] as List).first['content'] as String)
+              as Map<String, Object?>;
+      final batch = (content['ingredients'] as List).cast<Map>();
+      batchSizes.add(batch.length);
+      // Echo one proposal per ingredient in the batch.
+      final proposals = [
+        for (final ingredient in batch)
+          {'id': ingredient['id'], 'displayNameEn': 'X', 'category': 'other'},
+      ];
+      call += 1;
+      return http.Response(
+        jsonEncode({
+          'content': [
+            {
+              'type': 'text',
+              'text': jsonEncode({'proposals': proposals}),
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final classifier = AnthropicIngredientClassifier(
+      apiKey: 'test',
+      model: 'm',
+      batchSize: 2,
+      client: client,
+    );
+
+    final ingredients = [
+      for (var i = 0; i < 5; i++)
+        {
+          'id': 'i$i',
+          'displayNames': {'en': 'I$i'},
+        },
+    ];
+    final proposals = await classifier.classify(ingredients);
+
+    expect(call, 3); // ceil(5 / 2)
+    expect(batchSizes, [2, 2, 1]);
+    expect(proposals.map((p) => p.id), ['i0', 'i1', 'i2', 'i3', 'i4']);
+  });
+
+  test('each batch carries only its own ingredients\' candidates', () async {
+    final seenCandidateKeys = <List<String>>[];
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, Object?>;
+      final content =
+          jsonDecode((body['messages'] as List).first['content'] as String)
+              as Map<String, Object?>;
+      seenCandidateKeys.add(
+        (content['agrovocCandidates'] as Map).keys.cast<String>().toList(),
+      );
+      return http.Response(
+        jsonEncode({
+          'content': [
+            {
+              'type': 'text',
+              'text': jsonEncode({'proposals': []}),
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final classifier = AnthropicIngredientClassifier(
+      apiKey: 'test',
+      model: 'm',
+      batchSize: 1,
+      client: client,
+    );
+
+    await classifier.classify(
+      [
+        {
+          'id': 'a',
+          'displayNames': {'en': 'A'},
+        },
+        {
+          'id': 'b',
+          'displayNames': {'en': 'B'},
+        },
+      ],
+      agrovocCandidates: {
+        'a': const [AgrovocCandidate(uri: 'http://x/a', prefLabel: 'a')],
+        'b': const [AgrovocCandidate(uri: 'http://x/b', prefLabel: 'b')],
+      },
+    );
+
+    expect(seenCandidateKeys, [
+      ['a'],
+      ['b'],
+    ]);
+  });
+
+  test('empty ingredient list makes no API call', () async {
+    var called = false;
+    final client = MockClient((request) async {
+      called = true;
+      return http.Response('{}', 200);
+    });
+    final classifier = AnthropicIngredientClassifier(
+      apiKey: 'test',
+      model: 'm',
+      client: client,
+    );
+    final proposals = await classifier.classify(const []);
+    expect(called, isFalse);
+    expect(proposals, isEmpty);
   });
 
   test('classify works with no candidates (back-compat)', () async {

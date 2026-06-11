@@ -40,26 +40,61 @@ class AnthropicIngredientClassifier implements IngredientClassifier {
     this.apiKey,
     this.authToken,
     this.baseUrl = 'https://api.anthropic.com',
+    this.batchSize = 25,
     this.timeout = const Duration(minutes: 5),
     http.Client? client,
+    void Function(String message)? onProgress,
   }) : assert(
          apiKey != null || authToken != null,
          'Provide either apiKey (x-api-key) or authToken (Bearer).',
        ),
-       _client = client ?? http.Client();
+       assert(batchSize > 0, 'batchSize must be positive.'),
+       _client = client ?? http.Client(),
+       _onProgress = onProgress;
 
   final String model;
   final String? apiKey;
   final String? authToken;
   final String baseUrl;
+
+  /// Max ingredients per LLM request. The seed has hundreds of ingredients and
+  /// one response cannot hold that many proposals within the token cap, so the
+  /// work is split into batches and the proposals are concatenated.
+  final int batchSize;
   final Duration timeout;
   final http.Client _client;
+  final void Function(String message)? _onProgress;
 
   @override
   Future<List<IngredientCurationProposal>> classify(
     List<Map<String, Object?>> ingredients, {
     Map<String, List<AgrovocCandidate>> agrovocCandidates = const {},
   }) async {
+    if (ingredients.isEmpty) return const [];
+    final batchCount = (ingredients.length + batchSize - 1) ~/ batchSize;
+    final proposals = <IngredientCurationProposal>[];
+    for (
+      var start = 0, batch = 1;
+      start < ingredients.length;
+      start += batchSize, batch++
+    ) {
+      final end = (start + batchSize) > ingredients.length
+          ? ingredients.length
+          : start + batchSize;
+      final slice = ingredients.sublist(start, end);
+      _onProgress?.call(
+        'Classifying batch $batch/$batchCount (${slice.length} ingredients)...',
+      );
+      proposals.addAll(await _classifyBatch(slice, agrovocCandidates));
+    }
+    return List.unmodifiable(proposals);
+  }
+
+  Future<List<IngredientCurationProposal>> _classifyBatch(
+    List<Map<String, Object?>> ingredients,
+    Map<String, List<AgrovocCandidate>> agrovocCandidates,
+  ) async {
+    final batchIds = {for (final ingredient in ingredients) ingredient['id']};
     final endpoint = '${baseUrl.replaceAll(RegExp(r'/+$'), '')}/v1/messages';
     final response = await _client
         .post(
@@ -85,9 +120,11 @@ class AnthropicIngredientClassifier implements IngredientClassifier {
                   'allowedFormTags': allowedFormTags.toList()..sort(),
                   'agrovocCandidates': {
                     for (final entry in agrovocCandidates.entries)
-                      entry.key: [
-                        for (final candidate in entry.value) candidate.toJson(),
-                      ],
+                      if (batchIds.contains(entry.key))
+                        entry.key: [
+                          for (final candidate in entry.value)
+                            candidate.toJson(),
+                        ],
                   },
                 }),
               },

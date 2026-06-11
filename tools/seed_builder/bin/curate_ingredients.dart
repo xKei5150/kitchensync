@@ -117,11 +117,15 @@ AnthropicIngredientClassifier _buildAnthropicClassifier(
     );
   }
 
+  final batchSize = int.tryParse(_arg(args, '--batch-size') ?? '') ?? 25;
+
   return AnthropicIngredientClassifier(
     model: model,
     authToken: authToken,
     apiKey: authToken == null ? apiKey : null,
     baseUrl: baseUrl,
+    batchSize: batchSize,
+    onProgress: stdout.writeln,
   );
 }
 
