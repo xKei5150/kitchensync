@@ -28,15 +28,30 @@ class FixtureIngredientClassifier implements IngredientClassifier {
 }
 
 class AnthropicIngredientClassifier implements IngredientClassifier {
+  /// Talks to the Anthropic Messages API, or any Anthropic-compatible proxy
+  /// (e.g. a CCS profile exposing `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`).
+  ///
+  /// Supply [authToken] for `Authorization: Bearer` auth (the proxy/SDK
+  /// convention) or [apiKey] for `x-api-key`. At least one is required.
+  /// [baseUrl] must NOT include the `/v1` suffix — it is appended, matching the
+  /// official Anthropic SDK.
   AnthropicIngredientClassifier({
-    required this.apiKey,
     required this.model,
+    this.apiKey,
+    this.authToken,
+    this.baseUrl = 'https://api.anthropic.com',
     this.timeout = const Duration(minutes: 5),
     http.Client? client,
-  }) : _client = client ?? http.Client();
+  }) : assert(
+         apiKey != null || authToken != null,
+         'Provide either apiKey (x-api-key) or authToken (Bearer).',
+       ),
+       _client = client ?? http.Client();
 
-  final String apiKey;
   final String model;
+  final String? apiKey;
+  final String? authToken;
+  final String baseUrl;
   final Duration timeout;
   final http.Client _client;
 
@@ -45,13 +60,17 @@ class AnthropicIngredientClassifier implements IngredientClassifier {
     List<Map<String, Object?>> ingredients, {
     Map<String, List<AgrovocCandidate>> agrovocCandidates = const {},
   }) async {
+    final endpoint = '${baseUrl.replaceAll(RegExp(r'/+$'), '')}/v1/messages';
     final response = await _client
         .post(
-          Uri.parse('https://api.anthropic.com/v1/messages'),
+          Uri.parse(endpoint),
           headers: {
             'content-type': 'application/json',
-            'x-api-key': apiKey,
             'anthropic-version': '2023-06-01',
+            if (authToken != null)
+              'authorization': 'Bearer $authToken'
+            else if (apiKey != null)
+              'x-api-key': apiKey!,
           },
           body: jsonEncode({
             'model': model,

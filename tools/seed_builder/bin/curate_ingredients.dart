@@ -22,10 +22,7 @@ Future<void> main(List<String> args) async {
 
   final before = IngredientSeed.load(input);
   final classifier = fixturePath == null
-      ? AnthropicIngredientClassifier(
-          apiKey: _requiredEnv('ANTHROPIC_API_KEY'),
-          model: model,
-        )
+      ? _buildAnthropicClassifier(args, model)
       : FixtureIngredientClassifier(fixturePath);
 
   // Compute candidates once, then reuse for both the LLM call and label fetch.
@@ -85,10 +82,50 @@ String? _arg(List<String> args, String name) {
   return args[index + 1];
 }
 
-String _requiredEnv(String name) {
-  final value = Platform.environment[name];
-  if (value == null || value.trim().isEmpty) {
-    throw StateError('$name is required for live LLM curation.');
+/// Builds the live classifier from CLI flags and/or environment.
+///
+/// Auth resolves in this order:
+///   1. `--anthropic-auth-token` / `ANTHROPIC_AUTH_TOKEN` → `Authorization: Bearer`
+///      (use this to route through a CCS / Anthropic-compatible proxy)
+///   2. `ANTHROPIC_API_KEY` → `x-api-key` (direct Anthropic)
+///
+/// The base URL comes from `--anthropic-base-url` / `ANTHROPIC_BASE_URL`
+/// (default `https://api.anthropic.com`), and must NOT include the `/v1` suffix.
+///
+/// To use a CCS profile:
+///   eval $(ccs env <profile> --format anthropic)
+///   dart run bin/curate_ingredients.dart --agrovoc
+AnthropicIngredientClassifier _buildAnthropicClassifier(
+  List<String> args,
+  String model,
+) {
+  final env = Platform.environment;
+  final baseUrl =
+      _arg(args, '--anthropic-base-url') ??
+      _nonEmpty(env['ANTHROPIC_BASE_URL']) ??
+      'https://api.anthropic.com';
+  final authToken =
+      _nonEmpty(_arg(args, '--anthropic-auth-token')) ??
+      _nonEmpty(env['ANTHROPIC_AUTH_TOKEN']);
+  final apiKey = _nonEmpty(env['ANTHROPIC_API_KEY']);
+
+  if (authToken == null && apiKey == null) {
+    throw StateError(
+      'Live curation needs an Anthropic credential. Set ANTHROPIC_AUTH_TOKEN '
+      '(e.g. `eval \$(ccs env <profile> --format anthropic)` to route through '
+      'the CCS proxy) or ANTHROPIC_API_KEY for direct Anthropic access.',
+    );
   }
+
+  return AnthropicIngredientClassifier(
+    model: model,
+    authToken: authToken,
+    apiKey: authToken == null ? apiKey : null,
+    baseUrl: baseUrl,
+  );
+}
+
+String? _nonEmpty(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
   return value;
 }

@@ -86,6 +86,102 @@ void main() {
     });
   });
 
+  test(
+    'apiKey uses x-api-key against the default Anthropic endpoint',
+    () async {
+      late http.Request seen;
+      final client = MockClient((request) async {
+        seen = request;
+        return http.Response(
+          jsonEncode({
+            'content': [
+              {
+                'type': 'text',
+                'text': jsonEncode({'proposals': []}),
+              },
+            ],
+          }),
+          200,
+        );
+      });
+      final classifier = AnthropicIngredientClassifier(
+        apiKey: 'sk-test',
+        model: 'm',
+        client: client,
+      );
+
+      await classifier.classify(const []);
+
+      expect(seen.url.toString(), 'https://api.anthropic.com/v1/messages');
+      expect(seen.headers['x-api-key'], 'sk-test');
+      expect(seen.headers.containsKey('authorization'), isFalse);
+    },
+  );
+
+  test('authToken + baseUrl routes through a Bearer-auth proxy', () async {
+    late http.Request seen;
+    final client = MockClient((request) async {
+      seen = request;
+      return http.Response(
+        jsonEncode({
+          'content': [
+            {
+              'type': 'text',
+              'text': jsonEncode({'proposals': []}),
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final classifier = AnthropicIngredientClassifier(
+      authToken: 'ccs-token',
+      baseUrl: 'http://127.0.0.1:8317/api/provider/claude',
+      model: 'claude-opus-4-7[1m]',
+      client: client,
+    );
+
+    await classifier.classify(const []);
+
+    expect(
+      seen.url.toString(),
+      'http://127.0.0.1:8317/api/provider/claude/v1/messages',
+    );
+    expect(seen.headers['authorization'], 'Bearer ccs-token');
+    expect(seen.headers.containsKey('x-api-key'), isFalse);
+  });
+
+  test('a trailing slash on baseUrl is normalised', () async {
+    late http.Request seen;
+    final client = MockClient((request) async {
+      seen = request;
+      return http.Response(
+        jsonEncode({
+          'content': [
+            {
+              'type': 'text',
+              'text': jsonEncode({'proposals': []}),
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final classifier = AnthropicIngredientClassifier(
+      authToken: 't',
+      baseUrl: 'http://127.0.0.1:8317/api/provider/claude/',
+      model: 'm',
+      client: client,
+    );
+
+    await classifier.classify(const []);
+
+    expect(
+      seen.url.toString(),
+      'http://127.0.0.1:8317/api/provider/claude/v1/messages',
+    );
+  });
+
   test('classify works with no candidates (back-compat)', () async {
     final client = MockClient(
       (request) async => http.Response(
