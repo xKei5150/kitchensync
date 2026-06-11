@@ -32,7 +32,10 @@ void main() {
       final candidates = parseSearch(decoded);
       expect(candidates.map((c) => c.uri), ['http://x/c_1', 'http://x/c_2']);
       expect(candidates.first.prefLabel, 'green beans');
-      expect(candidates.first.toJson(), {'uri': 'http://x/c_1', 'label': 'green beans'});
+      expect(candidates.first.toJson(), {
+        'uri': 'http://x/c_1',
+        'label': 'green beans',
+      });
     });
 
     test('tolerates a missing prefLabel', () {
@@ -70,7 +73,10 @@ void main() {
           },
         ],
       };
-      expect(parseLabels(decoded, uri, {'en', 'fr'}), {'en': 'milk', 'fr': 'lait'});
+      expect(parseLabels(decoded, uri, {'en', 'fr'}), {
+        'en': 'milk',
+        'fr': 'lait',
+      });
     });
 
     test('handles a single prefLabel object (not a list)', () {

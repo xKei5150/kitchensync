@@ -30,9 +30,7 @@ class RestAgrovocClient implements AgrovocSource {
       '$baseUrl/search/?query=${Uri.encodeQueryComponent(query)}'
       '&lang=en&maxhits=$maxHits',
     );
-    final file = File(
-      '$cacheDir/search/${stableHash('$query|$maxHits')}.json',
-    );
+    final file = File('$cacheDir/search/${stableHash('$query|$maxHits')}.json');
     return parseSearch(await _getJson(url, file));
   }
 
@@ -87,8 +85,7 @@ class FixtureAgrovocSource implements AgrovocSource {
   Future<List<AgrovocCandidate>> search(
     String query, {
     int maxHits = 5,
-  }) async =>
-      searchResults[query] ?? const [];
+  }) async => searchResults[query] ?? const [];
 
   @override
   Future<AgrovocLabels> labels(String uri, Set<String> langs) async {
@@ -114,8 +111,7 @@ Future<Map<String, List<AgrovocCandidate>>> gatherAgrovocCandidates(
   final out = <String, List<AgrovocCandidate>>{};
   for (final ingredient in ingredients) {
     final id = ingredient['id'] as String;
-    final name =
-        ((ingredient['displayNames'] as Map?)?['en'] as String?) ?? '';
+    final name = ((ingredient['displayNames'] as Map?)?['en'] as String?) ?? '';
     if (name.trim().isEmpty) continue;
     out[id] = await source.search(searchQuery(name), maxHits: maxHits);
   }

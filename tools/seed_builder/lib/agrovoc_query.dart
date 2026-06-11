@@ -38,13 +38,15 @@ String searchQuery(String displayNameEn) => '*${primaryTerm(displayNameEn)}*';
 
 List<AgrovocCandidate> parseSearch(Map<String, Object?> decoded) {
   final results = (decoded['results'] as List?) ?? const [];
-  return results.map((raw) {
-    final map = Map<String, Object?>.from(raw as Map);
-    return AgrovocCandidate(
-      uri: (map['uri'] as String?) ?? '',
-      prefLabel: (map['prefLabel'] as String?) ?? '',
-    );
-  }).toList(growable: false);
+  return results
+      .map((raw) {
+        final map = Map<String, Object?>.from(raw as Map);
+        return AgrovocCandidate(
+          uri: (map['uri'] as String?) ?? '',
+          prefLabel: (map['prefLabel'] as String?) ?? '',
+        );
+      })
+      .toList(growable: false);
 }
 
 Map<String, String> parseLabels(

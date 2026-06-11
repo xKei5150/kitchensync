@@ -95,7 +95,16 @@ void main() {
       expect(agrovocCoreLangs, ['en', 'fr', 'es', 'ru', 'ar', 'zh']);
       expect(agrovocExtraLangs, ['ja', 'vi', 'th', 'ko']);
       expect(agrovocTargetLangs, [
-        'en', 'fr', 'es', 'ru', 'ar', 'zh', 'ja', 'vi', 'th', 'ko',
+        'en',
+        'fr',
+        'es',
+        'ru',
+        'ar',
+        'zh',
+        'ja',
+        'vi',
+        'th',
+        'ko',
       ]);
     });
   });
