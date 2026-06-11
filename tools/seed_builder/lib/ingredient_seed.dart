@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:seed_builder/agrovoc_query.dart';
 import 'package:seed_builder/curation_types.dart';
 
 const lowConfidenceThreshold = 0.70;
@@ -25,7 +26,11 @@ class IngredientSeed {
     return IngredientSeed.fromMap(jsonDecode(raw) as Map<String, Object?>);
   }
 
-  IngredientSeed applyProposals(List<IngredientCurationProposal> proposals) {
+  IngredientSeed applyProposals(
+    List<IngredientCurationProposal> proposals, {
+    Map<String, AgrovocLabels> agrovocLabels = const {},
+    bool agrovocEnabled = false,
+  }) {
     final proposalById = {
       for (final proposal in proposals) proposal.id: proposal,
     };
@@ -44,13 +49,55 @@ class IngredientSeed {
             if (proposal.displayNameEn.trim().isNotEmpty)
               'en': proposal.displayNameEn,
           };
+
+          final labels = agrovocEnabled ? agrovocLabels[id] : null;
+          if (labels != null) {
+            for (final entry in labels.prefLabels.entries) {
+              // English stays as the seed/LLM name; AGROVOC fills the rest.
+              if (entry.key == 'en') continue;
+              if (entry.value.trim().isEmpty) continue;
+              displayNames[entry.key] = entry.value;
+            }
+          }
+
+          final aliases = <String>{
+            ...proposal.aliases,
+            if (labels != null) ...labels.altLabelsEn,
+          }.toList(growable: false);
+
+          var status = proposal.confidence >= lowConfidenceThreshold
+              ? CurationStatus.accepted
+              : CurationStatus.needsReview;
+
+          String? agrovocStatus;
+          double? agrovocConfidence;
+          if (agrovocEnabled) {
+            agrovocConfidence = proposal.agrovocConfidence;
+            final agrovocUri = proposal.agrovocUri;
+            if (agrovocUri == null || agrovocUri.isEmpty) {
+              agrovocStatus = 'unmatched';
+            } else {
+              final missingCore = agrovocCoreLangs.where((lang) {
+                final value = displayNames[lang] as String?;
+                return value == null || value.trim().isEmpty;
+              });
+              if (proposal.agrovocConfidence < lowConfidenceThreshold ||
+                  missingCore.isNotEmpty) {
+                agrovocStatus = 'needsReview';
+                status = CurationStatus.needsReview;
+              } else {
+                agrovocStatus = 'matched';
+              }
+            }
+          }
+
           final curation = CurationMetadata(
-            status: proposal.confidence >= lowConfidenceThreshold
-                ? CurationStatus.accepted
-                : CurationStatus.needsReview,
+            status: status,
             confidence: proposal.confidence,
-            source: 'llm-assisted',
+            source: agrovocEnabled ? 'llm-assisted+agrovoc' : 'llm-assisted',
             notes: proposal.reason,
+            agrovocConfidence: agrovocConfidence,
+            agrovocStatus: agrovocStatus,
           );
 
           return <String, Object?>{
@@ -61,10 +108,11 @@ class IngredientSeed {
             else
               'parentIngredientId': proposal.parentIngredientId,
             'category': proposal.category,
-            'aliases': proposal.aliases,
+            'aliases': aliases,
             'taxonomyTags': proposal.taxonomyTags,
             'formTags': proposal.formTags,
             'isNonFood': proposal.isNonFood,
+            if (agrovocEnabled) 'agrovocUri': proposal.agrovocUri,
             'curation': curation.toMap(),
           };
         })

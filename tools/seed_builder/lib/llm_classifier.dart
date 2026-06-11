@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:seed_builder/agrovoc_query.dart';
 import 'package:seed_builder/curation_types.dart';
 
 abstract interface class IngredientClassifier {
   Future<List<IngredientCurationProposal>> classify(
-    List<Map<String, Object?>> ingredients,
-  );
+    List<Map<String, Object?>> ingredients, {
+    Map<String, List<AgrovocCandidate>> agrovocCandidates,
+  });
 }
 
 class FixtureIngredientClassifier implements IngredientClassifier {
@@ -17,8 +19,9 @@ class FixtureIngredientClassifier implements IngredientClassifier {
 
   @override
   Future<List<IngredientCurationProposal>> classify(
-    List<Map<String, Object?>> ingredients,
-  ) async {
+    List<Map<String, Object?>> ingredients, {
+    Map<String, List<AgrovocCandidate>> agrovocCandidates = const {},
+  }) async {
     final raw = await File(path).readAsString();
     return parseClassifierResponse(raw);
   }
@@ -39,8 +42,9 @@ class AnthropicIngredientClassifier implements IngredientClassifier {
 
   @override
   Future<List<IngredientCurationProposal>> classify(
-    List<Map<String, Object?>> ingredients,
-  ) async {
+    List<Map<String, Object?>> ingredients, {
+    Map<String, List<AgrovocCandidate>> agrovocCandidates = const {},
+  }) async {
     final response = await _client
         .post(
           Uri.parse('https://api.anthropic.com/v1/messages'),
@@ -60,6 +64,12 @@ class AnthropicIngredientClassifier implements IngredientClassifier {
                   'ingredients': ingredients,
                   'allowedTaxonomyTags': allowedTaxonomyTags.toList()..sort(),
                   'allowedFormTags': allowedFormTags.toList()..sort(),
+                  'agrovocCandidates': {
+                    for (final entry in agrovocCandidates.entries)
+                      entry.key: [
+                        for (final candidate in entry.value) candidate.toJson(),
+                      ],
+                  },
                 }),
               },
             ],
@@ -98,7 +108,7 @@ List<IngredientCurationProposal> parseClassifierResponse(String raw) {
 
 const _systemPrompt = '''
 You classify KitchenSync ingredient seed records. Return only JSON with this shape:
-{"proposals":[{"id":"string","displayNameEn":"string","parentIngredientId":null,"category":"produce","aliases":[],"taxonomyTags":[],"formTags":[],"isNonFood":false,"confidence":0.0,"reason":"string"}]}
+{"proposals":[{"id":"string","displayNameEn":"string","parentIngredientId":null,"category":"produce","aliases":[],"taxonomyTags":[],"formTags":[],"isNonFood":false,"agrovocUri":null,"agrovocConfidence":0.0,"confidence":0.0,"reason":"string"}]}
 Rules:
 - Do not invent or remove ingredient ids.
 - Use parentIngredientId only for real selectable ingredient parents.
@@ -106,5 +116,8 @@ Rules:
 - Prepared and packaged edible foods should stay edible and receive formTags.
 - Questionable non-food entries should set isNonFood true rather than being removed.
 - Use only allowed taxonomyTags and allowed formTags from the user payload.
+- For each ingredient you receive agrovocCandidates ([{uri,label}]). Choose the single
+  candidate uri that names the SAME edible ingredient, or null if none fits. Put it in
+  agrovocUri and set agrovocConfidence between 0 and 1. Do not invent uris.
 - Keep confidence between 0 and 1.
 ''';
