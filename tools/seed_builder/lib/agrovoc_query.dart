@@ -41,7 +41,7 @@ List<AgrovocCandidate> parseSearch(Map<String, Object?> decoded) {
   return results.map((raw) {
     final map = Map<String, Object?>.from(raw as Map);
     return AgrovocCandidate(
-      uri: map['uri'] as String,
+      uri: (map['uri'] as String?) ?? '',
       prefLabel: (map['prefLabel'] as String?) ?? '',
     );
   }).toList(growable: false);
@@ -79,27 +79,31 @@ List<String> parseAltLabels(
       .toList(growable: false);
 }
 
-/// Deterministic 64-bit FNV-1a hash, hex-encoded. Used for cache filenames so
+/// Deterministic 64-bit hash, hex-encoded. Used for cache filenames so
 /// the committed cache is stable across runs and machines.
 ///
+/// Two independent 32-bit FNV-1a passes, each starting from its own fixed
+/// offset basis, each iterating the input bytes independently. Results are
+/// concatenated as two 8-char hex halves for a 16-char output.
 /// Dart integers are 64-bit signed, so we work with 32-bit halves to stay in
-/// the unsigned range and produce a consistent 16-hex-char output.
+/// the unsigned range.
 String stableHash(String input) {
-  // FNV-1a over 32 bits to avoid signed-integer overflow in Dart VM.
-  const fnvOffset = 0x811c9dc5;
   const fnvPrime = 0x01000193;
   const mask32 = 0xFFFFFFFF;
 
-  var hash = fnvOffset;
+  // Pass 1: standard FNV-1a 32-bit offset basis.
+  var hash1 = 0x811c9dc5;
   for (final unit in input.codeUnits) {
-    hash = ((hash ^ unit) * fnvPrime) & mask32;
+    hash1 = ((hash1 ^ unit) * fnvPrime) & mask32;
   }
-  // Extend to 16 hex chars by doubling: run a second pass seeded from first.
-  var hash2 = (hash ^ 0x5f3759df) * fnvPrime & mask32;
+
+  // Pass 2: independent FNV-1a with a distinct fixed offset basis.
+  var hash2 = 0x6b43a9b5;
   for (final unit in input.codeUnits) {
     hash2 = ((hash2 ^ unit) * fnvPrime) & mask32;
   }
-  final hi = hash.toRadixString(16).padLeft(8, '0');
+
+  final hi = hash1.toRadixString(16).padLeft(8, '0');
   final lo = hash2.toRadixString(16).padLeft(8, '0');
   return '$hi$lo';
 }

@@ -43,6 +43,15 @@ void main() {
       });
       expect(candidates.single.prefLabel, '');
     });
+
+    test('tolerates a missing uri (yields empty string, does not throw)', () {
+      final candidates = parseSearch({
+        'results': [
+          {'prefLabel': 'some label'},
+        ],
+      });
+      expect(candidates.single.uri, '');
+    });
   });
 
   group('parseLabels', () {
