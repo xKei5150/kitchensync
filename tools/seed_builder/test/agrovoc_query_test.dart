@@ -112,6 +112,22 @@ void main() {
     expect(parseAltLabels(decoded, uri, 'en'), ['whole milk']);
   });
 
+  test('parseAltLabels skips entries missing a value without throwing', () {
+    const uri = 'http://x/c_1';
+    final decoded = {
+      'graph': [
+        {
+          'uri': uri,
+          'altLabel': [
+            {'lang': 'en'}, // no value — must be skipped, not throw
+            {'lang': 'en', 'value': 'whole milk'},
+          ],
+        },
+      ],
+    };
+    expect(parseAltLabels(decoded, uri, 'en'), ['whole milk']);
+  });
+
   test('stableHash is deterministic and hex', () {
     expect(stableHash('milk|5'), stableHash('milk|5'));
     expect(stableHash('a'), matches(RegExp(r'^[0-9a-f]{16}$')));

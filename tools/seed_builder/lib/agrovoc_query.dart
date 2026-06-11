@@ -76,7 +76,8 @@ List<String> parseAltLabels(
   if (node == null) return const [];
   return _entries(node['altLabel'])
       .where((entry) => entry['lang'] == lang)
-      .map((entry) => entry['value'] as String)
+      .map((entry) => entry['value'] as String?)
+      .whereType<String>()
       .where((value) => value.trim().isNotEmpty)
       .toList(growable: false);
 }
