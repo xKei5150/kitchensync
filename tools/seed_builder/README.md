@@ -21,3 +21,21 @@ One-time tool to bootstrap `assets/seed/ingredients.json` from USDA FoodData Cen
 6. Commit.
 
 The script is idempotent — running it again skips entries whose id already exists.
+
+## AGROVOC multilingual enrichment
+
+`curate_ingredients.dart --agrovoc` fills `displayNames` for
+en, fr, es, ru, ar, zh (CC-BY 3.0 IGO — **attribute FAO**) plus
+ja, vi, th, ko (non-core: licensing rests with the authorizing institution —
+review before release). The LLM picks the AGROVOC concept from candidates we
+search; we then fetch that concept's labels. Responses are cached under
+`.agrovoc-cache/` (committed) so re-runs are offline and deterministic.
+
+Run live:
+
+```
+ANTHROPIC_API_KEY=… dart run bin/curate_ingredients.dart --agrovoc
+```
+
+Attribution: AGROVOC © FAO, used under CC-BY 3.0 IGO. See
+https://www.fao.org/agrovoc/. Surface this notice in the app's about screen.
