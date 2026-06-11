@@ -1,6 +1,9 @@
 import 'dart:io';
 
+import 'package:seed_builder/agrovoc_client.dart';
+import 'package:seed_builder/agrovoc_query.dart';
 import 'package:seed_builder/curation_report.dart';
+import 'package:seed_builder/curation_types.dart';
 import 'package:seed_builder/hierarchy_validator.dart';
 import 'package:seed_builder/ingredient_seed.dart';
 import 'package:seed_builder/llm_classifier.dart';
@@ -10,6 +13,8 @@ Future<void> main(List<String> args) async {
   final output = _arg(args, '--output') ?? input;
   final reportPath = _arg(args, '--report') ?? 'reports/ingredient-curation.md';
   final fixturePath = _arg(args, '--fixture');
+  final agrovocEnabled = args.contains('--agrovoc');
+  final agrovocCacheDir = _arg(args, '--agrovoc-cache-dir') ?? '.agrovoc-cache';
   final model =
       _arg(args, '--model') ??
       Platform.environment['ANTHROPIC_MODEL'] ??
@@ -23,8 +28,36 @@ Future<void> main(List<String> args) async {
         )
       : FixtureIngredientClassifier(fixturePath);
 
-  final proposals = await classifier.classify(before.ingredients);
-  final after = before.applyProposals(proposals);
+  // Compute candidates once, then reuse for both the LLM call and label fetch.
+  AgrovocSource? agrovoc;
+  var candidates = const <String, List<AgrovocCandidate>>{};
+  if (agrovocEnabled) {
+    agrovoc = RestAgrovocClient(cacheDir: agrovocCacheDir);
+    stdout.writeln('Gathering AGROVOC candidates...');
+    candidates = await gatherAgrovocCandidates(agrovoc, before.ingredients);
+  }
+
+  final proposals = await classifier.classify(
+    before.ingredients,
+    agrovocCandidates: candidates,
+  );
+
+  final labels = agrovocEnabled
+      ? await fetchAgrovocLabels(
+          agrovoc!,
+          proposals,
+          agrovocTargetLangs.toSet(),
+        )
+      : const <String, AgrovocLabels>{};
+
+  agrovoc?.close();
+
+  final after = before.applyProposals(
+    proposals,
+    agrovocLabels: labels,
+    agrovocEnabled: agrovocEnabled,
+  );
+
   final validationErrors = HierarchyValidator.validate(after);
   if (validationErrors.isNotEmpty) {
     for (final error in validationErrors) {
