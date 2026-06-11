@@ -81,6 +81,54 @@ void main() {
     expect(() => rest.search('*milk*'), throwsA(isA<HttpException>()));
   });
 
+  test('RestAgrovocClient retries on 429 then succeeds', () async {
+    var calls = 0;
+    final client = MockClient((request) async {
+      calls += 1;
+      if (calls == 1) return http.Response('rate limited', 429);
+      return http.Response(
+        jsonEncode({
+          'results': [
+            {'uri': 'http://x/c_1', 'prefLabel': 'milk', 'lang': 'en'},
+          ],
+        }),
+        200,
+      );
+    });
+    final rest = RestAgrovocClient(
+      cacheDir: tempDir.path,
+      client: client,
+      retryBackoff: Duration.zero,
+      minRequestInterval: Duration.zero,
+    );
+
+    final result = await rest.search('*milk*');
+
+    expect(calls, 2);
+    expect(result.single.uri, 'http://x/c_1');
+  });
+
+  test(
+    'RestAgrovocClient gives up after maxRetries on persistent 429',
+    () async {
+      var calls = 0;
+      final client = MockClient((request) async {
+        calls += 1;
+        return http.Response('rate limited', 429);
+      });
+      final rest = RestAgrovocClient(
+        cacheDir: tempDir.path,
+        client: client,
+        maxRetries: 2,
+        retryBackoff: Duration.zero,
+        minRequestInterval: Duration.zero,
+      );
+
+      await expectLater(rest.search('*milk*'), throwsA(isA<HttpException>()));
+      expect(calls, 3); // initial attempt + 2 retries
+    },
+  );
+
   test(
     'gatherAgrovocCandidates queries per ingredient by English name',
     () async {
