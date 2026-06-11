@@ -182,6 +182,36 @@ void main() {
     );
   });
 
+  group('parseClassifierResponse', () {
+    test('parses bare JSON', () {
+      final proposals = parseClassifierResponse(
+        jsonEncode({
+          'proposals': [
+            {'id': 'milk', 'displayNameEn': 'Milk', 'category': 'dairy'},
+          ],
+        }),
+      );
+      expect(proposals.single.id, 'milk');
+    });
+
+    test('strips a ```json markdown code fence', () {
+      const raw =
+          '```json\n'
+          '{"proposals":[{"id":"milk","displayNameEn":"Milk","category":"dairy"}]}\n'
+          '```';
+      final proposals = parseClassifierResponse(raw);
+      expect(proposals.single.id, 'milk');
+    });
+
+    test('strips a plain ``` fence and surrounding whitespace', () {
+      const raw =
+          '\n```\n'
+          '{"proposals":[]}\n'
+          '```\n';
+      expect(parseClassifierResponse(raw), isEmpty);
+    });
+  });
+
   test('classify works with no candidates (back-compat)', () async {
     final client = MockClient(
       (request) async => http.Response(
