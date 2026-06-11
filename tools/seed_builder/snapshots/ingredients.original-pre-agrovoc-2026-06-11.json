@@ -1,0 +1,5886 @@
+{
+  "version": 1,
+  "ingredients": [
+    {
+      "id": "onion",
+      "displayNames": {
+        "en": "Onion"
+      },
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": [
+        "piece",
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": 30,
+      "aliases": [
+        "bulb onion"
+      ]
+    },
+    {
+      "id": "onion-red",
+      "displayNames": {
+        "en": "Red onion"
+      },
+      "parentIngredientId": "onion",
+      "parentTokens": [
+        "onion"
+      ],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": [
+        "piece",
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": 30
+    },
+    {
+      "id": "onion-white",
+      "displayNames": {
+        "en": "White onion"
+      },
+      "parentIngredientId": "onion",
+      "parentTokens": [
+        "onion"
+      ],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": [
+        "piece",
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": 30
+    },
+    {
+      "id": "onion-yellow",
+      "displayNames": {
+        "en": "Yellow onion"
+      },
+      "parentIngredientId": "onion",
+      "parentTokens": [
+        "onion"
+      ],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": [
+        "piece",
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": 30
+    },
+    {
+      "id": "onion-shallot",
+      "displayNames": {
+        "en": "Shallot"
+      },
+      "parentIngredientId": "onion",
+      "parentTokens": [
+        "onion"
+      ],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": [
+        "piece",
+        "g"
+      ],
+      "defaultShelfLifeDays": 30,
+      "aliases": [
+        "sibuyas tagalog"
+      ]
+    },
+    {
+      "id": "onion-spring",
+      "displayNames": {
+        "en": "Spring onion",
+        "tl": "Sibuyas-na-mura"
+      },
+      "parentIngredientId": "onion",
+      "parentTokens": [
+        "onion"
+      ],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": [
+        "piece",
+        "g"
+      ],
+      "defaultShelfLifeDays": 10,
+      "aliases": [
+        "green onion",
+        "scallion"
+      ]
+    },
+    {
+      "id": "sugar",
+      "displayNames": {
+        "en": "Sugar"
+      },
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 730,
+      "isBulkCandidate": true
+    },
+    {
+      "id": "sugar-white",
+      "displayNames": {
+        "en": "White sugar"
+      },
+      "parentIngredientId": "sugar",
+      "parentTokens": [
+        "sugar"
+      ],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "sugar-brown",
+      "displayNames": {
+        "en": "Brown sugar"
+      },
+      "parentIngredientId": "sugar",
+      "parentTokens": [
+        "sugar"
+      ],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "sugar-powdered",
+      "displayNames": {
+        "en": "Powdered sugar"
+      },
+      "parentIngredientId": "sugar",
+      "parentTokens": [
+        "sugar"
+      ],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "cup",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 730,
+      "aliases": [
+        "icing sugar",
+        "confectioner's sugar"
+      ]
+    },
+    {
+      "id": "salt",
+      "displayNames": {
+        "en": "Salt"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1825,
+      "isBulkCandidate": true
+    },
+    {
+      "id": "salt-table",
+      "displayNames": {
+        "en": "Table salt"
+      },
+      "parentIngredientId": "salt",
+      "parentTokens": [
+        "salt"
+      ],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1825
+    },
+    {
+      "id": "salt-sea",
+      "displayNames": {
+        "en": "Sea salt"
+      },
+      "parentIngredientId": "salt",
+      "parentTokens": [
+        "salt"
+      ],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1825
+    },
+    {
+      "id": "salt-kosher",
+      "displayNames": {
+        "en": "Kosher salt"
+      },
+      "parentIngredientId": "salt",
+      "parentTokens": [
+        "salt"
+      ],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1825
+    },
+    {
+      "id": "rice",
+      "displayNames": {
+        "en": "Rice"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365,
+      "isBulkCandidate": true
+    },
+    {
+      "id": "rice-jasmine",
+      "displayNames": {
+        "en": "Jasmine rice"
+      },
+      "parentIngredientId": "rice",
+      "parentTokens": [
+        "rice"
+      ],
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365
+    },
+    {
+      "id": "rice-basmati",
+      "displayNames": {
+        "en": "Basmati rice"
+      },
+      "parentIngredientId": "rice",
+      "parentTokens": [
+        "rice"
+      ],
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365
+    },
+    {
+      "id": "rice-brown",
+      "displayNames": {
+        "en": "Brown rice"
+      },
+      "parentIngredientId": "rice",
+      "parentTokens": [
+        "rice"
+      ],
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 180
+    },
+    {
+      "id": "rice-glutinous",
+      "displayNames": {
+        "en": "Glutinous rice",
+        "tl": "Malagkit"
+      },
+      "parentIngredientId": "rice",
+      "parentTokens": [
+        "rice"
+      ],
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365,
+      "aliases": [
+        "sticky rice"
+      ]
+    },
+    {
+      "id": "soy-sauce",
+      "displayNames": {
+        "en": "Soy sauce",
+        "tl": "Toyo"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1095,
+      "allergens": [
+        "soy"
+      ]
+    },
+    {
+      "id": "soy-sauce-light",
+      "displayNames": {
+        "en": "Light soy sauce"
+      },
+      "parentIngredientId": "soy-sauce",
+      "parentTokens": [
+        "soy",
+        "sauce",
+        "toyo"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1095,
+      "allergens": [
+        "soy"
+      ]
+    },
+    {
+      "id": "soy-sauce-dark",
+      "displayNames": {
+        "en": "Dark soy sauce"
+      },
+      "parentIngredientId": "soy-sauce",
+      "parentTokens": [
+        "soy",
+        "sauce",
+        "toyo"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1095,
+      "allergens": [
+        "soy"
+      ]
+    },
+    {
+      "id": "soy-sauce-sweet",
+      "displayNames": {
+        "en": "Sweet soy sauce"
+      },
+      "parentIngredientId": "soy-sauce",
+      "parentTokens": [
+        "soy",
+        "sauce",
+        "toyo"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1095,
+      "allergens": [
+        "soy"
+      ],
+      "aliases": [
+        "kecap manis"
+      ]
+    },
+    {
+      "id": "flour",
+      "displayNames": {
+        "en": "Flour"
+      },
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365,
+      "isBulkCandidate": true,
+      "allergens": [
+        "gluten"
+      ]
+    },
+    {
+      "id": "flour-all-purpose",
+      "displayNames": {
+        "en": "All-purpose flour"
+      },
+      "parentIngredientId": "flour",
+      "parentTokens": [
+        "flour"
+      ],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365,
+      "allergens": [
+        "gluten"
+      ]
+    },
+    {
+      "id": "flour-bread",
+      "displayNames": {
+        "en": "Bread flour"
+      },
+      "parentIngredientId": "flour",
+      "parentTokens": [
+        "flour"
+      ],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365,
+      "allergens": [
+        "gluten"
+      ]
+    },
+    {
+      "id": "flour-cake",
+      "displayNames": {
+        "en": "Cake flour"
+      },
+      "parentIngredientId": "flour",
+      "parentTokens": [
+        "flour"
+      ],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365,
+      "allergens": [
+        "gluten"
+      ]
+    },
+    {
+      "id": "flour-whole-wheat",
+      "displayNames": {
+        "en": "Whole-wheat flour"
+      },
+      "parentIngredientId": "flour",
+      "parentTokens": [
+        "flour"
+      ],
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 180,
+      "allergens": [
+        "gluten"
+      ]
+    },
+    {
+      "id": "oil",
+      "displayNames": {
+        "en": "Oil"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365,
+      "isBulkCandidate": true
+    },
+    {
+      "id": "oil-vegetable",
+      "displayNames": {
+        "en": "Vegetable oil"
+      },
+      "parentIngredientId": "oil",
+      "parentTokens": [
+        "oil"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365
+    },
+    {
+      "id": "oil-olive",
+      "displayNames": {
+        "en": "Olive oil"
+      },
+      "parentIngredientId": "oil",
+      "parentTokens": [
+        "oil"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 540
+    },
+    {
+      "id": "oil-canola",
+      "displayNames": {
+        "en": "Canola oil"
+      },
+      "parentIngredientId": "oil",
+      "parentTokens": [
+        "oil"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 365
+    },
+    {
+      "id": "oil-sesame",
+      "displayNames": {
+        "en": "Sesame oil"
+      },
+      "parentIngredientId": "oil",
+      "parentTokens": [
+        "oil"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 365,
+      "allergens": [
+        "sesame"
+      ]
+    },
+    {
+      "id": "oil-coconut",
+      "displayNames": {
+        "en": "Coconut oil"
+      },
+      "parentIngredientId": "oil",
+      "parentTokens": [
+        "oil"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "vinegar",
+      "displayNames": {
+        "en": "Vinegar",
+        "tl": "Suka"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "vinegar-white",
+      "displayNames": {
+        "en": "White vinegar"
+      },
+      "parentIngredientId": "vinegar",
+      "parentTokens": [
+        "vinegar",
+        "suka"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "vinegar-apple-cider",
+      "displayNames": {
+        "en": "Apple cider vinegar"
+      },
+      "parentIngredientId": "vinegar",
+      "parentTokens": [
+        "vinegar",
+        "suka"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "tsp",
+        "tbsp",
+        "cup"
+      ],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "vinegar-balsamic",
+      "displayNames": {
+        "en": "Balsamic vinegar"
+      },
+      "parentIngredientId": "vinegar",
+      "parentTokens": [
+        "vinegar",
+        "suka"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1095
+    },
+    {
+      "id": "vinegar-rice",
+      "displayNames": {
+        "en": "Rice vinegar"
+      },
+      "parentIngredientId": "vinegar",
+      "parentTokens": [
+        "vinegar",
+        "suka"
+      ],
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 730
+    },
+    {
+      "id": "tomato",
+      "displayNames": {
+        "en": "Tomato",
+        "tl": "Kamatis"
+      },
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": [
+        "piece",
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": 10
+    },
+    {
+      "id": "tomato-cherry",
+      "displayNames": {
+        "en": "Cherry tomato"
+      },
+      "parentIngredientId": "tomato",
+      "parentTokens": [
+        "tomato",
+        "kamatis"
+      ],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": [
+        "piece",
+        "g"
+      ],
+      "defaultShelfLifeDays": 7
+    },
+    {
+      "id": "tomato-roma",
+      "displayNames": {
+        "en": "Roma tomato"
+      },
+      "parentIngredientId": "tomato",
+      "parentTokens": [
+        "tomato",
+        "kamatis"
+      ],
+      "category": "produce",
+      "defaultUnit": "piece",
+      "allowedUnits": [
+        "piece",
+        "g"
+      ],
+      "defaultShelfLifeDays": 10
+    },
+    {
+      "id": "pepper",
+      "displayNames": {
+        "en": "Pepper"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1095
+    },
+    {
+      "id": "pepper-black",
+      "displayNames": {
+        "en": "Black pepper"
+      },
+      "parentIngredientId": "pepper",
+      "parentTokens": [
+        "pepper"
+      ],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1095
+    },
+    {
+      "id": "pepper-white",
+      "displayNames": {
+        "en": "White pepper"
+      },
+      "parentIngredientId": "pepper",
+      "parentTokens": [
+        "pepper"
+      ],
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": 1095
+    },
+    {
+      "id": "hummus",
+      "displayNames": {
+        "en": "Hummus"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "reduced-fat-milk",
+      "displayNames": {
+        "en": "Reduced Fat Milk"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "grape-tomato",
+      "displayNames": {
+        "en": "Grape tomato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null,
+      "parentIngredientId": "tomato",
+      "aliases": [],
+      "taxonomyTags": [],
+      "formTags": [
+        "fresh"
+      ],
+      "isNonFood": false,
+      "curation": {
+        "status": "accepted",
+        "confidence": 0.88,
+        "source": "llm-assisted",
+        "notes": "Grape tomato is a tomato variant."
+      }
+    },
+    {
+      "id": "iodized-table-salt",
+      "displayNames": {
+        "en": "Iodized Table Salt"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "green-snap-bean",
+      "displayNames": {
+        "en": "Green Snap Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "broccoli",
+      "displayNames": {
+        "en": "Broccoli"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "milk",
+      "displayNames": {
+        "en": "Milk"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "nonfat-milk",
+      "displayNames": {
+        "en": "Nonfat Milk"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-milk",
+      "displayNames": {
+        "en": "Whole milk"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null,
+      "parentIngredientId": "milk",
+      "aliases": [],
+      "taxonomyTags": [],
+      "formTags": [
+        "fresh"
+      ],
+      "isNonFood": false,
+      "curation": {
+        "status": "accepted",
+        "confidence": 0.9,
+        "source": "llm-assisted",
+        "notes": "Whole milk is a milk variant."
+      }
+    },
+    {
+      "id": "beef-frankfurter",
+      "displayNames": {
+        "en": "Beef Frankfurter"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "almond",
+      "displayNames": {
+        "en": "Almond"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-milk-ricotta-cheese",
+      "displayNames": {
+        "en": "Whole Milk Ricotta Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "kale",
+      "displayNames": {
+        "en": "Kale"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pasteurized-whole-egg",
+      "displayNames": {
+        "en": "Pasteurized Whole Egg"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pasteurized-white-egg",
+      "displayNames": {
+        "en": "Pasteurized White Egg"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "white-egg",
+      "displayNames": {
+        "en": "White Egg"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "salsa-sauce",
+      "displayNames": {
+        "en": "Salsa Sauce"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "beef-breakfast-sausage",
+      "displayNames": {
+        "en": "Beef Breakfast Sausage"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "breaded-onion-ring",
+      "displayNames": {
+        "en": "Breaded Onion Ring"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "kosher-cucumber-pickle",
+      "displayNames": {
+        "en": "Kosher Cucumber Pickle"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peanut-butter",
+      "displayNames": {
+        "en": "Peanut Butter"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "grated-parmesan-cheese",
+      "displayNames": {
+        "en": "Grated Parmesan Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "american-cheese",
+      "displayNames": {
+        "en": "American Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "bottled-white-grapefruit-juice",
+      "displayNames": {
+        "en": "Bottled White Grapefruit Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "yellow-peach",
+      "displayNames": {
+        "en": "Yellow Peach"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sunflower-seed-kernel",
+      "displayNames": {
+        "en": "Sunflower Seed Kernel"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "mild-pork-italian-sausage",
+      "displayNames": {
+        "en": "Mild Pork Italian Sausage"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "commercially-prepared-white-bread",
+      "displayNames": {
+        "en": "Commercially Prepared White Bread"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "breakfast-links-turkey-sausage",
+      "displayNames": {
+        "en": "Breakfast Links Turkey Sausage"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "swiss-cheese",
+      "displayNames": {
+        "en": "Swiss Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "carrot",
+      "displayNames": {
+        "en": "Carrot"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "yellow-mustard",
+      "displayNames": {
+        "en": "Yellow Mustard"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "fig",
+      "displayNames": {
+        "en": "Fig"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "green-kiwifruit",
+      "displayNames": {
+        "en": "Green Kiwifruit"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cantaloupe-melon",
+      "displayNames": {
+        "en": "Cantaloupe Melon"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "nectarine",
+      "displayNames": {
+        "en": "Nectarine"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "navels-orange",
+      "displayNames": {
+        "en": "Navels Orange"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "strawberry",
+      "displayNames": {
+        "en": "Strawberry"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cos-or-romaine-lettuce",
+      "displayNames": {
+        "en": "Cos Or Romaine Lettuce"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cheddar-cheese",
+      "displayNames": {
+        "en": "Cheddar Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cottage-cheese",
+      "displayNames": {
+        "en": "Cottage Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "low-moisture-mozzarella-cheese",
+      "displayNames": {
+        "en": "Low Moisture Mozzarella Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-egg",
+      "displayNames": {
+        "en": "Whole Egg"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pasteurized-yolk-egg",
+      "displayNames": {
+        "en": "Pasteurized Yolk Egg"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "yolk-egg",
+      "displayNames": {
+        "en": "Yolk Egg"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seco-dry-white-cheese",
+      "displayNames": {
+        "en": "Seco Dry White Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "nonfat-plain-greek-yogurt",
+      "displayNames": {
+        "en": "Nonfat Plain Greek Yogurt"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "nonfat-strawberry-greek-yogurt",
+      "displayNames": {
+        "en": "Nonfat Strawberry Greek Yogurt"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "93-lean-ground-turkey",
+      "displayNames": {
+        "en": "93% Lean Ground Turkey"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "drumstick-chicken",
+      "displayNames": {
+        "en": "Drumstick Chicken"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "breast-chicken",
+      "displayNames": {
+        "en": "Breast Chicken"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "spaghetti-marinara-pasta-sauce",
+      "displayNames": {
+        "en": "Spaghetti/Marinara Pasta Sauce"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "meat-pre-packaged-sliced-ham",
+      "displayNames": {
+        "en": "Meat Pre-Packaged Sliced Ham"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "bartlett-pear",
+      "displayNames": {
+        "en": "Bartlett Pear"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pimiento-manzanilla-green-olive",
+      "displayNames": {
+        "en": "Pimiento Manzanilla Green Olive"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "ground-chorizo-pork-sausage",
+      "displayNames": {
+        "en": "Ground Chorizo Pork Sausage"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "raisins-soft-oatmeal-cooky",
+      "displayNames": {
+        "en": "Raisins Soft Oatmeal Cooky"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "diced-ripe-red-tomato",
+      "displayNames": {
+        "en": "Diced Ripe Red Tomato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "haddock-fish",
+      "displayNames": {
+        "en": "Haddock Fish"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pollock-fish",
+      "displayNames": {
+        "en": "Pollock Fish"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "in-water-tuna-fish",
+      "displayNames": {
+        "en": "In Water Tuna Fish"
+      },
+      "category": "seafood",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "granulated-sugar",
+      "displayNames": {
+        "en": "Granulated Sugar"
+      },
+      "category": "baking",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "top-loin-steak-beef",
+      "displayNames": {
+        "en": "Top Loin Steak Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "tenderloin-roast-loin-beef",
+      "displayNames": {
+        "en": "Tenderloin Roast Loin Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "of-round-roast-beef",
+      "displayNames": {
+        "en": "Of Round Roast Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "top-round-roast-beef",
+      "displayNames": {
+        "en": "Top Round Roast Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "steak-short-loin-beef",
+      "displayNames": {
+        "en": "Steak Short Loin Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "commercially-prepared-whole-wheat-bread",
+      "displayNames": {
+        "en": "Commercially Prepared Whole-Wheat Bread"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "dark-red-kidney-bean",
+      "displayNames": {
+        "en": "Dark Red Kidney Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pink-bean",
+      "displayNames": {
+        "en": "Pink Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "navy-bean",
+      "displayNames": {
+        "en": "Navy Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "light-red-kidney-bean",
+      "displayNames": {
+        "en": "Light Red Kidney Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "brown-bean",
+      "displayNames": {
+        "en": "Brown Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "flor-de-mayo-bean",
+      "displayNames": {
+        "en": "Flor De Mayo Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "carioca-bean",
+      "displayNames": {
+        "en": "Carioca Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "tan-bean",
+      "displayNames": {
+        "en": "Tan Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pinto-bean",
+      "displayNames": {
+        "en": "Pinto Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "small-red-bean",
+      "displayNames": {
+        "en": "Small Red Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "medium-red-bean",
+      "displayNames": {
+        "en": "Medium Red Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cranberry-bean",
+      "displayNames": {
+        "en": "Cranberry Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "light-tan-bean",
+      "displayNames": {
+        "en": "Light Tan Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "black-bean",
+      "displayNames": {
+        "en": "Black Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "small-white-bean",
+      "displayNames": {
+        "en": "Small White Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "red-bean",
+      "displayNames": {
+        "en": "Red Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "great-northern-bean",
+      "displayNames": {
+        "en": "Great Northern Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "egg-white-large-egg",
+      "displayNames": {
+        "en": "Egg White Large Egg"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "egg-yolk-large-egg",
+      "displayNames": {
+        "en": "Egg Yolk Large Egg"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "corn-oil",
+      "displayNames": {
+        "en": "Corn Oil"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "soybean-oil",
+      "displayNames": {
+        "en": "Soybean Oil"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "extra-virgin-olive-oil",
+      "displayNames": {
+        "en": "Extra Virgin Olive Oil"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "egg-whole-large-egg",
+      "displayNames": {
+        "en": "Egg Whole Large Egg"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "unsalted-stick-butter",
+      "displayNames": {
+        "en": "Unsalted Stick Butter"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "all-purpose-wheat-flour",
+      "displayNames": {
+        "en": "All-Purpose Wheat Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-wheat-flour",
+      "displayNames": {
+        "en": "Whole Wheat Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "white-bread-flour",
+      "displayNames": {
+        "en": "White Bread Flour"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "white-rice-flour",
+      "displayNames": {
+        "en": "White Rice Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "meal-yellow-corn-flour",
+      "displayNames": {
+        "en": "Meal Yellow Corn Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "salted-stick-butter",
+      "displayNames": {
+        "en": "Salted Stick Butter"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "red-onion",
+      "displayNames": {
+        "en": "Red Onion"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "yellow-onion",
+      "displayNames": {
+        "en": "Yellow Onion"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "overripe-bananas",
+      "displayNames": {
+        "en": "Overripe Bananas"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "ripe-and-slightly-bananas",
+      "displayNames": {
+        "en": "Ripe And Slightly Bananas"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "garlic",
+      "displayNames": {
+        "en": "Garlic"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "defatted-soy-flour",
+      "displayNames": {
+        "en": "Defatted Soy Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "full-fat-soy-flour",
+      "displayNames": {
+        "en": "Full-Fat Soy Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "brown-rice-flour",
+      "displayNames": {
+        "en": "Brown Rice Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "glutinous-rice-flour",
+      "displayNames": {
+        "en": "Glutinous Rice Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pastry-flour",
+      "displayNames": {
+        "en": "Pastry Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "white-onion",
+      "displayNames": {
+        "en": "White Onion"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "red-delicious-apple",
+      "displayNames": {
+        "en": "Red Delicious Apple"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "honeycrisp-apple",
+      "displayNames": {
+        "en": "Honeycrisp Apple"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "granny-smith-apple",
+      "displayNames": {
+        "en": "Granny Smith Apple"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "gala-apple",
+      "displayNames": {
+        "en": "Gala Apple"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "fuji-apple",
+      "displayNames": {
+        "en": "Fuji Apple"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "plain-unsweetened-soy-milk",
+      "displayNames": {
+        "en": "Plain Unsweetened Soy Milk"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "plain-unsweetened-almond-milk",
+      "displayNames": {
+        "en": "Plain Unsweetened Almond Milk"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "lion-s-mane-mushroom",
+      "displayNames": {
+        "en": "Lion's Mane Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "oyster-mushroom",
+      "displayNames": {
+        "en": "Oyster Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "shiitake-mushroom",
+      "displayNames": {
+        "en": "Shiitake Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "white-button-mushroom",
+      "displayNames": {
+        "en": "White Button Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peanut-oil",
+      "displayNames": {
+        "en": "Peanut Oil"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sunflower-oil",
+      "displayNames": {
+        "en": "Sunflower Oil"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "safflower-oil",
+      "displayNames": {
+        "en": "Safflower Oil"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "extra-light-olive-oil",
+      "displayNames": {
+        "en": "Extra Light Olive Oil"
+      },
+      "category": "condiment",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "baby-spinach",
+      "displayNames": {
+        "en": "Baby Spinach"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "mature-spinach",
+      "displayNames": {
+        "en": "Mature Spinach"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "00-flour",
+      "displayNames": {
+        "en": "00 Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-grain-spelt-flour",
+      "displayNames": {
+        "en": "Whole Grain Spelt Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "semi-coarse-semolina-flour",
+      "displayNames": {
+        "en": "Semi-Coarse Semolina Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "fine-semolina-flour",
+      "displayNames": {
+        "en": "Fine Semolina Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "shelf-stable-apple-juice",
+      "displayNames": {
+        "en": "Shelf Stable Apple Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "no-pulp-orange-juice",
+      "displayNames": {
+        "en": "No Pulp Orange Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "stable-purple-grape-juice",
+      "displayNames": {
+        "en": "Stable Purple Grape Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "stable-white-grape-juice",
+      "displayNames": {
+        "en": "Stable White Grape Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "not-fortified-cranberry-juice",
+      "displayNames": {
+        "en": "Not Fortified Cranberry Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "fortified-red-grapefruit-juice",
+      "displayNames": {
+        "en": "Fortified Red Grapefruit Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "shelf-stable-tomato-juice",
+      "displayNames": {
+        "en": "Shelf Stable Tomato Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "portabella-mushroom",
+      "displayNames": {
+        "en": "Portabella Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "king-oyster-mushroom",
+      "displayNames": {
+        "en": "King Oyster Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "enoki-mushroom",
+      "displayNames": {
+        "en": "Enoki Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "crimini-mushroom",
+      "displayNames": {
+        "en": "Crimini Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "maitake-mushroom",
+      "displayNames": {
+        "en": "Maitake Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "beech-mushroom",
+      "displayNames": {
+        "en": "Beech Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pioppini-mushroom",
+      "displayNames": {
+        "en": "Pioppini Mushroom"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "plain-sweetened-soy-milk",
+      "displayNames": {
+        "en": "Plain Sweetened Soy Milk"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "plain-unsweetened-oat-milk",
+      "displayNames": {
+        "en": "Plain Unsweetened Oat Milk"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "mature-carrot",
+      "displayNames": {
+        "en": "Mature Carrot"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "baby-carrot",
+      "displayNames": {
+        "en": "Baby Carrot"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "green-bell-pepper",
+      "displayNames": {
+        "en": "Green Bell Pepper"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "yellow-bell-pepper",
+      "displayNames": {
+        "en": "Yellow Bell Pepper"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "red-bell-pepper",
+      "displayNames": {
+        "en": "Red Bell Pepper"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "orange-bell-pepper",
+      "displayNames": {
+        "en": "Orange Bell Pepper"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "buttermilk",
+      "displayNames": {
+        "en": "Buttermilk"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-milk-plain-yogurt",
+      "displayNames": {
+        "en": "Whole Milk Plain Yogurt"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "milk-plain-greek-yogurt",
+      "displayNames": {
+        "en": "Milk Plain Greek Yogurt"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "refrigerated-grated-parmesan-cheese",
+      "displayNames": {
+        "en": "Refrigerated Grated Parmesan Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-milk-feta-cheese",
+      "displayNames": {
+        "en": "Whole Milk Feta Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "almond-flour",
+      "displayNames": {
+        "en": "Almond Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-grain-oat-flour",
+      "displayNames": {
+        "en": "Whole Grain Oat Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "potato-flour",
+      "displayNames": {
+        "en": "Potato Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "creamy-peanut-butter",
+      "displayNames": {
+        "en": "Creamy Peanut Butter"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "creamy-sesame-butter",
+      "displayNames": {
+        "en": "Creamy Sesame Butter"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "creamy-almond-butter",
+      "displayNames": {
+        "en": "Creamy Almond Butter"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "ground-flaxseed",
+      "displayNames": {
+        "en": "Ground Flaxseed"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "raspberry",
+      "displayNames": {
+        "en": "Raspberry"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "blueberry",
+      "displayNames": {
+        "en": "Blueberry"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seedless-red-grape",
+      "displayNames": {
+        "en": "Seedless Red Grape"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seedless-green-grape",
+      "displayNames": {
+        "en": "Seedless Green Grape"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "unsweetened-applesauce",
+      "displayNames": {
+        "en": "Unsweetened Applesauce"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "full-fat-cottage-cheese",
+      "displayNames": {
+        "en": "Full Fat Cottage Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "full-fat-cream-cheese",
+      "displayNames": {
+        "en": "Full Fat Cream Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "heavy-cream",
+      "displayNames": {
+        "en": "Heavy Cream"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "full-fat-sour-cream",
+      "displayNames": {
+        "en": "Full Fat Sour Cream"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "iceberg-lettuce",
+      "displayNames": {
+        "en": "Iceberg Lettuce"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "green-romaine-lettuce",
+      "displayNames": {
+        "en": "Green Romaine Lettuce"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "red-leaf-lettuce",
+      "displayNames": {
+        "en": "Red Leaf Lettuce"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "green-leaf-lettuce",
+      "displayNames": {
+        "en": "Green Leaf Lettuce"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pine-nut",
+      "displayNames": {
+        "en": "Pine Nut"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-almond",
+      "displayNames": {
+        "en": "Whole Almond"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "halves-english-walnut",
+      "displayNames": {
+        "en": "Halves English Walnut"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "halves-pecan",
+      "displayNames": {
+        "en": "Halves Pecan"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "rolled-whole-grain-oat",
+      "displayNames": {
+        "en": "Rolled Whole Grain Oat"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cut-whole-grain-oat",
+      "displayNames": {
+        "en": "Cut Whole Grain Oat"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pineapple",
+      "displayNames": {
+        "en": "Pineapple"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "dark-red-sweet-cherry",
+      "displayNames": {
+        "en": "Dark Red Sweet Cherry"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "russet-potato",
+      "displayNames": {
+        "en": "Russet Potato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "red-potato",
+      "displayNames": {
+        "en": "Red Potato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "gold-potato",
+      "displayNames": {
+        "en": "Gold Potato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "orange-flesh-sweet-potato",
+      "displayNames": {
+        "en": "Orange Flesh Sweet Potato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "celery",
+      "displayNames": {
+        "en": "Celery"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "with-peel-cucumber",
+      "displayNames": {
+        "en": "With Peel Cucumber"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "green-cabbage",
+      "displayNames": {
+        "en": "Green Cabbage"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "red-cabbage",
+      "displayNames": {
+        "en": "Red Cabbage"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "amaranth-flour",
+      "displayNames": {
+        "en": "Amaranth Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "quinoa-flour",
+      "displayNames": {
+        "en": "Quinoa Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sorghum-flour",
+      "displayNames": {
+        "en": "Sorghum Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "buckwheat-flour",
+      "displayNames": {
+        "en": "Buckwheat Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "rye-flour",
+      "displayNames": {
+        "en": "Rye Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "barley-flour",
+      "displayNames": {
+        "en": "Barley Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cassava-flour",
+      "displayNames": {
+        "en": "Cassava Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-grain-buckwheat",
+      "displayNames": {
+        "en": "Whole Grain Buckwheat"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "whole-grain-millet",
+      "displayNames": {
+        "en": "Whole Grain Millet"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "long-grain-brown-rice",
+      "displayNames": {
+        "en": "Long Grain Brown Rice"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "long-grain-white-rice",
+      "displayNames": {
+        "en": "Long Grain White Rice"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "10-fat-ground-beef",
+      "displayNames": {
+        "en": "10% Fat Ground Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "20-fat-ground-beef",
+      "displayNames": {
+        "en": "20% Fat Ground Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "ground-pork",
+      "displayNames": {
+        "en": "Ground Pork"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "with-additives-ground-chicken",
+      "displayNames": {
+        "en": "With Additives Ground Chicken"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "7-fat-ground-turkey",
+      "displayNames": {
+        "en": "7% Fat Ground Turkey"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "brazilnut",
+      "displayNames": {
+        "en": "Brazilnut"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cashew-nut",
+      "displayNames": {
+        "en": "Cashew Nut"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "hazelnuts-or-filbert",
+      "displayNames": {
+        "en": "Hazelnuts Or Filbert"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peanut",
+      "displayNames": {
+        "en": "Peanut"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "chestnut-flour",
+      "displayNames": {
+        "en": "Chestnut Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "macadamia-nut",
+      "displayNames": {
+        "en": "Macadamia Nut"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pistachio-nut",
+      "displayNames": {
+        "en": "Pistachio Nut"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pumpkin-seed",
+      "displayNames": {
+        "en": "Pumpkin Seed"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "kernel-sunflower-seed",
+      "displayNames": {
+        "en": "Kernel Sunflower Seed"
+      },
+      "category": "other",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "coconut-flour",
+      "displayNames": {
+        "en": "Coconut Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cannellini-bean",
+      "displayNames": {
+        "en": "Cannellini Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "chickpeas",
+      "displayNames": {
+        "en": "Chickpeas"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "lentil",
+      "displayNames": {
+        "en": "Lentil"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "blackeye-pea",
+      "displayNames": {
+        "en": "Blackeye Pea"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sweet-green-peas",
+      "displayNames": {
+        "en": "Sweet Green Peas"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "loin-pork",
+      "displayNames": {
+        "en": "Loin Pork"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "tenderloin-loin-pork",
+      "displayNames": {
+        "en": "Tenderloin Loin Pork"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "thigh-chicken",
+      "displayNames": {
+        "en": "Thigh Chicken"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "steak-ribeye-beef",
+      "displayNames": {
+        "en": "Steak Ribeye Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "top-round-beef",
+      "displayNames": {
+        "en": "Top Round Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "roast-chuck-beef",
+      "displayNames": {
+        "en": "Roast Chuck Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "steak-flank-beef",
+      "displayNames": {
+        "en": "Steak Flank Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "nonfat-plain-yogurt",
+      "displayNames": {
+        "en": "Nonfat Plain Yogurt"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "solid-monterey-jack-cheese",
+      "displayNames": {
+        "en": "Solid Monterey Jack Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cheese-food-or-product",
+      "displayNames": {
+        "en": "Cheese Food Or Product"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sliced-provolone-cheese",
+      "displayNames": {
+        "en": "Sliced Provolone Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "solid-oaxaca-cheese",
+      "displayNames": {
+        "en": "Solid Oaxaca Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "solid-queso-fresco-cheese",
+      "displayNames": {
+        "en": "Solid Queso Fresco Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "solid-cotija-cheese",
+      "displayNames": {
+        "en": "Solid Cotija Cheese"
+      },
+      "category": "dairy",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "caught-sockeye-salmon-fish",
+      "displayNames": {
+        "en": "Caught Sockeye Salmon Fish"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "raised-atlantic-salmon-fish",
+      "displayNames": {
+        "en": "Raised Atlantic Salmon Fish"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "farm-raised-tilapia-fish",
+      "displayNames": {
+        "en": "Farm Raised Tilapia Fish"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "farm-raised-shrimp-crustacean",
+      "displayNames": {
+        "en": "Farm Raised Shrimp Crustacean"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "caught-atlantic-cod-fish",
+      "displayNames": {
+        "en": "Caught Atlantic Cod Fish"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "farm-raised-catfish-fish",
+      "displayNames": {
+        "en": "Farm Raised Catfish Fish"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "blue-swimming-crab-crustacean",
+      "displayNames": {
+        "en": "Blue Swimming Crab Crustacean"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "zucchini-green-summer-squash",
+      "displayNames": {
+        "en": "Zucchini Green Summer Squash"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "yellow-summer-squash",
+      "displayNames": {
+        "en": "Yellow Summer Squash"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "butternut-winter-squash",
+      "displayNames": {
+        "en": "Butternut Winter Squash"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "acorn-winter-squash",
+      "displayNames": {
+        "en": "Acorn Winter Squash"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "bok-choy-cabbage",
+      "displayNames": {
+        "en": "Bok Choy Cabbage"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "cauliflower",
+      "displayNames": {
+        "en": "Cauliflower"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "collard",
+      "displayNames": {
+        "en": "Collard"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "brussels-sprout",
+      "displayNames": {
+        "en": "Brussels Sprout"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "beet",
+      "displayNames": {
+        "en": "Beet"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "eggplant",
+      "displayNames": {
+        "en": "Eggplant"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "liquids-whole-tomato",
+      "displayNames": {
+        "en": "Liquids Whole Tomato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sauce-tomato",
+      "displayNames": {
+        "en": "Sauce Tomato"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "paste-tomato",
+      "displayNames": {
+        "en": "Paste Tomato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "crushed-tomato",
+      "displayNames": {
+        "en": "Crushed Tomato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "puree-tomato",
+      "displayNames": {
+        "en": "Puree Tomato"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "apricot",
+      "displayNames": {
+        "en": "Apricot"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "honeydew-melon",
+      "displayNames": {
+        "en": "Honeydew Melon"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "ripe-plantain",
+      "displayNames": {
+        "en": "Ripe Plantain"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "underripe-plantain",
+      "displayNames": {
+        "en": "Underripe Plantain"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "chia-seed",
+      "displayNames": {
+        "en": "Chia Seed"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "bulgur",
+      "displayNames": {
+        "en": "Bulgur"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "wild-rice",
+      "displayNames": {
+        "en": "Wild Rice"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "baby-arugula",
+      "displayNames": {
+        "en": "Baby Arugula"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "green-asparagus",
+      "displayNames": {
+        "en": "Green Asparagus"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peeled-hass-avocado",
+      "displayNames": {
+        "en": "Peeled Hass Avocado"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "black-rice",
+      "displayNames": {
+        "en": "Black Rice"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "white-kernels-sweet-corn",
+      "displayNames": {
+        "en": "White Kernels Sweet Corn"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "grain-einkorn",
+      "displayNames": {
+        "en": "Grain Einkorn"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pearled-farro",
+      "displayNames": {
+        "en": "Pearled Farro"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "grain-fonio",
+      "displayNames": {
+        "en": "Grain Fonio"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "grain-khorasan",
+      "displayNames": {
+        "en": "Grain Khorasan"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peeled-green-kiwifruit",
+      "displayNames": {
+        "en": "Peeled Green Kiwifruit"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peeled-seedless-mandarin",
+      "displayNames": {
+        "en": "Peeled Seedless Mandarin"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peeled-tommy-atkins-mango",
+      "displayNames": {
+        "en": "Peeled Tommy Atkins Mango"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peeled-ataulfo-mango",
+      "displayNames": {
+        "en": "Peeled Ataulfo Mango"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "masa-harina-corn-flour",
+      "displayNames": {
+        "en": "Masa Harina Corn Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "green-anjou-pear",
+      "displayNames": {
+        "en": "Green Anjou Pear"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "black-plum",
+      "displayNames": {
+        "en": "Black Plum"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "red-rice",
+      "displayNames": {
+        "en": "Red Rice"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "white-sorghum-bran",
+      "displayNames": {
+        "en": "White Sorghum Bran"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pearled-white-sorghum-flour",
+      "displayNames": {
+        "en": "Pearled White Sorghum Flour"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pearled-white-sorghum-grain",
+      "displayNames": {
+        "en": "Pearled White Sorghum Grain"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "white-whole-grain-sorghum",
+      "displayNames": {
+        "en": "White Whole Grain Sorghum"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "overripe-plantain",
+      "displayNames": {
+        "en": "Overripe Plantain"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "skin-drumstick-chicken",
+      "displayNames": {
+        "en": "Skin Drumstick Chicken"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "skin-thigh-chicken",
+      "displayNames": {
+        "en": "Skin Thigh Chicken"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "skin-wing-chicken",
+      "displayNames": {
+        "en": "Skin Wing Chicken"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "skin-breast-chicken",
+      "displayNames": {
+        "en": "Skin Breast Chicken"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "ground-lamb",
+      "displayNames": {
+        "en": "Ground Lamb"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "ground-bison",
+      "displayNames": {
+        "en": "Ground Bison"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "short-loin-beef",
+      "displayNames": {
+        "en": "Short Loin Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "tenderloin-steak-beef",
+      "displayNames": {
+        "en": "Tenderloin Steak Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "top-sirloin-steak-beef",
+      "displayNames": {
+        "en": "Top Sirloin Steak Beef"
+      },
+      "category": "meat",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "center-cut-chop-pork",
+      "displayNames": {
+        "en": "Center Cut Chop Pork"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "belly-pork",
+      "displayNames": {
+        "en": "Belly Pork"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seeded-peeled-pawpaw",
+      "displayNames": {
+        "en": "Seeded Peeled Pawpaw"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peeled-pie-pumpkin-squash",
+      "displayNames": {
+        "en": "Peeled Pie Pumpkin Squash"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seeded-peeled-spaghetti-squash",
+      "displayNames": {
+        "en": "Seeded Peeled Spaghetti Squash"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "peeled-rutabaga",
+      "displayNames": {
+        "en": "Peeled Rutabaga"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "blackberry",
+      "displayNames": {
+        "en": "Blackberry"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "dehusked-tomatillos",
+      "displayNames": {
+        "en": "Dehusked Tomatillos"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "destemmed-leaf-napa-cabbage",
+      "displayNames": {
+        "en": "Destemmed Leaf Napa Cabbage"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "bulb-and-greens-leek",
+      "displayNames": {
+        "en": "Bulb And Greens Leek"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "greens-green-onion",
+      "displayNames": {
+        "en": "Greens Green Onion"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "removed-peeled-bulb-shallot",
+      "displayNames": {
+        "en": "Removed Peeled Bulb Shallot"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "shelf-stable-prune-juice",
+      "displayNames": {
+        "en": "Shelf-Stable Prune Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "shelf-stable-pomegranate-juice",
+      "displayNames": {
+        "en": "Shelf-Stable Pomegranate Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "shelf-stable-tart-cherry-juice",
+      "displayNames": {
+        "en": "Shelf-Stable Tart Cherry Juice"
+      },
+      "category": "beverage",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "in-olive-oil-anchovy",
+      "displayNames": {
+        "en": "In Olive Oil Anchovy"
+      },
+      "category": "seafood",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "beet-green",
+      "displayNames": {
+        "en": "Beet Green"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pacific-or-alaskan-cod",
+      "displayNames": {
+        "en": "Pacific Or Alaskan Cod"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "bulb-fennel",
+      "displayNames": {
+        "en": "Bulb Fennel"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "wild-caught-halibut",
+      "displayNames": {
+        "en": "Wild Caught Halibut"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "caught-tail-only-lobster",
+      "displayNames": {
+        "en": "Caught Tail Only Lobster"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "wild-caught-mahi",
+      "displayNames": {
+        "en": "Wild Caught Mahi"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "parsnip",
+      "displayNames": {
+        "en": "Parsnip"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "hungarian-wax-pepper",
+      "displayNames": {
+        "en": "Hungarian Wax Pepper"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seeded-jalapeno-pepper",
+      "displayNames": {
+        "en": "Seeded Jalapeno Pepper"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seeded-poblano-pepper",
+      "displayNames": {
+        "en": "Seeded Poblano Pepper"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seeded-serrano-pepper",
+      "displayNames": {
+        "en": "Seeded Serrano Pepper"
+      },
+      "category": "spice",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "radicchio",
+      "displayNames": {
+        "en": "Radicchio"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "red-radish",
+      "displayNames": {
+        "en": "Red Radish"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "caught-patagonian-bay-scallop",
+      "displayNames": {
+        "en": "Caught Patagonian Bay Scallop"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "wild-caught-sea-scallop",
+      "displayNames": {
+        "en": "Wild Caught Sea Scallop"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "caught-chilean-sea-bass",
+      "displayNames": {
+        "en": "Caught Chilean Sea Bass"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "wild-caught-snapper",
+      "displayNames": {
+        "en": "Wild Caught Snapper"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "legs-only-snow-crab",
+      "displayNames": {
+        "en": "Legs Only Snow Crab"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "tubes-only-squid",
+      "displayNames": {
+        "en": "Tubes Only Squid"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "wild-caught-swordfish",
+      "displayNames": {
+        "en": "Wild Caught Swordfish"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "ahi-or-yellowfin-tuna",
+      "displayNames": {
+        "en": "Ahi Or Yellowfin Tuna"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "turnip",
+      "displayNames": {
+        "en": "Turnip"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "flesh-only-seedless-watermelon",
+      "displayNames": {
+        "en": "Flesh Only Seedless Watermelon"
+      },
+      "category": "produce",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "rind-only-seedless-watermelon",
+      "displayNames": {
+        "en": "Rind Only Seedless Watermelon"
+      },
+      "category": "produce",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "stalk-rhubarb",
+      "displayNames": {
+        "en": "Stalk Rhubarb"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sweetened-cranberry",
+      "displayNames": {
+        "en": "Sweetened Cranberry"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "grapefruit",
+      "displayNames": {
+        "en": "Grapefruit"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "plum",
+      "displayNames": {
+        "en": "Plum"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seedless-golden-raisin",
+      "displayNames": {
+        "en": "Seedless Golden Raisin"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "seedless-dark-raisin",
+      "displayNames": {
+        "en": "Seedless Dark Raisin"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "edamame",
+      "displayNames": {
+        "en": "Edamame"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "pork-original-baked-bean",
+      "displayNames": {
+        "en": "Pork Original Baked Bean"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "vegetarian-baked-bean",
+      "displayNames": {
+        "en": "Vegetarian Baked Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "refried-bean",
+      "displayNames": {
+        "en": "Refried Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "vegetarian-refried-bean",
+      "displayNames": {
+        "en": "Vegetarian Refried Bean"
+      },
+      "category": "produce",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg",
+        "piece"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "mayonnaise",
+      "displayNames": {
+        "en": "Mayonnaise"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "italian-dressing-salad",
+      "displayNames": {
+        "en": "Italian Dressing Salad"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "ranch-dressing",
+      "displayNames": {
+        "en": "Ranch Dressing"
+      },
+      "category": "condiment",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sweetened-condensed-milk",
+      "displayNames": {
+        "en": "Sweetened Condensed Milk"
+      },
+      "category": "dairy",
+      "defaultUnit": "ml",
+      "allowedUnits": [
+        "ml",
+        "l",
+        "cup"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "beef-bologna",
+      "displayNames": {
+        "en": "Beef Bologna"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "classic-bologna",
+      "displayNames": {
+        "en": "Classic Bologna"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "white-bread",
+      "displayNames": {
+        "en": "White Bread"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "100-whole-wheat-bread",
+      "displayNames": {
+        "en": "100% Whole Wheat Bread"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "mulitgrain-bread",
+      "displayNames": {
+        "en": "Mulitgrain Bread"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "stable-wheat-flour-tortilla",
+      "displayNames": {
+        "en": "Stable Wheat Flour Tortilla"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "shelf-stable-corn-tortilla",
+      "displayNames": {
+        "en": "Shelf Stable Corn Tortilla"
+      },
+      "category": "bakery",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "spaghetti-pasta",
+      "displayNames": {
+        "en": "Spaghetti Pasta"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "spaghetti-whole-grain-pasta",
+      "displayNames": {
+        "en": "Spaghetti Whole Grain Pasta"
+      },
+      "category": "grain",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "oven-roasted-turkey-lunchmeat",
+      "displayNames": {
+        "en": "Oven Roasted Turkey Lunchmeat"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "black-forest-ham-lunchmeat",
+      "displayNames": {
+        "en": "Black Forest Ham Lunchmeat"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sliced-roast-beef-lunchmeat",
+      "displayNames": {
+        "en": "Sliced Roast Beef Lunchmeat"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sliced-chicken-breast-lunchmeat",
+      "displayNames": {
+        "en": "Sliced Chicken Breast Lunchmeat"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "sliced-hard-salami",
+      "displayNames": {
+        "en": "Sliced Hard Salami"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "beef-and-pork-pepperoni",
+      "displayNames": {
+        "en": "Beef And Pork Pepperoni"
+      },
+      "category": "meat",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "tsp",
+        "tbsp"
+      ],
+      "defaultShelfLifeDays": null
+    },
+    {
+      "id": "alaska-pollock",
+      "displayNames": {
+        "en": "Alaska Pollock"
+      },
+      "category": "seafood",
+      "defaultUnit": "g",
+      "allowedUnits": [
+        "g",
+        "kg"
+      ],
+      "defaultShelfLifeDays": null
+    }
+  ]
+}

@@ -1,0 +1,514 @@
+# Ingredient curation report
+
+## Summary
+
+- Processed: 414
+- Renamed: 125
+- Parent links changed: 1
+- Tagged ingredients: 401
+- Marked non-food: 0
+- Needs review: 2
+- Validation warnings: 0
+
+## Parent links added or changed
+
+- `nonfat-milk` → `milk`
+
+## Renamed ingredients
+
+- `whole-milk`: "Whole milk" → "Whole Milk"
+- `navels-orange`: "Navels Orange" → "Navel Orange"
+- `cos-or-romaine-lettuce`: "Cos Or Romaine Lettuce" → "Cos or Romaine Lettuce"
+- `low-moisture-mozzarella-cheese`: "Low Moisture Mozzarella Cheese" → "Low-Moisture Mozzarella Cheese"
+- `pasteurized-yolk-egg`: "Pasteurized Yolk Egg" → "Pasteurized Egg Yolk"
+- `yolk-egg`: "Yolk Egg" → "Egg Yolk"
+- `drumstick-chicken`: "Drumstick Chicken" → "Chicken Drumstick"
+- `breast-chicken`: "Breast Chicken" → "Chicken Breast"
+- `meat-pre-packaged-sliced-ham`: "Meat Pre-Packaged Sliced Ham" → "Pre-Packaged Sliced Ham"
+- `raisins-soft-oatmeal-cooky`: "Raisins Soft Oatmeal Cooky" → "Soft Oatmeal Cookie with Raisins"
+- `in-water-tuna-fish`: "In Water Tuna Fish" → "Tuna Fish in Water"
+- `top-loin-steak-beef`: "Top Loin Steak Beef" → "Beef Top Loin Steak"
+- `tenderloin-roast-loin-beef`: "Tenderloin Roast Loin Beef" → "Beef Tenderloin Roast"
+- `of-round-roast-beef`: "Of Round Roast Beef" → "Beef Round Roast"
+- `top-round-roast-beef`: "Top Round Roast Beef" → "Beef Top Round Roast"
+- `steak-short-loin-beef`: "Steak Short Loin Beef" → "Beef Short Loin Steak"
+- `flor-de-mayo-bean`: "Flor De Mayo Bean" → "Flor de Mayo Bean"
+- `egg-white-large-egg`: "Egg White Large Egg" → "Egg White from Large Egg"
+- `egg-yolk-large-egg`: "Egg Yolk Large Egg" → "Egg Yolk from Large Egg"
+- `egg-whole-large-egg`: "Egg Whole Large Egg" → "Whole Large Egg"
+- `meal-yellow-corn-flour`: "Meal Yellow Corn Flour" → "Yellow Corn Meal Flour"
+- `ripe-and-slightly-bananas`: "Ripe And Slightly Bananas" → "Ripe and Slightly Overripe Bananas"
+- `shelf-stable-apple-juice`: "Shelf Stable Apple Juice" → "Shelf-Stable Apple Juice"
+- `no-pulp-orange-juice`: "No Pulp Orange Juice" → "No-Pulp Orange Juice"
+- `stable-purple-grape-juice`: "Stable Purple Grape Juice" → "Shelf-Stable Purple Grape Juice"
+- `stable-white-grape-juice`: "Stable White Grape Juice" → "Shelf-Stable White Grape Juice"
+- `not-fortified-cranberry-juice`: "Not Fortified Cranberry Juice" → "Non-Fortified Cranberry Juice"
+- `shelf-stable-tomato-juice`: "Shelf Stable Tomato Juice" → "Shelf-Stable Tomato Juice"
+- `milk-plain-greek-yogurt`: "Milk Plain Greek Yogurt" → "Plain Greek Yogurt"
+- `halves-pecan`: "Halves Pecan" → "Pecan Halves"
+- `rolled-whole-grain-oat`: "Rolled Whole Grain Oat" → "Rolled Whole Grain Oats"
+- `cut-whole-grain-oat`: "Cut Whole Grain Oat" → "Cut Whole Grain Oats"
+- `orange-flesh-sweet-potato`: "Orange Flesh Sweet Potato" → "Orange-Flesh Sweet Potato"
+- `with-peel-cucumber`: "With Peel Cucumber" → "Cucumber with Peel"
+- `long-grain-brown-rice`: "Long Grain Brown Rice" → "Long-Grain Brown Rice"
+- `long-grain-white-rice`: "Long Grain White Rice" → "Long-Grain White Rice"
+- `with-additives-ground-chicken`: "With Additives Ground Chicken" → "Ground Chicken with Additives"
+- `brazilnut`: "Brazilnut" → "Brazil Nut"
+- `hazelnuts-or-filbert`: "Hazelnuts Or Filbert" → "Hazelnut"
+- `kernel-sunflower-seed`: "Kernel Sunflower Seed" → "Sunflower Seed Kernels"
+- `blackeye-pea`: "Blackeye Pea" → "Black-Eyed Pea"
+- `loin-pork`: "Loin Pork" → "Pork Loin"
+- `tenderloin-loin-pork`: "Tenderloin Loin Pork" → "Pork Tenderloin"
+- `thigh-chicken`: "Thigh Chicken" → "Chicken Thigh"
+- `steak-ribeye-beef`: "Steak Ribeye Beef" → "Beef Ribeye Steak"
+- `top-round-beef`: "Top Round Beef" → "Beef Top Round"
+- `roast-chuck-beef`: "Roast Chuck Beef" → "Beef Chuck Roast"
+- `steak-flank-beef`: "Steak Flank Beef" → "Beef Flank Steak"
+- `solid-monterey-jack-cheese`: "Solid Monterey Jack Cheese" → "Monterey Jack Cheese"
+- `cheese-food-or-product`: "Cheese Food Or Product" → "Cheese Food or Product"
+- `solid-oaxaca-cheese`: "Solid Oaxaca Cheese" → "Oaxaca Cheese"
+- `solid-queso-fresco-cheese`: "Solid Queso Fresco Cheese" → "Queso Fresco Cheese"
+- `solid-cotija-cheese`: "Solid Cotija Cheese" → "Cotija Cheese"
+- `caught-sockeye-salmon-fish`: "Caught Sockeye Salmon Fish" → "Wild-Caught Sockeye Salmon"
+- `raised-atlantic-salmon-fish`: "Raised Atlantic Salmon Fish" → "Farm-Raised Atlantic Salmon"
+- `farm-raised-tilapia-fish`: "Farm Raised Tilapia Fish" → "Farm-Raised Tilapia"
+- `farm-raised-shrimp-crustacean`: "Farm Raised Shrimp Crustacean" → "Farm-Raised Shrimp"
+- `caught-atlantic-cod-fish`: "Caught Atlantic Cod Fish" → "Wild-Caught Atlantic Cod"
+- `farm-raised-catfish-fish`: "Farm Raised Catfish Fish" → "Farm-Raised Catfish"
+- `blue-swimming-crab-crustacean`: "Blue Swimming Crab Crustacean" → "Blue Swimming Crab"
+- `zucchini-green-summer-squash`: "Zucchini Green Summer Squash" → "Zucchini"
+- `butternut-winter-squash`: "Butternut Winter Squash" → "Butternut Squash"
+- `acorn-winter-squash`: "Acorn Winter Squash" → "Acorn Squash"
+- `bok-choy-cabbage`: "Bok Choy Cabbage" → "Bok Choy"
+- `collard`: "Collard" → "Collard Greens"
+- `brussels-sprout`: "Brussels Sprout" → "Brussels Sprouts"
+- `liquids-whole-tomato`: "Liquids Whole Tomato" → "Whole Tomatoes in Liquid"
+- `sauce-tomato`: "Sauce Tomato" → "Tomato Sauce"
+- `paste-tomato`: "Paste Tomato" → "Tomato Paste"
+- `crushed-tomato`: "Crushed Tomato" → "Crushed Tomatoes"
+- `puree-tomato`: "Puree Tomato" → "Tomato Puree"
+- `chia-seed`: "Chia Seed" → "Chia Seeds"
+- `white-kernels-sweet-corn`: "White Kernels Sweet Corn" → "White Sweet Corn Kernels"
+- `grain-einkorn`: "Grain Einkorn" → "Einkorn Grain"
+- `grain-fonio`: "Grain Fonio" → "Fonio Grain"
+- `grain-khorasan`: "Grain Khorasan" → "Khorasan Grain"
+- `skin-drumstick-chicken`: "Skin Drumstick Chicken" → "Chicken Drumstick with Skin"
+- `skin-thigh-chicken`: "Skin Thigh Chicken" → "Chicken Thigh with Skin"
+- `skin-wing-chicken`: "Skin Wing Chicken" → "Chicken Wing with Skin"
+- `skin-breast-chicken`: "Skin Breast Chicken" → "Chicken Breast with Skin"
+- `short-loin-beef`: "Short Loin Beef" → "Beef Short Loin"
+- `tenderloin-steak-beef`: "Tenderloin Steak Beef" → "Beef Tenderloin Steak"
+- `top-sirloin-steak-beef`: "Top Sirloin Steak Beef" → "Beef Top Sirloin Steak"
+- `center-cut-chop-pork`: "Center Cut Chop Pork" → "Pork Center Cut Chop"
+- `belly-pork`: "Belly Pork" → "Pork Belly"
+- `destemmed-leaf-napa-cabbage`: "Destemmed Leaf Napa Cabbage" → "Destemmed Napa Cabbage Leaves"
+- `bulb-and-greens-leek`: "Bulb And Greens Leek" → "Leek Bulb and Greens"
+- `greens-green-onion`: "Greens Green Onion" → "Green Onion Greens"
+- `removed-peeled-bulb-shallot`: "Removed Peeled Bulb Shallot" → "Peeled Shallot Bulb"
+- `in-olive-oil-anchovy`: "In Olive Oil Anchovy" → "Anchovies in Olive Oil"
+- `beet-green`: "Beet Green" → "Beet Greens"
+- `pacific-or-alaskan-cod`: "Pacific Or Alaskan Cod" → "Pacific or Alaskan Cod"
+- `bulb-fennel`: "Bulb Fennel" → "Fennel Bulb"
+- `wild-caught-halibut`: "Wild Caught Halibut" → "Wild-Caught Halibut"
+- `caught-tail-only-lobster`: "Caught Tail Only Lobster" → "Lobster Tail"
+- `wild-caught-mahi`: "Wild Caught Mahi" → "Wild-Caught Mahi-Mahi"
+- `seeded-jalapeno-pepper`: "Seeded Jalapeno Pepper" → "Seeded Jalapeño Pepper"
+- `caught-patagonian-bay-scallop`: "Caught Patagonian Bay Scallop" → "Patagonian Bay Scallops"
+- `wild-caught-sea-scallop`: "Wild Caught Sea Scallop" → "Wild-Caught Sea Scallops"
+- `caught-chilean-sea-bass`: "Caught Chilean Sea Bass" → "Chilean Sea Bass"
+- `wild-caught-snapper`: "Wild Caught Snapper" → "Wild-Caught Snapper"
+- `legs-only-snow-crab`: "Legs Only Snow Crab" → "Snow Crab Legs"
+- `tubes-only-squid`: "Tubes Only Squid" → "Squid Tubes"
+- `wild-caught-swordfish`: "Wild Caught Swordfish" → "Wild-Caught Swordfish"
+- `ahi-or-yellowfin-tuna`: "Ahi Or Yellowfin Tuna" → "Ahi or Yellowfin Tuna"
+- `flesh-only-seedless-watermelon`: "Flesh Only Seedless Watermelon" → "Seedless Watermelon Flesh"
+- `rind-only-seedless-watermelon`: "Rind Only Seedless Watermelon" → "Seedless Watermelon Rind"
+- `stalk-rhubarb`: "Stalk Rhubarb" → "Rhubarb Stalk"
+- `sweetened-cranberry`: "Sweetened Cranberry" → "Sweetened Cranberries"
+- `seedless-golden-raisin`: "Seedless Golden Raisin" → "Seedless Golden Raisins"
+- `seedless-dark-raisin`: "Seedless Dark Raisin" → "Seedless Dark Raisins"
+- `pork-original-baked-bean`: "Pork Original Baked Bean" → "Original Baked Beans with Pork"
+- `vegetarian-baked-bean`: "Vegetarian Baked Bean" → "Vegetarian Baked Beans"
+- `refried-bean`: "Refried Bean" → "Refried Beans"
+- `vegetarian-refried-bean`: "Vegetarian Refried Bean" → "Vegetarian Refried Beans"
+- `italian-dressing-salad`: "Italian Dressing Salad" → "Italian Salad Dressing"
+- `mulitgrain-bread`: "Mulitgrain Bread" → "Multigrain Bread"
+- `stable-wheat-flour-tortilla`: "Stable Wheat Flour Tortilla" → "Shelf-Stable Wheat Flour Tortilla"
+- `shelf-stable-corn-tortilla`: "Shelf Stable Corn Tortilla" → "Shelf-Stable Corn Tortilla"
+- `spaghetti-whole-grain-pasta`: "Spaghetti Whole Grain Pasta" → "Whole Grain Spaghetti Pasta"
+- `oven-roasted-turkey-lunchmeat`: "Oven Roasted Turkey Lunchmeat" → "Oven Roasted Turkey Lunch Meat"
+- `black-forest-ham-lunchmeat`: "Black Forest Ham Lunchmeat" → "Black Forest Ham Lunch Meat"
+- `sliced-roast-beef-lunchmeat`: "Sliced Roast Beef Lunchmeat" → "Sliced Roast Beef Lunch Meat"
+- `sliced-chicken-breast-lunchmeat`: "Sliced Chicken Breast Lunchmeat" → "Sliced Chicken Breast Lunch Meat"
+- `beef-and-pork-pepperoni`: "Beef And Pork Pepperoni" → "Beef and Pork Pepperoni"
+
+## Validation warnings
+
+- None
+
+## AGROVOC coverage
+
+- Matched: 67
+- Needs review: 1
+- Unmatched: 346
+
+### Labels filled per language
+
+- `fr`: 68
+- `es`: 68
+- `ru`: 68
+- `ar`: 68
+- `zh`: 67
+- `ja`: 53
+- `vi`: 8
+- `th`: 58
+- `ko`: 41
+
+### Unmatched (English-only) ingredients
+
+- `onion`
+- `onion-red`
+- `onion-white`
+- `onion-yellow`
+- `sugar`
+- `sugar-brown`
+- `sugar-powdered`
+- `salt`
+- `salt-sea`
+- `salt-kosher`
+- `rice`
+- `rice-jasmine`
+- `rice-glutinous`
+- `soy-sauce-light`
+- `soy-sauce-dark`
+- `soy-sauce-sweet`
+- `flour`
+- `flour-all-purpose`
+- `flour-bread`
+- `flour-cake`
+- `flour-whole-wheat`
+- `oil`
+- `vinegar-white`
+- `vinegar-apple-cider`
+- `vinegar-rice`
+- `tomato`
+- `tomato-roma`
+- `hummus`
+- `reduced-fat-milk`
+- `grape-tomato`
+- `iodized-table-salt`
+- `green-snap-bean`
+- `milk`
+- `nonfat-milk`
+- `beef-frankfurter`
+- `whole-milk-ricotta-cheese`
+- `pasteurized-whole-egg`
+- `pasteurized-white-egg`
+- `white-egg`
+- `salsa-sauce`
+- `beef-breakfast-sausage`
+- `breaded-onion-ring`
+- `kosher-cucumber-pickle`
+- `grated-parmesan-cheese`
+- `american-cheese`
+- `bottled-white-grapefruit-juice`
+- `yellow-peach`
+- `sunflower-seed-kernel`
+- `mild-pork-italian-sausage`
+- `commercially-prepared-white-bread`
+- `breakfast-links-turkey-sausage`
+- `swiss-cheese`
+- `carrot`
+- `yellow-mustard`
+- `green-kiwifruit`
+- `cantaloupe-melon`
+- `navels-orange`
+- `cos-or-romaine-lettuce`
+- `cheddar-cheese`
+- `low-moisture-mozzarella-cheese`
+- `whole-egg`
+- `pasteurized-yolk-egg`
+- `yolk-egg`
+- `seco-dry-white-cheese`
+- `nonfat-plain-greek-yogurt`
+- `nonfat-strawberry-greek-yogurt`
+- `93-lean-ground-turkey`
+- `drumstick-chicken`
+- `breast-chicken`
+- `spaghetti-marinara-pasta-sauce`
+- `meat-pre-packaged-sliced-ham`
+- `bartlett-pear`
+- `pimiento-manzanilla-green-olive`
+- `ground-chorizo-pork-sausage`
+- `raisins-soft-oatmeal-cooky`
+- `diced-ripe-red-tomato`
+- `haddock-fish`
+- `pollock-fish`
+- `in-water-tuna-fish`
+- `granulated-sugar`
+- `top-loin-steak-beef`
+- `tenderloin-roast-loin-beef`
+- `of-round-roast-beef`
+- `top-round-roast-beef`
+- `steak-short-loin-beef`
+- `commercially-prepared-whole-wheat-bread`
+- `dark-red-kidney-bean`
+- `pink-bean`
+- `light-red-kidney-bean`
+- `brown-bean`
+- `flor-de-mayo-bean`
+- `carioca-bean`
+- `tan-bean`
+- `small-red-bean`
+- `medium-red-bean`
+- `cranberry-bean`
+- `light-tan-bean`
+- `black-bean`
+- `small-white-bean`
+- `red-bean`
+- `great-northern-bean`
+- `egg-white-large-egg`
+- `egg-yolk-large-egg`
+- `extra-virgin-olive-oil`
+- `egg-whole-large-egg`
+- `unsalted-stick-butter`
+- `all-purpose-wheat-flour`
+- `white-bread-flour`
+- `white-rice-flour`
+- `meal-yellow-corn-flour`
+- `salted-stick-butter`
+- `red-onion`
+- `yellow-onion`
+- `overripe-bananas`
+- `ripe-and-slightly-bananas`
+- `defatted-soy-flour`
+- `full-fat-soy-flour`
+- `brown-rice-flour`
+- `glutinous-rice-flour`
+- `pastry-flour`
+- `white-onion`
+- `red-delicious-apple`
+- `honeycrisp-apple`
+- `granny-smith-apple`
+- `gala-apple`
+- `fuji-apple`
+- `plain-unsweetened-soy-milk`
+- `plain-unsweetened-almond-milk`
+- `lion-s-mane-mushroom`
+- `shiitake-mushroom`
+- `white-button-mushroom`
+- `extra-light-olive-oil`
+- `baby-spinach`
+- `mature-spinach`
+- `00-flour`
+- `whole-grain-spelt-flour`
+- `semi-coarse-semolina-flour`
+- `fine-semolina-flour`
+- `shelf-stable-apple-juice`
+- `no-pulp-orange-juice`
+- `stable-purple-grape-juice`
+- `stable-white-grape-juice`
+- `not-fortified-cranberry-juice`
+- `fortified-red-grapefruit-juice`
+- `shelf-stable-tomato-juice`
+- `portabella-mushroom`
+- `king-oyster-mushroom`
+- `enoki-mushroom`
+- `crimini-mushroom`
+- `maitake-mushroom`
+- `beech-mushroom`
+- `pioppini-mushroom`
+- `plain-sweetened-soy-milk`
+- `plain-unsweetened-oat-milk`
+- `mature-carrot`
+- `baby-carrot`
+- `green-bell-pepper`
+- `yellow-bell-pepper`
+- `red-bell-pepper`
+- `orange-bell-pepper`
+- `whole-milk-plain-yogurt`
+- `milk-plain-greek-yogurt`
+- `refrigerated-grated-parmesan-cheese`
+- `whole-milk-feta-cheese`
+- `almond-flour`
+- `whole-grain-oat-flour`
+- `creamy-peanut-butter`
+- `creamy-sesame-butter`
+- `creamy-almond-butter`
+- `ground-flaxseed`
+- `blueberry`
+- `seedless-red-grape`
+- `seedless-green-grape`
+- `unsweetened-applesauce`
+- `full-fat-cottage-cheese`
+- `full-fat-cream-cheese`
+- `heavy-cream`
+- `full-fat-sour-cream`
+- `iceberg-lettuce`
+- `green-romaine-lettuce`
+- `red-leaf-lettuce`
+- `green-leaf-lettuce`
+- `pine-nut`
+- `whole-almond`
+- `halves-english-walnut`
+- `halves-pecan`
+- `rolled-whole-grain-oat`
+- `cut-whole-grain-oat`
+- `dark-red-sweet-cherry`
+- `russet-potato`
+- `red-potato`
+- `gold-potato`
+- `orange-flesh-sweet-potato`
+- `with-peel-cucumber`
+- `green-cabbage`
+- `whole-grain-buckwheat`
+- `whole-grain-millet`
+- `long-grain-brown-rice`
+- `long-grain-white-rice`
+- `10-fat-ground-beef`
+- `20-fat-ground-beef`
+- `ground-pork`
+- `with-additives-ground-chicken`
+- `7-fat-ground-turkey`
+- `brazilnut`
+- `hazelnuts-or-filbert`
+- `peanut`
+- `chestnut-flour`
+- `pistachio-nut`
+- `kernel-sunflower-seed`
+- `coconut-flour`
+- `cannellini-bean`
+- `blackeye-pea`
+- `sweet-green-peas`
+- `loin-pork`
+- `tenderloin-loin-pork`
+- `thigh-chicken`
+- `steak-ribeye-beef`
+- `top-round-beef`
+- `roast-chuck-beef`
+- `steak-flank-beef`
+- `nonfat-plain-yogurt`
+- `solid-monterey-jack-cheese`
+- `cheese-food-or-product`
+- `sliced-provolone-cheese`
+- `solid-oaxaca-cheese`
+- `solid-queso-fresco-cheese`
+- `solid-cotija-cheese`
+- `caught-sockeye-salmon-fish`
+- `raised-atlantic-salmon-fish`
+- `farm-raised-tilapia-fish`
+- `farm-raised-shrimp-crustacean`
+- `caught-atlantic-cod-fish`
+- `farm-raised-catfish-fish`
+- `blue-swimming-crab-crustacean`
+- `zucchini-green-summer-squash`
+- `yellow-summer-squash`
+- `butternut-winter-squash`
+- `acorn-winter-squash`
+- `bok-choy-cabbage`
+- `collard`
+- `beet`
+- `liquids-whole-tomato`
+- `sauce-tomato`
+- `paste-tomato`
+- `crushed-tomato`
+- `puree-tomato`
+- `honeydew-melon`
+- `ripe-plantain`
+- `underripe-plantain`
+- `baby-arugula`
+- `green-asparagus`
+- `peeled-hass-avocado`
+- `black-rice`
+- `white-kernels-sweet-corn`
+- `grain-einkorn`
+- `pearled-farro`
+- `grain-fonio`
+- `grain-khorasan`
+- `peeled-green-kiwifruit`
+- `peeled-seedless-mandarin`
+- `peeled-tommy-atkins-mango`
+- `peeled-ataulfo-mango`
+- `masa-harina-corn-flour`
+- `green-anjou-pear`
+- `black-plum`
+- `red-rice`
+- `white-sorghum-bran`
+- `pearled-white-sorghum-flour`
+- `pearled-white-sorghum-grain`
+- `white-whole-grain-sorghum`
+- `overripe-plantain`
+- `skin-drumstick-chicken`
+- `skin-thigh-chicken`
+- `skin-wing-chicken`
+- `skin-breast-chicken`
+- `ground-lamb`
+- `ground-bison`
+- `short-loin-beef`
+- `tenderloin-steak-beef`
+- `top-sirloin-steak-beef`
+- `center-cut-chop-pork`
+- `belly-pork`
+- `seeded-peeled-pawpaw`
+- `peeled-pie-pumpkin-squash`
+- `seeded-peeled-spaghetti-squash`
+- `peeled-rutabaga`
+- `dehusked-tomatillos`
+- `destemmed-leaf-napa-cabbage`
+- `bulb-and-greens-leek`
+- `greens-green-onion`
+- `removed-peeled-bulb-shallot`
+- `shelf-stable-prune-juice`
+- `shelf-stable-pomegranate-juice`
+- `shelf-stable-tart-cherry-juice`
+- `in-olive-oil-anchovy`
+- `beet-green`
+- `pacific-or-alaskan-cod`
+- `bulb-fennel`
+- `wild-caught-halibut`
+- `caught-tail-only-lobster`
+- `wild-caught-mahi`
+- `hungarian-wax-pepper`
+- `seeded-jalapeno-pepper`
+- `seeded-poblano-pepper`
+- `seeded-serrano-pepper`
+- `red-radish`
+- `caught-patagonian-bay-scallop`
+- `wild-caught-sea-scallop`
+- `caught-chilean-sea-bass`
+- `wild-caught-snapper`
+- `legs-only-snow-crab`
+- `tubes-only-squid`
+- `wild-caught-swordfish`
+- `ahi-or-yellowfin-tuna`
+- `turnip`
+- `flesh-only-seedless-watermelon`
+- `rind-only-seedless-watermelon`
+- `stalk-rhubarb`
+- `sweetened-cranberry`
+- `plum`
+- `seedless-golden-raisin`
+- `seedless-dark-raisin`
+- `edamame`
+- `pork-original-baked-bean`
+- `vegetarian-baked-bean`
+- `refried-bean`
+- `vegetarian-refried-bean`
+- `italian-dressing-salad`
+- `ranch-dressing`
+- `sweetened-condensed-milk`
+- `beef-bologna`
+- `classic-bologna`
+- `white-bread`
+- `100-whole-wheat-bread`
+- `mulitgrain-bread`
+- `stable-wheat-flour-tortilla`
+- `shelf-stable-corn-tortilla`
+- `spaghetti-pasta`
+- `spaghetti-whole-grain-pasta`
+- `oven-roasted-turkey-lunchmeat`
+- `black-forest-ham-lunchmeat`
+- `sliced-roast-beef-lunchmeat`
+- `sliced-chicken-breast-lunchmeat`
+- `sliced-hard-salami`
+- `beef-and-pork-pepperoni`
