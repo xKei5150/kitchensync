@@ -18,6 +18,8 @@ const validCategories = <String>{
   'other',
 };
 
+final _agrovocUriPattern = RegExp(r'^http://aims\.fao\.org/aos/agrovoc/c_\w+$');
+
 const validUnits = <String>{
   'g',
   'kg',
@@ -142,6 +144,19 @@ class HierarchyValidator {
             ),
           );
         }
+      }
+
+      final agrovocUri = ingredient['agrovocUri'] as String?;
+      if (agrovocUri != null &&
+          agrovocUri.isNotEmpty &&
+          !_agrovocUriPattern.hasMatch(agrovocUri)) {
+        errors.add(
+          ValidationError(
+            code: 'invalid_agrovoc_uri',
+            ingredientId: id,
+            message: 'Invalid AGROVOC URI: $agrovocUri.',
+          ),
+        );
       }
 
       final parentId = ingredient['parentIngredientId'] as String?;
