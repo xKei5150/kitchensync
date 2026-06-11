@@ -1,3 +1,4 @@
+import 'package:seed_builder/curation_types.dart';
 import 'package:seed_builder/hierarchy_validator.dart';
 import 'package:seed_builder/ingredient_seed.dart';
 
@@ -97,6 +98,66 @@ class CurationReport {
         buffer.writeln(
           '- `${warning.ingredientId}` ${warning.code}: ${warning.message}',
         );
+      }
+    }
+
+    var matched = 0;
+    var unmatched = 0;
+    var needsAgrovocReview = 0;
+    final unmatchedIds = <String>[];
+    final langFills = <String, int>{
+      for (final lang in agrovocTargetLangs) lang: 0,
+    };
+
+    for (final ingredient in after.ingredients) {
+      final curation = ingredient['curation'];
+      final agrovocStatus = curation is Map
+          ? curation['agrovocStatus'] as String?
+          : null;
+      switch (agrovocStatus) {
+        case 'matched':
+          matched += 1;
+        case 'needsReview':
+          needsAgrovocReview += 1;
+        case 'unmatched':
+          unmatched += 1;
+          unmatchedIds.add(ingredient['id'] as String);
+      }
+      final names = ingredient['displayNames'];
+      if (names is Map) {
+        for (final lang in agrovocTargetLangs) {
+          if (lang == 'en') continue;
+          final value = names[lang];
+          if (value is String && value.trim().isNotEmpty) {
+            langFills[lang] = (langFills[lang] ?? 0) + 1;
+          }
+        }
+      }
+    }
+
+    buffer
+      ..writeln()
+      ..writeln('## AGROVOC coverage')
+      ..writeln()
+      ..writeln('- Matched: $matched')
+      ..writeln('- Needs review: $needsAgrovocReview')
+      ..writeln('- Unmatched: $unmatched')
+      ..writeln()
+      ..writeln('### Labels filled per language')
+      ..writeln();
+    for (final lang in agrovocTargetLangs) {
+      if (lang == 'en') continue;
+      buffer.writeln('- `$lang`: ${langFills[lang]}');
+    }
+    buffer
+      ..writeln()
+      ..writeln('### Unmatched (English-only) ingredients')
+      ..writeln();
+    if (unmatchedIds.isEmpty) {
+      buffer.writeln('- None');
+    } else {
+      for (final id in unmatchedIds) {
+        buffer.writeln('- `$id`');
       }
     }
 
