@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/utils/result.dart';
+import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
@@ -75,15 +76,12 @@ class IngredientDetailScreen extends ConsumerWidget {
                   spacing: KsTokens.space6,
                   runSpacing: KsTokens.space4,
                   children: [
-                    _InfoTag(label: ing.category.name, color: categoryColor),
-                    _InfoTag(
-                      label: 'default ${ing.defaultUnit.name}',
-                      color: KsTokens.brandPrimary,
-                    ),
+                    KsTag(label: ing.category.name, color: categoryColor),
+                    KsTag(label: 'default ${ing.defaultUnit.name}'),
                     if (ing.isBulkCandidate)
-                      _InfoTag(label: 'bulk', color: KsTokens.sectionBulk),
+                      const KsTag(label: 'bulk', color: KsTokens.sectionBulk),
                     if (ing.isNonFood)
-                      _InfoTag(
+                      const KsTag(
                         label: 'non-food',
                         color: KsTokens.sectionNonFood,
                       ),
@@ -96,9 +94,7 @@ class IngredientDetailScreen extends ConsumerWidget {
                     child: Wrap(
                       spacing: KsTokens.space6,
                       runSpacing: KsTokens.space4,
-                      children: ing.aliases
-                          .map((a) => _AliasTag(label: a))
-                          .toList(),
+                      children: ing.aliases.map(KsTag.alias).toList(),
                     ),
                   ),
                 ],
@@ -111,10 +107,8 @@ class IngredientDetailScreen extends ConsumerWidget {
                       runSpacing: KsTokens.space4,
                       children: ing.allergens
                           .map(
-                            (a) => _InfoTag(
-                              label: a.name,
-                              color: KsTokens.expired,
-                            ),
+                            (a) =>
+                                KsTag(label: a.name, color: KsTokens.expired),
                           )
                           .toList(),
                     ),
@@ -141,8 +135,7 @@ class IngredientDetailScreen extends ConsumerWidget {
                       runSpacing: KsTokens.space4,
                       children: ing.dietaryTags
                           .map(
-                            (d) =>
-                                _InfoTag(label: d.name, color: KsTokens.fresh),
+                            (d) => KsTag(label: d.name, color: KsTokens.fresh),
                           )
                           .toList(),
                     ),
@@ -163,59 +156,6 @@ class IngredientDetailScreen extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _InfoTag extends StatelessWidget {
-  const _InfoTag({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: KsTokens.space8,
-        vertical: KsTokens.space3,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(KsTokens.radius6),
-      ),
-      child: Text(
-        label,
-        style: KsTokens.labelSmall.copyWith(
-          color: color.withValues(alpha: 0.85),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _AliasTag extends StatelessWidget {
-  const _AliasTag({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: KsTokens.space8,
-        vertical: KsTokens.space3,
-      ),
-      decoration: BoxDecoration(
-        color: KsTokens.neutralSubtle,
-        borderRadius: BorderRadius.circular(KsTokens.radius6),
-        border: Border.all(color: KsTokens.border),
-      ),
-      child: Text(
-        label,
-        style: KsTokens.labelSmall.copyWith(color: KsTokens.textSecondary),
       ),
     );
   }

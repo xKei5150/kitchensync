@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/pantry/presentation/widgets/pantry_item_tile.dart';
@@ -78,48 +79,11 @@ class PantryHomeScreen extends ConsumerWidget {
   }
 
   Widget _emptyState(BuildContext context, PantrySection section) {
-    final color = section.color;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(KsTokens.space32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _iconFor(section),
-                size: 36,
-                color: color.withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: KsTokens.space20),
-            Semantics(
-              header: true,
-              child: Text(
-                'Your ${_labelFor(section).toLowerCase()} pantry\nis waiting',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: KsTokens.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: KsTokens.space8),
-            Text(
-              'Tap Add to stock your first item.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: KsTokens.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return KsEmptyState(
+      icon: _iconFor(section),
+      title: 'Your ${_labelFor(section).toLowerCase()} pantry\nis waiting',
+      subtitle: 'Tap Add to stock your first item.',
+      color: section.color,
     );
   }
 }
@@ -158,7 +122,7 @@ class _SectionSelector extends StatelessWidget {
             final color = section.color;
             return Padding(
               padding: const EdgeInsets.only(right: KsTokens.space8),
-              child: _SectionTab(
+              child: KsSectionTab(
                 label: labelFor(section),
                 icon: iconFor(section),
                 color: color,
@@ -167,67 +131,6 @@ class _SectionSelector extends StatelessWidget {
               ),
             );
           }).toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionTab extends StatelessWidget {
-  const _SectionTab({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(KsTokens.radius12),
-        child: AnimatedContainer(
-          duration: KsTokens.durationMedium,
-          curve: KsTokens.curveStandard,
-          padding: const EdgeInsets.symmetric(
-            horizontal: KsTokens.space16,
-            vertical: KsTokens.space10,
-          ),
-          decoration: BoxDecoration(
-            color: isSelected ? color : KsTokens.surfaceRaised,
-            borderRadius: BorderRadius.circular(KsTokens.radius12),
-            border: Border.all(color: isSelected ? color : KsTokens.border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isSelected
-                    ? KsTokens.textOnBrand
-                    : color.withValues(alpha: 0.7),
-              ),
-              const SizedBox(width: KsTokens.space8),
-              Text(
-                label,
-                style: KsTokens.labelLarge.copyWith(
-                  color: isSelected
-                      ? KsTokens.textOnBrand
-                      : KsTokens.textPrimary,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

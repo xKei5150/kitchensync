@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
+import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
@@ -164,33 +165,7 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
           ),
           if (_error != null) ...[
             const SizedBox(height: KsTokens.space16),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: KsTokens.space12,
-                vertical: KsTokens.space10,
-              ),
-              decoration: BoxDecoration(
-                color: KsTokens.expired.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(KsTokens.radius12),
-                border: Border.all(
-                  color: KsTokens.expired.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.error_outline, size: 18, color: KsTokens.expired),
-                  const SizedBox(width: KsTokens.space8),
-                  Expanded(
-                    child: Text(
-                      _error!,
-                      style: KsTokens.bodySmall.copyWith(
-                        color: KsTokens.expired,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            KsErrorAlert(message: _error!),
           ],
           const SizedBox(height: KsTokens.space24),
           FilledButton(

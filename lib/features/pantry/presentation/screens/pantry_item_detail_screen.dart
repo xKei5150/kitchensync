@@ -10,7 +10,7 @@ import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/freshness_helper.dart';
 import 'package:kitchensync/core/utils/quantity_formatter.dart';
 import 'package:kitchensync/core/utils/result.dart';
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
@@ -149,7 +149,7 @@ class _BodyState extends ConsumerState<_Body> {
                   ingredient: ingredient,
                 ),
                 const SizedBox(height: KsTokens.space20),
-                _QuantityStepper(
+                KsQuantityStepper(
                   qty: qty,
                   unit: unit,
                   onDecrease: () => _adjustQuantity(-1),
@@ -246,122 +246,12 @@ class _TitleRow extends StatelessWidget {
               ),
               if (ingredient != null) ...[
                 const SizedBox(height: KsTokens.space6),
-                _CategoryTag(category: ingredient!.category),
+                KsTag.category(ingredient!.category),
               ],
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _CategoryTag extends StatelessWidget {
-  const _CategoryTag({required this.category});
-
-  final IngredientCategory category;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = category.color;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: KsTokens.space8,
-        vertical: KsTokens.space3,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(KsTokens.radius6),
-      ),
-      child: Text(
-        category.name,
-        style: KsTokens.labelSmall.copyWith(
-          color: color.withValues(alpha: 0.85),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _QuantityStepper extends StatelessWidget {
-  const _QuantityStepper({
-    required this.qty,
-    required this.unit,
-    this.onDecrease,
-    this.onIncrease,
-  });
-
-  final String qty;
-  final String unit;
-  final VoidCallback? onDecrease;
-  final VoidCallback? onIncrease;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: KsTokens.space16,
-        vertical: KsTokens.space12,
-      ),
-      decoration: BoxDecoration(
-        color: KsTokens.surfaceRaised,
-        borderRadius: BorderRadius.circular(KsTokens.radius16),
-        border: Border.all(color: KsTokens.border),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _StepButton(
-            icon: Icons.remove_rounded,
-            onTap: onDecrease,
-            isDecrement: true,
-          ),
-          Column(
-            children: [
-              Text(qty, style: KsTokens.displayMedium),
-              const SizedBox(height: KsTokens.space2),
-              Text(
-                unit,
-                style: KsTokens.labelMedium.copyWith(
-                  color: KsTokens.textTertiary,
-                ),
-              ),
-            ],
-          ),
-          _StepButton(
-            icon: Icons.add_rounded,
-            onTap: onIncrease,
-            isDecrement: false,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepButton extends StatelessWidget {
-  const _StepButton({required this.icon, this.onTap, this.isDecrement = false});
-
-  final IconData icon;
-  final VoidCallback? onTap;
-  final bool isDecrement;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isDecrement ? KsTokens.lowStock : KsTokens.brandPrimary;
-    return Material(
-      color: color.withValues(alpha: 0.1),
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(icon, color: color, size: 22),
-        ),
-      ),
     );
   }
 }
@@ -381,25 +271,18 @@ class _MetadataCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(KsTokens.space16),
-      decoration: BoxDecoration(
-        color: KsTokens.surfaceRaised,
-        borderRadius: BorderRadius.circular(KsTokens.radius16),
-        border: Border.all(color: KsTokens.border),
-      ),
+    return KsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _MetadataRow(
+          KsMetadataRow(
             label: 'Section',
             value: _sectionLabel(item.section),
             color: item.section.color,
           ),
           if (expiryLabel.isNotEmpty) ...[
             const SizedBox(height: KsTokens.space12),
-            _MetadataRow(
+            KsMetadataRow(
               label: 'Freshness',
               value: expiryLabel,
               color: freshness.color,
@@ -408,28 +291,28 @@ class _MetadataCard extends StatelessWidget {
           ],
           if (item.lastPurchaseDate != null) ...[
             const SizedBox(height: KsTokens.space12),
-            _MetadataRow(
+            KsMetadataRow(
               label: 'Last purchased',
               value: _formatDate(item.lastPurchaseDate!),
             ),
           ],
           if (ingredient?.defaultShelfLifeDays != null) ...[
             const SizedBox(height: KsTokens.space12),
-            _MetadataRow(
+            KsMetadataRow(
               label: 'Typical shelf life',
               value: '${ingredient!.defaultShelfLifeDays} days',
             ),
           ],
           if (ingredient != null && ingredient!.allergens.isNotEmpty) ...[
             const SizedBox(height: KsTokens.space12),
-            _MetadataRow(
+            KsMetadataRow(
               label: 'Allergens',
               value: ingredient!.allergens.map((a) => a.name).join(', '),
             ),
           ],
           if (item.note != null && item.note!.isNotEmpty) ...[
             const SizedBox(height: KsTokens.space12),
-            _MetadataRow(label: 'Note', value: item.note!),
+            KsMetadataRow(label: 'Note', value: item.note!),
           ],
         ],
       ),
@@ -447,67 +330,6 @@ class _MetadataCard extends StatelessWidget {
       '${date.year.toString().padLeft(4, '0')}-'
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
-}
-
-class _MetadataRow extends StatelessWidget {
-  const _MetadataRow({
-    required this.label,
-    required this.value,
-    this.color,
-    this.showDot = false,
-  });
-
-  final String label;
-  final String value;
-  final Color? color;
-  final bool showDot;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 120,
-          child: Text(
-            label,
-            style: KsTokens.bodySmall.copyWith(
-              color: KsTokens.textTertiary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Row(
-            children: [
-              if (showDot && color != null) ...[
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: KsTokens.space6),
-              ],
-              Flexible(
-                child: Text(
-                  value,
-                  style: KsTokens.bodyMedium.copyWith(
-                    color: color ?? KsTokens.textPrimary,
-                    fontWeight: color != null
-                        ? FontWeight.w600
-                        : FontWeight.w400,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _WasteButton extends StatelessWidget {

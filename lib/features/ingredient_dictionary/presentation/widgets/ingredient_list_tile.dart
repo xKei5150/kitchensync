@@ -1,6 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 
@@ -49,9 +49,13 @@ class IngredientListTile extends StatelessWidget {
                     ),
                   ),
                 ],
-                _Thumbnail(
+                KsThumbnail(
                   imageUrl: ingredient.imageUrl,
                   categoryColor: category.color,
+                  size: 44,
+                  radius: KsTokens.radius10,
+                  icon: Icons.local_grocery_store_outlined,
+                  iconSize: 20,
                 ),
                 const SizedBox(width: KsTokens.space12),
                 Expanded(
@@ -90,55 +94,6 @@ class IngredientListTile extends StatelessWidget {
   }
 }
 
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({this.imageUrl, required this.categoryColor});
-
-  final String? imageUrl;
-  final Color categoryColor;
-
-  static const _size = 44.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: _size,
-      height: _size,
-      child: imageUrl != null
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(KsTokens.radius10),
-              child: CachedNetworkImage(
-                imageUrl: imageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => _Placeholder(color: categoryColor),
-                errorWidget: (_, __, ___) => _Placeholder(color: categoryColor),
-              ),
-            )
-          : _Placeholder(color: categoryColor),
-    );
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(KsTokens.radius10),
-      ),
-      child: Icon(
-        Icons.local_grocery_store_outlined,
-        size: 20,
-        color: color.withValues(alpha: 0.7),
-      ),
-    );
-  }
-}
-
 class _Subtitle extends StatelessWidget {
   const _Subtitle({
     required this.category,
@@ -159,40 +114,26 @@ class _Subtitle extends StatelessWidget {
       runSpacing: KsTokens.space2,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (indent) _MiniTag(label: 'Variant', color: KsTokens.brandAccent),
-        _MiniTag(label: category.name, color: category.color),
-        if (isBulk) _MiniTag(label: 'Bulk', color: KsTokens.sectionBulk),
+        if (indent)
+          const KsTag(
+            label: 'Variant',
+            color: KsTokens.brandAccent,
+            size: KsTagSize.sm,
+          ),
+        KsTag.category(category, size: KsTagSize.sm),
+        if (isBulk)
+          const KsTag(
+            label: 'Bulk',
+            color: KsTokens.sectionBulk,
+            size: KsTagSize.sm,
+          ),
         if (isNonFood)
-          _MiniTag(label: 'Non-food', color: KsTokens.sectionNonFood),
+          const KsTag(
+            label: 'Non-food',
+            color: KsTokens.sectionNonFood,
+            size: KsTagSize.sm,
+          ),
       ],
-    );
-  }
-}
-
-class _MiniTag extends StatelessWidget {
-  const _MiniTag({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: KsTokens.space6,
-        vertical: KsTokens.space2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(KsTokens.radius4),
-      ),
-      child: Text(
-        label,
-        style: KsTokens.labelSmall.copyWith(
-          color: color.withValues(alpha: 0.85),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 }

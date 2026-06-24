@@ -1,10 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/utils/freshness_helper.dart';
 import 'package:kitchensync/core/utils/quantity_formatter.dart';
 import 'package:kitchensync/core/utils/result.dart';
+import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
@@ -63,10 +63,17 @@ class PantryItemTile extends ConsumerWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _FreshnessBar(freshness: freshness),
-                  _Thumbnail(
-                    imageUrl: item.imageUrl,
-                    categoryColor: category?.color ?? KsTokens.catOther,
+                  KsFreshnessBar(freshness: freshness),
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: KsTokens.space8,
+                      top: KsTokens.space12,
+                      bottom: KsTokens.space12,
+                    ),
+                    child: KsThumbnail(
+                      imageUrl: item.imageUrl,
+                      categoryColor: category?.color ?? KsTokens.catOther,
+                    ),
                   ),
                   Expanded(
                     child: Padding(
@@ -87,7 +94,7 @@ class PantryItemTile extends ConsumerWidget {
                           ),
                           if (expiryLabel.isNotEmpty) ...[
                             const SizedBox(height: KsTokens.space6),
-                            _ExpiryBadge(
+                            KsExpiryBadge(
                               freshness: freshness,
                               label: expiryLabel,
                             ),
@@ -101,87 +108,6 @@ class PantryItemTile extends ConsumerWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _FreshnessBar extends StatelessWidget {
-  const _FreshnessBar({required this.freshness});
-
-  final Freshness freshness;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = freshness == Freshness.unknown
-        ? KsTokens.border
-        : freshness.color;
-
-    return Container(
-      width: 4,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(KsTokens.radius16),
-          bottomLeft: Radius.circular(KsTokens.radius16),
-        ),
-      ),
-    );
-  }
-}
-
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({this.imageUrl, required this.categoryColor});
-
-  final String? imageUrl;
-  final Color categoryColor;
-
-  static const _size = 56.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        left: KsTokens.space8,
-        top: KsTokens.space12,
-        bottom: KsTokens.space12,
-      ),
-      child: SizedBox(
-        width: _size,
-        height: _size,
-        child: imageUrl != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(KsTokens.radius12),
-                child: CachedNetworkImage(
-                  imageUrl: imageUrl!,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) => _Placeholder(color: categoryColor),
-                  errorWidget: (_, __, ___) =>
-                      _Placeholder(color: categoryColor),
-                ),
-              )
-            : _Placeholder(color: categoryColor),
-      ),
-    );
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(KsTokens.radius12),
-      ),
-      child: Icon(
-        Icons.local_dining,
-        size: 24,
-        color: color.withValues(alpha: 0.7),
       ),
     );
   }
@@ -207,37 +133,9 @@ class _Header extends StatelessWidget {
         ),
         if (category != null) ...[
           const SizedBox(width: KsTokens.space8),
-          _CategoryTag(category: category!),
+          KsTag.category(category!, size: KsTagSize.sm),
         ],
       ],
-    );
-  }
-}
-
-class _CategoryTag extends StatelessWidget {
-  const _CategoryTag({required this.category});
-
-  final IngredientCategory category;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = category.color;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: KsTokens.space6,
-        vertical: KsTokens.space2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(KsTokens.radius4),
-      ),
-      child: Text(
-        category.name,
-        style: KsTokens.labelSmall.copyWith(
-          color: color.withValues(alpha: 0.85),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 }
@@ -262,63 +160,14 @@ class _QuantityRow extends StatelessWidget {
         Text(
           '$qty $unit',
           style: KsTokens.titleLarge.copyWith(
-            fontSize: 18,
             fontWeight: FontWeight.w700,
             color: KsTokens.textPrimary,
           ),
         ),
         if (isLowStock) ...[
           const SizedBox(width: KsTokens.space8),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: KsTokens.space6,
-              vertical: KsTokens.space2,
-            ),
-            decoration: BoxDecoration(
-              color: KsTokens.lowStock.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(KsTokens.radius4),
-            ),
-            child: Text(
-              'Low',
-              style: KsTokens.labelSmall.copyWith(
-                color: KsTokens.lowStock,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+          KsTag.lowStock(),
         ],
-      ],
-    );
-  }
-}
-
-class _ExpiryBadge extends StatelessWidget {
-  const _ExpiryBadge({required this.freshness, required this.label});
-
-  final Freshness freshness;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = freshness.color;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: KsTokens.space6),
-        Text(
-          label,
-          style: KsTokens.bodySmall.copyWith(
-            color: freshness == Freshness.unknown
-                ? KsTokens.textTertiary
-                : color.withValues(alpha: 0.85),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
       ],
     );
   }
