@@ -44,7 +44,7 @@ class IngredientListTile extends StatelessWidget {
                     height: 36,
                     margin: const EdgeInsets.only(right: KsTokens.space12),
                     decoration: BoxDecoration(
-                      color: KsTokens.borderStrong,
+                      color: context.ksColors.borderStrong,
                       borderRadius: BorderRadius.circular(KsTokens.radiusFull),
                     ),
                   ),
@@ -83,7 +83,7 @@ class IngredientListTile extends StatelessWidget {
                   Icon(
                     Icons.chevron_right,
                     size: 20,
-                    color: KsTokens.textTertiary,
+                    color: context.ksColors.textTertiary,
                   ),
               ],
             ),

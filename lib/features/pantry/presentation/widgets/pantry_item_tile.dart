@@ -44,6 +44,7 @@ class PantryItemTile extends ConsumerWidget {
     final qty = QuantityFormatter.format(item.quantity);
     final unit = item.unit.name;
     final isLowStock = item.quantity <= 1;
+    final ks = context.ksColors;
 
     return Semantics(
       label: '$name $qty $unit ${freshness.label}',
@@ -55,9 +56,9 @@ class PantryItemTile extends ConsumerWidget {
           borderRadius: BorderRadius.circular(KsTokens.radius16),
           child: Container(
             decoration: BoxDecoration(
-              color: KsTokens.surfaceRaised,
+              color: ks.surfaceRaised,
               borderRadius: BorderRadius.circular(KsTokens.radius16),
-              border: Border.all(color: KsTokens.border),
+              border: Border.all(color: ks.border),
             ),
             child: IntrinsicHeight(
               child: Row(
@@ -161,7 +162,7 @@ class _QuantityRow extends StatelessWidget {
           '$qty $unit',
           style: KsTokens.titleLarge.copyWith(
             fontWeight: FontWeight.w700,
-            color: KsTokens.textPrimary,
+            color: context.ksColors.textPrimary,
           ),
         ),
         if (isLowStock) ...[

@@ -24,6 +24,7 @@ class KsSectionTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ks = context.ksColors;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -37,9 +38,9 @@ class KsSectionTab extends StatelessWidget {
             vertical: KsTokens.space10,
           ),
           decoration: BoxDecoration(
-            color: isSelected ? color : KsTokens.surfaceRaised,
+            color: isSelected ? color : ks.surfaceRaised,
             borderRadius: BorderRadius.circular(KsTokens.radius12),
-            border: Border.all(color: isSelected ? color : KsTokens.border),
+            border: Border.all(color: isSelected ? color : ks.border),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -55,9 +56,7 @@ class KsSectionTab extends StatelessWidget {
               Text(
                 label,
                 style: KsTokens.labelLarge.copyWith(
-                  color: isSelected
-                      ? KsTokens.textOnBrand
-                      : KsTokens.textPrimary,
+                  color: isSelected ? KsTokens.textOnBrand : ks.textPrimary,
                 ),
               ),
             ],

@@ -56,7 +56,7 @@ class IngredientDetailScreen extends ConsumerWidget {
           else
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: Container(
+              child: ColoredBox(
                 color: categoryColor.withValues(alpha: 0.08),
                 child: Icon(
                   Icons.local_grocery_store_outlined,
@@ -147,7 +147,7 @@ class IngredientDetailScreen extends ConsumerWidget {
                     'Image: ${ing.imageAttribution!.source},'
                     ' ${ing.imageAttribution!.license}',
                     style: KsTokens.bodySmall.copyWith(
-                      color: KsTokens.textTertiary,
+                      color: context.ksColors.textTertiary,
                     ),
                   ),
                 ],
@@ -174,7 +174,9 @@ class _MetadataSection extends StatelessWidget {
       children: [
         Text(
           label,
-          style: KsTokens.labelLarge.copyWith(color: KsTokens.textTertiary),
+          style: KsTokens.labelLarge.copyWith(
+            color: context.ksColors.textTertiary,
+          ),
         ),
         const SizedBox(height: KsTokens.space8),
         child,

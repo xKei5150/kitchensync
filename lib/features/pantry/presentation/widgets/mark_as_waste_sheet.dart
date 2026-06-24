@@ -76,6 +76,7 @@ class _MarkAsWasteSheetState extends ConsumerState<MarkAsWasteSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final ks = context.ksColors;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         KsTokens.space20,
@@ -92,7 +93,7 @@ class _MarkAsWasteSheetState extends ConsumerState<MarkAsWasteSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: KsTokens.borderStrong,
+                color: ks.borderStrong,
                 borderRadius: BorderRadius.circular(KsTokens.radiusFull),
               ),
             ),
@@ -104,14 +105,10 @@ class _MarkAsWasteSheetState extends ConsumerState<MarkAsWasteSheet> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: KsTokens.expired.withValues(alpha: 0.1),
+                  color: ks.danger.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(KsTokens.radius10),
                 ),
-                child: Icon(
-                  Icons.delete_outline,
-                  color: KsTokens.expired,
-                  size: 22,
-                ),
+                child: Icon(Icons.delete_outline, color: ks.danger, size: 22),
               ),
               const SizedBox(width: KsTokens.space12),
               Text(
@@ -146,7 +143,10 @@ class _MarkAsWasteSheetState extends ConsumerState<MarkAsWasteSheet> {
           const SizedBox(height: KsTokens.space24),
           FilledButton(
             onPressed: _submitting ? null : _submit,
-            style: FilledButton.styleFrom(backgroundColor: KsTokens.expired),
+            style: FilledButton.styleFrom(
+              backgroundColor: ks.danger,
+              foregroundColor: KsTokens.textOnBrand,
+            ),
             child: _submitting
                 ? const SizedBox.square(
                     dimension: 20,

@@ -29,6 +29,7 @@ class KsEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final ks = context.ksColors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(KsTokens.space32),
@@ -54,7 +55,7 @@ class KsEmptyState extends StatelessWidget {
               child: Text(
                 title,
                 style: textTheme.headlineMedium?.copyWith(
-                  color: KsTokens.textPrimary,
+                  color: ks.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -62,9 +63,7 @@ class KsEmptyState extends StatelessWidget {
             const SizedBox(height: KsTokens.space8),
             Text(
               subtitle,
-              style: textTheme.bodyMedium?.copyWith(
-                color: KsTokens.textSecondary,
-              ),
+              style: textTheme.bodyMedium?.copyWith(color: ks.textSecondary),
               textAlign: TextAlign.center,
             ),
             if (action != null) ...[

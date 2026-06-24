@@ -16,13 +16,14 @@ class KsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ks = context.ksColors;
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: KsTokens.surfaceRaised,
+        color: ks.surfaceRaised,
         borderRadius: BorderRadius.circular(KsTokens.radius16),
-        border: Border.all(color: KsTokens.border),
+        border: Border.all(color: ks.border),
       ),
       child: child,
     );
@@ -49,6 +50,7 @@ class KsMetadataRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ks = context.ksColors;
     final valueColor = color;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,7 +60,7 @@ class KsMetadataRow extends StatelessWidget {
           child: Text(
             label,
             style: KsTokens.bodySmall.copyWith(
-              color: KsTokens.textTertiary,
+              color: ks.textTertiary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -74,7 +76,7 @@ class KsMetadataRow extends StatelessWidget {
                 child: Text(
                   value,
                   style: KsTokens.bodyMedium.copyWith(
-                    color: valueColor ?? KsTokens.textPrimary,
+                    color: valueColor ?? ks.textPrimary,
                     fontWeight: valueColor != null
                         ? FontWeight.w600
                         : FontWeight.w400,

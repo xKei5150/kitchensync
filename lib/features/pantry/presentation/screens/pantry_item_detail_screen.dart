@@ -183,6 +183,7 @@ class _HeroPhoto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ks = context.ksColors;
     return Semantics(
       button: true,
       label: imageUrl != null ? 'Change photo' : 'Add photo',
@@ -191,27 +192,27 @@ class _HeroPhoto extends StatelessWidget {
         child: AspectRatio(
           aspectRatio: 16 / 9,
           child: uploading
-              ? Container(
-                  color: KsTokens.neutralSubtle,
+              ? ColoredBox(
+                  color: ks.neutralSubtle,
                   child: const Center(child: CircularProgressIndicator()),
                 )
               : imageUrl != null
               ? CachedNetworkImage(imageUrl: imageUrl!, fit: BoxFit.cover)
-              : Container(
-                  color: KsTokens.neutralSubtle,
+              : ColoredBox(
+                  color: ks.neutralSubtle,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons.add_photo_alternate_outlined,
                         size: 40,
-                        color: KsTokens.textTertiary,
+                        color: ks.textTertiary,
                       ),
                       const SizedBox(height: KsTokens.space8),
                       Text(
                         'Tap to add a photo',
                         style: KsTokens.bodyMedium.copyWith(
-                          color: KsTokens.textTertiary,
+                          color: ks.textTertiary,
                         ),
                       ),
                     ],

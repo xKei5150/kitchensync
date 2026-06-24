@@ -7,6 +7,7 @@ class AppTheme {
   static ThemeData light() => ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
+    extensions: const [KsColors.light],
     colorScheme: ColorScheme(
       brightness: Brightness.light,
       primary: KsTokens.brandPrimary,
@@ -178,6 +179,7 @@ class AppTheme {
   static ThemeData dark() => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
+    extensions: const [KsColors.dark],
     colorScheme: ColorScheme(
       brightness: Brightness.dark,
       primary: KsTokens.brandPrimaryLight,

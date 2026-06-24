@@ -13,7 +13,7 @@ class KsFreshnessBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = freshness == Freshness.unknown
-        ? KsTokens.border
+        ? context.ksColors.border
         : freshness.color;
 
     return Container(
@@ -69,7 +69,7 @@ class KsExpiryBadge extends StatelessWidget {
           label,
           style: KsTokens.bodySmall.copyWith(
             color: freshness == Freshness.unknown
-                ? KsTokens.textTertiary
+                ? context.ksColors.textTertiary
                 : color.withValues(alpha: 0.85),
             fontWeight: FontWeight.w500,
           ),

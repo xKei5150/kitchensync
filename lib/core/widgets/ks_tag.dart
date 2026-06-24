@@ -20,7 +20,7 @@ enum KsTagTone { tonal, neutral, solid, outline }
 class KsTag extends StatelessWidget {
   const KsTag({
     required this.label,
-    this.color = KsTokens.brandPrimary,
+    this.color,
     this.size = KsTagSize.md,
     this.tone = KsTagTone.tonal,
     super.key,
@@ -46,7 +46,8 @@ class KsTag extends StatelessWidget {
   final String label;
 
   /// Drives tonal / solid / outline colouring. Ignored by [KsTagTone.neutral].
-  final Color color;
+  /// Defaults to the theme's brand green when null.
+  final Color? color;
 
   /// Padding + radius preset.
   final KsTagSize size;
@@ -71,22 +72,25 @@ class KsTag extends StatelessWidget {
       ),
     };
 
+    final ks = context.ksColors;
+    final base = color ?? ks.brandPrimary;
+
     final (Color fill, Color textColor, BoxBorder? border) = switch (tone) {
       KsTagTone.tonal => (
-        color.withValues(alpha: 0.12),
-        color.withValues(alpha: 0.85),
+        base.withValues(alpha: 0.12),
+        base.withValues(alpha: 0.85),
         null,
       ),
       KsTagTone.neutral => (
-        KsTokens.neutralSubtle,
-        KsTokens.textSecondary,
-        Border.all(color: KsTokens.border),
+        ks.neutralSubtle,
+        ks.textSecondary,
+        Border.all(color: ks.border),
       ),
-      KsTagTone.solid => (color, KsTokens.textOnBrand, null),
+      KsTagTone.solid => (base, KsTokens.textOnBrand, null),
       KsTagTone.outline => (
         Colors.transparent,
-        color.withValues(alpha: 0.9),
-        Border.all(color: color.withValues(alpha: 0.55)),
+        base.withValues(alpha: 0.9),
+        Border.all(color: base.withValues(alpha: 0.55)),
       ),
     };
 

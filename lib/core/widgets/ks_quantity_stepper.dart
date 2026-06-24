@@ -19,7 +19,9 @@ class KsStepButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isDecrement ? KsTokens.lowStock : KsTokens.brandPrimary;
+    final color = isDecrement
+        ? KsTokens.lowStock
+        : context.ksColors.brandPrimary;
     return Material(
       color: color.withValues(alpha: 0.1),
       shape: const CircleBorder(),
@@ -56,15 +58,16 @@ class KsQuantityStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ks = context.ksColors;
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: KsTokens.space16,
         vertical: KsTokens.space12,
       ),
       decoration: BoxDecoration(
-        color: KsTokens.surfaceRaised,
+        color: ks.surfaceRaised,
         borderRadius: BorderRadius.circular(KsTokens.radius16),
-        border: Border.all(color: KsTokens.border),
+        border: Border.all(color: ks.border),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -80,9 +83,7 @@ class KsQuantityStepper extends StatelessWidget {
               const SizedBox(height: KsTokens.space2),
               Text(
                 unit,
-                style: KsTokens.labelMedium.copyWith(
-                  color: KsTokens.textTertiary,
-                ),
+                style: KsTokens.labelMedium.copyWith(color: ks.textTertiary),
               ),
             ],
           ),

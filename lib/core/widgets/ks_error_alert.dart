@@ -13,24 +13,25 @@ class KsErrorAlert extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final danger = context.ksColors.danger;
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: KsTokens.space12,
         vertical: KsTokens.space10,
       ),
       decoration: BoxDecoration(
-        color: KsTokens.expired.withValues(alpha: 0.08),
+        color: danger.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(KsTokens.radius12),
-        border: Border.all(color: KsTokens.expired.withValues(alpha: 0.2)),
+        border: Border.all(color: danger.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, size: 18, color: KsTokens.expired),
+          Icon(Icons.error_outline, size: 18, color: danger),
           const SizedBox(width: KsTokens.space8),
           Expanded(
             child: Text(
               message,
-              style: KsTokens.bodySmall.copyWith(color: KsTokens.expired),
+              style: KsTokens.bodySmall.copyWith(color: danger),
             ),
           ),
         ],
