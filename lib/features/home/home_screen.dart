@@ -36,13 +36,13 @@ class HomeScreen extends StatelessWidget {
                     onTap: () => context.push('/pantry'),
                   ),
                   _NavCard(
-                    label: 'Pick ingredient',
+                    label: 'Pick an ingredient',
                     icon: Icons.search,
                     color: KsTokens.brandAccent,
                     onTap: () => context.push('/ingredient/pick'),
                   ),
                   _NavCard(
-                    label: 'Custom ingredient',
+                    label: 'Create custom ingredient',
                     icon: Icons.add,
                     color: KsTokens.brandPrimaryDark,
                     onTap: () => context.push('/ingredient/create'),
@@ -94,7 +94,9 @@ class _Header extends StatelessWidget {
           const SizedBox(height: KsTokens.space4),
           Text(
             'What is in your kitchen today?',
-            style: KsTokens.bodyLarge.copyWith(color: KsTokens.textSecondary),
+            style: KsTokens.bodyLarge.copyWith(
+              color: context.ksColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -117,15 +119,16 @@ class _NavCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ks = context.ksColors;
     return Material(
-      color: KsTokens.surfaceRaised,
+      color: ks.surfaceRaised,
       borderRadius: BorderRadius.circular(KsTokens.radius16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            border: Border.all(color: KsTokens.border),
+            border: Border.all(color: ks.border),
             borderRadius: BorderRadius.circular(KsTokens.radius16),
           ),
           padding: const EdgeInsets.all(KsTokens.space16),

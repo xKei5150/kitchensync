@@ -77,3 +77,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/seed/ingredients.json
+    # Bundled fonts for google_fonts. The package loads matching files from this
+    # folder by name (e.g. DMSans-Regular.ttf) instead of fetching over the
+    # network — deterministic typography in tests and no first-launch FOUT.
+    - google_fonts/
