@@ -1,0 +1,169 @@
+<!-- @dsCard group="Components — Feedback" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Empty States</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-16);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Centered empty-state column. */
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: var(--space-12);
+      padding: var(--space-40) var(--space-24);
+    }
+
+    /* Circular tinted icon container — 76px, color@10% fill. */
+    .empty-icon {
+      width: 76px; height: 76px;
+      border-radius: var(--radius-full);
+      background: color-mix(in srgb, var(--c) 10%, transparent);
+      display: flex; align-items: center; justify-content: center;
+      transition: background var(--dur-medium) var(--curve-standard);
+    }
+    .empty:hover .empty-icon {
+      background: color-mix(in srgb, var(--c) 15%, transparent);
+    }
+    /* The glyph sits at color@55%; stroke-driven so it stays crisp at any tint. */
+    .empty-icon svg {
+      width: 34px; height: 34px;
+      fill: none;
+      stroke: color-mix(in srgb, var(--c) 55%, transparent);
+      stroke-width: 1.7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .empty-title {
+      color: var(--text-primary);
+      margin: var(--space-4) 0 0;
+    }
+    .empty-sub {
+      color: var(--text-secondary);
+      margin: 0;
+      max-width: 30ch;
+    }
+
+    .divider { height: 1px; background: var(--border); margin: var(--space-24) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Feedback</p>
+    <h1 class="ds-title">Empty States</h1>
+    <p class="ds-sub">
+      When a list has nothing to show, KitchenSync centers a single calm column:
+      a circular tinted icon, a Fraunces <span class="mono">headlineMedium</span> title,
+      and a <span class="mono">bodyMedium</span> subtitle that points to the next action.
+      The disc fills with <span class="mono">color&#64;10%</span>; the glyph reads at
+      <span class="mono">color&#64;55%</span>.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Empty pantry section</h3>
+      <div class="empty" style="--c: var(--brand-primary);">
+        <div class="empty-icon">
+          <!-- basket -->
+          <svg viewBox="0 0 24 24" role="img" aria-label="Empty basket">
+            <path d="M5 9h14l-1.2 9.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 9Z" />
+            <path d="M3 9h18" />
+            <path d="M9 9 11 4M15 9 13 4" />
+            <path d="M9.5 13v3M14.5 13v3" />
+          </svg>
+        </div>
+        <h2 class="empty-title t-headline-medium">Nothing here yet</h2>
+        <p class="empty-sub t-body-medium">Add items to your Food section to start tracking freshness.</p>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">No search results</h3>
+      <div class="empty" style="--c: var(--brand-primary);">
+        <div class="empty-icon">
+          <!-- search-off -->
+          <svg viewBox="0 0 24 24" role="img" aria-label="No matches">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="m20 20-3.6-3.6" />
+            <path d="m8 8 6 6" />
+          </svg>
+        </div>
+        <h2 class="empty-title t-headline-medium">No matches</h2>
+        <p class="empty-sub t-body-medium">Try a different ingredient name.</p>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Empty pantry section</h3>
+      <div class="empty" style="--c: var(--brand-primary);">
+        <div class="empty-icon">
+          <!-- basket -->
+          <svg viewBox="0 0 24 24" role="img" aria-label="Empty basket">
+            <path d="M5 9h14l-1.2 9.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 9Z" />
+            <path d="M3 9h18" />
+            <path d="M9 9 11 4M15 9 13 4" />
+            <path d="M9.5 13v3M14.5 13v3" />
+          </svg>
+        </div>
+        <h2 class="empty-title t-headline-medium">Nothing here yet</h2>
+        <p class="empty-sub t-body-medium">Add items to your Food section to start tracking freshness.</p>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">No search results</h3>
+      <div class="empty" style="--c: var(--brand-primary);">
+        <div class="empty-icon">
+          <!-- search-off -->
+          <svg viewBox="0 0 24 24" role="img" aria-label="No matches">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="m20 20-3.6-3.6" />
+            <path d="m8 8 6 6" />
+          </svg>
+        </div>
+        <h2 class="empty-title t-headline-medium">No matches</h2>
+        <p class="empty-sub t-body-medium">Try a different ingredient name.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Anatomy &amp; specs <span class="badge-proposed">proposed</span></h3>
+    <p class="t-body-small muted" style="margin: 0 0 var(--space-16);">
+      No shared <span class="mono">KsEmptyState</span> widget exists yet — empty lists are currently
+      hand-rolled per screen. This is the proposed canonical recipe for the port.
+    </p>
+    <table class="spec">
+      <tr><td>Layout</td><td class="mono">Column · center · gap 12 · pad 40/24</td></tr>
+      <tr><td>Icon disc</td><td class="mono">76&times;76 · radiusFull · color&#64;10% fill</td></tr>
+      <tr><td>Glyph</td><td class="mono">34&times;34 · color&#64;55%</td></tr>
+      <tr><td>Title</td><td class="mono">headlineMedium · Fraunces · textPrimary</td></tr>
+      <tr><td>Subtitle</td><td class="mono">bodyMedium · DM Sans · textSecondary · max ~30ch</td></tr>
+      <tr><td>Tint (both)</td><td class="mono">brandPrimary</td></tr>
+      <tr><td>Hover (web only)</td><td class="mono">disc &rarr; color&#64;15% · 300ms easeOutCubic</td></tr>
+    </table>
+  </section>
+</body>
+</html>

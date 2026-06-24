@@ -1,0 +1,275 @@
+<!-- @dsCard group="Components — Navigation" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Section Tabs</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    /* ── Section selector bar ──────────────────────────────────────────────
+       surface-base ground, hairline border-bottom, pad 16/12. Holds one
+       horizontal, scroll-friendly row of section pills. */
+    .section-bar {
+      background: var(--surface-base);
+      border-bottom: 1px solid var(--border);
+      padding: var(--space-12) var(--space-16);
+    }
+    .section-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-8);
+      overflow-x: auto;
+    }
+
+    /* ── Section tab pill ──────────────────────────────────────────────────
+       icon + label, pad 16/10, radius12. The fill, border, icon and label
+       colors all animate together on selection change. */
+    .section-tab {
+      --c: var(--section-food);
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-8);
+      padding: var(--space-10) var(--space-16);
+      border-radius: var(--radius-12);
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      white-space: nowrap;
+      cursor: pointer;
+      transition:
+        background var(--dur-medium) var(--curve-standard),
+        border-color var(--dur-medium) var(--curve-standard),
+        color var(--dur-medium) var(--curve-standard),
+        box-shadow var(--dur-medium) var(--curve-standard);
+    }
+    .section-tab .tab-icon {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      color: color-mix(in srgb, var(--c) 70%, transparent);
+      transition: color var(--dur-medium) var(--curve-standard);
+    }
+    .section-tab .tab-label {
+      font-family: var(--font-body);
+      font-size: var(--label-large-size);
+      font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls);
+      line-height: 1;
+      color: var(--text-primary);
+      transition: color var(--dur-medium) var(--curve-standard);
+    }
+
+    /* Selected — filled with the section color, on-brand label, same-hue border. */
+    .section-tab.is-selected {
+      background: var(--c);
+      border-color: var(--c);
+      box-shadow: var(--elevation-1);
+    }
+    .section-tab.is-selected .tab-icon { color: var(--text-on-brand); }
+    .section-tab.is-selected .tab-label { color: var(--text-on-brand); }
+
+    /* Hover only nudges the unselected pills — keeps the selected one stable. */
+    .section-tab:not(.is-selected):hover {
+      border-color: var(--border-strong);
+      background: color-mix(in srgb, var(--c) 6%, var(--surface-raised));
+    }
+
+    .row-caption {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-20) 0 var(--space-10);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .row-caption:first-of-type { margin-top: 0; }
+
+    /* Frame the bar so the hairline + warm ground read inside the panel. */
+    .bar-frame {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Navigation</p>
+    <h1 class="ds-title">Section Tabs</h1>
+    <p class="ds-sub">
+      The pantry section selector: a hairline-bordered bar holding four pills —
+      Food, Bulk, Non-food, Leftovers. The active section fills with its
+      <span class="mono">--section-*</span> color; the rest stay raised and quiet,
+      tinting their icon to <span class="mono">70%</span>. Selection cross-fades over
+      <span class="mono">300ms</span> on <span class="mono">easeOutCubic</span>.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="row-caption">Food selected</h3>
+      <div class="bar-frame">
+        <div class="section-bar">
+          <div class="section-row">
+            <button class="section-tab is-selected" style="--c: var(--section-food);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M17 2a3 3 0 0 0-3 3v6h6V5a3 3 0 0 0-3-3z"/><path d="M17 11v11"/>
+              </svg>
+              <span class="tab-label">Food</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-bulk);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+              </svg>
+              <span class="tab-label">Bulk</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-non-food);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+              </svg>
+              <span class="tab-label">Non-food</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-leftover);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2v20"/><path d="M2 12h20"/><circle cx="12" cy="12" r="10"/>
+              </svg>
+              <span class="tab-label">Leftovers</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="row-caption">Leftovers selected</h3>
+      <div class="bar-frame">
+        <div class="section-bar">
+          <div class="section-row">
+            <button class="section-tab" style="--c: var(--section-food);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M17 2a3 3 0 0 0-3 3v6h6V5a3 3 0 0 0-3-3z"/><path d="M17 11v11"/>
+              </svg>
+              <span class="tab-label">Food</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-bulk);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+              </svg>
+              <span class="tab-label">Bulk</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-non-food);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+              </svg>
+              <span class="tab-label">Non-food</span>
+            </button>
+            <button class="section-tab is-selected" style="--c: var(--section-leftover);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2v20"/><path d="M2 12h20"/><circle cx="12" cy="12" r="10"/>
+              </svg>
+              <span class="tab-label">Leftovers</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p class="t-body-small subtle" style="margin: var(--space-12) 0 0;">
+        Hover an unselected pill to see the standard transition; the selected fill is the live target.
+      </p>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="row-caption">Food selected</h3>
+      <div class="bar-frame">
+        <div class="section-bar">
+          <div class="section-row">
+            <button class="section-tab is-selected" style="--c: var(--section-food);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M17 2a3 3 0 0 0-3 3v6h6V5a3 3 0 0 0-3-3z"/><path d="M17 11v11"/>
+              </svg>
+              <span class="tab-label">Food</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-bulk);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+              </svg>
+              <span class="tab-label">Bulk</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-non-food);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+              </svg>
+              <span class="tab-label">Non-food</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-leftover);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2v20"/><path d="M2 12h20"/><circle cx="12" cy="12" r="10"/>
+              </svg>
+              <span class="tab-label">Leftovers</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="row-caption">Leftovers selected</h3>
+      <div class="bar-frame">
+        <div class="section-bar">
+          <div class="section-row">
+            <button class="section-tab" style="--c: var(--section-food);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M17 2a3 3 0 0 0-3 3v6h6V5a3 3 0 0 0-3-3z"/><path d="M17 11v11"/>
+              </svg>
+              <span class="tab-label">Food</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-bulk);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+              </svg>
+              <span class="tab-label">Bulk</span>
+            </button>
+            <button class="section-tab" style="--c: var(--section-non-food);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+              </svg>
+              <span class="tab-label">Non-food</span>
+            </button>
+            <button class="section-tab is-selected" style="--c: var(--section-leftover);">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2v20"/><path d="M2 12h20"/><circle cx="12" cy="12" r="10"/>
+              </svg>
+              <span class="tab-label">Leftovers</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p class="t-body-small subtle" style="margin: var(--space-12) 0 0;">
+        Section hues are reused as-is in dark mode (matching the current code) — fills stay
+        legible against the on-brand label, which resolves to <span class="mono">#1A1C16</span>.
+      </p>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="row-caption" style="margin-top:0;">Spec</h3>
+    <table class="spec">
+      <tr><td>Bar</td><td class="mono">surfaceBase · 1px border-bottom · pad 16/12 · row gap 8</td></tr>
+      <tr><td>Tab pill</td><td class="mono">radius12 · pad 16/10 · icon 18 + gap 8 + labelLarge w600</td></tr>
+      <tr><td>Selected</td><td class="mono">fill section · border section · label textOnBrand · elevation-1</td></tr>
+      <tr><td>Unselected</td><td class="mono">surfaceRaised · border · icon section@70% · label textPrimary</td></tr>
+      <tr><td>Sections</td><td class="mono">sectionFood · sectionBulk · sectionNonFood · sectionLeftover</td></tr>
+      <tr><td>Transition</td><td class="mono">fill/border/color · 300ms (durMedium) · easeOutCubic (curveStandard)</td></tr>
+      <tr><td>Hover (unselected)</td><td class="mono">border-strong + section@6% wash <span class="badge-proposed">proposed</span></td></tr>
+    </table>
+    <p class="t-body-small subtle" style="margin: var(--space-12) 0 0;">
+      The hover wash is a design-system nicety not present in the Flutter source today; everything else
+      mirrors the live pantry selector.
+    </p>
+  </section>
+</body>
+</html>

@@ -1,0 +1,300 @@
+<!-- @dsCard group="Components — Feedback" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sheets &amp; Alerts</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* ── Mark-as-waste bottom sheet ──────────────────────────────────────── */
+    .sheet {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-top-left-radius: var(--radius-20);
+      border-top-right-radius: var(--radius-20);
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      padding: var(--space-10) var(--space-20) var(--space-24);
+      box-shadow: var(--elevation-2);
+    }
+    .sheet-handle {
+      width: 36px; height: 4px;
+      background: var(--border-strong);
+      border-radius: var(--radius-full);
+      margin: var(--space-6) auto var(--space-20);
+    }
+    .sheet-icon {
+      width: 40px; height: 40px;
+      border-radius: var(--radius-10);
+      background: color-mix(in srgb, var(--expired) 10%, transparent);
+      color: var(--expired);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .sheet-icon svg { width: 20px; height: 20px; }
+    .sheet-title { color: var(--text-primary); margin: 0; }
+    .sheet-lede { color: var(--text-secondary); margin: var(--space-4) 0 0; }
+
+    /* Selectable reason chips */
+    .reason-row { display: flex; flex-wrap: wrap; gap: var(--space-8); margin: var(--space-16) 0 var(--space-20); }
+    .reason {
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls); line-height: 1;
+      padding: var(--space-8) var(--space-12);
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border-strong);
+      background: transparent;
+      color: var(--text-secondary);
+      transition: background var(--dur-fast) var(--curve-standard),
+                  border-color var(--dur-fast) var(--curve-standard),
+                  color var(--dur-fast) var(--curve-standard);
+      cursor: default;
+    }
+    .reason:hover { border-color: var(--expired); }
+    .reason[aria-selected="true"] {
+      background: color-mix(in srgb, var(--expired) 12%, transparent);
+      border-color: color-mix(in srgb, var(--expired) 55%, transparent);
+      color: var(--expired);
+    }
+
+    /* Destructive filled button */
+    .btn-destructive {
+      display: flex; align-items: center; justify-content: center; gap: var(--space-8);
+      width: 100%;
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls);
+      background: var(--expired);
+      color: #FFFFFF;          /* fixed on-expired: button fill is red in both themes */
+      border: none;
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-16);
+      box-shadow: var(--elevation-1);
+      transition: filter var(--dur-fast) var(--curve-standard);
+      cursor: default;
+    }
+    .btn-destructive:hover { filter: brightness(1.06); }
+    .btn-destructive svg { width: 18px; height: 18px; }
+
+    /* ── Inline error alert ──────────────────────────────────────────────── */
+    .alert-error {
+      display: flex; align-items: flex-start; gap: var(--space-8);
+      background: color-mix(in srgb, var(--expired) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--expired) 20%, transparent);
+      border-radius: var(--radius-12);
+      padding: var(--space-10) var(--space-12);
+      color: var(--expired);
+    }
+    .alert-error svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+    .alert-error p { margin: 0; color: var(--expired); }
+
+    /* ── Snackbar (floating pill) ────────────────────────────────────────── */
+    .snackbar {
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-16);
+      background: var(--text-primary);            /* light: dark surface */
+      color: var(--surface-raised);
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-16);
+      box-shadow: var(--elevation-2);
+    }
+    .snackbar p { margin: 0; color: inherit; }
+    .snackbar-action {
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls);
+      color: var(--brand-primary);
+      background: none; border: none;
+      padding: 0; cursor: default;
+      flex-shrink: 0;
+    }
+    /* Dark theme re-resolves the snackbar to a raised container surface. */
+    [data-theme="dark"] .snackbar {
+      background: var(--surface-container-highest);
+      color: var(--text-primary);
+    }
+
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Feedback</p>
+    <h1 class="ds-title">Sheets &amp; Alerts</h1>
+    <p class="ds-sub">
+      Three feedback surfaces that confirm, warn, and recover. The destructive
+      mark-as-waste sheet leans entirely on <span class="mono">expired</span>; the inline
+      alert and snackbar carry the same semantic weight at smaller scales. Tints use
+      <span class="mono">color-mix</span> to mirror Flutter's <span class="mono">withValues(alpha:)</span>.
+      The sheet shell, icon chip, and inline error match
+      <span class="mono">MarkAsWasteSheet</span> today; the reason <em>chips</em>, the
+      <span class="mono">headlineMedium</span> title, and the snackbar are proposed refinements.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Mark as waste — bottom sheet</h3>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="row" style="align-items: flex-start; gap: var(--space-12);">
+          <span class="sheet-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6" /><path d="M14 11v6" />
+            </svg>
+          </span>
+          <div style="flex: 1; min-width: 0;">
+            <h4 class="t-headline-medium sheet-title">Mark as waste</h4>
+            <p class="t-body-small sheet-lede">Roma Tomatoes · 350 g · expired 2 days ago</p>
+          </div>
+        </div>
+
+        <p class="t-body-small muted" style="margin: var(--space-16) 0 var(--space-8);">
+          Reason &nbsp;<span class="badge-proposed">proposed</span>
+        </p>
+        <div class="reason-row" style="margin-top: 0;">
+          <span class="reason" aria-selected="true">Spoiled</span>
+          <span class="reason">Expired</span>
+          <span class="reason">Discarded</span>
+          <span class="reason">Other</span>
+        </div>
+
+        <button class="btn-destructive" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          </svg>
+          Mark as waste
+        </button>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-8) 0 0;">
+        Today the picker is a <span class="mono">DropdownButtonFormField</span> below a quantity
+        field; the chip row and <span class="mono">headlineMedium</span> title are proposed.
+      </p>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Inline error</h3>
+      <div class="alert-error">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+          <path d="M12 9v4" /><path d="M12 17h.01" />
+        </svg>
+        <p class="t-body-small">Couldn't save — check your connection.</p>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Snackbar &nbsp;<span class="badge-proposed">proposed</span></h3>
+      <div class="snackbar">
+        <p class="t-body-medium">Moved Greek Yogurt to waste log</p>
+        <button class="snackbar-action" type="button">Undo</button>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Mark as waste — bottom sheet</h3>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="row" style="align-items: flex-start; gap: var(--space-12);">
+          <span class="sheet-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6" /><path d="M14 11v6" />
+            </svg>
+          </span>
+          <div style="flex: 1; min-width: 0;">
+            <h4 class="t-headline-medium sheet-title">Mark as waste</h4>
+            <p class="t-body-small sheet-lede">Roma Tomatoes · 350 g · expired 2 days ago</p>
+          </div>
+        </div>
+
+        <p class="t-body-small muted" style="margin: var(--space-16) 0 var(--space-8);">
+          Reason &nbsp;<span class="badge-proposed">proposed</span>
+        </p>
+        <div class="reason-row" style="margin-top: 0;">
+          <span class="reason" aria-selected="true">Spoiled</span>
+          <span class="reason">Expired</span>
+          <span class="reason">Discarded</span>
+          <span class="reason">Other</span>
+        </div>
+
+        <button class="btn-destructive" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          </svg>
+          Mark as waste
+        </button>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-8) 0 0;">
+        Category/section hues are reused as-is in dark mode today; the tuned
+        <span class="mono">--cat-*-dark</span> set is proposed elsewhere.
+      </p>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Inline error</h3>
+      <div class="alert-error">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+          <path d="M12 9v4" /><path d="M12 17h.01" />
+        </svg>
+        <p class="t-body-small">Couldn't save — check your connection.</p>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Snackbar &nbsp;<span class="badge-proposed">proposed</span></h3>
+      <div class="snackbar">
+        <p class="t-body-medium">Moved Greek Yogurt to waste log</p>
+        <button class="snackbar-action" type="button">Undo</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Surface specs (for the port)</h3>
+    <table class="spec">
+      <tr><td>Waste sheet</td><td class="mono">surfaceRaised · radius20 (sheet shape) · pad 20 · current</td></tr>
+      <tr><td>Drag handle</td><td class="mono">36&times;4 · borderStrong · radiusFull · centered · current</td></tr>
+      <tr><td>Icon chip</td><td class="mono">40&times;40 · radius10 · expired@10% fill · delete_outline @22 · current</td></tr>
+      <tr><td>Sheet headline</td><td class="mono">today: titleLarge · proposed: headlineMedium (Fraunces w500)</td></tr>
+      <tr><td>Reason chip — selected</td><td class="mono">radiusFull · expired@12% fill · expired@55% border · expired text · proposed</td></tr>
+      <tr><td>Reason chip — rest</td><td class="mono">radiusFull · transparent · borderStrong · textSecondary · proposed</td></tr>
+      <tr><td>Destructive button</td><td class="mono">FilledButton · expired fill · radius12 · labelLarge · "Confirm waste" today</td></tr>
+      <tr><td>Inline error</td><td class="mono">expired@8% fill · 1px expired@20% border · radius12 · pad 12/10 · bodySmall · current</td></tr>
+      <tr><td>Snackbar — light</td><td class="mono">textPrimary bg · surfaceRaised text · radius12 · floating · brand "Undo" · proposed</td></tr>
+      <tr><td>Snackbar — dark</td><td class="mono">surfaceContainerHighest bg · textPrimary text · radius12 · floating · proposed</td></tr>
+    </table>
+    <p class="t-body-small subtle" style="margin: var(--space-12) 0 0;">
+      Current sheet: drag handle, icon chip, <span class="mono">titleLarge</span> title, quantity
+      field, <span class="mono">DropdownButtonFormField</span> reason picker, the inline error, and a
+      <span class="mono">FilledButton</span> reading "Confirm waste". The reason <em>chips</em>, the
+      <span class="mono">headlineMedium</span> title, the "Mark as waste" button label, and the
+      floating snackbar are proposed. <span class="badge-proposed">proposed</span>
+    </p>
+  </section>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!-- @dsCard group="Color" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pantry Sections</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Section chips — one section color, two states. */
+    .chip-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-10); }
+    .chip-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-10); align-items: stretch; }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: var(--space-8);
+      border-radius: var(--radius-full);
+      padding: var(--space-8) var(--space-12);
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls); line-height: 1;
+      transition: background var(--dur-fast) var(--curve-standard),
+                  border-color var(--dur-fast) var(--curve-standard),
+                  box-shadow var(--dur-fast) var(--curve-standard);
+    }
+
+    /* SELECTED — filled section color, on-brand label. */
+    .chip--selected {
+      background: var(--c);
+      color: var(--text-on-brand);
+      border: 1px solid transparent;
+      box-shadow: var(--elevation-1);
+    }
+    .chip--selected .chip-icon { color: var(--text-on-brand); }
+
+    /* UNSELECTED — raised surface, hairline border, section-tinted dot. */
+    .chip--unselected {
+      background: var(--surface-raised);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+    .chip--unselected:hover { border-color: var(--c); }
+    .chip-dot {
+      width: 10px; height: 10px; border-radius: var(--radius-full);
+      background: var(--c); flex: 0 0 auto;
+    }
+
+    /* Inline leaf/box/cleaner/clock glyphs drawn with currentColor. */
+    .chip-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+    .chip-icon svg { display: block; width: 100%; height: 100%; }
+
+    .chip-cap {
+      font-size: var(--label-small-size); font-weight: 600;
+      letter-spacing: var(--label-small-ls); text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: 0 0 var(--space-6);
+    }
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Color · Foundations</p>
+    <h1 class="ds-title">Pantry Sections</h1>
+    <p class="ds-sub">
+      Four colors organize the pantry into its top-level shelves. <span class="mono">food</span>
+      reuses <span class="mono">brandPrimary</span>; <span class="mono">bulk</span> is the warm brown that
+      doubles as <span class="mono">lowStock</span>; <span class="mono">nonFood</span> is a calm blue-gray; and
+      <span class="mono">leftover</span> is a deep orange. Section colors are not re-tuned for the dark
+      theme — they carry the same hues, shown live below.
+    </p>
+  </header>
+
+  <!-- Swatch reference -->
+  <section class="ds-surface">
+    <h3 class="block-h" style="margin-top:0;">Tokens</h3>
+    <div class="swatches">
+      <div class="swatch">
+        <span class="swatch-chip" style="background: var(--section-food);"></span>
+        <div class="swatch-meta">
+          <p class="swatch-name">Food</p>
+          <span class="swatch-token mono">sectionFood</span>
+          <span class="swatch-hex mono">#2E7D32</span>
+          <span class="t-body-small subtle">Reuses brandPrimary</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <span class="swatch-chip" style="background: var(--section-bulk);"></span>
+        <div class="swatch-meta">
+          <p class="swatch-name">Bulk</p>
+          <span class="swatch-token mono">sectionBulk</span>
+          <span class="swatch-hex mono">#6D4C41</span>
+          <span class="t-body-small subtle">Warm brown · ≈ lowStock</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <span class="swatch-chip" style="background: var(--section-non-food);"></span>
+        <div class="swatch-meta">
+          <p class="swatch-name">Non-Food</p>
+          <span class="swatch-token mono">sectionNonFood</span>
+          <span class="swatch-hex mono">#546E7A</span>
+          <span class="t-body-small subtle">Blue-gray</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <span class="swatch-chip" style="background: var(--section-leftover);"></span>
+        <div class="swatch-meta">
+          <p class="swatch-name">Leftover</p>
+          <span class="swatch-token mono">sectionLeftover</span>
+          <span class="swatch-hex mono">#EF6C00</span>
+          <span class="t-body-small subtle">Deep orange</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ds-themes" style="margin-top: var(--space-20);">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Section chips — selected / unselected</h3>
+      <div class="chip-grid">
+        <!-- FOOD -->
+        <div>
+          <p class="chip-cap">Food · sectionFood</p>
+          <div class="chip-row">
+            <span class="chip chip--selected" style="--c: var(--section-food);">
+              <span class="chip-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
+                  <path d="M2 21c0-3 1.85-5.36 5.08-6"/>
+                </svg>
+              </span>
+              Food
+            </span>
+            <span class="chip chip--unselected" style="--c: var(--section-food);">
+              <span class="chip-dot"></span>
+              Food
+            </span>
+          </div>
+        </div>
+        <!-- BULK -->
+        <div>
+          <p class="chip-cap">Bulk · sectionBulk</p>
+          <div class="chip-row">
+            <span class="chip chip--selected" style="--c: var(--section-bulk);">
+              <span class="chip-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                  <path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+                </svg>
+              </span>
+              Bulk
+            </span>
+            <span class="chip chip--unselected" style="--c: var(--section-bulk);">
+              <span class="chip-dot"></span>
+              Bulk
+            </span>
+          </div>
+        </div>
+        <!-- NON-FOOD -->
+        <div>
+          <p class="chip-cap">Non-Food · sectionNonFood</p>
+          <div class="chip-row">
+            <span class="chip chip--selected" style="--c: var(--section-non-food);">
+              <span class="chip-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 11h8V3H3z"/><path d="M3 21h8v-6H3z"/><path d="M14 8h7"/>
+                  <path d="M17 8v13"/><path d="M14 15h7"/>
+                </svg>
+              </span>
+              Non-Food
+            </span>
+            <span class="chip chip--unselected" style="--c: var(--section-non-food);">
+              <span class="chip-dot"></span>
+              Non-Food
+            </span>
+          </div>
+        </div>
+        <!-- LEFTOVER -->
+        <div>
+          <p class="chip-cap">Leftover · sectionLeftover</p>
+          <div class="chip-row">
+            <span class="chip chip--selected" style="--c: var(--section-leftover);">
+              <span class="chip-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                </svg>
+              </span>
+              Leftover
+            </span>
+            <span class="chip chip--unselected" style="--c: var(--section-leftover);">
+              <span class="chip-dot"></span>
+              Leftover
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Section chips — selected / unselected</h3>
+      <div class="chip-grid">
+        <!-- FOOD -->
+        <div>
+          <p class="chip-cap">Food · sectionFood</p>
+          <div class="chip-row">
+            <span class="chip chip--selected" style="--c: var(--section-food);">
+              <span class="chip-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
+                  <path d="M2 21c0-3 1.85-5.36 5.08-6"/>
+                </svg>
+              </span>
+              Food
+            </span>
+            <span class="chip chip--unselected" style="--c: var(--section-food);">
+              <span class="chip-dot"></span>
+              Food
+            </span>
+          </div>
+        </div>
+        <!-- BULK -->
+        <div>
+          <p class="chip-cap">Bulk · sectionBulk</p>
+          <div class="chip-row">
+            <span class="chip chip--selected" style="--c: var(--section-bulk);">
+              <span class="chip-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                  <path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+                </svg>
+              </span>
+              Bulk
+            </span>
+            <span class="chip chip--unselected" style="--c: var(--section-bulk);">
+              <span class="chip-dot"></span>
+              Bulk
+            </span>
+          </div>
+        </div>
+        <!-- NON-FOOD -->
+        <div>
+          <p class="chip-cap">Non-Food · sectionNonFood</p>
+          <div class="chip-row">
+            <span class="chip chip--selected" style="--c: var(--section-non-food);">
+              <span class="chip-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 11h8V3H3z"/><path d="M3 21h8v-6H3z"/><path d="M14 8h7"/>
+                  <path d="M17 8v13"/><path d="M14 15h7"/>
+                </svg>
+              </span>
+              Non-Food
+            </span>
+            <span class="chip chip--unselected" style="--c: var(--section-non-food);">
+              <span class="chip-dot"></span>
+              Non-Food
+            </span>
+          </div>
+        </div>
+        <!-- LEFTOVER -->
+        <div>
+          <p class="chip-cap">Leftover · sectionLeftover</p>
+          <div class="chip-row">
+            <span class="chip chip--selected" style="--c: var(--section-leftover);">
+              <span class="chip-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                </svg>
+              </span>
+              Leftover
+            </span>
+            <span class="chip chip--unselected" style="--c: var(--section-leftover);">
+              <span class="chip-dot"></span>
+              Leftover
+            </span>
+          </div>
+        </div>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-16) 0 0;">
+        Section hues are reused as-is in dark mode — they are not re-tuned the way the
+        proposed <span class="mono">--cat-*-dark</span> set is for ingredient categories.
+      </p>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Specs</h3>
+    <table class="spec">
+      <tr><td>sectionFood</td><td class="mono">#2E7D32 · reuses brandPrimary · pantry shelf "Food"</td></tr>
+      <tr><td>sectionBulk</td><td class="mono">#6D4C41 · warm brown · same hue as lowStock</td></tr>
+      <tr><td>sectionNonFood</td><td class="mono">#546E7A · blue-gray · cleaning &amp; household</td></tr>
+      <tr><td>sectionLeftover</td><td class="mono">#EF6C00 · deep orange · cooked &amp; leftovers</td></tr>
+      <tr><td>Selected chip</td><td class="mono">fill section color · label textOnBrand · radiusFull · pad 12/8</td></tr>
+      <tr><td>Unselected chip</td><td class="mono">surfaceRaised · 1px border · section dot · label textPrimary</td></tr>
+    </table>
+  </section>
+</body>
+</html>

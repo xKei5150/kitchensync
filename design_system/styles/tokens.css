@@ -1,0 +1,158 @@
+/* ============================================================================
+   KitchenSync — Design Tokens (CSS mirror)
+   Generated from lib/app/design_tokens.dart + lib/app/theme.dart.
+   Single source of truth for the HTML design-system. Every card reads these
+   custom properties — never hard-code a color, space, radius, or duration.
+
+   :root            → light theme (KsTokens light values)
+   [data-theme=dark]→ dark theme (theme.dart dark ColorScheme)
+   --proposed-*     → NOT YET IN CODE. Badged "proposed" in the system.
+   ============================================================================ */
+
+:root {
+  /* ── Brand ──────────────────────────────────────────────────────────── */
+  --brand-primary: #2E7D32;
+  --brand-primary-light: #4CAF50;
+  --brand-primary-dark: #1B5E20;
+  --brand-accent: #F9A825;
+
+  /* ── Freshness (semantic) ───────────────────────────────────────────── */
+  --fresh: #43A047;
+  --expiring-soon: #FFB300;
+  --expired: #C62828;
+  --low-stock: #6D4C41;
+
+  /* ── Warm neutrals ──────────────────────────────────────────────────── */
+  --surface-base: #FAFAF7;     /* scaffold — warm linen */
+  --surface-raised: #FFFFFF;   /* cards, sheets */
+  --border: #E8E5DD;
+  --border-strong: #D7D2C8;
+  --neutral-subtle: #F5F3EE;
+
+  /* ── Text ───────────────────────────────────────────────────────────── */
+  --text-primary: #1A1C16;
+  --text-secondary: #5F6651;
+  --text-tertiary: #8B9183;
+  --text-on-brand: #FFFFFF;
+
+  /* ── Ingredient categories (14) ─────────────────────────────────────── */
+  --cat-produce: #66BB6A;
+  --cat-meat: #E57373;
+  --cat-seafood: #4FC3F7;
+  --cat-dairy: #FFF176;
+  --cat-grain: #D4A373;
+  --cat-bakery: #DEB887;
+  --cat-spice: #FF8A65;
+  --cat-condiment: #BA68C8;
+  --cat-baking: #A1887F;
+  --cat-beverage: #4DD0E1;
+  --cat-frozen: #90CAF9;
+  --cat-bulk-staple: #AED581;
+  --cat-non-food: #90A4AE;
+  --cat-other: #BDBDBD;
+
+  /* ── Pantry sections (4) ────────────────────────────────────────────── */
+  --section-food: #2E7D32;
+  --section-bulk: #6D4C41;
+  --section-non-food: #546E7A;
+  --section-leftover: #EF6C00;
+
+  /* ── Spacing (4-base) ───────────────────────────────────────────────── */
+  --space-2: 2px;   --space-3: 3px;   --space-4: 4px;   --space-6: 6px;
+  --space-8: 8px;   --space-10: 10px; --space-12: 12px; --space-16: 16px;
+  --space-20: 20px; --space-24: 24px; --space-32: 32px; --space-40: 40px;
+  --space-48: 48px;
+
+  /* ── Radii ──────────────────────────────────────────────────────────── */
+  --radius-4: 4px;   --radius-6: 6px;   --radius-8: 8px;   --radius-10: 10px;
+  --radius-12: 12px; --radius-16: 16px; --radius-20: 20px; --radius-full: 999px;
+
+  /* ── Elevation (soft, warm shadows) ─────────────────────────────────── */
+  --elevation-1: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --elevation-2: 0 4px 16px rgba(0, 0, 0, 0.07);
+
+  /* ── Motion ─────────────────────────────────────────────────────────── */
+  --dur-fast: 150ms;
+  --dur-medium: 300ms;
+  --dur-slow: 500ms;
+  --curve-standard: cubic-bezier(0.215, 0.61, 0.355, 1);  /* easeOutCubic */
+  --curve-enter: cubic-bezier(0, 0, 0.58, 1);             /* easeOut */
+  --curve-exit: cubic-bezier(0.42, 0, 1, 1);              /* easeIn */
+
+  /* ── Type families ──────────────────────────────────────────────────── */
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
+
+  /* ── Type ramp (size / weight / line-height / tracking) ─────────────── */
+  --display-large-size: 36px;  --display-large-weight: 600; --display-large-lh: 1.1;  --display-large-ls: -0.5px;
+  --display-medium-size: 28px; --display-medium-weight: 600; --display-medium-lh: 1.15; --display-medium-ls: -0.25px;
+  --display-small-size: 22px;  --display-small-weight: 500; --display-small-lh: 1.2;  --display-small-ls: 0;
+  --headline-large-size: 20px; --headline-large-weight: 500; --headline-large-lh: 1.25; --headline-large-ls: 0;
+  --headline-medium-size: 18px;--headline-medium-weight: 500;--headline-medium-lh: 1.3; --headline-medium-ls: 0;
+  --title-large-size: 18px;    --title-large-weight: 600;   --title-large-lh: 1.3;   --title-large-ls: 0;
+  --title-medium-size: 16px;   --title-medium-weight: 600;  --title-medium-lh: 1.35;  --title-medium-ls: 0;
+  --title-small-size: 14px;    --title-small-weight: 600;   --title-small-lh: 1.35;   --title-small-ls: 0;
+  --body-large-size: 16px;     --body-large-weight: 400;    --body-large-lh: 1.45;    --body-large-ls: 0;
+  --body-medium-size: 14px;    --body-medium-weight: 400;   --body-medium-lh: 1.45;   --body-medium-ls: 0;
+  --body-small-size: 12px;     --body-small-weight: 400;    --body-small-lh: 1.4;     --body-small-ls: 0;
+  --label-large-size: 14px;    --label-large-weight: 600;   --label-large-lh: 1.35;   --label-large-ls: 0.1px;
+  --label-medium-size: 12px;   --label-medium-weight: 600;  --label-medium-lh: 1.35;  --label-medium-ls: 0.5px;
+  --label-small-size: 11px;    --label-small-weight: 600;   --label-small-lh: 1.35;   --label-small-ls: 0.5px;
+
+  /* ── PROPOSED — not yet in design_tokens.dart ───────────────────────── */
+  --proposed-disabled-fill: #F5F3EE;
+  --proposed-disabled-text: #A8A496;
+  --proposed-focus-ring: #2E7D32;
+  --proposed-success: #2E7D32;
+  --proposed-info: #3E6B8C;
+  --proposed-warning: #EF6C00;
+  --proposed-scrim: rgba(0, 0, 0, 0.55);
+
+  /* Proposed dark-mode category set (luminance-lifted for >=4.5:1 on #272822).
+     Kept as separate vars so cards can show "current (reused)" vs "proposed". */
+  --cat-produce-dark: #8FD392;
+  --cat-meat-dark: #F0938E;
+  --cat-seafood-dark: #7FD6F9;
+  --cat-dairy-dark: #FFF4A0;
+  --cat-grain-dark: #E3BC95;
+  --cat-bakery-dark: #EACBA6;
+  --cat-spice-dark: #FFA68C;
+  --cat-condiment-dark: #D08FDB;
+  --cat-baking-dark: #C0A89F;
+  --cat-beverage-dark: #82E0EC;
+  --cat-frozen-dark: #B3DAFB;
+  --cat-bulk-staple-dark: #C7E4A8;
+  --cat-non-food-dark: #B3C2CB;
+  --cat-other-dark: #D4D4D4;
+}
+
+/* ============================================================================
+   DARK THEME — overrides only the tokens that change.
+   Category/section colors are intentionally NOT overridden here: that mirrors
+   the current code, which reuses the light hues in dark mode. The tuned dark
+   set lives in the --cat-*-dark proposed vars above.
+   ============================================================================ */
+[data-theme="dark"] {
+  --surface-base: #1E1F1B;
+  --surface-raised: #272822;
+  --border: #3D3F37;
+  --border-strong: #4D4F47;
+  --neutral-subtle: #2F302A;
+
+  --text-primary: #E8E5DD;
+  --text-secondary: #B5BBAE;
+  --text-tertiary: #8B9183;
+  --text-on-brand: #1A1C16;       /* dark onPrimary = textPrimary */
+
+  --brand-primary: #4CAF50;        /* dark primary = brandPrimaryLight */
+
+  /* Material 3 surface containers (theme.dart dark scheme) */
+  --surface-container-lowest: #16170F;
+  --surface-container-low: #1E1F1B;
+  --surface-container: #272822;
+  --surface-container-high: #2F302A;
+  --surface-container-highest: #373832;
+
+  --elevation-1: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --elevation-2: 0 4px 16px rgba(0, 0, 0, 0.35);
+}

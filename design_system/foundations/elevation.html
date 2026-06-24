@@ -1,0 +1,159 @@
+<!-- @dsCard group="Foundations" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Elevation</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Stack of raised cards laid on the panel's --surface-base. */
+    .elev-stack { display: flex; flex-direction: column; gap: var(--space-24); }
+
+    /* A demo "card" — the real default surface treatment in the app. */
+    .elev-card {
+      background: var(--surface-raised);
+      border-radius: var(--radius-16);
+      padding: var(--space-16);
+      transition: box-shadow var(--dur-medium) var(--curve-standard);
+    }
+    /* flat — the default card: 1px border, NO shadow. */
+    .elev-card.is-flat { border: 1px solid var(--border); box-shadow: none; }
+    /* elevation1 — borderless, soft warm lift. */
+    .elev-card.is-e1 { border: 1px solid transparent; box-shadow: var(--elevation-1); }
+    /* elevation2 — deeper lift for transient surfaces. */
+    .elev-card.is-e2 { border: 1px solid transparent; box-shadow: var(--elevation-2); }
+
+    .elev-name {
+      font-family: var(--font-body);
+      font-size: var(--title-small-size); font-weight: var(--title-small-weight);
+      color: var(--text-primary);
+      margin: 0;
+    }
+    .elev-role { color: var(--text-secondary); margin: var(--space-2) 0 0; }
+    .elev-spec {
+      display: inline-block; margin-top: var(--space-10);
+      background: var(--neutral-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-6);
+      padding: var(--space-3) var(--space-8);
+      color: var(--text-secondary);
+    }
+
+    /* Token chip used in the philosophy list. */
+    .use-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-8); }
+    .use-list li {
+      display: flex; align-items: baseline; gap: var(--space-8);
+      font-size: var(--body-small-size); line-height: var(--body-small-lh);
+      color: var(--text-secondary);
+    }
+    .use-dot {
+      flex: none; width: 6px; height: 6px; margin-top: 4px;
+      border-radius: var(--radius-full); background: var(--brand-primary);
+    }
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Foundations · Elevation</p>
+    <h1 class="ds-title">Elevation</h1>
+    <p class="ds-sub">
+      Shadows are soft, warm, and low. Most surfaces are defined by a 1px
+      <span class="mono">border</span> rather than a shadow — the default card is
+      <em>flat</em>. Elevation is reserved for surfaces that float above the page:
+      the FAB, bottom sheets, and snackbars. Only two shadow tokens exist;
+      dark mode deepens both.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+      <div class="elev-stack">
+
+        <div class="elev-card is-flat">
+          <p class="elev-name">flat <span class="subtle mono">— default card</span></p>
+          <p class="elev-role t-body-small">Pantry tiles, list rows, ingredient cards. Border-defined, no shadow.</p>
+          <span class="elev-spec mono">1px border · box-shadow: none</span>
+        </div>
+
+        <div class="elev-card is-e1">
+          <p class="elev-name">elevation1</p>
+          <p class="elev-role t-body-small">FAB at rest, raised panels. The lightest lift off the linen base.</p>
+          <span class="elev-spec mono">0 2px 8px rgba(0,0,0,.04)</span>
+        </div>
+
+        <div class="elev-card is-e2">
+          <p class="elev-name">elevation2</p>
+          <p class="elev-role t-body-small">Bottom sheets, snackbars, the FAB while pressed. Deeper, still soft.</p>
+          <span class="elev-spec mono">0 4px 16px rgba(0,0,0,.07)</span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+      <div class="elev-stack">
+
+        <div class="elev-card is-flat">
+          <p class="elev-name">flat <span class="subtle mono">— default card</span></p>
+          <p class="elev-role t-body-small">Pantry tiles, list rows, ingredient cards. Border-defined, no shadow.</p>
+          <span class="elev-spec mono">1px border · box-shadow: none</span>
+        </div>
+
+        <div class="elev-card is-e1">
+          <p class="elev-name">elevation1</p>
+          <p class="elev-role t-body-small">FAB at rest, raised panels. On dark surfaces the shadow runs deeper.</p>
+          <span class="elev-spec mono">0 2px 8px rgba(0,0,0,.25)</span>
+        </div>
+
+        <div class="elev-card is-e2">
+          <p class="elev-name">elevation2</p>
+          <p class="elev-role t-body-small">Bottom sheets, snackbars, the FAB while pressed. Deepest of the two.</p>
+          <span class="elev-spec mono">0 4px 16px rgba(0,0,0,.35)</span>
+        </div>
+
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-16) 0 0;">
+        Dark shadows are intentionally heavier so a lifted surface still separates from the near-black base.
+      </p>
+    </section>
+  </div>
+
+  <!-- Reference: tokens, philosophy, and where each is used -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Tokens</h3>
+    <table class="spec">
+      <tr><td>flat <span class="subtle mono">(default)</span></td><td class="mono">1px border · box-shadow: none</td></tr>
+      <tr><td>elevation1 — light</td><td class="mono">0 2px 8px rgba(0,0,0,.04)</td></tr>
+      <tr><td>elevation1 — dark</td><td class="mono">0 2px 8px rgba(0,0,0,.25)</td></tr>
+      <tr><td>elevation2 — light</td><td class="mono">0 4px 16px rgba(0,0,0,.07)</td></tr>
+      <tr><td>elevation2 — dark</td><td class="mono">0 4px 16px rgba(0,0,0,.35)</td></tr>
+    </table>
+
+    <hr class="divider" />
+
+    <h3 class="block-h">Philosophy &amp; where it's used</h3>
+    <ul class="use-list">
+      <li><span class="use-dot"></span><span><strong>Border before shadow.</strong> Most surfaces — cards, tiles, list rows — read as <span class="mono">flat</span> with a 1px <span class="mono">border</span>. Shadow is the exception, not the baseline.</span></li>
+      <li><span class="use-dot"></span><span><strong>Low and warm.</strong> Both shadows are short-offset and low-opacity, so a lifted surface whispers rather than shouts.</span></li>
+      <li><span class="use-dot"></span><span><strong>Reserved for floating UI.</strong> Elevation is applied only to the FAB, bottom sheets, and snackbars — surfaces that genuinely sit above the page.</span></li>
+      <li><span class="use-dot"></span><span><strong>Two steps, no more.</strong> The system stops at <span class="mono">elevation1</span> and <span class="mono">elevation2</span>; there is no z-axis ladder of five shadows.</span></li>
+    </ul>
+  </section>
+</body>
+</html>

@@ -1,0 +1,602 @@
+<!-- @dsCard group="Screens" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pantry — List</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    /* ── Screen layout ───────────────────────────────────────────────────── */
+    .screens {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-32);
+      align-items: flex-start;
+    }
+    .screen-col { display: flex; flex-direction: column; gap: var(--space-12); }
+    .screen-cap {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .screen-cap::before {
+      content: ""; width: 8px; height: 8px; border-radius: var(--radius-full);
+      background: var(--brand-primary);
+    }
+
+    /* The screen body sits in the surface-base scaffold colour. */
+    .screen-body { background: var(--surface-base); }
+
+    /* ── App bar ─────────────────────────────────────────────────────────── */
+    .pantry-appbar { display: flex; align-items: center; justify-content: space-between; }
+    .pantry-title {
+      font-family: var(--font-display);
+      font-size: var(--headline-large-size); font-weight: var(--headline-large-weight);
+      line-height: var(--headline-large-lh); letter-spacing: var(--headline-large-ls);
+      color: var(--text-primary);
+      margin: 0;
+    }
+    .appbar-glyph {
+      width: 36px; height: 36px; border-radius: var(--radius-full);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-secondary);
+      transition: background var(--dur-fast) var(--curve-standard);
+    }
+    .appbar-glyph:hover { background: color-mix(in srgb, var(--brand-primary) 8%, transparent); }
+    .appbar-glyph svg { width: 20px; height: 20px; }
+
+    /* ── Section tab bar ─────────────────────────────────────────────────── */
+    .section-tabs {
+      display: flex; gap: var(--space-8);
+      padding: var(--space-12) var(--space-16);
+      background: var(--surface-base);
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .section-tab {
+      display: inline-flex; align-items: center; gap: var(--space-8);
+      padding: var(--space-10) var(--space-16);
+      border-radius: var(--radius-12);
+      border: 1px solid var(--border);
+      background: var(--surface-raised);
+      white-space: nowrap;
+      transition:
+        background var(--dur-medium) var(--curve-standard),
+        border-color var(--dur-medium) var(--curve-standard);
+    }
+    .section-tab svg { width: 18px; height: 18px; }
+    .section-tab .tab-label {
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls); line-height: 1;
+    }
+    /* Unselected: section colour @70% icon, text-primary label */
+    .section-tab svg { color: color-mix(in srgb, var(--c) 70%, transparent); }
+    .section-tab .tab-label { color: var(--text-primary); }
+    /* Selected: filled with the section colour, on-brand text */
+    .section-tab.is-selected {
+      background: var(--c);
+      border-color: var(--c);
+    }
+    .section-tab.is-selected svg,
+    .section-tab.is-selected .tab-label { color: var(--text-on-brand); }
+
+    /* ── Item list ───────────────────────────────────────────────────────── */
+    .item-list {
+      display: flex; flex-direction: column; gap: var(--space-12);
+      padding: var(--space-16) var(--space-16) var(--space-24);
+    }
+    /* PantryItemTile: 4px freshness bar + 56px thumb + content, r16 raised card */
+    .tile {
+      display: flex; align-items: stretch;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+      overflow: hidden;
+      transition: box-shadow var(--dur-fast) var(--curve-standard);
+    }
+    .tile:hover { box-shadow: var(--elevation-1); }
+    .tile-bar { width: 4px; flex: none; background: var(--f); }
+    .tile-thumb {
+      width: 56px; height: 56px; flex: none;
+      margin: var(--space-12) 0 var(--space-12) var(--space-8);
+      border-radius: var(--radius-12);
+      background: color-mix(in srgb, var(--c) 15%, transparent);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tile-thumb svg { width: 24px; height: 24px; color: color-mix(in srgb, var(--c) 70%, transparent); }
+    .tile-main {
+      flex: 1; min-width: 0;
+      padding: var(--space-12);
+      display: flex; flex-direction: column; gap: var(--space-6);
+    }
+    .tile-head { display: flex; align-items: center; gap: var(--space-8); }
+    .tile-name {
+      flex: 1; min-width: 0;
+      font-family: var(--font-body);
+      font-size: var(--title-medium-size); font-weight: var(--title-medium-weight);
+      line-height: var(--title-medium-lh);
+      color: var(--text-primary);
+      margin: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* _CategoryTag: r4 · pad 6/2 · labelSmall w600 · color@12% / @85% */
+    .cat-tag {
+      flex: none;
+      display: inline-flex; align-items: center;
+      padding: var(--space-2) var(--space-6);
+      border-radius: var(--radius-4);
+      background: color-mix(in srgb, var(--c) 12%, transparent);
+      color: color-mix(in srgb, var(--c) 85%, transparent);
+      font-family: var(--font-body);
+      font-size: var(--label-small-size); font-weight: 600;
+      letter-spacing: var(--label-small-ls); line-height: 1;
+      white-space: nowrap;
+    }
+
+    /* Quantity stat: titleLarge @18 / w700 + optional Low pill */
+    .tile-qty { display: flex; align-items: baseline; gap: var(--space-8); }
+    .qty-value {
+      font-family: var(--font-body);
+      font-size: 18px; font-weight: 700; line-height: 1.2;
+      color: var(--text-primary);
+    }
+    .low-pill {
+      display: inline-flex; align-items: center;
+      padding: var(--space-2) var(--space-6);
+      border-radius: var(--radius-4);
+      background: color-mix(in srgb, var(--low-stock) 12%, transparent);
+      color: var(--low-stock);
+      font-family: var(--font-body);
+      font-size: var(--label-small-size); font-weight: 600;
+      letter-spacing: var(--label-small-ls); line-height: 1;
+    }
+
+    /* Expiry badge: 6px freshness dot + bodySmall @85% / w500 */
+    .expiry { display: flex; align-items: center; gap: var(--space-6); }
+    .expiry-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--f); flex: none; }
+    .expiry-label {
+      font-family: var(--font-body);
+      font-size: var(--body-small-size); font-weight: 500; line-height: 1.4;
+      color: color-mix(in srgb, var(--f) 85%, transparent);
+    }
+
+    /* ── Extended FAB ────────────────────────────────────────────────────── */
+    .fab-layer { position: relative; }
+    .fab {
+      position: absolute; right: var(--space-16); bottom: var(--space-16);
+      display: inline-flex; align-items: center; gap: var(--space-8);
+      padding: var(--space-16) var(--space-20);
+      border-radius: var(--radius-16);
+      background: var(--brand-primary);
+      color: var(--text-on-brand);
+      box-shadow: var(--elevation-2);
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls);
+      transition: transform var(--dur-fast) var(--curve-standard);
+    }
+    .fab:hover { transform: translateY(-1px); }
+    .fab svg { width: 18px; height: 18px; }
+
+    /* ── Empty state ─────────────────────────────────────────────────────── */
+    .empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      padding: var(--space-48) var(--space-32);
+      min-height: 360px;
+    }
+    .empty-orb {
+      width: 80px; height: 80px; border-radius: var(--radius-full);
+      background: color-mix(in srgb, var(--section-food) 10%, transparent);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: var(--space-20);
+    }
+    .empty-orb svg { width: 36px; height: 36px; color: color-mix(in srgb, var(--section-food) 60%, transparent); }
+    .empty-title {
+      font-family: var(--font-display);
+      font-size: var(--headline-medium-size); font-weight: var(--headline-medium-weight);
+      line-height: var(--headline-medium-lh);
+      color: var(--text-primary);
+      margin: 0 0 var(--space-8);
+    }
+    .empty-sub {
+      font-family: var(--font-body);
+      font-size: var(--body-medium-size); line-height: var(--body-medium-lh);
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    /* ── Dark thumbnail (same screen, shrunk) ────────────────────────────── */
+    .thumb-frame {
+      width: 234px; /* 390 * 0.6 */
+      transform-origin: top left;
+    }
+    .thumb-frame .phone {
+      width: 390px;
+      transform: scale(0.6);
+      transform-origin: top left;
+    }
+    /* Reserve the post-scale footprint so following content does not overlap. */
+    .thumb-clip { height: 0; overflow: visible; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Screens · Pantry</p>
+    <h1 class="ds-title">Pantry — List</h1>
+    <p class="ds-sub">
+      The pantry home screen: a Fraunces app-bar title, the section tab bar
+      (Food selected), and a stack of <span class="mono">PantryItemTile</span>s
+      spanning every freshness state, with the extended <span class="mono">Add item</span>
+      FAB anchored bottom-right. Shown at full size in light, as a dark thumbnail
+      of the same screen, and in its empty-state variant.
+    </p>
+  </header>
+
+  <div class="screens">
+
+    <!-- ─────────────────────────── LIGHT · full ─────────────────────────── -->
+    <div class="screen-col">
+      <p class="screen-cap">Light · stocked</p>
+      <div class="phone fab-layer">
+        <div class="phone-statusbar">9:41</div>
+        <div class="phone-appbar pantry-appbar">
+          <h2 class="pantry-title">Pantry</h2>
+          <span class="appbar-glyph" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" />
+            </svg>
+          </span>
+        </div>
+
+        <!-- Section tabs · Food selected -->
+        <div class="section-tabs">
+          <span class="section-tab is-selected" style="--c: var(--section-food);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 3v7a3 3 0 0 0 3 3v8M7 3v6M10 3v6M19 3c-1.5 1.5-2 4-2 7v3h2V3M19 13v8" />
+            </svg>
+            <span class="tab-label">Food</span>
+          </span>
+          <span class="section-tab" style="--c: var(--section-bulk);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 9l9-5 9 5-9 5-9-5zM3 9v6l9 5 9-5V9M12 14v6" />
+            </svg>
+            <span class="tab-label">Bulk</span>
+          </span>
+          <span class="section-tab" style="--c: var(--section-non-food);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 13l4-9 3 1-3 8M9 13h4l1 7H6l1-7zM12 4l2-1" />
+            </svg>
+            <span class="tab-label">Non-food</span>
+          </span>
+          <span class="section-tab" style="--c: var(--section-leftover);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 12a8 8 0 0 1 16 0zM2 12h20M11 5V3" />
+            </svg>
+            <span class="tab-label">Leftovers</span>
+          </span>
+        </div>
+
+        <!-- Item list -->
+        <div class="screen-body item-list">
+
+          <!-- Expired -->
+          <div class="tile" style="--c: var(--cat-meat); --f: var(--expired);">
+            <span class="tile-bar"></span>
+            <span class="tile-thumb" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 4c2.5 0 4.5 2 4.5 4.5S16.5 13 14 13l-5 5a2.8 2.8 0 0 1-4-4l5-5C10 6.5 11.5 4 14 4z" />
+              </svg>
+            </span>
+            <div class="tile-main">
+              <div class="tile-head">
+                <p class="tile-name">Chicken breast</p>
+                <span class="cat-tag" style="--c: var(--cat-meat);">meat</span>
+              </div>
+              <div class="tile-qty"><span class="qty-value">2 pcs</span></div>
+              <div class="expiry">
+                <span class="expiry-dot"></span>
+                <span class="expiry-label">Expired 2 days ago</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Expiring soon -->
+          <div class="tile" style="--c: var(--cat-produce); --f: var(--expiring-soon);">
+            <span class="tile-bar"></span>
+            <span class="tile-thumb" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 20c-4-1-7-4-7-9 3 0 5 1 6 3 1-3 4-5 7-5 0 6-3 10-6 11zM11 20v2" />
+              </svg>
+            </span>
+            <div class="tile-main">
+              <div class="tile-head">
+                <p class="tile-name">Spinach</p>
+                <span class="cat-tag" style="--c: var(--cat-produce);">produce</span>
+              </div>
+              <div class="tile-qty"><span class="qty-value">1 bunch</span></div>
+              <div class="expiry">
+                <span class="expiry-dot"></span>
+                <span class="expiry-label">2 days left</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fresh -->
+          <div class="tile" style="--c: var(--cat-condiment); --f: var(--fresh);">
+            <span class="tile-bar"></span>
+            <span class="tile-thumb" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 2h6M10 2v3M14 2v3M8 5h8l-1 4a4 4 0 0 1-1.2 2.6L13 12v8a2 2 0 0 1-2 0v-8l-.8-.4A4 4 0 0 1 9 9L8 5z" />
+              </svg>
+            </span>
+            <div class="tile-main">
+              <div class="tile-head">
+                <p class="tile-name">Olive oil</p>
+                <span class="cat-tag" style="--c: var(--cat-condiment);">condiment</span>
+              </div>
+              <div class="tile-qty"><span class="qty-value">750 ml</span></div>
+              <div class="expiry">
+                <span class="expiry-dot"></span>
+                <span class="expiry-label">8 months left</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fresh + Low stock -->
+          <div class="tile" style="--c: var(--cat-grain); --f: var(--fresh);">
+            <span class="tile-bar"></span>
+            <span class="tile-thumb" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3c1.5 2 1.5 4 0 6-1.5-2-1.5-4 0-6zM8 8c2 1 3 3 2.5 5C8.5 12 7.5 10 8 8zM16 8c-2 1-3 3-2.5 5C15.5 12 16.5 10 16 8zM12 14v7" />
+              </svg>
+            </span>
+            <div class="tile-main">
+              <div class="tile-head">
+                <p class="tile-name">Jasmine rice</p>
+                <span class="cat-tag" style="--c: var(--cat-grain);">grain</span>
+              </div>
+              <div class="tile-qty">
+                <span class="qty-value">1 kg</span>
+                <span class="low-pill">Low</span>
+              </div>
+              <div class="expiry">
+                <span class="expiry-dot"></span>
+                <span class="expiry-label">14 months left</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Extended FAB -->
+        <span class="fab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Add item
+        </span>
+      </div>
+    </div>
+
+    <!-- Right column: dark thumbnail + empty state stacked -->
+    <div class="screen-col">
+
+      <!-- ───────────────────────── DARK · thumbnail ─────────────────────── -->
+      <p class="screen-cap">Dark · same screen, thumbnail</p>
+      <div class="thumb-frame">
+        <div class="phone fab-layer" data-theme="dark">
+          <div class="phone-statusbar">9:41</div>
+          <div class="phone-appbar pantry-appbar">
+            <h2 class="pantry-title">Pantry</h2>
+            <span class="appbar-glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" />
+              </svg>
+            </span>
+          </div>
+
+          <div class="section-tabs">
+            <span class="section-tab is-selected" style="--c: var(--section-food);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 3v7a3 3 0 0 0 3 3v8M7 3v6M10 3v6M19 3c-1.5 1.5-2 4-2 7v3h2V3M19 13v8" />
+              </svg>
+              <span class="tab-label">Food</span>
+            </span>
+            <span class="section-tab" style="--c: var(--section-bulk);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 9l9-5 9 5-9 5-9-5zM3 9v6l9 5 9-5V9M12 14v6" />
+              </svg>
+              <span class="tab-label">Bulk</span>
+            </span>
+            <span class="section-tab" style="--c: var(--section-non-food);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 13l4-9 3 1-3 8M9 13h4l1 7H6l1-7zM12 4l2-1" />
+              </svg>
+              <span class="tab-label">Non-food</span>
+            </span>
+          </div>
+
+          <div class="screen-body item-list">
+            <div class="tile" style="--c: var(--cat-meat); --f: var(--expired);">
+              <span class="tile-bar"></span>
+              <span class="tile-thumb" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 4c2.5 0 4.5 2 4.5 4.5S16.5 13 14 13l-5 5a2.8 2.8 0 0 1-4-4l5-5C10 6.5 11.5 4 14 4z" />
+                </svg>
+              </span>
+              <div class="tile-main">
+                <div class="tile-head">
+                  <p class="tile-name">Chicken breast</p>
+                  <span class="cat-tag" style="--c: var(--cat-meat);">meat</span>
+                </div>
+                <div class="tile-qty"><span class="qty-value">2 pcs</span></div>
+                <div class="expiry">
+                  <span class="expiry-dot"></span>
+                  <span class="expiry-label">Expired 2 days ago</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="tile" style="--c: var(--cat-produce); --f: var(--expiring-soon);">
+              <span class="tile-bar"></span>
+              <span class="tile-thumb" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 20c-4-1-7-4-7-9 3 0 5 1 6 3 1-3 4-5 7-5 0 6-3 10-6 11zM11 20v2" />
+                </svg>
+              </span>
+              <div class="tile-main">
+                <div class="tile-head">
+                  <p class="tile-name">Spinach</p>
+                  <span class="cat-tag" style="--c: var(--cat-produce);">produce</span>
+                </div>
+                <div class="tile-qty"><span class="qty-value">1 bunch</span></div>
+                <div class="expiry">
+                  <span class="expiry-dot"></span>
+                  <span class="expiry-label">2 days left</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="tile" style="--c: var(--cat-grain); --f: var(--fresh);">
+              <span class="tile-bar"></span>
+              <span class="tile-thumb" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3c1.5 2 1.5 4 0 6-1.5-2-1.5-4 0-6zM8 8c2 1 3 3 2.5 5C8.5 12 7.5 10 8 8zM16 8c-2 1-3 3-2.5 5C15.5 12 16.5 10 16 8zM12 14v7" />
+                </svg>
+              </span>
+              <div class="tile-main">
+                <div class="tile-head">
+                  <p class="tile-name">Jasmine rice</p>
+                  <span class="cat-tag" style="--c: var(--cat-grain);">grain</span>
+                </div>
+                <div class="tile-qty">
+                  <span class="qty-value">1 kg</span>
+                  <span class="low-pill">Low</span>
+                </div>
+                <div class="expiry">
+                  <span class="expiry-dot"></span>
+                  <span class="expiry-label">14 months left</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <span class="fab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add item
+          </span>
+        </div>
+      </div>
+
+      <!-- ───────────────────────── LIGHT · empty state ──────────────────── -->
+      <!-- Spacer reserving the scaled-down dark thumbnail's real footprint. -->
+      <div aria-hidden="true" style="height: 282px;"></div>
+
+      <p class="screen-cap">Light · empty state</p>
+      <div class="phone fab-layer">
+        <div class="phone-statusbar">9:41</div>
+        <div class="phone-appbar pantry-appbar">
+          <h2 class="pantry-title">Pantry</h2>
+          <span class="appbar-glyph" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" />
+            </svg>
+          </span>
+        </div>
+
+        <div class="section-tabs">
+          <span class="section-tab is-selected" style="--c: var(--section-food);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 3v7a3 3 0 0 0 3 3v8M7 3v6M10 3v6M19 3c-1.5 1.5-2 4-2 7v3h2V3M19 13v8" />
+            </svg>
+            <span class="tab-label">Food</span>
+          </span>
+          <span class="section-tab" style="--c: var(--section-bulk);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 9l9-5 9 5-9 5-9-5zM3 9v6l9 5 9-5V9M12 14v6" />
+            </svg>
+            <span class="tab-label">Bulk</span>
+          </span>
+          <span class="section-tab" style="--c: var(--section-non-food);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 13l4-9 3 1-3 8M9 13h4l1 7H6l1-7zM12 4l2-1" />
+            </svg>
+            <span class="tab-label">Non-food</span>
+          </span>
+        </div>
+
+        <div class="screen-body empty">
+          <div class="empty-orb" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 9h18l-2 10a2 2 0 0 1-2 1.6H7A2 2 0 0 1 5 19L3 9z" />
+              <path d="M3 9l3-5h12l3 5M8 13v3M12 13v3M16 13v3" />
+            </svg>
+          </div>
+          <p class="empty-title">Nothing here yet</p>
+          <p class="empty-sub">Your food pantry is waiting.<br />Tap Add to stock your first item.</p>
+        </div>
+
+        <span class="fab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Add item
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reference / honesty note -->
+  <section class="ds-surface" style="margin-top: var(--space-32);">
+    <table class="spec">
+      <tr><td>PantryItemTile</td><td class="mono">r16 raised card · 4px freshness bar · 56px thumb (r12) · titleMedium name</td></tr>
+      <tr><td>Category tag</td><td class="mono">_CategoryTag · r4 · pad 6/2 · labelSmall w600 · color@12% / @85%</td></tr>
+      <tr><td>Quantity stat</td><td class="mono">titleLarge @18 / w700 · textPrimary</td></tr>
+      <tr><td>Low pill</td><td class="mono">r4 · pad 6/2 · lowStock@12% fill / lowStock text · shows when qty ≤ 1</td></tr>
+      <tr><td>Expiry badge</td><td class="mono">6px freshness dot · bodySmall w500 · freshness@85%</td></tr>
+      <tr><td>Section tab — selected</td><td class="mono">r12 · pad 16/10 · section colour fill · textOnBrand</td></tr>
+      <tr><td>Section tab — idle</td><td class="mono">r12 · surfaceRaised · border · icon section@70% · textPrimary</td></tr>
+      <tr><td>Add FAB</td><td class="mono">extended · brandPrimary · r16 · elevation2 · labelLarge</td></tr>
+      <tr>
+        <td>Empty-state copy <span class="badge-proposed">proposed</span></td>
+        <td class="mono">code reads "Your food pantry is waiting" — "Nothing here yet" headline is new</td>
+      </tr>
+      <tr>
+        <td>Dark category fills <span class="badge-proposed">proposed</span></td>
+        <td class="mono">thumbnail reuses light --cat-* (matches code); tuned --cat-*-dark not yet wired</td>
+      </tr>
+    </table>
+  </section>
+</body>
+</html>

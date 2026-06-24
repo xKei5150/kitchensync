@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
@@ -85,114 +86,224 @@ class _CreateCustomIngredientScreenState
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(KsTokens.space20),
           children: [
-            TextFormField(
-              controller: _name,
-              decoration: const InputDecoration(labelText: 'Name (English)'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<IngredientCategory>(
-              initialValue: _category,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: IngredientCategory.values
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c.name)))
-                  .toList(),
-              onChanged: (c) => setState(() => _category = c!),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<Unit>(
-              initialValue: _defaultUnit,
-              decoration: const InputDecoration(labelText: 'Default unit'),
-              items: Unit.values
-                  .map((u) => DropdownMenuItem(value: u, child: Text(u.name)))
-                  .toList(),
-              onChanged: (u) => setState(() {
-                _defaultUnit = u!;
-                _allowedUnits.add(u);
-              }),
-            ),
-            const SizedBox(height: 16),
-            const Text('Allowed units'),
-            Wrap(
-              spacing: 8,
-              children: Unit.values
-                  .map(
-                    (u) => FilterChip(
-                      label: Text(u.name),
-                      selected: _allowedUnits.contains(u),
-                      onSelected: (sel) => setState(() {
-                        if (sel) {
-                          _allowedUnits.add(u);
-                        } else {
-                          _allowedUnits.remove(u);
-                        }
-                      }),
+            _SectionCard(
+              label: 'Basics',
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _name,
+                    decoration: const InputDecoration(
+                      labelText: 'Name (English)',
                     ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _aliases,
-              decoration: const InputDecoration(
-                labelText: 'Aliases (comma-separated)',
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: KsTokens.space12),
+                  DropdownButtonFormField<IngredientCategory>(
+                    initialValue: _category,
+                    decoration: const InputDecoration(labelText: 'Category'),
+                    items: IngredientCategory.values
+                        .map(
+                          (c) =>
+                              DropdownMenuItem(value: c, child: Text(c.name)),
+                        )
+                        .toList(),
+                    onChanged: (c) => setState(() => _category = c!),
+                  ),
+                  const SizedBox(height: KsTokens.space12),
+                  TextFormField(
+                    controller: _aliases,
+                    decoration: const InputDecoration(
+                      labelText: 'Aliases (comma-separated)',
+                      hintText: 'e.g. cilantro, coriander',
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            const Text('Allergens'),
-            Wrap(
-              spacing: 8,
-              children: Allergen.values
-                  .map(
-                    (a) => FilterChip(
-                      label: Text(a.name),
-                      selected: _allergens.contains(a),
-                      onSelected: (sel) => setState(() {
-                        if (sel) {
-                          _allergens.add(a);
-                        } else {
-                          _allergens.remove(a);
-                        }
-                      }),
+            const SizedBox(height: KsTokens.space16),
+            _SectionCard(
+              label: 'Units',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<Unit>(
+                    initialValue: _defaultUnit,
+                    decoration: const InputDecoration(
+                      labelText: 'Default unit',
                     ),
-                  )
-                  .toList(),
+                    items: Unit.values
+                        .map(
+                          (u) =>
+                              DropdownMenuItem(value: u, child: Text(u.name)),
+                        )
+                        .toList(),
+                    onChanged: (u) => setState(() {
+                      _defaultUnit = u!;
+                      _allowedUnits.add(u);
+                    }),
+                  ),
+                  const SizedBox(height: KsTokens.space12),
+                  Text(
+                    'Allowed units',
+                    style: KsTokens.labelMedium.copyWith(
+                      color: KsTokens.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: KsTokens.space8),
+                  Wrap(
+                    spacing: KsTokens.space6,
+                    runSpacing: KsTokens.space4,
+                    children: Unit.values.map((u) {
+                      return FilterChip(
+                        label: Text(u.name),
+                        selected: _allowedUnits.contains(u),
+                        onSelected: (sel) => setState(() {
+                          if (sel) {
+                            _allowedUnits.add(u);
+                          } else {
+                            _allowedUnits.remove(u);
+                          }
+                        }),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            const Text('Dietary tags'),
-            Wrap(
-              spacing: 8,
-              children: DietaryTag.values
-                  .map(
-                    (d) => FilterChip(
-                      label: Text(d.name),
-                      selected: _diet.contains(d),
-                      onSelected: (sel) => setState(() {
-                        if (sel) {
-                          _diet.add(d);
-                        } else {
-                          _diet.remove(d);
-                        }
-                      }),
+            const SizedBox(height: KsTokens.space16),
+            _SectionCard(
+              label: 'Allergens & diet',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Allergens',
+                    style: KsTokens.labelMedium.copyWith(
+                      color: KsTokens.textTertiary,
                     ),
-                  )
-                  .toList(),
+                  ),
+                  const SizedBox(height: KsTokens.space8),
+                  Wrap(
+                    spacing: KsTokens.space6,
+                    runSpacing: KsTokens.space4,
+                    children: Allergen.values.map((a) {
+                      return FilterChip(
+                        label: Text(a.name),
+                        selected: _allergens.contains(a),
+                        onSelected: (sel) => setState(() {
+                          if (sel) {
+                            _allergens.add(a);
+                          } else {
+                            _allergens.remove(a);
+                          }
+                        }),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  Text(
+                    'Dietary tags',
+                    style: KsTokens.labelMedium.copyWith(
+                      color: KsTokens.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: KsTokens.space8),
+                  Wrap(
+                    spacing: KsTokens.space6,
+                    runSpacing: KsTokens.space4,
+                    children: DietaryTag.values.map((d) {
+                      return FilterChip(
+                        label: Text(d.name),
+                        selected: _diet.contains(d),
+                        onSelected: (sel) => setState(() {
+                          if (sel) {
+                            _diet.add(d);
+                          } else {
+                            _diet.remove(d);
+                          }
+                        }),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
             ),
             if (_error != null) ...[
-              const SizedBox(height: 16),
-              Text(_error!, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: KsTokens.space16),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: KsTokens.space12,
+                  vertical: KsTokens.space10,
+                ),
+                decoration: BoxDecoration(
+                  color: KsTokens.expired.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(KsTokens.radius12),
+                  border: Border.all(
+                    color: KsTokens.expired.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 18,
+                      color: KsTokens.expired,
+                    ),
+                    const SizedBox(width: KsTokens.space8),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: KsTokens.bodySmall.copyWith(
+                          color: KsTokens.expired,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: KsTokens.space24),
             FilledButton.icon(
               icon: const Icon(Icons.check),
-              label: Text(_submitting ? 'Saving...' : 'Save'),
+              label: Text(_submitting ? 'Saving...' : 'Save ingredient'),
               onPressed: _submitting ? null : _submit,
             ),
+            const SizedBox(height: KsTokens.space32),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(KsTokens.space16),
+      decoration: BoxDecoration(
+        color: KsTokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(KsTokens.radius16),
+        border: Border.all(color: KsTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: KsTokens.labelLarge.copyWith(color: KsTokens.textSecondary),
+          ),
+          const SizedBox(height: KsTokens.space12),
+          child,
+        ],
       ),
     );
   }

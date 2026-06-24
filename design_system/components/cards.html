@@ -1,0 +1,254 @@
+<!-- @dsCard group="Components — Surfaces" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cards &amp; Surfaces</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* ── _SectionCard: raised, r16, 1px border, pad 16 ─────────────────── */
+    .section-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+      padding: var(--space-16);
+    }
+    .section-label {
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls); line-height: var(--label-large-lh);
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin: 0 0 var(--space-12);
+    }
+
+    /* ── _MetadataCard / _MetadataRow ──────────────────────────────────── */
+    .meta-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+      padding: var(--space-16);
+    }
+    .meta-row {
+      display: flex; align-items: center; gap: var(--space-12);
+      padding: var(--space-8) 0;
+    }
+    .meta-row + .meta-row { border-top: 1px solid var(--border); }
+    .meta-label {
+      width: 120px; flex: 0 0 120px;
+      font-family: var(--font-body);
+      font-size: var(--label-medium-size); font-weight: var(--label-medium-weight);
+      letter-spacing: var(--label-medium-ls); line-height: var(--label-medium-lh);
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+    }
+    .meta-value {
+      display: flex; align-items: center; gap: var(--space-8);
+      font-family: var(--font-body);
+      font-size: var(--body-medium-size); font-weight: var(--body-medium-weight);
+      line-height: var(--body-medium-lh);
+      color: var(--text-primary);
+    }
+    .dot {
+      width: 6px; height: 6px; border-radius: var(--radius-full);
+      background: var(--c, var(--fresh)); flex: 0 0 6px;
+    }
+
+    /* ── Quantity stepper ──────────────────────────────────────────────── */
+    .stepper {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+      padding: var(--space-12) var(--space-16);
+    }
+    .step-btn {
+      width: 44px; height: 44px; border-radius: var(--radius-full);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-body); font-size: 22px; font-weight: 600; line-height: 1;
+      transition: background var(--dur-fast) var(--curve-standard),
+                  transform var(--dur-fast) var(--curve-standard);
+    }
+    .step-btn:hover { transform: scale(1.06); }
+    .step-btn:active { transform: scale(0.94); }
+    .step-btn--minus {
+      background: color-mix(in srgb, var(--low-stock) 10%, transparent);
+      color: var(--low-stock);
+    }
+    .step-btn--minus:hover {
+      background: color-mix(in srgb, var(--low-stock) 15%, transparent);
+    }
+    .step-btn--plus {
+      background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+      color: var(--brand-primary);
+    }
+    .step-btn--plus:hover {
+      background: color-mix(in srgb, var(--brand-primary) 15%, transparent);
+    }
+    .step-value {
+      display: flex; align-items: baseline; gap: var(--space-6);
+      color: var(--text-primary);
+    }
+    .step-unit {
+      font-family: var(--font-body);
+      font-size: var(--label-medium-size); font-weight: var(--label-medium-weight);
+      letter-spacing: var(--label-medium-ls);
+      color: var(--text-tertiary);
+    }
+
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+    .stack { display: flex; flex-direction: column; gap: var(--space-16); }
+    .body-text { color: var(--text-secondary); margin: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Surfaces</p>
+    <h1 class="ds-title">Cards &amp; Surfaces</h1>
+    <p class="ds-sub">
+      The three building blocks that wrap content on detail and form screens. All share a
+      <span class="mono">surfaceRaised</span> fill, <span class="mono">radius16</span>, a 1px
+      <span class="mono">border</span>, and <span class="mono">16</span> padding — only the
+      interior layout differs. Metadata rows pair a fixed 120px label with a body value,
+      optionally led by a 6px status dot.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+      <div class="stack">
+
+        <div>
+          <h3 class="block-h">Section / form card &nbsp;<span class="mono">_SectionCard</span></h3>
+          <div class="section-card">
+            <p class="section-label">Details</p>
+            <p class="body-text t-body-medium">
+              Roma tomatoes, halved and lightly salted. Stored in the crisper drawer to
+              slow ripening. Best used within the week for sauces and quick roasting.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="block-h">Metadata card &nbsp;<span class="mono">_MetadataCard</span></h3>
+          <div class="meta-card">
+            <div class="meta-row">
+              <span class="meta-label">Expires</span>
+              <span class="meta-value"><span class="dot" style="--c: var(--fresh);"></span>in 3 days</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Added</span>
+              <span class="meta-value">Jun 22</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Section</span>
+              <span class="meta-value">Food</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Quantity</span>
+              <span class="meta-value">500 g</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="block-h">Quantity stepper</h3>
+          <div class="stepper">
+            <button class="step-btn step-btn--minus" type="button" aria-label="Decrease quantity">&minus;</button>
+            <span class="step-value">
+              <span class="t-display-medium">500</span>
+              <span class="step-unit">g</span>
+            </span>
+            <button class="step-btn step-btn--plus" type="button" aria-label="Increase quantity">+</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+      <div class="stack">
+
+        <div>
+          <h3 class="block-h">Section / form card &nbsp;<span class="mono">_SectionCard</span></h3>
+          <div class="section-card">
+            <p class="section-label">Details</p>
+            <p class="body-text t-body-medium">
+              Roma tomatoes, halved and lightly salted. Stored in the crisper drawer to
+              slow ripening. Best used within the week for sauces and quick roasting.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="block-h">Metadata card &nbsp;<span class="mono">_MetadataCard</span></h3>
+          <div class="meta-card">
+            <div class="meta-row">
+              <span class="meta-label">Expires</span>
+              <span class="meta-value"><span class="dot" style="--c: var(--fresh);"></span>in 3 days</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Added</span>
+              <span class="meta-value">Jun 22</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Section</span>
+              <span class="meta-value">Food</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Quantity</span>
+              <span class="meta-value">500 g</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="block-h">Quantity stepper</h3>
+          <div class="stepper">
+            <button class="step-btn step-btn--minus" type="button" aria-label="Decrease quantity">&minus;</button>
+            <span class="step-value">
+              <span class="t-display-medium">500</span>
+              <span class="step-unit">g</span>
+            </span>
+            <button class="step-btn step-btn--plus" type="button" aria-label="Increase quantity">+</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Surface specs (for the port)</h3>
+    <table class="spec">
+      <tr><td>_SectionCard</td><td class="mono">surfaceRaised · radius16 · 1px border · pad 16 · label labelLarge / textSecondary upper</td></tr>
+      <tr><td>_MetadataCard</td><td class="mono">surfaceRaised · radius16 · 1px border · pad 16 · rows split by 1px border</td></tr>
+      <tr><td>_MetadataRow</td><td class="mono">label 120px labelMedium / textTertiary · value bodyMedium / textPrimary · optional 6px dot</td></tr>
+      <tr><td>Stepper — value</td><td class="mono">displayMedium · unit labelMedium / textTertiary</td></tr>
+      <tr><td>Stepper — minus</td><td class="mono">44 circle · lowStock&#64;10% fill / lowStock glyph</td></tr>
+      <tr><td>Stepper — plus</td><td class="mono">44 circle · brandPrimary&#64;10% fill / brandPrimary glyph</td></tr>
+    </table>
+    <p class="t-body-small subtle" style="margin: var(--space-12) 0 0;">
+      Hover scale + tint shift on the stepper buttons is a CSS-only affordance preview
+      <span class="badge-proposed">proposed</span> — the Flutter buttons render the same fills statically today.
+    </p>
+  </section>
+</body>
+</html>

@@ -1,0 +1,410 @@
+<!-- @dsCard group="Screens" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pantry — Item Detail</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    /* Two phones side by side: one full-size light, one dark thumbnail. */
+    .screen-stage {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-32);
+      align-items: flex-start;
+    }
+    .screen-col { display: flex; flex-direction: column; gap: var(--space-12); }
+    .screen-cap {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .screen-cap::before {
+      content: ""; width: 8px; height: 8px; border-radius: var(--radius-full);
+      background: var(--brand-primary);
+    }
+
+    /* The detail screen scrolls inside the phone's content area. */
+    .detail-body {
+      background: var(--surface-base);
+      padding-bottom: var(--space-32);
+    }
+
+    /* Back app bar — leading chevron + title (AppBar title 'Item detail'). */
+    .appbar-back {
+      display: flex; align-items: center; gap: var(--space-12);
+    }
+    .appbar-icon {
+      width: 40px; height: 40px; border-radius: var(--radius-full);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-primary);
+      transition: background var(--dur-fast) var(--curve-standard);
+    }
+    .appbar-icon svg { width: 22px; height: 22px; }
+    .appbar-back:hover .appbar-icon { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+    .appbar-title { font-size: var(--title-large-size); font-weight: var(--title-large-weight); }
+
+    /* ── 16:9 category-tinted hero placeholder ────────────────────────── */
+    .hero {
+      aspect-ratio: 16 / 9;
+      background: color-mix(in srgb, var(--cat-meat) 12%, var(--surface-base));
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .hero-glyph {
+      width: 72px; height: 72px;
+      color: color-mix(in srgb, var(--cat-meat) 72%, transparent);
+    }
+    .hero-glyph svg { width: 100%; height: 100%; }
+    .hero-hint {
+      position: absolute; bottom: var(--space-12);
+      font-size: var(--body-small-size);
+      color: color-mix(in srgb, var(--cat-meat) 75%, var(--text-tertiary));
+      font-weight: 500;
+    }
+
+    /* ── Padded content stack (KsTokens.space20 in code) ──────────────── */
+    .detail-pad { padding: var(--space-20); display: flex; flex-direction: column; }
+
+    /* Title + tonal category tag */
+    .detail-title { color: var(--text-primary); margin: 0; }
+    .cat-tag {
+      align-self: flex-start;
+      margin-top: var(--space-6);
+      display: inline-flex; align-items: center;
+      font-size: var(--label-small-size); font-weight: 600;
+      letter-spacing: var(--label-small-ls); line-height: 1;
+      border-radius: var(--radius-6);
+      padding: var(--space-3) var(--space-8);
+      background: color-mix(in srgb, var(--cat-meat) 12%, transparent);
+      color: color-mix(in srgb, var(--cat-meat) 85%, transparent);
+    }
+
+    /* ── Cards (surfaceRaised, radius16, 1px border) ──────────────────── */
+    .card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+    }
+
+    /* Quantity stepper — − 500 g + */
+    .stepper {
+      margin-top: var(--space-20);
+      padding: var(--space-12) var(--space-16);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .step-btn {
+      width: 44px; height: 44px; border-radius: var(--radius-full);
+      border: 0; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform var(--dur-fast) var(--curve-standard),
+                  filter var(--dur-fast) var(--curve-standard);
+    }
+    .step-btn svg { width: 22px; height: 22px; }
+    .step-btn:hover { filter: brightness(0.96); }
+    .step-btn:active { transform: scale(0.92); }
+    .step-btn--minus {
+      background: color-mix(in srgb, var(--low-stock) 10%, transparent);
+      color: var(--low-stock);
+    }
+    .step-btn--plus {
+      background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+      color: var(--brand-primary);
+    }
+    .step-readout { text-align: center; display: flex; flex-direction: column; gap: var(--space-2); }
+    .step-qty { color: var(--text-primary); }
+    .step-unit {
+      font-size: var(--label-medium-size); font-weight: var(--label-medium-weight);
+      letter-spacing: var(--label-medium-ls);
+      color: var(--text-tertiary); text-transform: lowercase;
+    }
+
+    /* Metadata card — 120px label column + value */
+    .meta { margin-top: var(--space-20); padding: var(--space-16); }
+    .meta-row { display: flex; align-items: flex-start; }
+    .meta-row + .meta-row { margin-top: var(--space-12); }
+    .meta-label {
+      width: 96px; flex: none;
+      font-size: var(--body-small-size); font-weight: 600;
+      color: var(--text-tertiary);
+    }
+    .meta-value {
+      display: flex; align-items: center; gap: var(--space-6);
+      font-size: var(--body-medium-size); line-height: var(--body-medium-lh);
+      color: var(--text-primary);
+    }
+    .meta-value--emph { font-weight: 600; }
+    .fresh-dot {
+      width: 6px; height: 6px; border-radius: var(--radius-full);
+      background: var(--fresh); flex: none;
+    }
+
+    /* Full-width outlined "Mark as waste" button */
+    .waste-btn {
+      margin-top: var(--space-24);
+      width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: var(--space-8);
+      padding: var(--space-12) var(--space-16);
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-8);
+      color: var(--text-secondary);
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls);
+      cursor: pointer;
+      transition: border-color var(--dur-fast) var(--curve-standard),
+                  background var(--dur-fast) var(--curve-standard),
+                  color var(--dur-fast) var(--curve-standard);
+    }
+    .waste-btn svg { width: 20px; height: 20px; }
+    .waste-btn:hover {
+      border-color: var(--expired);
+      color: var(--expired);
+      background: color-mix(in srgb, var(--expired) 6%, transparent);
+    }
+
+    /* Dark thumbnail: render the same phone at ~62% scale. */
+    .phone--thumb {
+      width: 390px;
+      transform: scale(0.62);
+      transform-origin: top left;
+    }
+    .thumb-frame { width: 242px; height: 540px; overflow: hidden; }
+
+    .note {
+      margin: var(--space-20) 0 0;
+      max-width: 880px;
+    }
+    .note .badge-proposed { margin-right: var(--space-6); }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Screens · Pantry</p>
+    <h1 class="ds-title">Pantry — Item Detail</h1>
+    <p class="ds-sub">
+      The full item record: a 16:9 hero photo, ingredient title with a tonal category
+      tag, an inline quantity stepper, a metadata card, and a destructive
+      <span class="mono">Mark&nbsp;as&nbsp;waste</span> action. Composed entirely from
+      tokens — hero placeholder, stepper buttons, and freshness dot are all
+      <span class="mono">color-mix</span> tints of category and semantic colors.
+    </p>
+  </header>
+
+  <div class="screen-stage">
+    <!-- ── LIGHT, full size ─────────────────────────────────────────── -->
+    <div class="screen-col">
+      <p class="screen-cap">Light · full</p>
+      <div class="phone">
+        <div class="phone-statusbar">9:41</div>
+        <div class="phone-appbar">
+          <div class="appbar-back">
+            <span class="appbar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </span>
+            <span class="appbar-title">Item detail</span>
+          </div>
+        </div>
+
+        <div class="detail-body">
+          <!-- Hero photo placeholder, category-tinted (meat) -->
+          <div class="hero">
+            <span class="hero-glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <circle cx="8.5" cy="8.5" r="1.6" />
+                <path d="M21 15l-5-5L5 21" />
+              </svg>
+            </span>
+            <span class="hero-hint">Tap to add a photo</span>
+          </div>
+
+          <div class="detail-pad">
+            <h2 class="detail-title t-display-medium">Chicken breast</h2>
+            <span class="cat-tag">meat</span>
+
+            <!-- Quantity stepper -->
+            <div class="card stepper">
+              <button class="step-btn step-btn--minus" type="button" aria-label="Decrease quantity">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round"><path d="M5 12h14" /></svg>
+              </button>
+              <div class="step-readout">
+                <span class="step-qty t-display-medium">500</span>
+                <span class="step-unit">g</span>
+              </div>
+              <button class="step-btn step-btn--plus" type="button" aria-label="Increase quantity">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+            </div>
+
+            <!-- Metadata card -->
+            <div class="card meta">
+              <div class="meta-row">
+                <span class="meta-label">Expires</span>
+                <span class="meta-value meta-value--emph">
+                  <span class="fresh-dot" aria-hidden="true"></span>in 3 days
+                </span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Added</span>
+                <span class="meta-value">Jun 22</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Section</span>
+                <span class="meta-value">Food</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Storage</span>
+                <span class="meta-value">Fridge</span>
+              </div>
+            </div>
+
+            <!-- Mark as waste -->
+            <button class="waste-btn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+              </svg>
+              Mark as waste
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DARK, thumbnail ──────────────────────────────────────────── -->
+    <div class="screen-col">
+      <p class="screen-cap">Dark · thumbnail</p>
+      <div class="thumb-frame">
+        <div class="phone phone--thumb" data-theme="dark">
+          <div class="phone-statusbar">9:41</div>
+          <div class="phone-appbar">
+            <div class="appbar-back">
+              <span class="appbar-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span class="appbar-title">Item detail</span>
+            </div>
+          </div>
+
+          <div class="detail-body">
+            <div class="hero">
+              <span class="hero-glyph" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <circle cx="8.5" cy="8.5" r="1.6" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+              </span>
+              <span class="hero-hint">Tap to add a photo</span>
+            </div>
+
+            <div class="detail-pad">
+              <h2 class="detail-title t-display-medium">Chicken breast</h2>
+              <span class="cat-tag">meat</span>
+
+              <div class="card stepper">
+                <button class="step-btn step-btn--minus" type="button" aria-label="Decrease quantity">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                       stroke-linecap="round"><path d="M5 12h14" /></svg>
+                </button>
+                <div class="step-readout">
+                  <span class="step-qty t-display-medium">500</span>
+                  <span class="step-unit">g</span>
+                </div>
+                <button class="step-btn step-btn--plus" type="button" aria-label="Increase quantity">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                       stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                </button>
+              </div>
+
+              <div class="card meta">
+                <div class="meta-row">
+                  <span class="meta-label">Expires</span>
+                  <span class="meta-value meta-value--emph">
+                    <span class="fresh-dot" aria-hidden="true"></span>in 3 days
+                  </span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Added</span>
+                  <span class="meta-value">Jun 22</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Section</span>
+                  <span class="meta-value">Food</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Storage</span>
+                  <span class="meta-value">Fridge</span>
+                </div>
+              </div>
+
+              <button class="waste-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+                </svg>
+                Mark as waste
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Honest current-vs-proposed deltas against the live screen -->
+  <section class="ds-surface note">
+    <table class="spec">
+      <tr>
+        <td>Title type</td>
+        <td>
+          <span class="badge-proposed">proposed</span>
+          Mock uses <span class="mono">displayMedium</span> per this card's spec; the live
+          <span class="mono">_TitleRow</span> renders <span class="mono">headlineMedium</span>.
+        </td>
+      </tr>
+      <tr>
+        <td>App bar title</td>
+        <td>
+          <span class="badge-proposed">proposed</span>
+          Code shows <span class="mono">"Item detail"</span>; the card title reads
+          <span class="mono">"Pantry — Item Detail"</span> for the system index.
+        </td>
+      </tr>
+      <tr>
+        <td>"Added" / "Storage" rows</td>
+        <td>
+          <span class="badge-proposed">proposed</span>
+          The live <span class="mono">_MetadataCard</span> renders Section, Freshness,
+          Last purchased, shelf life, allergens, and note — not literal
+          <span class="mono">Added</span> or <span class="mono">Storage</span> rows yet.
+        </td>
+      </tr>
+      <tr>
+        <td>Freshness phrasing</td>
+        <td class="mono">
+          FreshnessHelper.relativeLabel → "3 days left" (live) vs "in 3 days" (spec copy)
+        </td>
+      </tr>
+      <tr>
+        <td>Stepper · in code</td>
+        <td class="mono">surfaceRaised · radius16 · −lowStock@10% / +brandPrimary@10% · 44×44</td>
+      </tr>
+    </table>
+  </section>
+</body>
+</html>

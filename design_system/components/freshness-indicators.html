@@ -1,0 +1,364 @@
+<!-- @dsCard group="Components — Tags" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freshness Indicators</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Each primitive sits in its own labelled cell with a mono spec caption. */
+    .prim-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--space-16);
+    }
+    .prim {
+      display: flex; flex-direction: column; gap: var(--space-8);
+      padding: var(--space-12) 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .prim:last-child { border-bottom: 0; padding-bottom: 0; }
+    .prim-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-16); }
+    .prim-cap { color: var(--text-tertiary); }
+
+    /* ── 1 · Left-edge freshness bar ───────────────────────────────────────
+       4px bar, radius16 top-left + bottom-left, shown as the left edge of a
+       mock tile so the rounded corner reads. unknown => --border. */
+    .mock-tile {
+      display: flex; align-items: stretch;
+      width: 168px; min-height: 56px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+    }
+    .fresh-bar {
+      width: 4px; flex: 0 0 4px;
+      background: var(--c);
+      border-top-left-radius: var(--radius-16);
+      border-bottom-left-radius: var(--radius-16);
+    }
+    .mock-body {
+      flex: 1; padding: var(--space-8) var(--space-12);
+      display: flex; flex-direction: column; justify-content: center; gap: var(--space-3);
+      min-width: 0;
+    }
+    .mock-title {
+      font-family: var(--font-body);
+      font-size: var(--title-small-size); font-weight: var(--title-small-weight);
+      color: var(--text-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .mock-sub { color: var(--text-tertiary); }
+
+    /* ── 2 · Status dot ────────────────────────────────────────────────────
+       6px circle in the freshness color. */
+    .dot {
+      width: 6px; height: 6px; flex: 0 0 6px;
+      border-radius: var(--radius-full);
+      background: var(--c);
+      display: inline-block;
+    }
+
+    /* ── 3 · Expiry badge ──────────────────────────────────────────────────
+       6px dot + label in bodySmall at color@85% (unknown => textTertiary). */
+    .expiry {
+      display: inline-flex; align-items: center; gap: var(--space-6);
+      white-space: nowrap;
+    }
+    .expiry-label {
+      font-family: var(--font-body);
+      font-size: var(--body-small-size); font-weight: 500;
+      line-height: var(--body-small-lh);
+      color: color-mix(in srgb, var(--c) 85%, transparent);
+    }
+    .expiry--unknown .expiry-label { color: var(--text-tertiary); }
+
+    /* ── 4 · Low-stock pill ────────────────────────────────────────────────
+       lowStock@12% fill, radius4, pad 6/2, "Low" in labelSmall/lowStock. */
+    .low-pill {
+      display: inline-flex; align-items: center;
+      background: color-mix(in srgb, var(--low-stock) 12%, transparent);
+      color: var(--low-stock);
+      border-radius: var(--radius-4);
+      padding: var(--space-2) var(--space-6);
+      font-family: var(--font-body);
+      font-size: var(--label-small-size); font-weight: var(--label-small-weight);
+      letter-spacing: var(--label-small-ls); line-height: 1;
+    }
+
+    /* State key — small swatch + name, one per freshness state. */
+    .state-key { display: flex; flex-wrap: wrap; gap: var(--space-8); margin-top: var(--space-4); }
+    .state-chip {
+      display: inline-flex; align-items: center; gap: var(--space-6);
+      font-size: var(--body-small-size); color: var(--text-secondary);
+    }
+
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Tags</p>
+    <h1 class="ds-title">Freshness Indicators</h1>
+    <p class="ds-sub">
+      The small primitives that signal how close an item is to its expiry: a
+      left-edge bar on every pantry tile, a status dot, an expiry badge, and a
+      low-stock pill. All four read from one semantic set —
+      <span class="mono">fresh</span>, <span class="mono">expiringSoon</span>,
+      <span class="mono">expired</span>, <span class="mono">unknown</span> —
+      derived from the item's expiry date by <span class="mono">FreshnessHelper</span>.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <!-- 1 · Freshness bar -->
+      <h3 class="block-h">1 · Left-edge freshness bar</h3>
+      <div class="prim-grid">
+        <div class="prim">
+          <div class="prim-row">
+            <div class="mock-tile">
+              <span class="fresh-bar" style="--c: var(--fresh);"></span>
+              <div class="mock-body">
+                <span class="mock-title">Baby spinach</span>
+                <span class="mock-sub mono">220 g</span>
+              </div>
+            </div>
+            <div class="mock-tile">
+              <span class="fresh-bar" style="--c: var(--expiring-soon);"></span>
+              <div class="mock-body">
+                <span class="mock-title">Greek yogurt</span>
+                <span class="mock-sub mono">500 g</span>
+              </div>
+            </div>
+            <div class="mock-tile">
+              <span class="fresh-bar" style="--c: var(--expired);"></span>
+              <div class="mock-body">
+                <span class="mock-title">Chicken thighs</span>
+                <span class="mock-sub mono">640 g</span>
+              </div>
+            </div>
+            <div class="mock-tile">
+              <span class="fresh-bar" style="--c: var(--border);"></span>
+              <div class="mock-body">
+                <span class="mock-title">Sea salt</span>
+                <span class="mock-sub mono">no expiry</span>
+              </div>
+            </div>
+          </div>
+          <span class="prim-cap mono">4px · radius16 top-left + bottom-left · unknown = border</span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- 2 · Status dot -->
+      <h3 class="block-h">2 · Status dot</h3>
+      <div class="prim-grid">
+        <div class="prim">
+          <div class="prim-row">
+            <span class="dot" style="--c: var(--fresh);"></span>
+            <span class="dot" style="--c: var(--expiring-soon);"></span>
+            <span class="dot" style="--c: var(--expired);"></span>
+            <span class="dot" style="--c: var(--text-tertiary);"></span>
+          </div>
+          <div class="state-key">
+            <span class="state-chip"><span class="dot" style="--c: var(--fresh);"></span>fresh</span>
+            <span class="state-chip"><span class="dot" style="--c: var(--expiring-soon);"></span>expiringSoon</span>
+            <span class="state-chip"><span class="dot" style="--c: var(--expired);"></span>expired</span>
+            <span class="state-chip"><span class="dot" style="--c: var(--text-tertiary);"></span>unknown</span>
+          </div>
+          <span class="prim-cap mono">6px circle · freshness color · unknown = textTertiary</span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- 3 · Expiry badge -->
+      <h3 class="block-h">3 · Expiry badge</h3>
+      <div class="prim-grid">
+        <div class="prim">
+          <div class="prim-row">
+            <span class="expiry" style="--c: var(--fresh);">
+              <span class="dot" style="--c: var(--fresh);"></span>
+              <span class="expiry-label">Fresh</span>
+            </span>
+            <span class="expiry" style="--c: var(--expiring-soon);">
+              <span class="dot" style="--c: var(--expiring-soon);"></span>
+              <span class="expiry-label">Eat in 2 days</span>
+            </span>
+            <span class="expiry" style="--c: var(--expired);">
+              <span class="dot" style="--c: var(--expired);"></span>
+              <span class="expiry-label">Expired 1 day ago</span>
+            </span>
+            <span class="expiry expiry--unknown" style="--c: var(--text-tertiary);">
+              <span class="dot" style="--c: var(--text-tertiary);"></span>
+              <span class="expiry-label">&mdash;</span>
+            </span>
+          </div>
+          <span class="prim-cap mono">6px dot + bodySmall w500 · label color@85% · unknown = textTertiary</span>
+          <p class="t-body-small subtle" style="margin: var(--space-4) 0 0;">
+            Today the badge is hidden when the label is empty, so the unknown
+            <span class="mono">&mdash;</span> state is
+            <span class="badge-proposed">proposed</span> — a visible placeholder for items with no expiry.
+          </p>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- 4 · Low-stock pill -->
+      <h3 class="block-h">4 · Low-stock pill</h3>
+      <div class="prim-grid">
+        <div class="prim">
+          <div class="prim-row">
+            <span class="mock-title" style="font-size: var(--title-large-size); font-weight: 700;">1 pc</span>
+            <span class="low-pill">Low</span>
+          </div>
+          <span class="prim-cap mono">lowStock@12% fill · radius4 · pad 6/2 · labelSmall / lowStock</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <!-- 1 · Freshness bar -->
+      <h3 class="block-h">1 · Left-edge freshness bar</h3>
+      <div class="prim-grid">
+        <div class="prim">
+          <div class="prim-row">
+            <div class="mock-tile">
+              <span class="fresh-bar" style="--c: var(--fresh);"></span>
+              <div class="mock-body">
+                <span class="mock-title">Baby spinach</span>
+                <span class="mock-sub mono">220 g</span>
+              </div>
+            </div>
+            <div class="mock-tile">
+              <span class="fresh-bar" style="--c: var(--expiring-soon);"></span>
+              <div class="mock-body">
+                <span class="mock-title">Greek yogurt</span>
+                <span class="mock-sub mono">500 g</span>
+              </div>
+            </div>
+            <div class="mock-tile">
+              <span class="fresh-bar" style="--c: var(--expired);"></span>
+              <div class="mock-body">
+                <span class="mock-title">Chicken thighs</span>
+                <span class="mock-sub mono">640 g</span>
+              </div>
+            </div>
+            <div class="mock-tile">
+              <span class="fresh-bar" style="--c: var(--border);"></span>
+              <div class="mock-body">
+                <span class="mock-title">Sea salt</span>
+                <span class="mock-sub mono">no expiry</span>
+              </div>
+            </div>
+          </div>
+          <span class="prim-cap mono">4px · radius16 top-left + bottom-left · unknown = border</span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- 2 · Status dot -->
+      <h3 class="block-h">2 · Status dot</h3>
+      <div class="prim-grid">
+        <div class="prim">
+          <div class="prim-row">
+            <span class="dot" style="--c: var(--fresh);"></span>
+            <span class="dot" style="--c: var(--expiring-soon);"></span>
+            <span class="dot" style="--c: var(--expired);"></span>
+            <span class="dot" style="--c: var(--text-tertiary);"></span>
+          </div>
+          <div class="state-key">
+            <span class="state-chip"><span class="dot" style="--c: var(--fresh);"></span>fresh</span>
+            <span class="state-chip"><span class="dot" style="--c: var(--expiring-soon);"></span>expiringSoon</span>
+            <span class="state-chip"><span class="dot" style="--c: var(--expired);"></span>expired</span>
+            <span class="state-chip"><span class="dot" style="--c: var(--text-tertiary);"></span>unknown</span>
+          </div>
+          <span class="prim-cap mono">6px circle · freshness color · unknown = textTertiary</span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- 3 · Expiry badge -->
+      <h3 class="block-h">3 · Expiry badge</h3>
+      <div class="prim-grid">
+        <div class="prim">
+          <div class="prim-row">
+            <span class="expiry" style="--c: var(--fresh);">
+              <span class="dot" style="--c: var(--fresh);"></span>
+              <span class="expiry-label">Fresh</span>
+            </span>
+            <span class="expiry" style="--c: var(--expiring-soon);">
+              <span class="dot" style="--c: var(--expiring-soon);"></span>
+              <span class="expiry-label">Eat in 2 days</span>
+            </span>
+            <span class="expiry" style="--c: var(--expired);">
+              <span class="dot" style="--c: var(--expired);"></span>
+              <span class="expiry-label">Expired 1 day ago</span>
+            </span>
+            <span class="expiry expiry--unknown" style="--c: var(--text-tertiary);">
+              <span class="dot" style="--c: var(--text-tertiary);"></span>
+              <span class="expiry-label">&mdash;</span>
+            </span>
+          </div>
+          <span class="prim-cap mono">6px dot + bodySmall w500 · label color@85% · unknown = textTertiary</span>
+          <p class="t-body-small subtle" style="margin: var(--space-4) 0 0;">
+            On dark surfaces the <span class="mono">expired</span> red and the
+            <span class="mono">&mdash;</span> placeholder are
+            <span class="badge-proposed">proposed</span> — the semantic freshness
+            hues are reused from light and may need a luminance lift.
+          </p>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- 4 · Low-stock pill -->
+      <h3 class="block-h">4 · Low-stock pill</h3>
+      <div class="prim-grid">
+        <div class="prim">
+          <div class="prim-row">
+            <span class="mock-title" style="font-size: var(--title-large-size); font-weight: 700;">1 pc</span>
+            <span class="low-pill">Low</span>
+          </div>
+          <span class="prim-cap mono">lowStock@12% fill · radius4 · pad 6/2 · labelSmall / lowStock</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Specs (for the port)</h3>
+    <table class="spec">
+      <tr><td>Freshness bar</td><td class="mono">w4 · radius16 topLeft + bottomLeft · fill = freshness color · unknown = border</td></tr>
+      <tr><td>Status dot</td><td class="mono">6&times;6 circle · fill = freshness color · unknown = textTertiary</td></tr>
+      <tr><td>Expiry badge</td><td class="mono">dot + space6 + label · bodySmall w500 · label color@85% · unknown text = textTertiary</td></tr>
+      <tr><td>Low-stock pill</td><td class="mono">radius4 · pad 6/2 · labelSmall w600 · lowStock@12% fill / lowStock text</td></tr>
+      <tr><td>States</td><td class="mono">fresh #43A047 · expiringSoon #FFB300 · expired #C62828 · unknown #8B9183</td></tr>
+      <tr><td>Threshold</td><td class="mono">expired &lt; 0d · expiringSoon &le; 3d · else fresh · null expiry = unknown</td></tr>
+    </table>
+  </section>
+</body>
+</html>

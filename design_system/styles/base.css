@@ -1,0 +1,173 @@
+/* ============================================================================
+   KitchenSync Design System — shared card chrome + foundational helpers.
+   Pairs with tokens.css. Cards link both, then add bespoke component CSS.
+   ============================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* The card page sits on a soft neutral so light + dark panels both read. */
+body.ds {
+  background: #ECEAE3;
+  padding: var(--space-32);
+}
+
+/* ── Card header ───────────────────────────────────────────────────────── */
+.ds-head { margin: 0 0 var(--space-24); max-width: 880px; }
+.ds-eyebrow {
+  font-family: var(--font-body);
+  font-size: 11px; font-weight: 600; letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--brand-primary);
+  margin: 0 0 var(--space-8);
+}
+.ds-title {
+  font-family: var(--font-display);
+  font-size: 30px; font-weight: 600; line-height: 1.1; letter-spacing: -0.4px;
+  color: var(--text-primary);
+  margin: 0;
+}
+.ds-sub {
+  font-family: var(--font-body);
+  font-size: 14px; font-weight: 400; line-height: 1.5;
+  color: var(--text-secondary);
+  margin: var(--space-8) 0 0;
+}
+
+/* ── Light / Dark panel pair ───────────────────────────────────────────── */
+.ds-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-20);
+  align-items: start;
+}
+.ds-panel {
+  background: var(--surface-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-20);
+  padding: var(--space-24);
+  box-shadow: var(--elevation-1);
+}
+.ds-panel-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin: 0 0 var(--space-16);
+  display: flex; align-items: center; gap: var(--space-8);
+}
+.ds-panel-label::before {
+  content: ""; width: 8px; height: 8px; border-radius: var(--radius-full);
+  background: var(--brand-primary);
+}
+
+/* A single demo surface (no light/dark split). */
+.ds-surface {
+  background: var(--surface-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-20);
+  padding: var(--space-24);
+}
+
+/* ── Type ramp utilities ───────────────────────────────────────────────── */
+.t-display-large  { font-family: var(--font-display); font-size: var(--display-large-size);  font-weight: var(--display-large-weight);  line-height: var(--display-large-lh);  letter-spacing: var(--display-large-ls); }
+.t-display-medium { font-family: var(--font-display); font-size: var(--display-medium-size); font-weight: var(--display-medium-weight); line-height: var(--display-medium-lh); letter-spacing: var(--display-medium-ls); }
+.t-display-small  { font-family: var(--font-display); font-size: var(--display-small-size);  font-weight: var(--display-small-weight);  line-height: var(--display-small-lh);  letter-spacing: var(--display-small-ls); }
+.t-headline-large { font-family: var(--font-display); font-size: var(--headline-large-size); font-weight: var(--headline-large-weight); line-height: var(--headline-large-lh); letter-spacing: var(--headline-large-ls); }
+.t-headline-medium{ font-family: var(--font-display); font-size: var(--headline-medium-size);font-weight: var(--headline-medium-weight);line-height: var(--headline-medium-lh);letter-spacing: var(--headline-medium-ls); }
+.t-title-large    { font-family: var(--font-body); font-size: var(--title-large-size);    font-weight: var(--title-large-weight);    line-height: var(--title-large-lh);    letter-spacing: var(--title-large-ls); }
+.t-title-medium   { font-family: var(--font-body); font-size: var(--title-medium-size);   font-weight: var(--title-medium-weight);   line-height: var(--title-medium-lh);   letter-spacing: var(--title-medium-ls); }
+.t-title-small    { font-family: var(--font-body); font-size: var(--title-small-size);    font-weight: var(--title-small-weight);    line-height: var(--title-small-lh);    letter-spacing: var(--title-small-ls); }
+.t-body-large     { font-family: var(--font-body); font-size: var(--body-large-size);     font-weight: var(--body-large-weight);     line-height: var(--body-large-lh);     letter-spacing: var(--body-large-ls); }
+.t-body-medium    { font-family: var(--font-body); font-size: var(--body-medium-size);    font-weight: var(--body-medium-weight);    line-height: var(--body-medium-lh);    letter-spacing: var(--body-medium-ls); }
+.t-body-small     { font-family: var(--font-body); font-size: var(--body-small-size);     font-weight: var(--body-small-weight);     line-height: var(--body-small-lh);     letter-spacing: var(--body-small-ls); }
+.t-label-large    { font-family: var(--font-body); font-size: var(--label-large-size);    font-weight: var(--label-large-weight);    line-height: var(--label-large-lh);    letter-spacing: var(--label-large-ls); }
+.t-label-medium   { font-family: var(--font-body); font-size: var(--label-medium-size);   font-weight: var(--label-medium-weight);   line-height: var(--label-medium-lh);   letter-spacing: var(--label-medium-ls); }
+.t-label-small    { font-family: var(--font-body); font-size: var(--label-small-size);    font-weight: var(--label-small-weight);    line-height: var(--label-small-lh);    letter-spacing: var(--label-small-ls); }
+
+.muted  { color: var(--text-secondary); }
+.subtle { color: var(--text-tertiary); }
+.mono {
+  font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+  font-size: 11px; letter-spacing: 0;
+}
+
+/* ── Swatches ──────────────────────────────────────────────────────────── */
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-12);
+}
+.swatch {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-12);
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+.swatch-chip { height: 64px; width: 100%; display: block; }
+.swatch-meta { padding: var(--space-10) var(--space-12) var(--space-12); }
+.swatch-name {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  margin: 0 0 2px; line-height: 1.3;
+}
+.swatch-token { color: var(--text-tertiary); display: block; margin-bottom: 2px; }
+.swatch-hex   { color: var(--text-secondary); text-transform: uppercase; }
+
+/* ── Proposed badge ────────────────────────────────────────────────────── */
+.badge-proposed {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(249, 168, 37, 0.16);
+  color: #8a6300;
+  border: 1px solid rgba(249, 168, 37, 0.4);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
+  vertical-align: middle;
+}
+.badge-proposed::before { content: "\26A1"; font-size: 10px; }
+[data-theme="dark"] .badge-proposed { color: #FFD27A; }
+
+/* ── Spec list (key/value reference rows) ──────────────────────────────── */
+.spec { width: 100%; border-collapse: collapse; }
+.spec td {
+  padding: var(--space-8) var(--space-12);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px; vertical-align: middle;
+}
+.spec tr:last-child td { border-bottom: none; }
+.spec td:first-child { color: var(--text-secondary); white-space: nowrap; }
+.spec td:last-child  { color: var(--text-primary); font-weight: 500; }
+
+/* ── Layout atoms ──────────────────────────────────────────────────────── */
+.row   { display: flex; align-items: center; gap: var(--space-12); flex-wrap: wrap; }
+.col   { display: flex; flex-direction: column; gap: var(--space-12); }
+.wrap  { display: flex; flex-wrap: wrap; gap: var(--space-12); }
+.between { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); }
+
+/* ── Phone frame (screen compositions) ─────────────────────────────────── */
+.phone {
+  width: 390px;
+  border-radius: var(--radius-20);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--surface-base);
+  box-shadow: var(--elevation-2);
+}
+.phone-statusbar {
+  height: 28px; background: var(--surface-base);
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 var(--space-16);
+  font-size: 11px; font-weight: 600; color: var(--text-tertiary);
+}
+.phone-appbar {
+  padding: var(--space-8) var(--space-16) var(--space-12);
+  background: var(--surface-base);
+}

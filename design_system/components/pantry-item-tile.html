@@ -1,0 +1,358 @@
+<!-- @dsCard group="Components — Lists" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pantry Item Tile</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    /* ── PantryItemTile — faithful HTML mirror ─────────────────────────────
+       Equal-height row: [4px freshness bar][56px thumb][content column].
+       Surface = surfaceRaised, radius16, 1px border. ---------------------- */
+    .tile {
+      display: flex;
+      align-items: stretch;            /* IntrinsicHeight + stretch */
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+      overflow: hidden;
+      transition: border-color var(--dur-fast) var(--curve-standard),
+                  box-shadow var(--dur-fast) var(--curve-standard);
+    }
+    /* InkWell affordance: a subtle lift on hover (CSS-only). */
+    .tile:hover {
+      border-color: var(--border-strong);
+      box-shadow: var(--elevation-1);
+    }
+
+    /* 4px freshness left-bar. radius16 on the LEFT corners only. --c set inline. */
+    .tile-bar {
+      flex: 0 0 4px;
+      width: 4px;
+      background: var(--c);
+      border-top-left-radius: var(--radius-16);
+      border-bottom-left-radius: var(--radius-16);
+    }
+
+    /* 56px thumbnail, radius12, category placeholder = color@15% + dining glyph. */
+    .tile-thumb {
+      flex: 0 0 auto;
+      width: 56px;
+      height: 56px;
+      margin: var(--space-12) 0 var(--space-12) var(--space-8);
+      border-radius: var(--radius-12);
+      background: color-mix(in srgb, var(--c) 15%, transparent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tile-thumb svg {
+      width: 24px; height: 24px;
+      color: color-mix(in srgb, var(--c) 70%, transparent);
+    }
+
+    .tile-content {
+      flex: 1 1 auto;
+      min-width: 0;                    /* lets the name ellipsize */
+      padding: var(--space-12);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header: name (titleMedium, ellipsis) + category tag pinned right. */
+    .tile-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-8);
+    }
+    .tile-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* _CategoryTag: radius4 · pad 6/2 · labelSmall w600 · color@12% / @85%. */
+    .cat-tag {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      padding: var(--space-2) var(--space-6);
+      border-radius: var(--radius-4);
+      background: color-mix(in srgb, var(--c) 12%, transparent);
+      color: color-mix(in srgb, var(--c) 85%, transparent);
+      white-space: nowrap;
+    }
+
+    /* Quantity row: stat "500 g" (DM Sans 18px / w700 / textPrimary) + low pill. */
+    .tile-qty {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-8);
+      margin-top: var(--space-6);
+    }
+    .qty-stat {
+      font-family: var(--font-body);
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--text-primary);
+    }
+    /* Low-stock pill: radius4 · pad 6/2 · lowStock@12% / lowStock. */
+    .low-pill {
+      align-self: center;
+      display: inline-flex;
+      align-items: center;
+      padding: var(--space-2) var(--space-6);
+      border-radius: var(--radius-4);
+      background: color-mix(in srgb, var(--low-stock) 12%, transparent);
+      color: var(--low-stock);
+      white-space: nowrap;
+    }
+
+    /* Expiry badge: 6px dot + bodySmall label at color@85% (textTertiary if unknown). */
+    .tile-expiry {
+      display: flex;
+      align-items: center;
+      gap: var(--space-6);
+      margin-top: var(--space-6);
+    }
+    .expiry-dot {
+      flex: 0 0 auto;
+      width: 6px; height: 6px;
+      border-radius: var(--radius-full);
+      background: var(--c);
+    }
+    .expiry-label {
+      color: color-mix(in srgb, var(--c) 85%, transparent);
+      font-weight: 500;
+    }
+
+    .tile-stack { display: flex; flex-direction: column; gap: var(--space-12); }
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: 0 0 var(--space-12);
+    }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Lists</p>
+    <h1 class="ds-title">Pantry Item Tile</h1>
+    <p class="ds-sub">
+      The workhorse row of the pantry list. A <span class="mono">4px</span> freshness bar reads at a glance,
+      a category-tinted thumbnail anchors the name, and the quantity is treated as a real stat.
+      The left bar takes <span class="mono">radius16</span> on its leading corners; the whole tile is
+      <span class="mono">surfaceRaised</span>, <span class="mono">radius16</span>, with a 1px
+      <span class="mono">border</span>.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+      <div class="tile-stack">
+
+        <!-- Expired -->
+        <div class="tile">
+          <span class="tile-bar" style="--c: var(--expired);"></span>
+          <span class="tile-thumb" style="--c: var(--cat-meat);">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.1 13.34l2.83-2.83L3.91 3.5a4 4 0 0 0 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+          </span>
+          <div class="tile-content">
+            <div class="tile-header">
+              <span class="tile-name t-title-medium">Chicken breast</span>
+              <span class="cat-tag t-label-small" style="--c: var(--cat-meat);">meat</span>
+            </div>
+            <div class="tile-qty">
+              <span class="qty-stat">500 g</span>
+            </div>
+            <div class="tile-expiry" style="--c: var(--expired);">
+              <span class="expiry-dot"></span>
+              <span class="expiry-label t-body-small">Expired 1 day ago</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expiring soon -->
+        <div class="tile">
+          <span class="tile-bar" style="--c: var(--expiring-soon);"></span>
+          <span class="tile-thumb" style="--c: var(--cat-produce);">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.1 13.34l2.83-2.83L3.91 3.5a4 4 0 0 0 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+          </span>
+          <div class="tile-content">
+            <div class="tile-header">
+              <span class="tile-name t-title-medium">Spinach</span>
+              <span class="cat-tag t-label-small" style="--c: var(--cat-produce);">produce</span>
+            </div>
+            <div class="tile-qty">
+              <span class="qty-stat">1 bunch</span>
+            </div>
+            <div class="tile-expiry" style="--c: var(--expiring-soon);">
+              <span class="expiry-dot"></span>
+              <span class="expiry-label t-body-small">Eat in 2 days</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fresh -->
+        <div class="tile">
+          <span class="tile-bar" style="--c: var(--fresh);"></span>
+          <span class="tile-thumb" style="--c: var(--cat-condiment);">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.1 13.34l2.83-2.83L3.91 3.5a4 4 0 0 0 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+          </span>
+          <div class="tile-content">
+            <div class="tile-header">
+              <span class="tile-name t-title-medium">Olive oil</span>
+              <span class="cat-tag t-label-small" style="--c: var(--cat-condiment);">condiment</span>
+            </div>
+            <div class="tile-qty">
+              <span class="qty-stat">750 ml</span>
+            </div>
+            <div class="tile-expiry" style="--c: var(--fresh);">
+              <span class="expiry-dot"></span>
+              <span class="expiry-label t-body-small">Fresh</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Unknown + low-stock pill (no expiry row) -->
+        <div class="tile">
+          <span class="tile-bar" style="--c: var(--border);"></span>
+          <span class="tile-thumb" style="--c: var(--cat-grain);">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.1 13.34l2.83-2.83L3.91 3.5a4 4 0 0 0 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+          </span>
+          <div class="tile-content">
+            <div class="tile-header">
+              <span class="tile-name t-title-medium">Jasmine rice</span>
+              <span class="cat-tag t-label-small" style="--c: var(--cat-grain);">grain</span>
+            </div>
+            <div class="tile-qty">
+              <span class="qty-stat">2 kg</span>
+              <span class="low-pill t-label-small">Low</span>
+            </div>
+            <!-- unknown freshness → relativeLabel is empty → no expiry badge -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+      <div class="tile-stack">
+
+        <!-- Expired -->
+        <div class="tile">
+          <span class="tile-bar" style="--c: var(--expired);"></span>
+          <span class="tile-thumb" style="--c: var(--cat-meat);">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.1 13.34l2.83-2.83L3.91 3.5a4 4 0 0 0 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+          </span>
+          <div class="tile-content">
+            <div class="tile-header">
+              <span class="tile-name t-title-medium">Chicken breast</span>
+              <span class="cat-tag t-label-small" style="--c: var(--cat-meat);">meat</span>
+            </div>
+            <div class="tile-qty">
+              <span class="qty-stat">500 g</span>
+            </div>
+            <div class="tile-expiry" style="--c: var(--expired);">
+              <span class="expiry-dot"></span>
+              <span class="expiry-label t-body-small">Expired 1 day ago</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expiring soon -->
+        <div class="tile">
+          <span class="tile-bar" style="--c: var(--expiring-soon);"></span>
+          <span class="tile-thumb" style="--c: var(--cat-produce);">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.1 13.34l2.83-2.83L3.91 3.5a4 4 0 0 0 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+          </span>
+          <div class="tile-content">
+            <div class="tile-header">
+              <span class="tile-name t-title-medium">Spinach</span>
+              <span class="cat-tag t-label-small" style="--c: var(--cat-produce);">produce</span>
+            </div>
+            <div class="tile-qty">
+              <span class="qty-stat">1 bunch</span>
+            </div>
+            <div class="tile-expiry" style="--c: var(--expiring-soon);">
+              <span class="expiry-dot"></span>
+              <span class="expiry-label t-body-small">Eat in 2 days</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fresh -->
+        <div class="tile">
+          <span class="tile-bar" style="--c: var(--fresh);"></span>
+          <span class="tile-thumb" style="--c: var(--cat-condiment);">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.1 13.34l2.83-2.83L3.91 3.5a4 4 0 0 0 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+          </span>
+          <div class="tile-content">
+            <div class="tile-header">
+              <span class="tile-name t-title-medium">Olive oil</span>
+              <span class="cat-tag t-label-small" style="--c: var(--cat-condiment);">condiment</span>
+            </div>
+            <div class="tile-qty">
+              <span class="qty-stat">750 ml</span>
+            </div>
+            <div class="tile-expiry" style="--c: var(--fresh);">
+              <span class="expiry-dot"></span>
+              <span class="expiry-label t-body-small">Fresh</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Unknown + low-stock pill (no expiry row) -->
+        <div class="tile">
+          <span class="tile-bar" style="--c: var(--border);"></span>
+          <span class="tile-thumb" style="--c: var(--cat-grain);">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.1 13.34l2.83-2.83L3.91 3.5a4 4 0 0 0 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+          </span>
+          <div class="tile-content">
+            <div class="tile-header">
+              <span class="tile-name t-title-medium">Jasmine rice</span>
+              <span class="cat-tag t-label-small" style="--c: var(--cat-grain);">grain</span>
+            </div>
+            <div class="tile-qty">
+              <span class="qty-stat">2 kg</span>
+              <span class="low-pill t-label-small">Low</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-12) 0 0;">
+        Categories and freshness reuse the light hues in dark mode — mirroring current code.
+        The tuned <span class="mono">--cat-*-dark</span> set is proposed elsewhere.
+      </p>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h">Anatomy (for the port)</h3>
+    <table class="spec">
+      <tr><td>Tile surface</td><td class="mono">surfaceRaised · radius16 · 1px border · IntrinsicHeight row</td></tr>
+      <tr><td>Freshness bar</td><td class="mono">4px wide · freshness.color · radius16 top/bottom-left · unknown&rarr;border</td></tr>
+      <tr><td>Thumbnail</td><td class="mono">56&times;56 · radius12 · pad left8/top12/bottom12 · placeholder = category@15% + local_dining @70%</td></tr>
+      <tr><td>Name</td><td class="mono">titleMedium · maxLines 1 · ellipsis · Expanded</td></tr>
+      <tr><td>Category tag</td><td class="mono">_CategoryTag · radius4 · pad 6/2 · labelSmall w600 · color@12% / @85%</td></tr>
+      <tr><td>Quantity stat</td><td class="mono">"{qty} {unit}" · DM Sans 18px / w700 · textPrimary · baseline-aligned</td></tr>
+      <tr><td>Low-stock pill</td><td class="mono">shown when quantity &le; 1 · radius4 · pad 6/2 · lowStock@12% / lowStock</td></tr>
+      <tr><td>Expiry badge</td><td class="mono">6px dot + bodySmall w500 · color@85% (textTertiary if unknown) · hidden when label empty</td></tr>
+      <tr><td>Content padding</td><td class="mono">horizontal 12 · vertical 12 · gaps space6 between rows</td></tr>
+    </table>
+  </section>
+</body>
+</html>

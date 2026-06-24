@@ -1,0 +1,261 @@
+<!-- @dsCard group="Components — Actions" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buttons &amp; Actions</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Every control resets the UA button chrome and inherits app type. */
+    .btn {
+      font-family: var(--font-body);
+      font-size: var(--label-large-size);
+      font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls);
+      line-height: 1;
+      border: 0; margin: 0; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: var(--space-8);
+      transition: background var(--dur-fast) var(--curve-standard),
+                  border-color var(--dur-fast) var(--curve-standard),
+                  box-shadow var(--dur-fast) var(--curve-standard),
+                  transform var(--dur-fast) var(--curve-standard);
+    }
+    .btn:focus-visible {
+      outline: 2px solid var(--proposed-focus-ring);
+      outline-offset: 2px;
+    }
+
+    /* FilledButton — brandPrimary fill, radius12, pad 24/12, labelLarge */
+    .btn-filled {
+      background: var(--brand-primary);
+      color: var(--text-on-brand);
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-24);
+    }
+    .btn-filled:hover  { background: color-mix(in srgb, var(--brand-primary) 88%, black); }
+    .btn-filled:active { background: color-mix(in srgb, var(--brand-primary) 80%, black); transform: translateY(1px); }
+
+    /* FilledButton — disabled (PROPOSED tokens) */
+    .btn-filled.is-disabled,
+    .btn-filled:disabled {
+      background: var(--proposed-disabled-fill);
+      color: var(--proposed-disabled-text);
+      cursor: not-allowed; transform: none;
+    }
+
+    /* OutlinedButton — transparent, 1px borderStrong, brandPrimary text */
+    .btn-outlined {
+      background: transparent;
+      color: var(--brand-primary);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-24);
+    }
+    .btn-outlined:hover  { background: color-mix(in srgb, var(--brand-primary) 8%, transparent); }
+    .btn-outlined:active { background: color-mix(in srgb, var(--brand-primary) 12%, transparent); border-color: var(--brand-primary); }
+
+    /* TextButton — brandPrimary text only */
+    .btn-text {
+      background: transparent;
+      color: var(--brand-primary);
+      border-radius: var(--radius-8);
+      padding: var(--space-8) var(--space-12);
+    }
+    .btn-text:hover  { background: color-mix(in srgb, var(--brand-primary) 8%, transparent); }
+    .btn-text:active { background: color-mix(in srgb, var(--brand-primary) 12%, transparent); }
+
+    /* Destructive FilledButton — expired fill (PROPOSED: not yet themed) */
+    .btn-destructive {
+      background: var(--expired);
+      color: var(--text-on-brand);
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-24);
+    }
+    .btn-destructive:hover  { background: color-mix(in srgb, var(--expired) 88%, black); }
+    .btn-destructive:active { background: color-mix(in srgb, var(--expired) 80%, black); transform: translateY(1px); }
+
+    /* FAB extended — brandPrimary, radius16, elevation-2, leading glyph */
+    .fab {
+      background: var(--brand-primary);
+      color: var(--text-on-brand);
+      border-radius: var(--radius-16);
+      box-shadow: var(--elevation-2);
+      padding: var(--space-16) var(--space-20);
+      gap: var(--space-12);
+    }
+    .fab:hover  { box-shadow: 0 6px 20px rgba(0,0,0,0.16); transform: translateY(-1px); }
+    .fab:active { box-shadow: var(--elevation-1); transform: translateY(0); }
+    .fab .glyph {
+      font-size: 20px; line-height: 1; font-weight: 400;
+      width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+    }
+
+    /* _StepButton — 44px circle, color@10% fill, 22px glyph */
+    .step {
+      width: 44px; height: 44px;
+      border-radius: var(--radius-full);
+      background: color-mix(in srgb, var(--c) 10%, transparent);
+      color: var(--c);
+      font-size: 22px; line-height: 1; font-weight: 500;
+      padding: 0; gap: 0;
+    }
+    .step:hover  { background: color-mix(in srgb, var(--c) 16%, transparent); }
+    .step:active { background: color-mix(in srgb, var(--c) 22%, transparent); transform: scale(0.94); }
+
+    /* The live stepper this _StepButton lives inside */
+    .stepper {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+      padding: var(--space-12) var(--space-16);
+    }
+    .stepper .readout { text-align: center; }
+    .stepper .readout .qty {
+      font-family: var(--font-display);
+      font-size: var(--display-medium-size); font-weight: var(--display-medium-weight);
+      line-height: var(--display-medium-lh); letter-spacing: var(--display-medium-ls);
+      color: var(--text-primary);
+    }
+    .stepper .readout .unit {
+      font-size: var(--label-medium-size); font-weight: var(--label-medium-weight);
+      letter-spacing: var(--label-medium-ls);
+      color: var(--text-tertiary);
+      margin-top: var(--space-2);
+    }
+
+    .stack { display: flex; flex-direction: column; gap: var(--space-12); align-items: flex-start; }
+    .caption { color: var(--text-tertiary); }
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Actions</p>
+    <h1 class="ds-title">Buttons &amp; Actions</h1>
+    <p class="ds-sub">
+      The full action vocabulary, driven entirely by <span class="mono">theme.dart</span> button themes —
+      filled, outlined, and text share <span class="mono">radius12 · pad 24/12 · labelLarge</span>.
+      Hover and active states use <span class="mono">--dur-fast</span> easing. Disabled fills and the
+      destructive variant are not in the theme yet and are marked proposed.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Filled · Outlined · Text</h3>
+      <div class="wrap">
+        <button class="btn btn-filled">Save changes</button>
+        <button class="btn btn-outlined">Scan barcode</button>
+        <button class="btn btn-text">Skip for now</button>
+      </div>
+
+      <h3 class="block-h">Filled — disabled &nbsp;<span class="badge-proposed">proposed</span></h3>
+      <div class="stack">
+        <button class="btn btn-filled is-disabled" disabled>Save changes</button>
+        <span class="caption mono">--proposed-disabled-fill / --proposed-disabled-text</span>
+      </div>
+
+      <h3 class="block-h">FAB — extended</h3>
+      <div class="stack">
+        <button class="btn fab"><span class="glyph">+</span>Add item</button>
+        <span class="caption mono">brandPrimary · radius16 · elevation-2</span>
+      </div>
+
+      <h3 class="block-h">Step button — quantity</h3>
+      <div class="stepper" style="max-width: 280px;">
+        <button class="btn step" style="--c: var(--low-stock);" aria-label="Decrease">&minus;</button>
+        <div class="readout">
+          <div class="qty">2.5</div>
+          <div class="unit">kg</div>
+        </div>
+        <button class="btn step" style="--c: var(--brand-primary);" aria-label="Increase">+</button>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-8) 0 0;">
+        44&times;44 circle · fill <span class="mono">color&#64;10%</span> · decrement <span class="mono">lowStock</span> · increment <span class="mono">brandPrimary</span>
+      </p>
+
+      <h3 class="block-h">Destructive — filled &nbsp;<span class="badge-proposed">proposed</span></h3>
+      <div class="stack">
+        <button class="btn btn-destructive">Mark as waste</button>
+        <span class="caption mono">expired fill · textOnBrand · not yet themed</span>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Filled · Outlined · Text</h3>
+      <div class="wrap">
+        <button class="btn btn-filled">Save changes</button>
+        <button class="btn btn-outlined">Scan barcode</button>
+        <button class="btn btn-text">Skip for now</button>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-8) 0 0;">
+        In dark, <span class="mono">brandPrimary</span> resolves to <span class="mono">#4CAF50</span> and onPrimary flips to <span class="mono">textPrimary</span>.
+      </p>
+
+      <h3 class="block-h">Filled — disabled &nbsp;<span class="badge-proposed">proposed</span></h3>
+      <div class="stack">
+        <button class="btn btn-filled is-disabled" disabled>Save changes</button>
+        <span class="caption mono">disabled tokens are light-only today</span>
+      </div>
+
+      <h3 class="block-h">FAB — extended</h3>
+      <div class="stack">
+        <button class="btn fab"><span class="glyph">+</span>Add item</button>
+        <span class="caption mono">brandPrimary · radius16 · elevation-2</span>
+      </div>
+
+      <h3 class="block-h">Step button — quantity</h3>
+      <div class="stepper" style="max-width: 280px;">
+        <button class="btn step" style="--c: var(--low-stock);" aria-label="Decrease">&minus;</button>
+        <div class="readout">
+          <div class="qty">2.5</div>
+          <div class="unit">kg</div>
+        </div>
+        <button class="btn step" style="--c: var(--brand-primary);" aria-label="Increase">+</button>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-8) 0 0;">
+        Fills reuse the light category hues at <span class="mono">10%</span> — legible on raised dark surfaces.
+      </p>
+
+      <h3 class="block-h">Destructive — filled &nbsp;<span class="badge-proposed">proposed</span></h3>
+      <div class="stack">
+        <button class="btn btn-destructive">Mark as waste</button>
+        <span class="caption mono">expired fill · textOnBrand · not yet themed</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Theme specs (from <span class="mono">theme.dart</span>)</h3>
+    <table class="spec">
+      <tr><td>FilledButton</td><td class="mono">brandPrimary fill · textOnBrand · radius12 · pad 24/12 · labelLarge</td></tr>
+      <tr><td>OutlinedButton</td><td class="mono">transparent · 1px borderStrong · brandPrimary · radius12 · pad 24/12</td></tr>
+      <tr><td>TextButton</td><td class="mono">brandPrimary · labelLarge · no padding override</td></tr>
+      <tr><td>FAB (extended)</td><td class="mono">brandPrimary · textOnBrand · radius16 · elevation 2</td></tr>
+      <tr><td>_StepButton</td><td class="mono">44px circle · color&#64;10% fill · icon 22 · lowStock / brandPrimary</td></tr>
+      <tr><td>Filled — disabled</td><td class="mono">proposedDisabledFill / proposedDisabledText &nbsp;<span class="badge-proposed">proposed</span></td></tr>
+      <tr><td>Destructive Filled</td><td class="mono">expired fill · textOnBrand · radius12 &nbsp;<span class="badge-proposed">proposed</span></td></tr>
+    </table>
+  </section>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!-- @dsCard group="Components — Tags" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tags &amp; Badges</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Tonal tag: color@12% fill + color@85% text — mirrors withValues(alpha:) */
+    .tag {
+      display: inline-flex; align-items: center;
+      font-family: var(--font-body);
+      font-size: var(--label-small-size); font-weight: 600;
+      letter-spacing: var(--label-small-ls); line-height: 1;
+      background: color-mix(in srgb, var(--c) 12%, transparent);
+      color: color-mix(in srgb, var(--c) 85%, transparent);
+      white-space: nowrap;
+    }
+    .tag--r4 { border-radius: var(--radius-4); padding: var(--space-2) var(--space-6); }
+    .tag--r6 { border-radius: var(--radius-6); padding: var(--space-3) var(--space-8); }
+    .tag--alias {
+      background: var(--neutral-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: var(--radius-6);
+      padding: var(--space-3) var(--space-8);
+      font-weight: 600;
+    }
+    .tag--solid {
+      background: var(--c);
+      color: var(--text-on-brand);
+      border-radius: var(--radius-6);
+      padding: var(--space-3) var(--space-8);
+    }
+    .tag--outline {
+      background: transparent;
+      border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+      color: color-mix(in srgb, var(--c) 90%, transparent);
+      border-radius: var(--radius-6);
+      padding: var(--space-3) var(--space-8);
+    }
+    .variant { display: flex; flex-direction: column; gap: var(--space-6); align-items: flex-start; }
+    .variant .caption { color: var(--text-tertiary); }
+    .tag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-16); }
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Tags &amp; Badges</p>
+    <h1 class="ds-title">Tags &amp; Badges</h1>
+    <p class="ds-sub">
+      One idea — a small tonal label — is currently reimplemented four ways with four
+      different paddings and radii. Below: the variants in use today, then a single
+      proposed <span class="mono">KsTag</span> that unifies them. Tonal tags use a
+      <span class="mono">color&#64;12%</span> fill with <span class="mono">color&#64;85%</span> text,
+      typeset in <span class="mono">labelSmall / w600</span>.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Today — 4 variants, 4 specs</h3>
+      <div class="tag-grid">
+        <div class="variant">
+          <span class="tag tag--r4" style="--c: var(--cat-produce);">produce</span>
+          <span class="caption mono">_CategoryTag (tile) · r4 · 6/2</span>
+        </div>
+        <div class="variant">
+          <span class="tag tag--r6" style="--c: var(--cat-produce);">produce</span>
+          <span class="caption mono">_CategoryTag (detail) · r6 · 8/3</span>
+        </div>
+        <div class="variant">
+          <span class="tag tag--r6" style="--c: var(--expired);">contains nuts</span>
+          <span class="caption mono">_InfoTag · r6 · 8/3</span>
+        </div>
+        <div class="variant">
+          <span class="tag tag--r4" style="--c: var(--cat-grain);">grain</span>
+          <span class="caption mono">_MiniTag · r4 · 6/2</span>
+        </div>
+        <div class="variant">
+          <span class="tag tag--alias">also: scallion</span>
+          <span class="caption mono">_AliasTag · solid · r6 · 8/3</span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Proposed — one <span class="mono">KsTag</span> &nbsp;<span class="badge-proposed">proposed</span></h3>
+      <p class="t-body-small muted" style="margin: 0 0 var(--space-12);">Default size <span class="mono">md</span> · r6 · 8/3 · tonal</p>
+      <div class="wrap">
+        <span class="tag tag--r6" style="--c: var(--cat-produce);">produce</span>
+        <span class="tag tag--r6" style="--c: var(--cat-meat);">meat</span>
+        <span class="tag tag--r6" style="--c: var(--cat-seafood);">seafood</span>
+        <span class="tag tag--r6" style="--c: var(--cat-condiment);">condiment</span>
+        <span class="tag tag--r6" style="--c: var(--cat-beverage);">beverage</span>
+      </div>
+
+      <p class="t-body-small muted" style="margin: var(--space-16) 0 var(--space-8);">Sizes</p>
+      <div class="wrap">
+        <span class="tag tag--r4" style="--c: var(--cat-spice);">sm · r4 · 6/2</span>
+        <span class="tag tag--r6" style="--c: var(--cat-spice);">md · r6 · 8/3</span>
+      </div>
+
+      <p class="t-body-small muted" style="margin: var(--space-16) 0 var(--space-8);">Tones</p>
+      <div class="wrap">
+        <span class="tag tag--r6" style="--c: var(--cat-frozen);">tonal</span>
+        <span class="tag tag--outline" style="--c: var(--brand-primary);">outline</span>
+        <span class="tag tag--solid" style="--c: var(--section-leftover);">solid</span>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Today — 4 variants, 4 specs</h3>
+      <div class="tag-grid">
+        <div class="variant">
+          <span class="tag tag--r4" style="--c: var(--cat-produce);">produce</span>
+          <span class="caption mono">_CategoryTag (tile) · r4 · 6/2</span>
+        </div>
+        <div class="variant">
+          <span class="tag tag--r6" style="--c: var(--cat-produce);">produce</span>
+          <span class="caption mono">_CategoryTag (detail) · r6 · 8/3</span>
+        </div>
+        <div class="variant">
+          <span class="tag tag--r6" style="--c: var(--expired);">contains nuts</span>
+          <span class="caption mono">_InfoTag · r6 · 8/3</span>
+        </div>
+        <div class="variant">
+          <span class="tag tag--r4" style="--c: var(--cat-grain);">grain</span>
+          <span class="caption mono">_MiniTag · r4 · 6/2</span>
+        </div>
+        <div class="variant">
+          <span class="tag tag--alias">also: scallion</span>
+          <span class="caption mono">_AliasTag · solid · r6 · 8/3</span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Proposed — one <span class="mono">KsTag</span> &nbsp;<span class="badge-proposed">proposed</span></h3>
+      <p class="t-body-small muted" style="margin: 0 0 var(--space-12);">Default size <span class="mono">md</span> · r6 · 8/3 · tonal</p>
+      <div class="wrap">
+        <span class="tag tag--r6" style="--c: var(--cat-produce-dark);">produce</span>
+        <span class="tag tag--r6" style="--c: var(--cat-meat-dark);">meat</span>
+        <span class="tag tag--r6" style="--c: var(--cat-seafood-dark);">seafood</span>
+        <span class="tag tag--r6" style="--c: var(--cat-condiment-dark);">condiment</span>
+        <span class="tag tag--r6" style="--c: var(--cat-beverage-dark);">beverage</span>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-8) 0 0;">Uses the proposed dark category set for legible fills on dark surfaces.</p>
+
+      <p class="t-body-small muted" style="margin: var(--space-16) 0 var(--space-8);">Tones</p>
+      <div class="wrap">
+        <span class="tag tag--r6" style="--c: var(--cat-frozen-dark);">tonal</span>
+        <span class="tag tag--outline" style="--c: var(--brand-primary);">outline</span>
+        <span class="tag tag--solid" style="--c: var(--section-leftover);">solid</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Current specs (for the port)</h3>
+    <table class="spec">
+      <tr><td>_CategoryTag — tile</td><td class="mono">radius4 · pad 6/2 · labelSmall w600 · color@12% / @85%</td></tr>
+      <tr><td>_CategoryTag — detail</td><td class="mono">radius6 · pad 8/3 · labelSmall w600 · color@12% / @85%</td></tr>
+      <tr><td>_InfoTag</td><td class="mono">radius6 · pad 8/3 · labelSmall w600 · color@12% / @85%</td></tr>
+      <tr><td>_MiniTag</td><td class="mono">radius4 · pad 6/2 · labelSmall w600 · color@10% / @85%</td></tr>
+      <tr><td>_AliasTag</td><td class="mono">radius6 · pad 8/3 · labelSmall · neutralSubtle fill · border · textSecondary</td></tr>
+      <tr><td>Low-stock pill</td><td class="mono">radius4 · pad 6/2 · lowStock@12% / lowStock</td></tr>
+    </table>
+  </section>
+</body>
+</html>

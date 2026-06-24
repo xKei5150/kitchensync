@@ -1,0 +1,216 @@
+<!-- @dsCard group="Typography" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Typography</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    /* Pairing strip — two families side by side at a glance. */
+    .pairing {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: var(--space-16);
+      margin-bottom: var(--space-20);
+    }
+    .family-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+      padding: var(--space-16) var(--space-20);
+    }
+    .family-card .glyphs {
+      font-size: 40px; line-height: 1; margin: 0 0 var(--space-10);
+      color: var(--text-primary);
+    }
+    .family-card .role {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.4px;
+      color: var(--text-secondary); margin: 0;
+    }
+    .family-card .role .mono { color: var(--text-tertiary); }
+
+    /* Block label between type groups. */
+    .group-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .group-h::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+    .group-h:first-of-type { margin-top: 0; }
+
+    /* One ramp row: rendered specimen above a single mono spec line. */
+    .ramp-row {
+      padding: var(--space-12) 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .ramp-row:last-child { border-bottom: none; }
+    .ramp-row .specimen { color: var(--text-primary); margin: 0; }
+    .ramp-row .spec-line {
+      margin: var(--space-6) 0 0;
+      color: var(--text-tertiary);
+    }
+    .ramp-row .spec-line .tok { color: var(--text-secondary); font-weight: 600; }
+
+    /* Compact dark specimen strip — proves the ramp re-resolves on dark. */
+    .dark-strip {
+      margin-top: var(--space-20);
+      padding: var(--space-20) var(--space-24);
+      border-radius: var(--radius-16);
+      background: var(--surface-base);
+      border: 1px solid var(--border);
+    }
+    .dark-strip .stack { display: flex; flex-direction: column; gap: var(--space-8); }
+    .dark-strip .specimen { color: var(--text-primary); margin: 0; }
+    .dark-strip .specimen .accent { color: var(--brand-accent); }
+    .dark-strip .meta { color: var(--text-tertiary); }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Typography · Foundations</p>
+    <h1 class="ds-title">Typography</h1>
+    <p class="ds-sub">
+      <span class="mono">Fraunces</span> — a warm, characterful serif — carries display and
+      headline; <span class="mono">DM Sans</span> — a clean humanist sans — carries titles,
+      body, and labels. Thirteen styles, one scale, every value drawn from the type tokens.
+    </p>
+  </header>
+
+  <!-- Pairing at a glance -->
+  <div class="pairing">
+    <div class="family-card">
+      <p class="glyphs" style="font-family: var(--font-display);">Aa &middot; 36</p>
+      <p class="role">Fraunces <span class="mono">--font-display</span> &middot; display + headline</p>
+    </div>
+    <div class="family-card">
+      <p class="glyphs" style="font-family: var(--font-body);">Aa &middot; 36</p>
+      <p class="role">DM Sans <span class="mono">--font-body</span> &middot; title + body + label</p>
+    </div>
+  </div>
+
+  <div class="ds-themes">
+    <!-- LIGHT — the full 13-style ramp -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light · Full ramp</p>
+
+      <!-- DISPLAY — Fraunces -->
+      <h3 class="group-h">Display · Fraunces</h3>
+
+      <div class="ramp-row">
+        <p class="specimen t-display-large">What's in your kitchen</p>
+        <p class="spec-line mono"><span class="tok">displayLarge</span> · Fraunces · 36/600 · lh 1.1 · ls -0.5</p>
+      </div>
+      <div class="ramp-row">
+        <p class="specimen t-display-medium">Tonight's pantry</p>
+        <p class="spec-line mono"><span class="tok">displayMedium</span> · Fraunces · 28/600 · lh 1.15 · ls -0.25</p>
+      </div>
+      <div class="ramp-row">
+        <p class="specimen t-display-small">Expiring this week</p>
+        <p class="spec-line mono"><span class="tok">displaySmall</span> · Fraunces · 22/500 · lh 1.2 · ls 0</p>
+      </div>
+
+      <!-- HEADLINE — Fraunces -->
+      <h3 class="group-h">Headline · Fraunces</h3>
+
+      <div class="ramp-row">
+        <p class="specimen t-headline-large">Fresh Produce</p>
+        <p class="spec-line mono"><span class="tok">headlineLarge</span> · Fraunces · 20/500 · lh 1.25 · ls 0</p>
+      </div>
+      <div class="ramp-row">
+        <p class="specimen t-headline-medium">Dairy &amp; Eggs</p>
+        <p class="spec-line mono"><span class="tok">headlineMedium</span> · Fraunces · 18/500 · lh 1.3 · ls 0</p>
+      </div>
+
+      <!-- TITLE — DM Sans -->
+      <h3 class="group-h">Title · DM Sans</h3>
+
+      <div class="ramp-row">
+        <p class="specimen t-title-large">Organic baby spinach</p>
+        <p class="spec-line mono"><span class="tok">titleLarge</span> · DM Sans · 18/600 · lh 1.3 · ls 0</p>
+      </div>
+      <div class="ramp-row">
+        <p class="specimen t-title-medium">Whole milk · 1 gallon</p>
+        <p class="spec-line mono"><span class="tok">titleMedium</span> · DM Sans · 16/600 · lh 1.35 · ls 0</p>
+      </div>
+      <div class="ramp-row">
+        <p class="specimen t-title-small">Add to pantry</p>
+        <p class="spec-line mono"><span class="tok">titleSmall</span> · DM Sans · 14/600 · lh 1.35 · ls 0</p>
+      </div>
+
+      <!-- BODY — DM Sans -->
+      <h3 class="group-h">Body · DM Sans</h3>
+
+      <div class="ramp-row">
+        <p class="specimen t-body-large">Stored in the crisper drawer. Best used within four days for peak freshness.</p>
+        <p class="spec-line mono"><span class="tok">bodyLarge</span> · DM Sans · 16/400 · lh 1.45 · ls 0</p>
+      </div>
+      <div class="ramp-row">
+        <p class="specimen t-body-medium">Opened on Jun 21. Refrigerate after opening and consume within seven days.</p>
+        <p class="spec-line mono"><span class="tok">bodyMedium</span> · DM Sans · 14/400 · lh 1.45 · ls 0</p>
+      </div>
+      <div class="ramp-row">
+        <p class="specimen t-body-small">Logged from the weekly grocery run. Quantity reflects what's left on hand.</p>
+        <p class="spec-line mono"><span class="tok">bodySmall</span> · DM Sans · 12/400 · lh 1.4 · ls 0</p>
+      </div>
+
+      <!-- LABEL — DM Sans -->
+      <h3 class="group-h">Label · DM Sans</h3>
+
+      <div class="ramp-row">
+        <p class="specimen t-label-large">MARK AS USED</p>
+        <p class="spec-line mono"><span class="tok">labelLarge</span> · DM Sans · 14/600 · lh 1.35 · ls 0.1</p>
+      </div>
+      <div class="ramp-row">
+        <p class="specimen t-label-medium">EXPIRES IN 2 DAYS</p>
+        <p class="spec-line mono"><span class="tok">labelMedium</span> · DM Sans · 12/600 · lh 1.35 · ls 0.5</p>
+      </div>
+      <div class="ramp-row">
+        <p class="specimen t-label-small">LOW STOCK</p>
+        <p class="spec-line mono"><span class="tok">labelSmall</span> · DM Sans · 11/600 · lh 1.35 · ls 0.5</p>
+      </div>
+    </section>
+
+    <!-- DARK — compact specimen strip + spec reference -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark · Specimen</p>
+
+      <div class="dark-strip">
+        <div class="stack">
+          <p class="specimen t-display-small">Expiring this week</p>
+          <p class="specimen t-headline-medium">Fresh Produce</p>
+          <p class="specimen t-title-medium">Organic baby spinach · 5 oz</p>
+          <p class="specimen t-body-medium">Crisper drawer. Best within <span class="accent">4 days</span>.</p>
+          <p class="specimen t-label-small">EXPIRES IN 2 DAYS</p>
+        </div>
+        <p class="t-body-small meta" style="margin: var(--space-12) 0 0;">
+          Same ramp, re-resolved on <span class="mono">surface-base</span>. Text colors swap
+          to <span class="mono">text-primary</span> / <span class="mono">text-tertiary</span>;
+          the type scale is unchanged across themes.
+        </p>
+      </div>
+
+      <h3 class="group-h" style="margin-top: var(--space-24);">Ramp reference</h3>
+      <table class="spec">
+        <tr><td>displayLarge</td><td class="mono">36 / 600 · -0.5</td></tr>
+        <tr><td>displayMedium</td><td class="mono">28 / 600 · -0.25</td></tr>
+        <tr><td>displaySmall</td><td class="mono">22 / 500 · 0</td></tr>
+        <tr><td>headlineLarge</td><td class="mono">20 / 500 · 0</td></tr>
+        <tr><td>headlineMedium</td><td class="mono">18 / 500 · 0</td></tr>
+        <tr><td>titleLarge</td><td class="mono">18 / 600 · 0</td></tr>
+        <tr><td>titleMedium</td><td class="mono">16 / 600 · 0</td></tr>
+        <tr><td>titleSmall</td><td class="mono">14 / 600 · 0</td></tr>
+        <tr><td>bodyLarge</td><td class="mono">16 / 400 · 0</td></tr>
+        <tr><td>bodyMedium</td><td class="mono">14 / 400 · 0</td></tr>
+        <tr><td>bodySmall</td><td class="mono">12 / 400 · 0</td></tr>
+        <tr><td>labelLarge</td><td class="mono">14 / 600 · 0.1</td></tr>
+        <tr><td>labelMedium</td><td class="mono">12 / 600 · 0.5</td></tr>
+        <tr><td>labelSmall</td><td class="mono">11 / 600 · 0.5</td></tr>
+      </table>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,267 @@
+<!-- @dsCard group="Foundations" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radius</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    /* Each step renders a square sample at the literal corner radius, plus a
+       label. radiusFull renders as a pill rather than a rounded square. */
+    .radii {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: var(--space-20) var(--space-16);
+    }
+    .radius-item {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-8);
+    }
+    .radius-sample {
+      width: 76px;
+      height: 76px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      box-shadow: var(--elevation-1);
+      transition: border-color var(--dur-fast) var(--curve-standard);
+    }
+    .radius-item:hover .radius-sample { border-color: var(--brand-primary); }
+
+    .radius-sample--r4   { border-radius: var(--radius-4); }
+    .radius-sample--r6   { border-radius: var(--radius-6); }
+    .radius-sample--r8   { border-radius: var(--radius-8); }
+    .radius-sample--r10  { border-radius: var(--radius-10); }
+    .radius-sample--r12  { border-radius: var(--radius-12); }
+    .radius-sample--r16  { border-radius: var(--radius-16); }
+    .radius-sample--r20  { border-radius: var(--radius-20); }
+
+    /* radiusFull → pill. Width > height so the full rounding reads as a stadium. */
+    .radius-sample--full {
+      width: 120px;
+      border-radius: var(--radius-full);
+    }
+
+    .radius-label {
+      font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.35;
+    }
+    .radius-label b { color: var(--text-primary); font-weight: 600; }
+
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Usage notes: token chip + where it's applied. */
+    .usage td:first-child { white-space: nowrap; }
+    .usage .chip {
+      display: inline-flex; align-items: center;
+      font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+      font-size: 11px; font-weight: 600;
+      color: var(--brand-primary);
+      background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--brand-primary) 15%, transparent);
+      border-radius: var(--radius-full);
+      padding: var(--space-2) var(--space-8);
+    }
+
+    /* Small dark strip — re-resolves tokens so the samples read on a dark surface. */
+    .dark-strip {
+      margin-top: var(--space-20);
+      display: flex; align-items: flex-end; gap: var(--space-16); flex-wrap: wrap;
+    }
+    .dark-strip .radius-item { gap: var(--space-6); }
+    .dark-strip .radius-sample { width: 56px; height: 56px; }
+    .dark-strip .radius-sample--full { width: 92px; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Foundations · Radius</p>
+    <h1 class="ds-title">Radius</h1>
+    <p class="ds-sub">
+      Eight corner-radius steps, from the tight <span class="mono">radius4</span> on tags up to the
+      generous <span class="mono">radius20</span> on bottom sheets, plus a fully-round
+      <span class="mono">radiusFull (999px)</span> for pills and handles. Larger surfaces carry
+      larger radii so the curve stays visually proportional to the shape.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Scale</h3>
+      <div class="radii">
+        <div class="radius-item">
+          <span class="radius-sample radius-sample--r4"></span>
+          <span class="radius-label"><b>radius4</b> · 4px</span>
+        </div>
+        <div class="radius-item">
+          <span class="radius-sample radius-sample--r6"></span>
+          <span class="radius-label"><b>radius6</b> · 6px</span>
+        </div>
+        <div class="radius-item">
+          <span class="radius-sample radius-sample--r8"></span>
+          <span class="radius-label"><b>radius8</b> · 8px</span>
+        </div>
+        <div class="radius-item">
+          <span class="radius-sample radius-sample--r10"></span>
+          <span class="radius-label"><b>radius10</b> · 10px</span>
+        </div>
+        <div class="radius-item">
+          <span class="radius-sample radius-sample--r12"></span>
+          <span class="radius-label"><b>radius12</b> · 12px</span>
+        </div>
+        <div class="radius-item">
+          <span class="radius-sample radius-sample--r16"></span>
+          <span class="radius-label"><b>radius16</b> · 16px</span>
+        </div>
+        <div class="radius-item">
+          <span class="radius-sample radius-sample--r20"></span>
+          <span class="radius-label"><b>radius20</b> · 20px</span>
+        </div>
+        <div class="radius-item">
+          <span class="radius-sample radius-sample--full"></span>
+          <span class="radius-label"><b>radiusFull</b> · 999px</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- USAGE -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Usage</p>
+
+      <h3 class="block-h">Where each step is used</h3>
+      <table class="spec usage">
+        <tr>
+          <td><span class="chip">radius4 · radius6</span></td>
+          <td>Tags &amp; badges — category chips, freshness pills</td>
+        </tr>
+        <tr>
+          <td><span class="chip">radius8</span></td>
+          <td>Compact controls — segmented buttons, small icon targets</td>
+        </tr>
+        <tr>
+          <td><span class="chip">radius10 · radius12</span></td>
+          <td>Inputs, thumbnails, list tiles</td>
+        </tr>
+        <tr>
+          <td><span class="chip">radius16</span></td>
+          <td>Cards &amp; tiles — pantry items, ingredient cards</td>
+        </tr>
+        <tr>
+          <td><span class="chip">radius20</span></td>
+          <td>Bottom sheets — add item, mark as waste</td>
+        </tr>
+        <tr>
+          <td><span class="chip">radiusFull</span></td>
+          <td>Pills, status dots, FAB, drag handles</td>
+        </tr>
+      </table>
+
+      <h3 class="block-h">In context</h3>
+      <div class="col">
+        <!-- A list tile (radius16) holding a category tag (radius6) and a drag handle (full) -->
+        <div style="
+          background: var(--surface-raised);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-16);
+          box-shadow: var(--elevation-1);
+          padding: var(--space-12) var(--space-16);
+          display: flex; align-items: center; gap: var(--space-12);
+        ">
+          <span style="
+            width: 40px; height: 40px;
+            border-radius: var(--radius-10);
+            background: color-mix(in srgb, var(--cat-produce) 12%, transparent);
+            display: grid; place-items: center;
+            font-size: 18px;
+          ">🥬</span>
+          <div style="flex: 1; min-width: 0;">
+            <p class="t-title-small" style="margin: 0;">Romaine Lettuce</p>
+            <p class="t-body-small muted" style="margin: var(--space-2) 0 0;">2 heads · expires Jun 28</p>
+          </div>
+          <span style="
+            font-family: ui-monospace, monospace;
+            font-size: var(--label-small-size); font-weight: 600;
+            color: color-mix(in srgb, var(--cat-produce) 85%, transparent);
+            background: color-mix(in srgb, var(--cat-produce) 12%, transparent);
+            border-radius: var(--radius-6);
+            padding: var(--space-2) var(--space-6);
+          ">produce</span>
+          <span style="
+            width: 4px; height: 22px;
+            border-radius: var(--radius-full);
+            background: var(--border-strong);
+          "></span>
+        </div>
+        <p class="t-body-small subtle" style="margin: 0;">
+          Tile <span class="mono">r16</span> · thumbnail <span class="mono">r10</span> · tag <span class="mono">r6</span> · handle <span class="mono">full</span>
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Bonus: a compact dark strip showing the same steps re-resolved on a dark surface. -->
+  <section class="ds-panel" data-theme="dark" style="margin-top: var(--space-20);">
+    <p class="ds-panel-label">Dark</p>
+    <p class="t-body-small muted" style="margin: 0 0 var(--space-16);">
+      Same radii, dark surfaces. The <span class="mono">surface-raised</span> fill and
+      <span class="mono">border</span> re-resolve; corner values never change across themes.
+    </p>
+    <div class="dark-strip">
+      <div class="radius-item">
+        <span class="radius-sample radius-sample--r4"></span>
+        <span class="radius-label"><b>r4</b></span>
+      </div>
+      <div class="radius-item">
+        <span class="radius-sample radius-sample--r8"></span>
+        <span class="radius-label"><b>r8</b></span>
+      </div>
+      <div class="radius-item">
+        <span class="radius-sample radius-sample--r12"></span>
+        <span class="radius-label"><b>r12</b></span>
+      </div>
+      <div class="radius-item">
+        <span class="radius-sample radius-sample--r16"></span>
+        <span class="radius-label"><b>r16</b></span>
+      </div>
+      <div class="radius-item">
+        <span class="radius-sample radius-sample--r20"></span>
+        <span class="radius-label"><b>r20</b></span>
+      </div>
+      <div class="radius-item">
+        <span class="radius-sample radius-sample--full"></span>
+        <span class="radius-label"><b>full</b></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Token reference</h3>
+    <table class="spec">
+      <tr><td>radius4</td><td class="mono">4px · tags, mini badges</td></tr>
+      <tr><td>radius6</td><td class="mono">6px · category tags, freshness pills</td></tr>
+      <tr><td>radius8</td><td class="mono">8px · compact controls</td></tr>
+      <tr><td>radius10</td><td class="mono">10px · inputs, thumbnails</td></tr>
+      <tr><td>radius12</td><td class="mono">12px · list tiles, swatches</td></tr>
+      <tr><td>radius16</td><td class="mono">16px · cards &amp; tiles</td></tr>
+      <tr><td>radius20</td><td class="mono">20px · bottom sheets, panels</td></tr>
+      <tr><td>radiusFull</td><td class="mono">999px · pills, dots, drag handles</td></tr>
+    </table>
+  </section>
+</body>
+</html>

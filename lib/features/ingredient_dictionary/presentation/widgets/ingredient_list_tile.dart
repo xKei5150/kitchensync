@@ -1,5 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 
 class IngredientListTile extends StatelessWidget {
@@ -17,70 +19,180 @@ class IngredientListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = ingredient.displayNames['en'] ?? ingredient.name;
+    final category = ingredient.category;
+
     return Semantics(
       button: onTap != null,
       label: name,
-      child: ListTile(
-        contentPadding: EdgeInsets.fromLTRB(indent ? 32 : 16, 4, 16, 4),
-        leading: SizedBox(
-          width: 40,
-          height: 40,
-          child: ingredient.imageUrl != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: ingredient.imageUrl!,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) =>
-                        const ColoredBox(color: Color(0xFFEEEEEE)),
-                    errorWidget: (_, __, ___) =>
-                        const Icon(Icons.image_not_supported, size: 24),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(KsTokens.radius12),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              indent ? KsTokens.space24 : KsTokens.space16,
+              KsTokens.space10,
+              KsTokens.space16,
+              KsTokens.space10,
+            ),
+            child: Row(
+              children: [
+                if (indent) ...[
+                  Container(
+                    width: 2,
+                    height: 36,
+                    margin: const EdgeInsets.only(right: KsTokens.space12),
+                    decoration: BoxDecoration(
+                      color: KsTokens.borderStrong,
+                      borderRadius: BorderRadius.circular(KsTokens.radiusFull),
+                    ),
                   ),
-                )
-              : Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.local_grocery_store, size: 20),
+                ],
+                _Thumbnail(
+                  imageUrl: ingredient.imageUrl,
+                  categoryColor: category.color,
                 ),
+                const SizedBox(width: KsTokens.space12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        name,
+                        style: Theme.of(context).textTheme.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: KsTokens.space2),
+                      _Subtitle(
+                        category: category,
+                        indent: indent,
+                        isBulk: ingredient.isBulkCandidate,
+                        isNonFood: ingredient.isNonFood,
+                      ),
+                    ],
+                  ),
+                ),
+                if (onTap != null)
+                  Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: KsTokens.textTertiary,
+                  ),
+              ],
+            ),
+          ),
         ),
-        title: Text(name),
-        subtitle: _Subtitle(ingredient: ingredient, indent: indent),
-        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _Thumbnail extends StatelessWidget {
+  const _Thumbnail({this.imageUrl, required this.categoryColor});
+
+  final String? imageUrl;
+  final Color categoryColor;
+
+  static const _size = 44.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _size,
+      height: _size,
+      child: imageUrl != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(KsTokens.radius10),
+              child: CachedNetworkImage(
+                imageUrl: imageUrl!,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => _Placeholder(color: categoryColor),
+                errorWidget: (_, __, ___) => _Placeholder(color: categoryColor),
+              ),
+            )
+          : _Placeholder(color: categoryColor),
+    );
+  }
+}
+
+class _Placeholder extends StatelessWidget {
+  const _Placeholder({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(KsTokens.radius10),
+      ),
+      child: Icon(
+        Icons.local_grocery_store_outlined,
+        size: 20,
+        color: color.withValues(alpha: 0.7),
       ),
     );
   }
 }
 
 class _Subtitle extends StatelessWidget {
-  const _Subtitle({required this.ingredient, required this.indent});
+  const _Subtitle({
+    required this.category,
+    required this.indent,
+    required this.isBulk,
+    required this.isNonFood,
+  });
 
-  final Ingredient ingredient;
+  final IngredientCategory category;
   final bool indent;
+  final bool isBulk;
+  final bool isNonFood;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final categoryText = Text(
-      ingredient.category.name,
-      style: theme.textTheme.bodySmall,
-    );
-    if (!indent) return categoryText;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      spacing: KsTokens.space6,
+      runSpacing: KsTokens.space2,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(
-          'Variant',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.secondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(' · ', style: theme.textTheme.bodySmall),
-        Flexible(child: categoryText),
+        if (indent) _MiniTag(label: 'Variant', color: KsTokens.brandAccent),
+        _MiniTag(label: category.name, color: category.color),
+        if (isBulk) _MiniTag(label: 'Bulk', color: KsTokens.sectionBulk),
+        if (isNonFood)
+          _MiniTag(label: 'Non-food', color: KsTokens.sectionNonFood),
       ],
+    );
+  }
+}
+
+class _MiniTag extends StatelessWidget {
+  const _MiniTag({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: KsTokens.space6,
+        vertical: KsTokens.space2,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(KsTokens.radius4),
+      ),
+      child: Text(
+        label,
+        style: KsTokens.labelSmall.copyWith(
+          color: color.withValues(alpha: 0.85),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

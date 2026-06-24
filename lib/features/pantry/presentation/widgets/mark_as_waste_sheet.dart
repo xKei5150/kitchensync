@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
@@ -75,29 +76,59 @@ class _MarkAsWasteSheetState extends ConsumerState<MarkAsWasteSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
+      padding: EdgeInsets.fromLTRB(
+        KsTokens.space20,
+        KsTokens.space20,
+        KsTokens.space20,
+        KsTokens.space20 + bottomInset,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Mark as waste', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 16),
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: KsTokens.borderStrong,
+                borderRadius: BorderRadius.circular(KsTokens.radiusFull),
+              ),
+            ),
+          ),
+          const SizedBox(height: KsTokens.space20),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: KsTokens.expired.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(KsTokens.radius10),
+                ),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: KsTokens.expired,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: KsTokens.space12),
+              Text(
+                'Mark as waste',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ],
+          ),
+          const SizedBox(height: KsTokens.space20),
           TextField(
             controller: _qty,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Quantity',
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(labelText: 'Quantity'),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: KsTokens.space12),
           DropdownButtonFormField<WasteReason>(
-            // ignore: deprecated_member_use
             value: _reason,
-            decoration: const InputDecoration(
-              labelText: 'Reason',
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(labelText: 'Reason'),
             items: WasteReason.values
                 .map((r) => DropdownMenuItem(value: r, child: Text(r.name)))
                 .toList(),
@@ -108,19 +139,46 @@ class _MarkAsWasteSheetState extends ConsumerState<MarkAsWasteSheet> {
                   },
           ),
           if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: KsTokens.space12),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: KsTokens.space12,
+                vertical: KsTokens.space10,
+              ),
+              decoration: BoxDecoration(
+                color: KsTokens.expired.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(KsTokens.radius12),
+                border: Border.all(
+                  color: KsTokens.expired.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, size: 18, color: KsTokens.expired),
+                  const SizedBox(width: KsTokens.space8),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: KsTokens.bodySmall.copyWith(
+                        color: KsTokens.expired,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: KsTokens.space24),
           FilledButton(
             onPressed: _submitting ? null : _submit,
+            style: FilledButton.styleFrom(backgroundColor: KsTokens.expired),
             child: _submitting
                 ? const SizedBox.square(
                     dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: KsTokens.textOnBrand,
+                    ),
                   )
                 : const Text('Confirm waste'),
           ),

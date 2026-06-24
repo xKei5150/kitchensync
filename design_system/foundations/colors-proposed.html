@@ -1,0 +1,347 @@
+<!-- @dsCard group="Color" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proposed Semantic Tokens</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8); flex-wrap: wrap;
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+
+    /* ── Disabled control sample ─────────────────────────────────────────── */
+    .btn-disabled {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--proposed-disabled-fill);
+      color: var(--proposed-disabled-text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-20);
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls);
+      cursor: not-allowed;
+    }
+
+    /* ── Focus-ring samples ──────────────────────────────────────────────── */
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--brand-primary);
+      color: var(--text-on-brand);
+      border: 0;
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-20);
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls);
+    }
+    .input-field {
+      display: block; width: 100%;
+      background: var(--surface-raised);
+      color: var(--text-primary);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-16);
+      font-family: var(--font-body);
+      font-size: var(--body-medium-size); line-height: var(--body-medium-lh);
+    }
+    /* 2px ring + 2px offset, drawn with layered box-shadows so it never
+       reflows layout — mirrors a Material FocusRing on the brand color. */
+    .is-focused {
+      outline: none;
+      box-shadow:
+        0 0 0 2px var(--surface-base),
+        0 0 0 4px var(--proposed-focus-ring);
+    }
+    .focus-row { display: grid; gap: var(--space-16); max-width: 280px; }
+    .field-label {
+      font-size: var(--label-medium-size); font-weight: var(--label-medium-weight);
+      letter-spacing: var(--label-medium-ls);
+      color: var(--text-secondary);
+      margin: 0 0 var(--space-6);
+    }
+
+    /* ── Semantic swatch row (chip + token + hex + rationale) ────────────── */
+    .sem-list { display: grid; gap: var(--space-12); }
+    .sem-row {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: var(--space-12);
+      align-items: start;
+    }
+    .sem-chip {
+      width: 40px; height: 40px;
+      border-radius: var(--radius-10);
+      border: 1px solid color-mix(in srgb, var(--text-primary) 12%, transparent);
+    }
+    .sem-name {
+      font-size: 13px; font-weight: 600; color: var(--text-primary);
+      margin: 0 0 2px; line-height: 1.3;
+      display: flex; align-items: center; gap: var(--space-8); flex-wrap: wrap;
+    }
+    .sem-meta { color: var(--text-tertiary); display: block; margin-bottom: 3px; }
+    .sem-why { color: var(--text-secondary); font-size: 12px; line-height: 1.4; margin: 0; }
+
+    /* ── Applied tonal alert: color@12% fill + color@85% text + dot ──────── */
+    .alert {
+      display: flex; align-items: center; gap: var(--space-10);
+      background: color-mix(in srgb, var(--c) 12%, transparent);
+      color: color-mix(in srgb, var(--c) 85%, transparent);
+      border-radius: var(--radius-10);
+      padding: var(--space-10) var(--space-12);
+      font-family: var(--font-body);
+      font-size: var(--body-medium-size); line-height: 1.3;
+      font-weight: 500;
+    }
+    .alert-dot {
+      flex: none;
+      width: 8px; height: 8px; border-radius: var(--radius-full);
+      background: var(--c);
+    }
+    .alerts { display: grid; gap: var(--space-10); }
+
+    /* ── Scrim sample: translucent overlay over a "photo" surface ────────── */
+    .scrim-stage {
+      position: relative;
+      height: 132px;
+      border-radius: var(--radius-12);
+      overflow: hidden;
+      /* Stand-in "ingredient photo": warm produce gradient, no raster needed. */
+      background:
+        radial-gradient(120% 90% at 18% 12%, color-mix(in srgb, var(--cat-produce) 70%, transparent), transparent 60%),
+        radial-gradient(120% 90% at 92% 88%, color-mix(in srgb, var(--cat-spice) 65%, transparent), transparent 58%),
+        linear-gradient(135deg, var(--cat-grain), var(--section-leftover));
+    }
+    .scrim-overlay {
+      position: absolute; inset: 0;
+      background: var(--proposed-scrim);
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: var(--space-12) var(--space-16);
+    }
+    .scrim-overlay .scrim-title {
+      color: #FFFFFF;
+      font-family: var(--font-display);
+      font-size: var(--headline-medium-size); font-weight: var(--headline-medium-weight);
+      line-height: var(--headline-medium-lh);
+      margin: 0;
+    }
+    .scrim-overlay .scrim-sub {
+      color: color-mix(in srgb, #FFFFFF 80%, transparent);
+      font-size: var(--body-small-size); line-height: var(--body-small-lh);
+      margin: 2px 0 0;
+    }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Color · Foundations</p>
+    <h1 class="ds-title">Proposed Semantic Tokens</h1>
+    <p class="ds-sub">
+      Every token on this card is a <strong>proposal</strong> — none of these exist in
+      <span class="mono">design_tokens.dart</span> yet. They live only as
+      <span class="mono">--proposed-*</span> CSS vars so the system can preview them. Each
+      formalizes a gap the app currently fills ad-hoc: a real disabled surface, a focus
+      ring, distinct success/info/warning that don't borrow from freshness, and a scrim
+      for photo overlays.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Disabled surface <span class="badge-proposed">proposed</span></h3>
+      <div class="row" style="align-items: flex-start;">
+        <span class="btn-disabled">Add to pantry</span>
+        <div style="flex: 1; min-width: 160px;">
+          <p class="sem-meta mono">disabledFill · #F5F3EE</p>
+          <p class="sem-meta mono">disabledText · #A8A496</p>
+          <p class="sem-why">Formalizes the de-facto disabled surface; text clears ~AA on the fill.</p>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Focus ring <span class="badge-proposed">proposed</span></h3>
+      <p class="t-body-small muted" style="margin: 0 0 var(--space-12);">2px ring + 2px offset · <span class="mono">focusRing #2E7D32</span></p>
+      <div class="focus-row">
+        <span class="btn-primary is-focused">Save item</span>
+        <div>
+          <p class="field-label">Quantity</p>
+          <input class="input-field is-focused" type="text" value="2 bunches" readonly aria-label="Quantity" />
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Status colors <span class="badge-proposed">proposed</span></h3>
+      <div class="sem-list">
+        <div class="sem-row">
+          <span class="sem-chip" style="background: var(--proposed-success);"></span>
+          <div>
+            <p class="sem-name">Success</p>
+            <span class="sem-meta mono">success · #2E7D32</span>
+            <p class="sem-why">Deliberate confirmation color; <span class="mono">fresh</span> stays freshness-only.</p>
+          </div>
+        </div>
+        <div class="sem-row">
+          <span class="sem-chip" style="background: var(--proposed-info);"></span>
+          <div>
+            <p class="sem-name">Info</p>
+            <span class="sem-meta mono">info · #3E6B8C</span>
+            <p class="sem-why">Calm slate-blue that sits inside the warm palette without clashing.</p>
+          </div>
+        </div>
+        <div class="sem-row">
+          <span class="sem-chip" style="background: var(--proposed-warning);"></span>
+          <div>
+            <p class="sem-name">Warning</p>
+            <span class="sem-meta mono">warning · #EF6C00</span>
+            <p class="sem-why">Generic warning, distinct from the <span class="mono">expiringSoon</span> amber.</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="t-body-small muted" style="margin: var(--space-16) 0 var(--space-8);">Applied — tonal alert rows</p>
+      <div class="alerts">
+        <div class="alert" style="--c: var(--proposed-success);">
+          <span class="alert-dot"></span>
+          <span>2 bunches of kale added to Produce.</span>
+        </div>
+        <div class="alert" style="--c: var(--proposed-info);">
+          <span class="alert-dot"></span>
+          <span>Synced 18 pantry items just now.</span>
+        </div>
+        <div class="alert" style="--c: var(--proposed-warning);">
+          <span class="alert-dot"></span>
+          <span>Olive oil is running low — 1 bottle left.</span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Scrim <span class="badge-proposed">proposed</span></h3>
+      <p class="t-body-small muted" style="margin: 0 0 var(--space-12);"><span class="mono">scrim rgba(0,0,0,.55)</span> over an ingredient photo</p>
+      <div class="scrim-stage">
+        <div class="scrim-overlay">
+          <p class="scrim-title">Heirloom Tomatoes</p>
+          <p class="scrim-sub">Produce · expires Jun 28 · 6 on hand</p>
+        </div>
+      </div>
+      <p class="sem-why" style="margin-top: var(--space-8);">A consistent 55% black scrim keeps overlaid white text legible across any photo.</p>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Disabled surface <span class="badge-proposed">proposed</span></h3>
+      <div class="row" style="align-items: flex-start;">
+        <span class="btn-disabled">Add to pantry</span>
+        <div style="flex: 1; min-width: 160px;">
+          <p class="sem-meta mono">disabledFill · #F5F3EE</p>
+          <p class="sem-meta mono">disabledText · #A8A496</p>
+          <p class="sem-why">Fixed values today; a dark-tuned pair is still open — see note below.</p>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Focus ring <span class="badge-proposed">proposed</span></h3>
+      <p class="t-body-small muted" style="margin: 0 0 var(--space-12);">2px ring + 2px offset · <span class="mono">focusRing #2E7D32</span></p>
+      <div class="focus-row">
+        <span class="btn-primary is-focused">Save item</span>
+        <div>
+          <p class="field-label">Quantity</p>
+          <input class="input-field is-focused" type="text" value="2 bunches" readonly aria-label="Quantity" />
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Status colors <span class="badge-proposed">proposed</span></h3>
+      <div class="sem-list">
+        <div class="sem-row">
+          <span class="sem-chip" style="background: var(--proposed-success);"></span>
+          <div>
+            <p class="sem-name">Success</p>
+            <span class="sem-meta mono">success · #2E7D32</span>
+            <p class="sem-why">Deliberate confirmation color; <span class="mono">fresh</span> stays freshness-only.</p>
+          </div>
+        </div>
+        <div class="sem-row">
+          <span class="sem-chip" style="background: var(--proposed-info);"></span>
+          <div>
+            <p class="sem-name">Info</p>
+            <span class="sem-meta mono">info · #3E6B8C</span>
+            <p class="sem-why">Calm slate-blue that sits inside the warm palette without clashing.</p>
+          </div>
+        </div>
+        <div class="sem-row">
+          <span class="sem-chip" style="background: var(--proposed-warning);"></span>
+          <div>
+            <p class="sem-name">Warning</p>
+            <span class="sem-meta mono">warning · #EF6C00</span>
+            <p class="sem-why">Generic warning, distinct from the <span class="mono">expiringSoon</span> amber.</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="t-body-small muted" style="margin: var(--space-16) 0 var(--space-8);">Applied — tonal alert rows</p>
+      <div class="alerts">
+        <div class="alert" style="--c: var(--proposed-success);">
+          <span class="alert-dot"></span>
+          <span>2 bunches of kale added to Produce.</span>
+        </div>
+        <div class="alert" style="--c: var(--proposed-info);">
+          <span class="alert-dot"></span>
+          <span>Synced 18 pantry items just now.</span>
+        </div>
+        <div class="alert" style="--c: var(--proposed-warning);">
+          <span class="alert-dot"></span>
+          <span>Olive oil is running low — 1 bottle left.</span>
+        </div>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-8) 0 0;">On dark surfaces these fixed hues lose contrast; the open question is a dark-tuned set (like the proposed <span class="mono">--cat-*-dark</span> categories).</p>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Scrim <span class="badge-proposed">proposed</span></h3>
+      <p class="t-body-small muted" style="margin: 0 0 var(--space-12);"><span class="mono">scrim rgba(0,0,0,.55)</span> over an ingredient photo</p>
+      <div class="scrim-stage">
+        <div class="scrim-overlay">
+          <p class="scrim-title">Heirloom Tomatoes</p>
+          <p class="scrim-sub">Produce · expires Jun 28 · 6 on hand</p>
+        </div>
+      </div>
+      <p class="sem-why" style="margin-top: var(--space-8);">A consistent 55% black scrim keeps overlaid white text legible across any photo.</p>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Proposed token reference <span class="badge-proposed">proposed</span></h3>
+    <table class="spec">
+      <tr><td>disabledFill</td><td class="mono">#F5F3EE · de-facto disabled surface, formalized</td></tr>
+      <tr><td>disabledText</td><td class="mono">#A8A496 · ~AA on disabledFill</td></tr>
+      <tr><td>focusRing</td><td class="mono">#2E7D32 · 2px ring + 2px offset on focusable controls</td></tr>
+      <tr><td>success</td><td class="mono">#2E7D32 · confirmation — fresh stays freshness-only</td></tr>
+      <tr><td>info</td><td class="mono">#3E6B8C · calm slate-blue for the warm palette</td></tr>
+      <tr><td>warning</td><td class="mono">#EF6C00 · generic warning, distinct from expiringSoon</td></tr>
+      <tr><td>scrim</td><td class="mono">rgba(0,0,0,.55) · photo / sheet overlay</td></tr>
+    </table>
+    <p class="t-body-small subtle" style="margin: var(--space-12) 0 0;">None of these are wired into <span class="mono">design_tokens.dart</span>. Adopting them would replace the current inline <span class="mono">withValues(alpha:)</span> and one-off grays scattered across screens.</p>
+  </section>
+</body>
+</html>

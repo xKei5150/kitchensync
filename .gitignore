@@ -67,3 +67,11 @@ coverage/
 
 # Seed builder: transient USDA dataset (downloaded, not committed)
 tools/seed_builder/food.csv
+
+# Node tooling dependencies (installed, not committed)
+tools/seed_uploader/node_modules/
+
+# Local agent / session tooling state (not project source)
+.entire/
+.omo/
+.superpowers/

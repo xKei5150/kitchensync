@@ -1,0 +1,320 @@
+<!-- @dsCard group="Foundations" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spacing</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    /* Each row pairs a fixed-width fill bar with its token label, so the
+       ascending stack reads as a rhythm. The bar WIDTH equals the token value;
+       the fill is a brand tint, mirroring a translucent accent. */
+    .scale {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-12);
+    }
+    .scale-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      align-items: center;
+      gap: var(--space-16);
+    }
+    .scale-label {
+      font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+    .scale-label b { color: var(--text-primary); font-weight: 600; }
+    .scale-track {
+      display: flex;
+      align-items: center;
+      gap: var(--space-12);
+    }
+    .scale-bar {
+      height: 18px;
+      border-radius: var(--radius-4);
+      background: color-mix(in srgb, var(--brand-primary) 70%, transparent);
+      flex: 0 0 auto;
+      transition: width var(--dur-medium) var(--curve-standard);
+    }
+    /* Bar widths = the literal token value for each step. */
+    .w-2  { width: var(--space-2); }
+    .w-3  { width: var(--space-3); }
+    .w-4  { width: var(--space-4); }
+    .w-6  { width: var(--space-6); }
+    .w-8  { width: var(--space-8); }
+    .w-10 { width: var(--space-10); }
+    .w-12 { width: var(--space-12); }
+    .w-16 { width: var(--space-16); }
+    .w-20 { width: var(--space-20); }
+    .w-24 { width: var(--space-24); }
+    .w-32 { width: var(--space-32); }
+    .w-40 { width: var(--space-40); }
+    .w-48 { width: var(--space-48); }
+
+    .scale-px {
+      font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+    /* The four "odd" sub-4 / non-doubling steps get a quiet accent dot. */
+    .scale-row.is-odd .scale-bar {
+      background: color-mix(in srgb, var(--brand-accent) 70%, transparent);
+    }
+    .scale-row.is-odd .scale-label b { color: var(--brand-primary-dark); }
+    [data-theme="dark"] .scale-row.is-odd .scale-label b { color: var(--brand-primary); }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-16);
+      margin-top: var(--space-20);
+      padding-top: var(--space-16);
+      border-top: 1px solid var(--border);
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-8);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .legend-dot {
+      width: 14px; height: 14px;
+      border-radius: var(--radius-4);
+      flex: 0 0 auto;
+    }
+    .legend-dot.base { background: color-mix(in srgb, var(--brand-primary) 70%, transparent); }
+    .legend-dot.odd  { background: color-mix(in srgb, var(--brand-accent) 70%, transparent); }
+
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: 0 0 var(--space-12);
+    }
+
+    /* Applied-rhythm demo: a compact pantry tile using the scale in situ. */
+    .demo-tile {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-12);
+      padding: var(--space-16);
+      box-shadow: var(--elevation-1);
+      max-width: 300px;
+    }
+    .demo-tile .demo-row { display: flex; align-items: center; gap: var(--space-12); }
+    .demo-swatch {
+      width: var(--space-40); height: var(--space-40);
+      border-radius: var(--radius-10);
+      background: color-mix(in srgb, var(--cat-produce) 18%, transparent);
+      display: flex; align-items: center; justify-content: center;
+      flex: 0 0 auto;
+    }
+    .demo-swatch span {
+      font-size: var(--label-small-size); font-weight: 700;
+      color: color-mix(in srgb, var(--cat-produce) 85%, transparent);
+      text-transform: uppercase; letter-spacing: var(--label-small-ls);
+    }
+    .demo-meta { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+    .demo-name { font-size: var(--title-medium-size); font-weight: var(--title-medium-weight); color: var(--text-primary); }
+    .demo-sub  { font-size: var(--body-small-size); color: var(--text-secondary); }
+    .demo-chips { display: flex; gap: var(--space-6); margin-top: var(--space-12); }
+    .demo-chip {
+      font-size: var(--label-small-size); font-weight: 600; line-height: 1;
+      letter-spacing: var(--label-small-ls);
+      padding: var(--space-2) var(--space-6);
+      border-radius: var(--radius-4);
+      background: color-mix(in srgb, var(--fresh) 12%, transparent);
+      color: color-mix(in srgb, var(--fresh) 85%, transparent);
+    }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Foundations · Spacing</p>
+    <h1 class="ds-title">Spacing</h1>
+    <p class="ds-sub">
+      A 4px-based scale drives every gap, inset, and stack in the app. Steps double
+      and step toward larger layout rhythm, while a few small odd values
+      (<span class="mono">2 · 3 · 6 · 10</span>) exist for tight tag and badge insets.
+      Each bar below is drawn at its literal token width, ascending so the rhythm reads.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+      <div class="scale">
+        <div class="scale-row is-odd">
+          <span class="scale-label"><b>space2</b> · 2px</span>
+          <div class="scale-track"><span class="scale-bar w-2"></span><span class="scale-px mono">tag inset</span></div>
+        </div>
+        <div class="scale-row is-odd">
+          <span class="scale-label"><b>space3</b> · 3px</span>
+          <div class="scale-track"><span class="scale-bar w-3"></span><span class="scale-px mono">badge inset</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space4</b> · 4px</span>
+          <div class="scale-track"><span class="scale-bar w-4"></span><span class="scale-px mono">base unit</span></div>
+        </div>
+        <div class="scale-row is-odd">
+          <span class="scale-label"><b>space6</b> · 6px</span>
+          <div class="scale-track"><span class="scale-bar w-6"></span><span class="scale-px mono">tight gap</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space8</b> · 8px</span>
+          <div class="scale-track"><span class="scale-bar w-8"></span><span class="scale-px mono">chip gap</span></div>
+        </div>
+        <div class="scale-row is-odd">
+          <span class="scale-label"><b>space10</b> · 10px</span>
+          <div class="scale-track"><span class="scale-bar w-10"></span><span class="scale-px mono">swatch meta</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space12</b> · 12px</span>
+          <div class="scale-track"><span class="scale-bar w-12"></span><span class="scale-px mono">row gap</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space16</b> · 16px</span>
+          <div class="scale-track"><span class="scale-bar w-16"></span><span class="scale-px mono">card inset</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space20</b> · 20px</span>
+          <div class="scale-track"><span class="scale-bar w-20"></span><span class="scale-px mono">panel inset</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space24</b> · 24px</span>
+          <div class="scale-track"><span class="scale-bar w-24"></span><span class="scale-px mono">section pad</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space32</b> · 32px</span>
+          <div class="scale-track"><span class="scale-bar w-32"></span><span class="scale-px mono">screen pad</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space40</b> · 40px</span>
+          <div class="scale-track"><span class="scale-bar w-40"></span><span class="scale-px mono">block gap</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space48</b> · 48px</span>
+          <div class="scale-track"><span class="scale-bar w-48"></span><span class="scale-px mono">major rhythm</span></div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot base"></span>4-base step</span>
+        <span class="legend-item"><span class="legend-dot odd"></span>odd inset (2 · 3 · 6 · 10)</span>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+      <div class="scale">
+        <div class="scale-row is-odd">
+          <span class="scale-label"><b>space2</b> · 2px</span>
+          <div class="scale-track"><span class="scale-bar w-2"></span><span class="scale-px mono">tag inset</span></div>
+        </div>
+        <div class="scale-row is-odd">
+          <span class="scale-label"><b>space3</b> · 3px</span>
+          <div class="scale-track"><span class="scale-bar w-3"></span><span class="scale-px mono">badge inset</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space4</b> · 4px</span>
+          <div class="scale-track"><span class="scale-bar w-4"></span><span class="scale-px mono">base unit</span></div>
+        </div>
+        <div class="scale-row is-odd">
+          <span class="scale-label"><b>space6</b> · 6px</span>
+          <div class="scale-track"><span class="scale-bar w-6"></span><span class="scale-px mono">tight gap</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space8</b> · 8px</span>
+          <div class="scale-track"><span class="scale-bar w-8"></span><span class="scale-px mono">chip gap</span></div>
+        </div>
+        <div class="scale-row is-odd">
+          <span class="scale-label"><b>space10</b> · 10px</span>
+          <div class="scale-track"><span class="scale-bar w-10"></span><span class="scale-px mono">swatch meta</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space12</b> · 12px</span>
+          <div class="scale-track"><span class="scale-bar w-12"></span><span class="scale-px mono">row gap</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space16</b> · 16px</span>
+          <div class="scale-track"><span class="scale-bar w-16"></span><span class="scale-px mono">card inset</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space20</b> · 20px</span>
+          <div class="scale-track"><span class="scale-bar w-20"></span><span class="scale-px mono">panel inset</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space24</b> · 24px</span>
+          <div class="scale-track"><span class="scale-bar w-24"></span><span class="scale-px mono">section pad</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space32</b> · 32px</span>
+          <div class="scale-track"><span class="scale-bar w-32"></span><span class="scale-px mono">screen pad</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space40</b> · 40px</span>
+          <div class="scale-track"><span class="scale-bar w-40"></span><span class="scale-px mono">block gap</span></div>
+        </div>
+        <div class="scale-row">
+          <span class="scale-label"><b>space48</b> · 48px</span>
+          <div class="scale-track"><span class="scale-bar w-48"></span><span class="scale-px mono">major rhythm</span></div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot base"></span>4-base step</span>
+        <span class="legend-item"><span class="legend-dot odd"></span>odd inset (2 · 3 · 6 · 10)</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Applied rhythm: the scale in a real pantry tile -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h">Applied rhythm — pantry tile</h3>
+    <div class="row" style="align-items: flex-start;">
+      <div class="demo-tile">
+        <div class="demo-row">
+          <div class="demo-swatch"><span>PR</span></div>
+          <div class="demo-meta">
+            <span class="demo-name">Roma Tomatoes</span>
+            <span class="demo-sub">6 pcs · added Jun 22</span>
+          </div>
+        </div>
+        <div class="demo-chips">
+          <span class="demo-chip">fresh</span>
+          <span class="demo-chip" style="background: color-mix(in srgb, var(--expiring-soon) 12%, transparent); color: color-mix(in srgb, var(--low-stock) 90%, transparent);">3 days left</span>
+        </div>
+      </div>
+      <div class="col" style="gap: var(--space-8); max-width: 360px;">
+        <p class="t-body-small subtle mono" style="margin: 0;">tile padding · space16</p>
+        <p class="t-body-small subtle mono" style="margin: 0;">avatar · space40 box · radius10</p>
+        <p class="t-body-small subtle mono" style="margin: 0;">avatar &harr; text gap · space12</p>
+        <p class="t-body-small subtle mono" style="margin: 0;">name &harr; meta gap · space2</p>
+        <p class="t-body-small subtle mono" style="margin: 0;">chips top gap · space12 · chip gap · space6</p>
+        <p class="t-body-small subtle mono" style="margin: 0;">chip inset · space6 / space2 (odd)</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h">Scale reference</h3>
+    <table class="spec">
+      <tr><td>Base unit</td><td class="mono">space4 · all 4-base steps are multiples of 4</td></tr>
+      <tr><td>Odd insets</td><td class="mono">space2 · space3 · space6 · space10 — tight tag / badge padding</td></tr>
+      <tr><td>Component insets</td><td class="mono">space8 · space12 · space16</td></tr>
+      <tr><td>Container insets</td><td class="mono">space20 · space24 (panels, sections)</td></tr>
+      <tr><td>Screen &amp; layout</td><td class="mono">space32 · space40 · space48</td></tr>
+      <tr><td>Source</td><td class="mono">KsTokens.space2&hellip;space48 in lib/app/design_tokens.dart</td></tr>
+    </table>
+  </section>
+</body>
+</html>

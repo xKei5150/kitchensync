@@ -1,0 +1,321 @@
+<!-- @dsCard group="Color" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neutrals &amp; Text</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Whites and near-whites need a visible border so the chip reads on a
+       light panel. Off-white neutrals get the same outline for consistency. */
+    .swatch-chip--ring { box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+    /* Text specimen: a real pantry line rendered in each text token, sitting
+       on a raised surface so secondary/tertiary contrast reads honestly. */
+    .specimen {
+      display: flex; flex-direction: column; gap: 2px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-16);
+    }
+    .specimen + .specimen { margin-top: var(--space-10); }
+    .specimen .label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+      color: var(--text-tertiary);
+    }
+    .specimen-line { font-family: var(--font-body); }
+    .specimen-line.on-brand {
+      background: var(--brand-primary);
+      color: var(--text-on-brand);
+      border-radius: var(--radius-8);
+      padding: var(--space-8) var(--space-12);
+      display: inline-block;
+      align-self: flex-start;
+    }
+
+    /* Dark surface-container ramp — a small stepped strip (M3 containers). */
+    .ramp {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      border-radius: var(--radius-10); overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .ramp-step { height: 56px; display: flex; align-items: flex-end; }
+    .ramp-step span {
+      font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+      font-size: 9px; color: var(--text-tertiary);
+      padding: 0 0 var(--space-4) var(--space-4); line-height: 1;
+    }
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Color · Foundations</p>
+    <h1 class="ds-title">Neutrals &amp; Text</h1>
+    <p class="ds-sub">
+      The surfaces are warm linen, not clinical white — <span class="mono">surfaceBase</span>
+      carries a faint cream cast and raised cards sit on pure white above it.
+      Four text tokens descend from near-black ink to a muted sage tertiary, with
+      <span class="mono">textOnBrand</span> reserved for type on the green primary.
+      Every value re-resolves for dark mode below.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Neutrals</h3>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="swatch-chip swatch-chip--ring" style="background: var(--surface-base);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Surface Base</p>
+            <span class="swatch-token mono">surfaceBase</span>
+            <span class="swatch-hex mono">#FAFAF7</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip swatch-chip--ring" style="background: var(--surface-raised);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Surface Raised</p>
+            <span class="swatch-token mono">surfaceRaised</span>
+            <span class="swatch-hex mono">#FFFFFF</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip swatch-chip--ring" style="background: var(--neutral-subtle);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Neutral Subtle</p>
+            <span class="swatch-token mono">neutralSubtle</span>
+            <span class="swatch-hex mono">#F5F3EE</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--border);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Border</p>
+            <span class="swatch-token mono">border</span>
+            <span class="swatch-hex mono">#E8E5DD</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--border-strong);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Border Strong</p>
+            <span class="swatch-token mono">borderStrong</span>
+            <span class="swatch-hex mono">#D7D2C8</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Text</h3>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--text-primary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Text Primary</p>
+            <span class="swatch-token mono">textPrimary</span>
+            <span class="swatch-hex mono">#1A1C16</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--text-secondary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Text Secondary</p>
+            <span class="swatch-token mono">textSecondary</span>
+            <span class="swatch-hex mono">#5F6651</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--text-tertiary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Text Tertiary</p>
+            <span class="swatch-token mono">textTertiary</span>
+            <span class="swatch-hex mono">#8B9183</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip swatch-chip--ring" style="background: var(--text-on-brand);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Text On Brand</p>
+            <span class="swatch-token mono">textOnBrand</span>
+            <span class="swatch-hex mono">#FFFFFF</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="t-body-small muted" style="margin: var(--space-16) 0 var(--space-8);">Specimens on a raised surface</p>
+      <div class="specimen">
+        <span class="label">textPrimary</span>
+        <span class="specimen-line t-title-medium" style="color: var(--text-primary);">Chicken breast · 500 g</span>
+      </div>
+      <div class="specimen">
+        <span class="label">textSecondary</span>
+        <span class="specimen-line t-body-medium" style="color: var(--text-secondary);">Refrigerator · opened 2 days ago</span>
+      </div>
+      <div class="specimen">
+        <span class="label">textTertiary</span>
+        <span class="specimen-line t-body-small" style="color: var(--text-tertiary);">Best before Jun 28 · 3 left in stock</span>
+      </div>
+      <div class="specimen">
+        <span class="label">textOnBrand</span>
+        <span class="specimen-line on-brand t-label-large">Add to pantry</span>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Neutrals</h3>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="swatch-chip swatch-chip--ring" style="background: var(--surface-base);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Surface Base</p>
+            <span class="swatch-token mono">surfaceBase</span>
+            <span class="swatch-hex mono">#1E1F1B</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip swatch-chip--ring" style="background: var(--surface-raised);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Surface Raised</p>
+            <span class="swatch-token mono">surfaceRaised</span>
+            <span class="swatch-hex mono">#272822</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip swatch-chip--ring" style="background: var(--neutral-subtle);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Neutral Subtle</p>
+            <span class="swatch-token mono">neutralSubtle</span>
+            <span class="swatch-hex mono">#2F302A</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--border);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Border</p>
+            <span class="swatch-token mono">border</span>
+            <span class="swatch-hex mono">#3D3F37</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--border-strong);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Border Strong</p>
+            <span class="swatch-token mono">borderStrong</span>
+            <span class="swatch-hex mono">#4D4F47</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Text</h3>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--text-primary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Text Primary</p>
+            <span class="swatch-token mono">textPrimary</span>
+            <span class="swatch-hex mono">#E8E5DD</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--text-secondary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Text Secondary</p>
+            <span class="swatch-token mono">textSecondary</span>
+            <span class="swatch-hex mono">#B5BBAE</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--text-tertiary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Text Tertiary</p>
+            <span class="swatch-token mono">textTertiary</span>
+            <span class="swatch-hex mono">#8B9183</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--text-on-brand);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Text On Brand</p>
+            <span class="swatch-token mono">textOnBrand</span>
+            <span class="swatch-hex mono">#1A1C16</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="t-body-small muted" style="margin: var(--space-16) 0 var(--space-8);">Specimens on a raised surface</p>
+      <div class="specimen">
+        <span class="label">textPrimary</span>
+        <span class="specimen-line t-title-medium" style="color: var(--text-primary);">Chicken breast · 500 g</span>
+      </div>
+      <div class="specimen">
+        <span class="label">textSecondary</span>
+        <span class="specimen-line t-body-medium" style="color: var(--text-secondary);">Refrigerator · opened 2 days ago</span>
+      </div>
+      <div class="specimen">
+        <span class="label">textTertiary</span>
+        <span class="specimen-line t-body-small" style="color: var(--text-tertiary);">Best before Jun 28 · 3 left in stock</span>
+      </div>
+      <div class="specimen">
+        <span class="label">textOnBrand</span>
+        <span class="specimen-line on-brand t-label-large">Add to pantry</span>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Surface-container ramp</h3>
+      <p class="t-body-small muted" style="margin: 0 0 var(--space-10);">
+        Material 3 elevation tiers from <span class="mono">theme.dart</span> — overlay-free, stepped lightness.
+      </p>
+      <div class="ramp">
+        <div class="ramp-step" style="background: var(--surface-container-lowest);"><span>#16170F</span></div>
+        <div class="ramp-step" style="background: var(--surface-container-low);"><span>#1E1F1B</span></div>
+        <div class="ramp-step" style="background: var(--surface-container);"><span>#272822</span></div>
+        <div class="ramp-step" style="background: var(--surface-container-high);"><span>#2F302A</span></div>
+        <div class="ramp-step" style="background: var(--surface-container-highest);"><span>#373832</span></div>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-8) 0 0;">
+        lowest · low · container · high · highest
+      </p>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Token reference (light → dark)</h3>
+    <table class="spec">
+      <tr><td>surfaceBase</td><td class="mono">#FAFAF7 → #1E1F1B · scaffold background</td></tr>
+      <tr><td>surfaceRaised</td><td class="mono">#FFFFFF → #272822 · cards, sheets</td></tr>
+      <tr><td>neutralSubtle</td><td class="mono">#F5F3EE → #2F302A · inset fills, chips</td></tr>
+      <tr><td>border</td><td class="mono">#E8E5DD → #3D3F37 · default hairline</td></tr>
+      <tr><td>borderStrong</td><td class="mono">#D7D2C8 → #4D4F47 · emphasized dividers</td></tr>
+      <tr><td>textPrimary</td><td class="mono">#1A1C16 → #E8E5DD · titles, values</td></tr>
+      <tr><td>textSecondary</td><td class="mono">#5F6651 → #B5BBAE · supporting copy</td></tr>
+      <tr><td>textTertiary</td><td class="mono">#8B9183 → #8B9183 · captions (shared hue)</td></tr>
+      <tr><td>textOnBrand</td><td class="mono">#FFFFFF → #1A1C16 · type on brandPrimary</td></tr>
+    </table>
+  </section>
+</body>
+</html>

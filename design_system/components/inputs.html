@@ -1,0 +1,341 @@
+<!-- @dsCard group="Components — Forms" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inputs &amp; Forms</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    .field { display: flex; flex-direction: column; gap: var(--space-6); }
+    .field + .field { margin-top: var(--space-20); }
+
+    /* Floating label — sits above the control like an active InputDecoration label. */
+    .field-label {
+      font-family: var(--font-body);
+      font-size: var(--label-medium-size); font-weight: var(--label-medium-weight);
+      letter-spacing: var(--label-medium-ls); line-height: 1;
+      color: var(--text-secondary);
+    }
+    .field-label--brand { color: var(--brand-primary); }
+    .field-label--error { color: var(--expired); }
+
+    /* InputDecorationTheme: filled surfaceRaised, radius12, 1px border. */
+    .input {
+      display: flex; align-items: center; gap: var(--space-10);
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-12);
+      padding: var(--space-12) var(--space-16);
+      transition: border-color var(--dur-fast) var(--curve-standard),
+                  box-shadow var(--dur-fast) var(--curve-standard);
+    }
+    .input-value {
+      flex: 1;
+      font-family: var(--font-body);
+      font-size: var(--body-large-size); font-weight: var(--body-large-weight);
+      line-height: 1; color: var(--text-primary);
+    }
+    .input-hint { color: var(--text-tertiary); }
+
+    /* Focused — 1.5px brand border + soft focus ring. */
+    .input--focused {
+      border: 1.5px solid var(--brand-primary);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 12%, transparent);
+    }
+    /* A faux caret to sell the focused state. */
+    .caret {
+      width: 1.5px; height: 18px; background: var(--brand-primary);
+      border-radius: var(--radius-full);
+      animation: blink 1s steps(1) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Error — expired border + helper text. */
+    .input--error { border: 1.5px solid var(--expired); }
+    .field-help {
+      font-family: var(--font-body);
+      font-size: var(--body-small-size); line-height: var(--body-small-lh);
+      color: var(--text-tertiary);
+    }
+    .field-help--error { color: var(--expired); }
+
+    .input-icon { flex: none; display: inline-flex; }
+    .input-icon--lead { color: var(--text-tertiary); }
+    .input-icon--trail { color: var(--text-secondary); }
+
+    /* FilterChips — pill, label-large, with a hover lift on selectable chips. */
+    .chip {
+      display: inline-flex; align-items: center; gap: var(--space-6);
+      font-family: var(--font-body);
+      font-size: var(--label-large-size); font-weight: var(--label-large-weight);
+      letter-spacing: var(--label-large-ls); line-height: 1;
+      border-radius: var(--radius-full);
+      padding: var(--space-8) var(--space-16);
+      cursor: pointer; user-select: none;
+      transition: background var(--dur-fast) var(--curve-standard),
+                  border-color var(--dur-fast) var(--curve-standard),
+                  transform var(--dur-fast) var(--curve-standard);
+    }
+    .chip--off {
+      background: var(--neutral-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+    .chip--off:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .chip--on {
+      background: color-mix(in srgb, var(--brand-primary-light) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
+      color: var(--brand-primary-dark);
+    }
+    .chip--on:hover { transform: translateY(-1px); }
+    [data-theme="dark"] .chip--on { color: var(--brand-primary); }
+    .chip-check { display: inline-flex; }
+
+    .chip-group-label {
+      font-family: var(--font-body);
+      font-size: var(--body-small-size); color: var(--text-secondary);
+      margin: var(--space-16) 0 var(--space-8);
+    }
+    .chip-group-label:first-of-type { margin-top: 0; }
+
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Forms</p>
+    <h1 class="ds-title">Inputs &amp; Forms</h1>
+    <p class="ds-sub">
+      The field family from <span class="mono">InputDecorationTheme</span>: a filled
+      <span class="mono">surfaceRaised</span> control, <span class="mono">radius12</span> corners,
+      and a hairline <span class="mono">border</span> that thickens to
+      <span class="mono">1.5px / brandPrimary</span> on focus. Below: text, search, and dropdown
+      states, plus the <span class="mono">FilterChip</span> pills used for units and allergens.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Text field — states</h3>
+
+      <div class="field">
+        <span class="field-label">Quantity</span>
+        <div class="input">
+          <span class="input-value">2.5</span>
+          <span class="input-icon input-icon--trail mono subtle">kg</span>
+        </div>
+        <span class="field-help">Enabled · resting border</span>
+      </div>
+
+      <div class="field">
+        <span class="field-label field-label--brand">Ingredient name</span>
+        <div class="input input--focused">
+          <span class="input-value">Roma tomatoes</span>
+          <span class="caret" aria-hidden="true"></span>
+        </div>
+        <span class="field-help">Focused · 1.5px brandPrimary + 12% ring</span>
+      </div>
+
+      <div class="field">
+        <span class="field-label field-label--error">Expiry date</span>
+        <div class="input input--error">
+          <span class="input-value">31/02/2026</span>
+        </div>
+        <span class="field-help field-help--error">Not a valid date — check the day for February.</span>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Search field</h3>
+      <div class="field">
+        <div class="input">
+          <span class="input-icon input-icon--lead" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </span>
+          <span class="input-value input-hint">Search ingredients&hellip;</span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Dropdown</h3>
+      <div class="field">
+        <span class="field-label">Category</span>
+        <div class="input">
+          <span class="input-value">Produce</span>
+          <span class="input-icon input-icon--trail" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Filter chips</h3>
+      <p class="chip-group-label">Unit</p>
+      <div class="wrap">
+        <span class="chip chip--on">
+          <span class="chip-check" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </span>
+          g
+        </span>
+        <span class="chip chip--off">kg</span>
+        <span class="chip chip--off">ml</span>
+        <span class="chip chip--off">piece</span>
+      </div>
+
+      <p class="chip-group-label">Allergens</p>
+      <div class="wrap">
+        <span class="chip chip--on">
+          <span class="chip-check" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </span>
+          Gluten
+        </span>
+        <span class="chip chip--off">Nuts</span>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Text field — states</h3>
+
+      <div class="field">
+        <span class="field-label">Quantity</span>
+        <div class="input">
+          <span class="input-value">2.5</span>
+          <span class="input-icon input-icon--trail mono subtle">kg</span>
+        </div>
+        <span class="field-help">Enabled · resting border</span>
+      </div>
+
+      <div class="field">
+        <span class="field-label field-label--brand">Ingredient name</span>
+        <div class="input input--focused">
+          <span class="input-value">Roma tomatoes</span>
+          <span class="caret" aria-hidden="true"></span>
+        </div>
+        <span class="field-help">Focused · 1.5px brandPrimary + 12% ring</span>
+      </div>
+
+      <div class="field">
+        <span class="field-label field-label--error">Expiry date</span>
+        <div class="input input--error">
+          <span class="input-value">31/02/2026</span>
+        </div>
+        <span class="field-help field-help--error">Not a valid date — check the day for February.</span>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Search field</h3>
+      <div class="field">
+        <div class="input">
+          <span class="input-icon input-icon--lead" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </span>
+          <span class="input-value input-hint">Search ingredients&hellip;</span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Dropdown</h3>
+      <div class="field">
+        <span class="field-label">Category</span>
+        <div class="input">
+          <span class="input-value">Produce</span>
+          <span class="input-icon input-icon--trail" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Filter chips</h3>
+      <p class="chip-group-label">Unit</p>
+      <div class="wrap">
+        <span class="chip chip--on">
+          <span class="chip-check" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </span>
+          g
+        </span>
+        <span class="chip chip--off">kg</span>
+        <span class="chip chip--off">ml</span>
+        <span class="chip chip--off">piece</span>
+      </div>
+
+      <p class="chip-group-label">Allergens</p>
+      <div class="wrap">
+        <span class="chip chip--on">
+          <span class="chip-check" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </span>
+          Gluten
+        </span>
+        <span class="chip chip--off">Nuts</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">InputDecorationTheme specs</h3>
+    <table class="spec">
+      <tr><td>Fill</td><td class="mono">surfaceRaised · filled: true</td></tr>
+      <tr><td>Shape</td><td class="mono">radius12 · 1px border (border)</td></tr>
+      <tr><td>Content padding</td><td class="mono">16 horizontal · 12 vertical</td></tr>
+      <tr><td>Value text</td><td class="mono">bodyLarge · textPrimary</td></tr>
+      <tr><td>Hint text</td><td class="mono">bodyLarge · textTertiary</td></tr>
+      <tr><td>Label — resting</td><td class="mono">labelMedium · textSecondary</td></tr>
+      <tr><td>Focused</td><td class="mono">1.5px border · brandPrimary · label → brandPrimary</td></tr>
+      <tr><td>Error</td><td class="mono">1.5px border · expired · helper bodySmall / expired</td></tr>
+      <tr><td>FilterChip — off</td><td class="mono">neutralSubtle · 1px border · textPrimary · radiusFull</td></tr>
+      <tr><td>FilterChip — on</td><td class="mono">brandPrimaryLight@16% · @45% border · check glyph</td></tr>
+    </table>
+    <p class="t-body-small subtle" style="margin: var(--space-12) 0 0;">
+      <span class="badge-proposed">proposed</span> &nbsp;The focus ring
+      (<span class="mono">brandPrimary@12%</span> glow) and the FilterChip selected-fill recipe are
+      design-system additions — current Flutter chips fall back to Material defaults and the theme
+      defines no focus shadow.
+    </p>
+  </section>
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!-- @dsCard group="Components — Lists" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ingredient List Tile</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* The dictionary list: rows on a raised surface, hairline dividers between. */
+    .ks-list {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-16);
+      overflow: hidden;
+    }
+
+    /* IngredientListTile — a tappable ListTile-style row. */
+    .tile {
+      display: flex;
+      align-items: center;
+      gap: var(--space-12);
+      padding: var(--space-10) var(--space-16);
+      background: transparent;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--curve-standard);
+    }
+    .tile:last-child { border-bottom: none; }
+    .tile:hover  { background: color-mix(in srgb, var(--brand-primary) 6%, transparent); }
+    .tile:active { background: color-mix(in srgb, var(--brand-primary) 10%, transparent); }
+
+    /* 44px thumbnail, radius10, category-tinted placeholder (color@15%). */
+    .thumb {
+      flex: 0 0 auto;
+      width: 44px; height: 44px;
+      border-radius: var(--radius-10);
+      background: color-mix(in srgb, var(--c) 15%, transparent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; line-height: 1;
+      color: color-mix(in srgb, var(--c) 85%, transparent);
+    }
+
+    .tile-body { flex: 1 1 auto; min-width: 0; }
+    .tile-title {
+      font-family: var(--font-body);
+      font-size: var(--title-medium-size); font-weight: var(--title-medium-weight);
+      line-height: var(--title-medium-lh); letter-spacing: var(--title-medium-ls);
+      color: var(--text-primary);
+      margin: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    /* subtitle = a Wrap of mini-tags. */
+    .tile-tags {
+      display: flex; flex-wrap: wrap;
+      gap: var(--space-6);
+      margin-top: var(--space-4);
+    }
+
+    /* Mini-tag: tonal, radius4, pad 6/2 — color@12% fill / color@85% text. */
+    .mini-tag {
+      display: inline-flex; align-items: center;
+      font-family: var(--font-body);
+      font-size: var(--label-small-size); font-weight: var(--label-small-weight);
+      letter-spacing: var(--label-small-ls); line-height: 1;
+      border-radius: var(--radius-4);
+      padding: var(--space-2) var(--space-6);
+      background: color-mix(in srgb, var(--c) 12%, transparent);
+      color: color-mix(in srgb, var(--c) 85%, transparent);
+      white-space: nowrap;
+    }
+    /* Neutral mini-tag for variant/bulk/non-food qualifiers. */
+    .mini-tag--neutral {
+      --c: var(--text-tertiary);
+      background: var(--neutral-subtle);
+      color: var(--text-secondary);
+    }
+
+    /* Trailing chevron, --text-tertiary. */
+    .chevron {
+      flex: 0 0 auto;
+      color: var(--text-tertiary);
+      font-size: 18px; line-height: 1;
+    }
+
+    /* Indented variant row: 2px border-strong left bar (radiusFull) + space24 indent. */
+    .tile--variant { padding-left: var(--space-24); position: relative; }
+    .tile--variant::before {
+      content: "";
+      position: absolute;
+      left: var(--space-12);
+      top: var(--space-12); bottom: var(--space-12);
+      width: 2px;
+      border-radius: var(--radius-full);
+      background: var(--border-strong);
+    }
+
+    .note { margin: var(--space-12) 0 0; }
+    .anatomy {
+      display: flex; flex-wrap: wrap; gap: var(--space-8) var(--space-16);
+      margin: var(--space-12) 0 0;
+    }
+    .anatomy span { display: inline-flex; align-items: center; gap: var(--space-6); }
+    .anatomy .dot {
+      width: 8px; height: 8px; border-radius: var(--radius-full);
+      background: var(--brand-primary);
+    }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Components · Lists</p>
+    <h1 class="ds-title">Ingredient List Tile</h1>
+    <p class="ds-sub">
+      The repeating row of the ingredient dictionary. Each tile pairs a 44px
+      category-tinted thumbnail with a <span class="mono">titleMedium</span> name and a
+      wrap of tonal mini-tags. Variant ingredients tuck under their parent with a
+      <span class="mono">borderStrong</span> rail and an extra <span class="mono">space24</span> indent.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <div class="ks-list">
+        <!-- Tomato — produce -->
+        <div class="tile" style="--c: var(--cat-produce);">
+          <div class="thumb">&#127813;</div>
+          <div class="tile-body">
+            <p class="tile-title">Tomato</p>
+            <div class="tile-tags">
+              <span class="mini-tag">produce</span>
+            </div>
+          </div>
+          <span class="chevron">&rsaquo;</span>
+        </div>
+
+        <!-- Cherry tomato — produce + variant (indented) -->
+        <div class="tile tile--variant" style="--c: var(--cat-produce);">
+          <div class="thumb">&#127813;</div>
+          <div class="tile-body">
+            <p class="tile-title">Cherry tomato</p>
+            <div class="tile-tags">
+              <span class="mini-tag">produce</span>
+              <span class="mini-tag mini-tag--neutral">variant</span>
+            </div>
+          </div>
+          <span class="chevron">&rsaquo;</span>
+        </div>
+
+        <!-- Quinoa — grain + bulk -->
+        <div class="tile" style="--c: var(--cat-grain);">
+          <div class="thumb">&#127806;</div>
+          <div class="tile-body">
+            <p class="tile-title">Quinoa</p>
+            <div class="tile-tags">
+              <span class="mini-tag">grain</span>
+              <span class="mini-tag mini-tag--neutral">bulk</span>
+            </div>
+          </div>
+          <span class="chevron">&rsaquo;</span>
+        </div>
+
+        <!-- Dish soap — nonFood -->
+        <div class="tile" style="--c: var(--cat-non-food);">
+          <div class="thumb">&#129532;</div>
+          <div class="tile-body">
+            <p class="tile-title">Dish soap</p>
+            <div class="tile-tags">
+              <span class="mini-tag">non-food</span>
+            </div>
+          </div>
+          <span class="chevron">&rsaquo;</span>
+        </div>
+      </div>
+
+      <div class="anatomy t-body-small subtle">
+        <span><i class="dot"></i>Thumb 44 · r10 · color&#64;15%</span>
+        <span><i class="dot"></i>Title titleMedium</span>
+        <span><i class="dot"></i>Mini-tag r4 · 6/2</span>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <div class="ks-list">
+        <!-- Tomato — produce -->
+        <div class="tile" style="--c: var(--cat-produce);">
+          <div class="thumb">&#127813;</div>
+          <div class="tile-body">
+            <p class="tile-title">Tomato</p>
+            <div class="tile-tags">
+              <span class="mini-tag">produce</span>
+            </div>
+          </div>
+          <span class="chevron">&rsaquo;</span>
+        </div>
+
+        <!-- Cherry tomato — produce + variant (indented) -->
+        <div class="tile tile--variant" style="--c: var(--cat-produce);">
+          <div class="thumb">&#127813;</div>
+          <div class="tile-body">
+            <p class="tile-title">Cherry tomato</p>
+            <div class="tile-tags">
+              <span class="mini-tag">produce</span>
+              <span class="mini-tag mini-tag--neutral">variant</span>
+            </div>
+          </div>
+          <span class="chevron">&rsaquo;</span>
+        </div>
+
+        <!-- Quinoa — grain + bulk -->
+        <div class="tile" style="--c: var(--cat-grain);">
+          <div class="thumb">&#127806;</div>
+          <div class="tile-body">
+            <p class="tile-title">Quinoa</p>
+            <div class="tile-tags">
+              <span class="mini-tag">grain</span>
+              <span class="mini-tag mini-tag--neutral">bulk</span>
+            </div>
+          </div>
+          <span class="chevron">&rsaquo;</span>
+        </div>
+
+        <!-- Dish soap — nonFood -->
+        <div class="tile" style="--c: var(--cat-non-food);">
+          <div class="thumb">&#129532;</div>
+          <div class="tile-body">
+            <p class="tile-title">Dish soap</p>
+            <div class="tile-tags">
+              <span class="mini-tag">non-food</span>
+            </div>
+          </div>
+          <span class="chevron">&rsaquo;</span>
+        </div>
+      </div>
+
+      <p class="note t-body-small subtle" style="margin-top: var(--space-16);">
+        Category hues are reused from the light set today, matching the current code.
+        The tuned <span class="mono">--cat-*-dark</span> set is proposed for crisper fills.
+        <span class="badge-proposed">proposed</span>
+      </p>
+    </section>
+  </div>
+
+  <!-- Reference table -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Anatomy &amp; specs (for the port)</h3>
+    <table class="spec">
+      <tr><td>Row padding</td><td class="mono">10 / 16 (vertical / horizontal) · ListTile</td></tr>
+      <tr><td>Thumbnail</td><td class="mono">44 &times; 44 · radius10 · placeholder color@15% fill · grocery glyph</td></tr>
+      <tr><td>Title</td><td class="mono">titleMedium · w600 · textPrimary · 1 line, ellipsis</td></tr>
+      <tr><td>Subtitle</td><td class="mono">Wrap of mini-tags · gap 6 · margin-top 4</td></tr>
+      <tr><td>Mini-tag</td><td class="mono">radius4 · pad 6/2 · labelSmall w600 · color@12% / @85%</td></tr>
+      <tr><td>Qualifier tag</td><td class="mono">variant · bulk · non-food → neutralSubtle fill · textSecondary</td></tr>
+      <tr><td>Variant indent</td><td class="mono">left pad space24 · 2px borderStrong rail · radiusFull · inset space12</td></tr>
+      <tr><td>Trailing</td><td class="mono">chevron_right · textTertiary</td></tr>
+      <tr><td>Hover / pressed</td><td class="mono">brandPrimary@6% · @10% · 150ms easeOutCubic</td></tr>
+    </table>
+  </section>
+</body>
+</html>

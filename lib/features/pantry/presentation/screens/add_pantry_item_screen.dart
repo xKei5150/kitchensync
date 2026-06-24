@@ -1,6 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
@@ -84,6 +86,13 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
     }
   }
 
+  String _labelFor(PantrySection section) => switch (section) {
+    PantrySection.food => 'Food',
+    PantrySection.bulk => 'Bulk',
+    PantrySection.nonFood => 'Non-food',
+    PantrySection.leftover => 'Leftovers',
+  };
+
   @override
   Widget build(BuildContext context) {
     final allowedUnits = _selected?.allowedUnits ?? Unit.values;
@@ -91,103 +100,245 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Add pantry item')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(KsTokens.space20),
         children: [
-          // Ingredient picker
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.kitchen),
-            title: Text(
-              _selected?.displayNames['en'] ??
-                  _selected?.name ??
-                  'Select ingredient',
-            ),
-            subtitle: _selected == null ? const Text('Tap to pick') : null,
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _submitting ? null : _pickIngredient,
-          ),
-          const Divider(),
-          const SizedBox(height: 16),
-
-          // Quantity
-          TextField(
-            controller: _qty,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Quantity',
-              border: OutlineInputBorder(),
+          _SectionCard(
+            label: 'Ingredient',
+            child: _IngredientPickerRow(
+              selected: _selected,
+              onTap: _submitting ? null : _pickIngredient,
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Unit dropdown
-          DropdownButtonFormField<Unit>(
-            // ignore: deprecated_member_use
-            value: allowedUnits.contains(_unit) ? _unit : allowedUnits.first,
-            decoration: const InputDecoration(
-              labelText: 'Unit',
-              border: OutlineInputBorder(),
+          const SizedBox(height: KsTokens.space16),
+          _SectionCard(
+            label: 'Quantity',
+            child: Column(
+              children: [
+                TextField(
+                  controller: _qty,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Amount',
+                    hintText: '0',
+                  ),
+                ),
+                const SizedBox(height: KsTokens.space12),
+                DropdownButtonFormField<Unit>(
+                  value: allowedUnits.contains(_unit)
+                      ? _unit
+                      : allowedUnits.first,
+                  decoration: const InputDecoration(labelText: 'Unit'),
+                  items: allowedUnits
+                      .map(
+                        (u) => DropdownMenuItem(value: u, child: Text(u.name)),
+                      )
+                      .toList(),
+                  onChanged: _submitting
+                      ? null
+                      : (u) {
+                          if (u != null) setState(() => _unit = u);
+                        },
+                ),
+              ],
             ),
-            items: allowedUnits
-                .map((u) => DropdownMenuItem(value: u, child: Text(u.name)))
-                .toList(),
-            onChanged: _submitting
-                ? null
-                : (u) {
-                    if (u != null) setState(() => _unit = u);
-                  },
           ),
-          const SizedBox(height: 16),
-
-          // Section dropdown
-          DropdownButtonFormField<PantrySection>(
-            // ignore: deprecated_member_use
-            value: _section,
-            decoration: const InputDecoration(
-              labelText: 'Section',
-              border: OutlineInputBorder(),
+          const SizedBox(height: KsTokens.space16),
+          _SectionCard(
+            label: 'Section',
+            child: Wrap(
+              spacing: KsTokens.space8,
+              runSpacing: KsTokens.space8,
+              children: PantrySection.values.map((section) {
+                return ChoiceChip(
+                  label: Text(_labelFor(section)),
+                  selected: section == _section,
+                  onSelected: _submitting
+                      ? null
+                      : (_) => setState(() => _section = section),
+                  avatar: Icon(_iconFor(section), size: 18),
+                );
+              }).toList(),
             ),
-            items: PantrySection.values
-                .map(
-                  (s) => DropdownMenuItem(value: s, child: Text(_labelFor(s))),
-                )
-                .toList(),
-            onChanged: _submitting
-                ? null
-                : (s) {
-                    if (s != null) setState(() => _section = s);
-                  },
           ),
-
-          // Error text
           if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: KsTokens.space16),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: KsTokens.space12,
+                vertical: KsTokens.space10,
+              ),
+              decoration: BoxDecoration(
+                color: KsTokens.expired.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(KsTokens.radius12),
+                border: Border.all(
+                  color: KsTokens.expired.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, size: 18, color: KsTokens.expired),
+                  const SizedBox(width: KsTokens.space8),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: KsTokens.bodySmall.copyWith(
+                        color: KsTokens.expired,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-          const SizedBox(height: 24),
-
-          // Save button
+          const SizedBox(height: KsTokens.space24),
           FilledButton(
             onPressed: _submitting ? null : _save,
             child: _submitting
                 ? const SizedBox.square(
                     dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: KsTokens.textOnBrand,
+                    ),
                   )
-                : const Text('Save'),
+                : const Text('Save to pantry'),
           ),
+          const SizedBox(height: KsTokens.space32),
         ],
       ),
     );
   }
 
-  String _labelFor(PantrySection section) => switch (section) {
-    PantrySection.food => 'Food',
-    PantrySection.bulk => 'Bulk',
-    PantrySection.nonFood => 'Non-food',
-    PantrySection.leftover => 'Leftovers',
+  IconData _iconFor(PantrySection section) => switch (section) {
+    PantrySection.food => Icons.restaurant_outlined,
+    PantrySection.bulk => Icons.inventory_2_outlined,
+    PantrySection.nonFood => Icons.cleaning_services_outlined,
+    PantrySection.leftover => Icons.lunch_dining_outlined,
   };
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(KsTokens.space16),
+      decoration: BoxDecoration(
+        color: KsTokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(KsTokens.radius16),
+        border: Border.all(color: KsTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: KsTokens.labelLarge.copyWith(color: KsTokens.textSecondary),
+          ),
+          const SizedBox(height: KsTokens.space12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _IngredientPickerRow extends StatelessWidget {
+  const _IngredientPickerRow({this.selected, this.onTap});
+
+  final Ingredient? selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected?.category.color ?? KsTokens.catOther;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(KsTokens.radius12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: KsTokens.space8,
+            vertical: KsTokens.space10,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(KsTokens.radius10),
+                ),
+                child: selected?.imageUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(KsTokens.radius10),
+                        child: CachedNetworkImage(
+                          imageUrl: selected!.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) =>
+                              _PickerIcon(color: color),
+                        ),
+                      )
+                    : _PickerIcon(color: color),
+              ),
+              const SizedBox(width: KsTokens.space12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      selected?.displayNames['en'] ??
+                          selected?.name ??
+                          'Select ingredient',
+                      style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (selected == null)
+                      Text(
+                        'Tap to pick from dictionary',
+                        style: KsTokens.bodySmall.copyWith(
+                          color: KsTokens.textTertiary,
+                        ),
+                      )
+                    else
+                      Text(
+                        selected!.category.name,
+                        style: KsTokens.bodySmall.copyWith(
+                          color: KsTokens.textSecondary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: KsTokens.textTertiary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerIcon extends StatelessWidget {
+  const _PickerIcon({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(
+      Icons.local_grocery_store_outlined,
+      size: 22,
+      color: color.withValues(alpha: 0.7),
+    );
+  }
 }

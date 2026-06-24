@@ -1,0 +1,279 @@
+<!-- @dsCard group="Foundations" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Motion</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Duration bars — width animates purely to illustrate relative length on hover. */
+    .dur-row {
+      display: grid;
+      grid-template-columns: 72px 1fr 64px;
+      align-items: center;
+      gap: var(--space-12);
+      margin-bottom: var(--space-10);
+    }
+    .dur-row:last-child { margin-bottom: 0; }
+    .dur-name { font-weight: 600; color: var(--text-primary); font-size: 13px; }
+    .dur-track {
+      height: 10px;
+      border-radius: var(--radius-full);
+      background: var(--neutral-subtle);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .dur-fill {
+      height: 100%;
+      border-radius: var(--radius-full);
+      background: var(--brand-primary);
+    }
+    .dur-fill--fast   { width: 30%; }
+    .dur-fill--medium { width: 60%; }
+    .dur-fill--slow   { width: 100%; }
+    .dur-val { text-align: right; }
+
+    /* Curve key — swatch dot uses each curve var so the legend reads at a glance. */
+    .curve-legend { display: flex; flex-direction: column; gap: var(--space-8); }
+    .curve-key {
+      display: grid;
+      grid-template-columns: 18px 96px 1fr;
+      align-items: center;
+      gap: var(--space-10);
+      font-size: 13px;
+    }
+    .curve-dot {
+      width: 12px; height: 12px; border-radius: var(--radius-full);
+      background: var(--brand-accent);
+    }
+    .curve-dot--standard { background: var(--brand-primary); }
+    .curve-dot--enter    { background: var(--fresh); }
+    .curve-dot--exit     { background: var(--expiring-soon); }
+    .curve-name { font-weight: 600; color: var(--text-primary); }
+
+    /* Live demo chip — eases on hover using durationMedium + curveStandard. */
+    .demo-stage {
+      background: var(--neutral-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-12);
+      padding: var(--space-16);
+      display: flex; flex-direction: column; gap: var(--space-10);
+    }
+    .demo-rail {
+      position: relative;
+      height: 40px;
+      border-radius: var(--radius-10);
+      background: var(--surface-raised);
+      border: 1px dashed var(--border-strong);
+      display: flex; align-items: center;
+      padding: 0 var(--space-6);
+    }
+    .demo-chip {
+      display: inline-flex; align-items: center; gap: var(--space-6);
+      font-family: var(--font-body);
+      font-size: var(--label-medium-size);
+      font-weight: var(--label-medium-weight);
+      letter-spacing: var(--label-medium-ls);
+      color: var(--text-on-brand);
+      background: var(--brand-primary);
+      border-radius: var(--radius-full);
+      padding: var(--space-6) var(--space-12);
+      box-shadow: var(--elevation-1);
+      transform: translateX(0);
+      transition: transform var(--dur-medium) var(--curve-standard);
+      will-change: transform;
+    }
+    .demo-chip::before {
+      content: "";
+      width: 8px; height: 8px; border-radius: var(--radius-full);
+      background: var(--brand-accent);
+    }
+    /* Slides the chip to the far end of its rail — transform only, compositor-friendly. */
+    .demo-rail:hover .demo-chip { transform: translateX(calc(100% + var(--space-12))); }
+    .demo-caption { color: var(--text-tertiary); }
+
+    /* easeOutCubic plot — fast start, gentle settle. */
+    .curve-plot {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-12);
+      padding: var(--space-12);
+    }
+    .curve-plot svg { display: block; width: 100%; height: auto; }
+    .curve-grid  { stroke: var(--border); stroke-width: 1; }
+    .curve-diag  { stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 3 4; }
+    .curve-path  { stroke: var(--brand-primary); stroke-width: 2.5; fill: none; stroke-linecap: round; }
+    .curve-axis  { fill: var(--text-tertiary); font-family: var(--font-body); font-size: 9px; }
+
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Foundations · Motion</p>
+    <h1 class="ds-title">Motion</h1>
+    <p class="ds-sub">
+      Three durations and three curves carry every transition in KitchenSync.
+      <span class="mono">durationMedium</span> paired with <span class="mono">curveStandard</span>
+      (easeOutCubic) drives the section-tab selection animation; <span class="mono">fast</span>
+      handles taps and small state flips, <span class="mono">slow</span> covers larger transitions.
+      Hover the chip below to feel the standard ease.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Durations</h3>
+      <div class="dur-row">
+        <span class="dur-name">Fast</span>
+        <span class="dur-track"><span class="dur-fill dur-fill--fast"></span></span>
+        <span class="dur-val mono">150ms</span>
+      </div>
+      <div class="dur-row">
+        <span class="dur-name">Medium</span>
+        <span class="dur-track"><span class="dur-fill dur-fill--medium"></span></span>
+        <span class="dur-val mono">300ms</span>
+      </div>
+      <div class="dur-row">
+        <span class="dur-name">Slow</span>
+        <span class="dur-track"><span class="dur-fill dur-fill--slow"></span></span>
+        <span class="dur-val mono">500ms</span>
+      </div>
+
+      <h3 class="block-h">Curves</h3>
+      <div class="curve-legend">
+        <div class="curve-key">
+          <span class="curve-dot curve-dot--standard"></span>
+          <span class="curve-name">Standard</span>
+          <span class="muted mono">easeOutCubic · cubic-bezier(.215,.61,.355,1)</span>
+        </div>
+        <div class="curve-key">
+          <span class="curve-dot curve-dot--enter"></span>
+          <span class="curve-name">Enter</span>
+          <span class="muted mono">easeOut · cubic-bezier(0,0,.58,1)</span>
+        </div>
+        <div class="curve-key">
+          <span class="curve-dot curve-dot--exit"></span>
+          <span class="curve-name">Exit</span>
+          <span class="muted mono">easeIn · cubic-bezier(.42,0,1,1)</span>
+        </div>
+      </div>
+
+      <h3 class="block-h">Live · hover the chip</h3>
+      <div class="demo-stage">
+        <div class="demo-rail">
+          <span class="demo-chip">Produce</span>
+        </div>
+        <span class="demo-caption t-body-small">
+          <span class="mono">durationMedium</span> + <span class="mono">curveStandard</span> — the same pairing as the section-tab indicator.
+        </span>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Durations</h3>
+      <div class="dur-row">
+        <span class="dur-name">Fast</span>
+        <span class="dur-track"><span class="dur-fill dur-fill--fast"></span></span>
+        <span class="dur-val mono">150ms</span>
+      </div>
+      <div class="dur-row">
+        <span class="dur-name">Medium</span>
+        <span class="dur-track"><span class="dur-fill dur-fill--medium"></span></span>
+        <span class="dur-val mono">300ms</span>
+      </div>
+      <div class="dur-row">
+        <span class="dur-name">Slow</span>
+        <span class="dur-track"><span class="dur-fill dur-fill--slow"></span></span>
+        <span class="dur-val mono">500ms</span>
+      </div>
+
+      <h3 class="block-h">Curves</h3>
+      <div class="curve-legend">
+        <div class="curve-key">
+          <span class="curve-dot curve-dot--standard"></span>
+          <span class="curve-name">Standard</span>
+          <span class="muted mono">easeOutCubic · cubic-bezier(.215,.61,.355,1)</span>
+        </div>
+        <div class="curve-key">
+          <span class="curve-dot curve-dot--enter"></span>
+          <span class="curve-name">Enter</span>
+          <span class="muted mono">easeOut · cubic-bezier(0,0,.58,1)</span>
+        </div>
+        <div class="curve-key">
+          <span class="curve-dot curve-dot--exit"></span>
+          <span class="curve-name">Exit</span>
+          <span class="muted mono">easeIn · cubic-bezier(.42,0,1,1)</span>
+        </div>
+      </div>
+
+      <h3 class="block-h">Live · hover the chip</h3>
+      <div class="demo-stage">
+        <div class="demo-rail">
+          <span class="demo-chip">Produce</span>
+        </div>
+        <span class="demo-caption t-body-small">
+          <span class="mono">durationMedium</span> + <span class="mono">curveStandard</span> — the same pairing as the section-tab indicator.
+        </span>
+      </div>
+    </section>
+  </div>
+
+  <!-- easeOutCubic plot + spec -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">easeOutCubic — the standard curve</h3>
+    <div class="row" style="align-items: stretch; gap: var(--space-20);">
+      <div class="curve-plot" style="flex: 0 0 200px;">
+        <svg viewBox="0 0 120 120" role="img" aria-label="easeOutCubic timing curve — fast start, gentle settle">
+          <!-- frame + midlines -->
+          <line class="curve-grid" x1="10" y1="10"  x2="110" y2="10" />
+          <line class="curve-grid" x1="10" y1="60"  x2="110" y2="60" />
+          <line class="curve-grid" x1="10" y1="110" x2="110" y2="110" />
+          <line class="curve-grid" x1="10"  y1="10" x2="10"  y2="110" />
+          <line class="curve-grid" x1="60"  y1="10" x2="60"  y2="110" />
+          <line class="curve-grid" x1="110" y1="10" x2="110" y2="110" />
+          <!-- linear reference -->
+          <line class="curve-diag" x1="10" y1="110" x2="110" y2="10" />
+          <!-- cubic-bezier(.215,.61,.355,1): P0(0,0) C(.215,.61)(.355,1) P3(1,1) -->
+          <!-- mapped to 10..110 px box, y flipped so progress rises upward -->
+          <path class="curve-path" d="M 10 110 C 31.5 49 45.5 10 110 10" />
+          <text class="curve-axis" x="10"  y="119">0</text>
+          <text class="curve-axis" x="100" y="119">t</text>
+          <text class="curve-axis" x="2"   y="14" transform="rotate(-90 6 12)">1</text>
+        </svg>
+        <p class="t-body-small subtle" style="margin: var(--space-8) 0 0; text-align: center;">progress vs time</p>
+      </div>
+
+      <table class="spec" style="flex: 1 1 320px;">
+        <tr><td>durationFast</td><td class="mono">150ms · taps, small state flips</td></tr>
+        <tr><td>durationMedium</td><td class="mono">300ms · section-tab selection</td></tr>
+        <tr><td>durationSlow</td><td class="mono">500ms · larger transitions</td></tr>
+        <tr><td>curveStandard</td><td class="mono">Curves.easeOutCubic · cubic-bezier(.215,.61,.355,1)</td></tr>
+        <tr><td>curveEnter</td><td class="mono">Curves.easeOut · cubic-bezier(0,0,.58,1)</td></tr>
+        <tr><td>curveExit</td><td class="mono">Curves.easeIn · cubic-bezier(.42,0,1,1)</td></tr>
+      </table>
+    </div>
+    <p class="t-body-small muted" style="margin: var(--space-16) 0 0;">
+      Section-tab selection is the canonical pairing: <span class="mono">AnimatedContainer(duration: durationMedium, curve: curveStandard)</span>.
+      Reduced-motion handling <span class="badge-proposed">proposed</span> — honor the platform "reduce motion" flag to drop to instant transitions; not yet wired in the Flutter code.
+    </p>
+  </section>
+</body>
+</html>

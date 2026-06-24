@@ -1,0 +1,259 @@
+<!-- @dsCard group="Color" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freshness Colors</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <style>
+    .block-h {
+      font-family: var(--font-body);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: var(--space-24) 0 var(--space-12);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .block-h:first-of-type { margin-top: 0; }
+
+    /* Applied state: a 6px status dot + bodySmall label at color@85% — the
+       exact treatment used on pantry tiles and ingredient rows. */
+    .state {
+      display: flex; align-items: center; gap: var(--space-8);
+      padding: var(--space-8) var(--space-10);
+      border-radius: var(--radius-8);
+      background: color-mix(in srgb, var(--c) 8%, transparent);
+    }
+    .state-dot {
+      width: 6px; height: 6px; flex: 0 0 6px;
+      border-radius: var(--radius-full);
+      background: var(--c);
+    }
+    .state-label {
+      font-family: var(--font-body);
+      font-size: var(--body-small-size); font-weight: 500;
+      line-height: 1;
+      color: color-mix(in srgb, var(--c) 85%, transparent);
+    }
+    /* The "unknown" state borrows textTertiary and ships an EMPTY label. */
+    .state--unknown { background: var(--neutral-subtle); }
+    .state--unknown .state-dot { background: var(--text-tertiary); }
+    .state-label.is-empty { color: var(--text-tertiary); font-style: italic; }
+
+    .states { display: flex; flex-direction: column; gap: var(--space-8); align-items: flex-start; }
+    .states .state { width: auto; }
+
+    .divider { height: 1px; background: var(--border); margin: var(--space-20) 0; border: 0; }
+    .note {
+      margin: 0; padding: var(--space-12) var(--space-16);
+      border-radius: var(--radius-12);
+      background: color-mix(in srgb, var(--low-stock) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--low-stock) 24%, transparent);
+    }
+  </style>
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Color · Foundations</p>
+    <h1 class="ds-title">Freshness</h1>
+    <p class="ds-sub">
+      Four semantic colors signal how a pantry item is doing. Three are time-based —
+      <span class="mono">fresh</span>, <span class="mono">expiringSoon</span>,
+      <span class="mono">expired</span> — and read like a traffic light. The fourth,
+      <span class="mono">lowStock</span>, is a quantity signal in warm brown, deliberately
+      off the green-amber-red axis. An <span class="mono">unknown</span> item falls back to
+      <span class="mono">textTertiary</span> with an empty label.
+    </p>
+  </header>
+
+  <!-- Swatches: token + hex + meaning -->
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+
+      <h3 class="block-h">Swatches</h3>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--fresh);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Fresh</p>
+            <span class="swatch-token mono">fresh</span>
+            <span class="swatch-hex mono">#43A047</span>
+            <span class="swatch-token mono" style="margin-top:4px;">plenty of time</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--expiring-soon);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Expiring soon</p>
+            <span class="swatch-token mono">expiringSoon</span>
+            <span class="swatch-hex mono">#FFB300</span>
+            <span class="swatch-token mono" style="margin-top:4px;">1&ndash;3 days left</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--expired);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Expired</p>
+            <span class="swatch-token mono">expired</span>
+            <span class="swatch-hex mono">#C62828</span>
+            <span class="swatch-token mono" style="margin-top:4px;">past expiry / 0 days</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--low-stock);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Low</p>
+            <span class="swatch-token mono">lowStock</span>
+            <span class="swatch-hex mono">#6D4C41</span>
+            <span class="swatch-token mono" style="margin-top:4px;">running low &middot; quantity</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--text-tertiary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Unknown</p>
+            <span class="swatch-token mono">textTertiary</span>
+            <span class="swatch-hex mono">#8B9183</span>
+            <span class="swatch-token mono" style="margin-top:4px;">empty label</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Applied &mdash; dot &plus; bodySmall &commat;85&percnt;</h3>
+      <div class="states">
+        <div class="state" style="--c: var(--fresh);">
+          <span class="state-dot"></span>
+          <span class="state-label">Fresh &middot; 9 days left</span>
+        </div>
+        <div class="state" style="--c: var(--expiring-soon);">
+          <span class="state-dot"></span>
+          <span class="state-label">Expiring soon &middot; 2 days left</span>
+        </div>
+        <div class="state" style="--c: var(--expired);">
+          <span class="state-dot"></span>
+          <span class="state-label">Expired &middot; 3 days ago</span>
+        </div>
+        <div class="state" style="--c: var(--low-stock);">
+          <span class="state-dot"></span>
+          <span class="state-label">Low &middot; 1 egg left</span>
+        </div>
+        <div class="state state--unknown">
+          <span class="state-dot"></span>
+          <span class="state-label is-empty">no expiry set</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+
+      <h3 class="block-h">Swatches</h3>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--fresh);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Fresh</p>
+            <span class="swatch-token mono">fresh</span>
+            <span class="swatch-hex mono">#43A047</span>
+            <span class="swatch-token mono" style="margin-top:4px;">plenty of time</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--expiring-soon);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Expiring soon</p>
+            <span class="swatch-token mono">expiringSoon</span>
+            <span class="swatch-hex mono">#FFB300</span>
+            <span class="swatch-token mono" style="margin-top:4px;">1&ndash;3 days left</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--expired);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Expired</p>
+            <span class="swatch-token mono">expired</span>
+            <span class="swatch-hex mono">#C62828</span>
+            <span class="swatch-token mono" style="margin-top:4px;">past expiry / 0 days</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--low-stock);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Low</p>
+            <span class="swatch-token mono">lowStock</span>
+            <span class="swatch-hex mono">#6D4C41</span>
+            <span class="swatch-token mono" style="margin-top:4px;">running low &middot; quantity</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--text-tertiary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Unknown</p>
+            <span class="swatch-token mono">textTertiary</span>
+            <span class="swatch-hex mono">#8B9183</span>
+            <span class="swatch-token mono" style="margin-top:4px;">empty label</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <h3 class="block-h">Applied &mdash; dot &plus; bodySmall &commat;85&percnt;</h3>
+      <div class="states">
+        <div class="state" style="--c: var(--fresh);">
+          <span class="state-dot"></span>
+          <span class="state-label">Fresh &middot; 9 days left</span>
+        </div>
+        <div class="state" style="--c: var(--expiring-soon);">
+          <span class="state-dot"></span>
+          <span class="state-label">Expiring soon &middot; 2 days left</span>
+        </div>
+        <div class="state" style="--c: var(--expired);">
+          <span class="state-dot"></span>
+          <span class="state-label">Expired &middot; 3 days ago</span>
+        </div>
+        <div class="state" style="--c: var(--low-stock);">
+          <span class="state-dot"></span>
+          <span class="state-label">Low &middot; 1 egg left</span>
+        </div>
+        <div class="state state--unknown">
+          <span class="state-dot"></span>
+          <span class="state-label is-empty">no expiry set</span>
+        </div>
+      </div>
+      <p class="t-body-small subtle" style="margin: var(--space-12) 0 0;">
+        Freshness hues are reused unchanged in dark mode, mirroring the current code.
+        <span class="mono">lowStock</span> brown sits darkest against the raised surface.
+      </p>
+    </section>
+  </div>
+
+  <!-- Reference table + note -->
+  <section class="ds-surface" style="margin-top: var(--space-20);">
+    <h3 class="block-h" style="margin-top:0;">Semantics</h3>
+    <table class="spec">
+      <tr><td>fresh</td><td class="mono">#43A047 &middot; time &middot; plenty of time left</td></tr>
+      <tr><td>expiringSoon</td><td class="mono">#FFB300 &middot; time &middot; 1&ndash;3 days left</td></tr>
+      <tr><td>expired</td><td class="mono">#C62828 &middot; time &middot; past expiry / 0 days</td></tr>
+      <tr><td>lowStock</td><td class="mono">#6D4C41 &middot; quantity &middot; running low</td></tr>
+      <tr><td>unknown</td><td class="mono">textTertiary #8B9183 &middot; empty label</td></tr>
+    </table>
+
+    <p class="note t-body-small" style="margin-top: var(--space-16);">
+      <strong>lowStock is a different axis.</strong> Fresh, expiringSoon, and expired answer
+      <em>&ldquo;how much time is left?&rdquo;</em> and run green &rarr; amber &rarr; red.
+      lowStock answers <em>&ldquo;how much is left?&rdquo;</em> &mdash; a quantity signal, so it
+      lives off that axis in warm brown to avoid reading as a third point on the time scale.
+      An item can be both <span class="mono">fresh</span> and <span class="mono">lowStock</span>
+      (e.g. one fresh egg). The applied dot uses a <span class="mono">color&#64;8%</span> fill with
+      <span class="mono">color&#64;85%</span> bodySmall text.
+    </p>
+  </section>
+</body>
+</html>

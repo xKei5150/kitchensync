@@ -1,0 +1,103 @@
+<!-- @dsCard group="Color" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brand Colors</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+</head>
+<body class="ds">
+  <header class="ds-head">
+    <p class="ds-eyebrow">Color · Foundations</p>
+    <h1 class="ds-title">Brand</h1>
+    <p class="ds-sub">
+      Warm, slightly earthy green anchors the palette — not a tech-startup neon.
+      A single amber accent provides contrast for selection and highlights.
+      In the dark theme, <span class="mono">ColorScheme.primary</span> resolves to
+      <span class="mono">brandPrimaryLight</span> for legibility, shown live below.
+    </p>
+  </header>
+
+  <div class="ds-themes">
+    <!-- LIGHT -->
+    <section class="ds-panel">
+      <p class="ds-panel-label">Light</p>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--brand-primary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Primary <span class="subtle mono">(resolved)</span></p>
+            <span class="swatch-token mono">brandPrimary</span>
+            <span class="swatch-hex mono">#2E7D32</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: #4CAF50;"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Primary Light</p>
+            <span class="swatch-token mono">brandPrimaryLight</span>
+            <span class="swatch-hex mono">#4CAF50</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: #1B5E20;"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Primary Dark</p>
+            <span class="swatch-token mono">brandPrimaryDark</span>
+            <span class="swatch-hex mono">#1B5E20</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: #F9A825;"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Accent</p>
+            <span class="swatch-token mono">brandAccent</span>
+            <span class="swatch-hex mono">#F9A825</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DARK -->
+    <section class="ds-panel" data-theme="dark">
+      <p class="ds-panel-label">Dark</p>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="swatch-chip" style="background: var(--brand-primary);"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Primary <span class="subtle mono">(resolved)</span></p>
+            <span class="swatch-token mono">brandPrimary&rarr;Light</span>
+            <span class="swatch-hex mono">#4CAF50</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: #4CAF50;"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Primary Light</p>
+            <span class="swatch-token mono">brandPrimaryLight</span>
+            <span class="swatch-hex mono">#4CAF50</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: #1B5E20;"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Primary Dark</p>
+            <span class="swatch-token mono">brandPrimaryDark</span>
+            <span class="swatch-hex mono">#1B5E20</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <span class="swatch-chip" style="background: #F9A825;"></span>
+          <div class="swatch-meta">
+            <p class="swatch-name">Accent</p>
+            <span class="swatch-token mono">brandAccent</span>
+            <span class="swatch-hex mono">#F9A825</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

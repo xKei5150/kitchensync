@@ -32,6 +32,9 @@ dependencies:
   # Routing
   go_router: ^14.2.7
 
+  # Fonts
+  google_fonts: ^6.2.1
+
   # Images
   image_picker: ^1.1.2
   image_cropper: ^8.0.2
