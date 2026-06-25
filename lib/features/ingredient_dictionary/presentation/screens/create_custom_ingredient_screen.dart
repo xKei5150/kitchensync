@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,15 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingre
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/create_custom_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
+/// Screen 21 · Create ingredient — defining a new kind of thing.
+///
+/// Catalog-level, not stock-level: this is where an ingredient's identity is
+/// set — the category that colours it everywhere, its default unit, and the
+/// shelf life that powers every future freshness countdown. A live identity
+/// card at the top mirrors those choices back before they're committed.
+///
+/// Graduated from "KitchenSync — P3 Accessibility & Forms". Every control binds
+/// to a real [CreateCustomIngredientParams] field.
 class CreateCustomIngredientScreen extends ConsumerStatefulWidget {
   const CreateCustomIngredientScreen({super.key, this.initialName});
 
@@ -22,30 +33,73 @@ class CreateCustomIngredientScreen extends ConsumerStatefulWidget {
 
 class _CreateCustomIngredientScreenState
     extends ConsumerState<CreateCustomIngredientScreen> {
-  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name = TextEditingController(
     text: widget.initialName ?? '',
-  );
-  final _aliases = TextEditingController();
+  )..addListener(() => setState(() {}));
+  final TextEditingController _aliasInput = TextEditingController();
+  final List<String> _aliases = [];
   IngredientCategory _category = IngredientCategory.produce;
   Unit _defaultUnit = Unit.piece;
   final Set<Unit> _allowedUnits = {Unit.piece};
   final Set<Allergen> _allergens = {};
   final Set<DietaryTag> _diet = {};
+  int _shelfLifeDays = 7;
   bool _submitting = false;
   String? _error;
 
   @override
   void dispose() {
     _name.dispose();
-    _aliases.dispose();
+    _aliasInput.dispose();
     super.dispose();
   }
 
+  // The shelf-life slider is perceptual: a linear 0…1 track maps onto
+  // 1 day … ~1 year so short perishables get fine control near the bottom.
+  static const int _minShelfLife = 1;
+  static const int _maxShelfLife = 365;
+
+  double get _shelfSlider =>
+      math.log(_shelfLifeDays / _minShelfLife) /
+      math.log(_maxShelfLife / _minShelfLife);
+
+  void _onShelfSlider(double t) {
+    final days = (_minShelfLife * math.pow(_maxShelfLife / _minShelfLife, t))
+        .round();
+    setState(() => _shelfLifeDays = days.clamp(_minShelfLife, _maxShelfLife));
+  }
+
+  void _addAlias() {
+    final value = _aliasInput.text.trim();
+    if (value.isEmpty || _aliases.contains(value)) {
+      _aliasInput.clear();
+      return;
+    }
+    setState(() {
+      _aliases.add(value);
+      _aliasInput.clear();
+    });
+  }
+
+  void _selectCategory(IngredientCategory category) {
+    setState(() => _category = category);
+  }
+
+  void _selectDefaultUnit(Unit unit) {
+    setState(() {
+      _defaultUnit = unit;
+      _allowedUnits.add(unit);
+    });
+  }
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Give the ingredient a name.');
+      return;
+    }
     if (!_allowedUnits.contains(_defaultUnit)) {
-      setState(() => _error = 'Default unit must be in allowed units');
+      setState(() => _error = 'The default unit must be an allowed unit.');
       return;
     }
     setState(() {
@@ -57,17 +111,15 @@ class _CreateCustomIngredientScreenState
     final r = await useCase(
       CreateCustomIngredientParams(
         householdId: hid,
-        displayNames: {'en': _name.text.trim()},
+        displayNames: {'en': name},
         category: _category,
         defaultUnit: _defaultUnit,
         allowedUnits: _allowedUnits.toList(),
-        aliases: _aliases.text
-            .split(',')
-            .map((a) => a.trim())
-            .where((a) => a.isNotEmpty)
-            .toList(),
+        aliases: List.unmodifiable(_aliases),
         allergens: _allergens.toList(),
         dietaryTags: _diet.toList(),
+        defaultShelfLifeDays: _shelfLifeDays,
+        isNonFood: _category == IngredientCategory.nonFood,
       ),
     );
     if (!mounted) return;
@@ -82,167 +134,166 @@ class _CreateCustomIngredientScreenState
 
   @override
   Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final name = _name.text.trim();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Add ingredient')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(KsTokens.space20),
+      backgroundColor: ks.surfaceBase,
+      body: SafeArea(
+        child: Column(
           children: [
-            _SectionCard(
-              label: 'Basics',
-              child: Column(
+            _CreateTopBar(onBack: () => context.pop()),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  KsTokens.space20,
+                  KsTokens.space4,
+                  KsTokens.space20,
+                  KsTokens.space24,
+                ),
                 children: [
-                  TextFormField(
+                  _IdentityPreview(
+                    name: name.isEmpty ? 'New ingredient' : name,
+                    category: _category,
+                    shelfLifeDays: _shelfLifeDays,
+                    placeholder: name.isEmpty,
+                  ),
+                  const SizedBox(height: KsTokens.space20),
+                  const KsFieldLabel('Name'),
+                  _PlainField(
                     controller: _name,
-                    decoration: const InputDecoration(
-                      labelText: 'Name (English)',
-                    ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                  const SizedBox(height: KsTokens.space12),
-                  DropdownButtonFormField<IngredientCategory>(
-                    initialValue: _category,
-                    decoration: const InputDecoration(labelText: 'Category'),
-                    items: IngredientCategory.values
-                        .map(
-                          (c) =>
-                              DropdownMenuItem(value: c, child: Text(c.name)),
-                        )
-                        .toList(),
-                    onChanged: (c) => setState(() => _category = c!),
-                  ),
-                  const SizedBox(height: KsTokens.space12),
-                  TextFormField(
-                    controller: _aliases,
-                    decoration: const InputDecoration(
-                      labelText: 'Aliases (comma-separated)',
-                      hintText: 'e.g. cilantro, coriander',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: KsTokens.space16),
-            _SectionCard(
-              label: 'Units',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DropdownButtonFormField<Unit>(
-                    initialValue: _defaultUnit,
-                    decoration: const InputDecoration(
-                      labelText: 'Default unit',
-                    ),
-                    items: Unit.values
-                        .map(
-                          (u) =>
-                              DropdownMenuItem(value: u, child: Text(u.name)),
-                        )
-                        .toList(),
-                    onChanged: (u) => setState(() {
-                      _defaultUnit = u!;
-                      _allowedUnits.add(u);
-                    }),
-                  ),
-                  const SizedBox(height: KsTokens.space12),
-                  Text(
-                    'Allowed units',
-                    style: KsTokens.labelMedium.copyWith(
-                      color: KsTokens.textTertiary,
-                    ),
-                  ),
-                  const SizedBox(height: KsTokens.space8),
-                  Wrap(
-                    spacing: KsTokens.space6,
-                    runSpacing: KsTokens.space4,
-                    children: Unit.values.map((u) {
-                      return FilterChip(
-                        label: Text(u.name),
-                        selected: _allowedUnits.contains(u),
-                        onSelected: (sel) => setState(() {
-                          if (sel) {
-                            _allowedUnits.add(u);
-                          } else {
-                            _allowedUnits.remove(u);
-                          }
-                        }),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: KsTokens.space16),
-            _SectionCard(
-              label: 'Allergens & diet',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Allergens',
-                    style: KsTokens.labelMedium.copyWith(
-                      color: KsTokens.textTertiary,
-                    ),
-                  ),
-                  const SizedBox(height: KsTokens.space8),
-                  Wrap(
-                    spacing: KsTokens.space6,
-                    runSpacing: KsTokens.space4,
-                    children: Allergen.values.map((a) {
-                      return FilterChip(
-                        label: Text(a.name),
-                        selected: _allergens.contains(a),
-                        onSelected: (sel) => setState(() {
-                          if (sel) {
-                            _allergens.add(a);
-                          } else {
-                            _allergens.remove(a);
-                          }
-                        }),
-                      );
-                    }).toList(),
+                    hintText: 'e.g. Sweet potato',
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: KsTokens.space16),
-                  Text(
-                    'Dietary tags',
-                    style: KsTokens.labelMedium.copyWith(
-                      color: KsTokens.textTertiary,
-                    ),
-                  ),
-                  const SizedBox(height: KsTokens.space8),
+                  const KsFieldLabel('Category — sets the colour everywhere'),
                   Wrap(
-                    spacing: KsTokens.space6,
-                    runSpacing: KsTokens.space4,
-                    children: DietaryTag.values.map((d) {
-                      return FilterChip(
-                        label: Text(d.name),
-                        selected: _diet.contains(d),
-                        onSelected: (sel) => setState(() {
-                          if (sel) {
-                            _diet.add(d);
-                          } else {
-                            _diet.remove(d);
-                          }
-                        }),
-                      );
-                    }).toList(),
+                    spacing: KsTokens.space8,
+                    runSpacing: KsTokens.space8,
+                    children: [
+                      for (final category in IngredientCategory.values)
+                        KsSelectChip(
+                          label: _categoryLabel(category),
+                          color: category.color,
+                          dotColor: category.color,
+                          selected: category == _category,
+                          onTap: _submitting
+                              ? null
+                              : () => _selectCategory(category),
+                        ),
+                    ],
                   ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel(
+                    'Typical shelf life — drives the countdown',
+                  ),
+                  _ShelfLifeSlider(
+                    days: _shelfLifeDays,
+                    value: _shelfSlider,
+                    enabled: !_submitting,
+                    onChanged: _onShelfSlider,
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Default unit'),
+                  Wrap(
+                    spacing: KsTokens.space8,
+                    runSpacing: KsTokens.space8,
+                    children: [
+                      for (final unit in Unit.values)
+                        KsSelectChip(
+                          label: unit.name,
+                          selected: unit == _defaultUnit,
+                          onTap: _submitting
+                              ? null
+                              : () => _selectDefaultUnit(unit),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Allowed units'),
+                  Wrap(
+                    spacing: KsTokens.space8,
+                    runSpacing: KsTokens.space8,
+                    children: [
+                      for (final unit in Unit.values)
+                        KsSelectChip(
+                          label: unit.name,
+                          selected: _allowedUnits.contains(unit),
+                          onTap: _submitting
+                              ? null
+                              : () => setState(() {
+                                  if (_allowedUnits.contains(unit)) {
+                                    // The default unit must stay allowed.
+                                    if (unit == _defaultUnit) return;
+                                    _allowedUnits.remove(unit);
+                                  } else {
+                                    _allowedUnits.add(unit);
+                                  }
+                                }),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Also known as'),
+                  _AliasEditor(
+                    controller: _aliasInput,
+                    aliases: _aliases,
+                    enabled: !_submitting,
+                    onAdd: _addAlias,
+                    onRemove: (alias) => setState(() => _aliases.remove(alias)),
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Allergens'),
+                  Wrap(
+                    spacing: KsTokens.space8,
+                    runSpacing: KsTokens.space8,
+                    children: [
+                      for (final allergen in Allergen.values)
+                        KsSelectChip(
+                          label: allergen.name,
+                          color: ks.warning,
+                          selected: _allergens.contains(allergen),
+                          onTap: _submitting
+                              ? null
+                              : () => setState(() {
+                                  _allergens.contains(allergen)
+                                      ? _allergens.remove(allergen)
+                                      : _allergens.add(allergen);
+                                }),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Dietary tags'),
+                  Wrap(
+                    spacing: KsTokens.space8,
+                    runSpacing: KsTokens.space8,
+                    children: [
+                      for (final tag in DietaryTag.values)
+                        KsSelectChip(
+                          label: tag.name,
+                          selected: _diet.contains(tag),
+                          onTap: _submitting
+                              ? null
+                              : () => setState(() {
+                                  _diet.contains(tag)
+                                      ? _diet.remove(tag)
+                                      : _diet.add(tag);
+                                }),
+                        ),
+                    ],
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: KsTokens.space16),
+                    KsErrorAlert(message: _error!),
+                  ],
                 ],
               ),
             ),
-            if (_error != null) ...[
-              const SizedBox(height: KsTokens.space16),
-              KsErrorAlert(message: _error!),
-            ],
-            const SizedBox(height: KsTokens.space24),
-            FilledButton.icon(
-              icon: const Icon(Icons.check),
-              label: Text(_submitting ? 'Saving...' : 'Save ingredient'),
+            _CreateSaveBar(
+              submitting: _submitting,
               onPressed: _submitting ? null : _submit,
             ),
-            const SizedBox(height: KsTokens.space32),
           ],
         ),
       ),
@@ -250,31 +301,454 @@ class _CreateCustomIngredientScreenState
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.label, required this.child});
+String _categoryLabel(IngredientCategory c) => switch (c) {
+  IngredientCategory.bulkStaple => 'Bulk staple',
+  IngredientCategory.nonFood => 'Non-food',
+  _ => '${c.name[0].toUpperCase()}${c.name.substring(1)}',
+};
 
-  final String label;
-  final Widget child;
+/// The back-topped header with the "New ingredient" eyebrow and serif title.
+class _CreateTopBar extends StatelessWidget {
+  const _CreateTopBar({required this.onBack});
+
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space12,
+        KsTokens.space4,
+        KsTokens.space20,
+        KsTokens.space12,
+      ),
+      child: Row(
+        children: [
+          KsHeaderAction(
+            icon: Icons.arrow_back_rounded,
+            tooltip: 'Back',
+            size: 34,
+            onTap: onBack,
+          ),
+          const SizedBox(width: KsTokens.space12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'NEW INGREDIENT',
+                  style: KsTokens.labelSmall.copyWith(
+                    color: isDark ? KsTokens.brandAccent : ks.brandPrimary,
+                    fontSize: 9,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                const SizedBox(height: KsTokens.space2),
+                Text(
+                  'Add to catalog',
+                  style: KsTokens.headlineLarge.copyWith(color: ks.textPrimary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The live identity card — a category-tinted glyph tile, the name, and the
+/// category + shelf-life summary, updating as the form changes.
+class _IdentityPreview extends StatelessWidget {
+  const _IdentityPreview({
+    required this.name,
+    required this.category,
+    required this.shelfLifeDays,
+    required this.placeholder,
+  });
+
+  final String name;
+  final IngredientCategory category;
+  final int shelfLifeDays;
+  final bool placeholder;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final brightness = Theme.of(context).brightness;
+    final hue = category.colorFor(brightness);
     return Container(
       padding: const EdgeInsets.all(KsTokens.space16),
       decoration: BoxDecoration(
-        color: KsTokens.surfaceRaised,
+        color: ks.surfaceSunken,
         borderRadius: BorderRadius.circular(KsTokens.radius16),
-        border: Border.all(color: KsTokens.border),
+        border: Border.all(color: ks.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                hue.withValues(alpha: 0.22),
+                ks.surfaceRaised,
+              ),
+              borderRadius: BorderRadius.circular(KsTokens.radius12),
+              border: Border.all(color: hue.withValues(alpha: 0.45)),
+            ),
+            child: Icon(
+              _categoryIcon(category),
+              size: 22,
+              color: hue.readableInk(brightness),
+            ),
+          ),
+          const SizedBox(width: KsTokens.space12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  name,
+                  style: KsTokens.headlineMedium.copyWith(
+                    color: placeholder ? ks.textTertiary : ks.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: KsTokens.space2),
+                Text(
+                  '${_categoryLabel(category)} · keeps ~$shelfLifeDays days',
+                  style: KsTokens.bodySmall.copyWith(color: ks.textTertiary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _categoryIcon(IngredientCategory c) => switch (c) {
+  IngredientCategory.produce => Icons.eco_outlined,
+  IngredientCategory.meat => Icons.kebab_dining_outlined,
+  IngredientCategory.seafood => Icons.set_meal_outlined,
+  IngredientCategory.dairy => Icons.egg_outlined,
+  IngredientCategory.grain => Icons.grass_outlined,
+  IngredientCategory.bakery => Icons.bakery_dining_outlined,
+  IngredientCategory.spice => Icons.local_fire_department_outlined,
+  IngredientCategory.condiment => Icons.water_drop_outlined,
+  IngredientCategory.baking => Icons.cake_outlined,
+  IngredientCategory.beverage => Icons.local_cafe_outlined,
+  IngredientCategory.frozen => Icons.ac_unit_outlined,
+  IngredientCategory.bulkStaple => Icons.inventory_2_outlined,
+  IngredientCategory.nonFood => Icons.cleaning_services_outlined,
+  IngredientCategory.other => Icons.category_outlined,
+};
+
+/// A plain styled text input matching the form's `.input` treatment.
+class _PlainField extends StatelessWidget {
+  const _PlainField({
+    required this.controller,
+    this.hintText,
+    this.textInputAction,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String? hintText;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return TextField(
+      controller: controller,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      style: KsTokens.bodyLarge.copyWith(color: ks.textPrimary),
+      decoration: InputDecoration(
+        hintText: hintText,
+        filled: true,
+        fillColor: ks.surfaceRaised,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: KsTokens.space12,
+          vertical: KsTokens.space12,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(KsTokens.radius10),
+          borderSide: BorderSide(color: ks.borderStrong),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(KsTokens.radius10),
+          borderSide: BorderSide(color: ks.brandPrimary, width: 2),
+        ),
+      ),
+    );
+  }
+}
+
+/// The perceptual shelf-life slider — a big day count, a "Perishable" flag for
+/// short-lived items, and 1d / 2-week / 1-year anchor ticks.
+class _ShelfLifeSlider extends StatelessWidget {
+  const _ShelfLifeSlider({
+    required this.days,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final int days;
+  final double value;
+  final bool enabled;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final perishable = days <= 3;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space16,
+        KsTokens.space12,
+        KsTokens.space16,
+        KsTokens.space8,
+      ),
+      decoration: BoxDecoration(
+        color: ks.surfaceRaised,
+        borderRadius: BorderRadius.circular(KsTokens.radius12),
+        border: Border.all(color: ks.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '$days ',
+                      style: KsTokens.displaySmall.copyWith(
+                        color: ks.textPrimary,
+                        fontSize: 26,
+                      ),
+                    ),
+                    TextSpan(
+                      text: days == 1 ? 'day' : 'days',
+                      style: KsTokens.bodyMedium.copyWith(
+                        color: ks.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (perishable)
+                KsTag(
+                  label: 'Perishable',
+                  color: ks.danger,
+                  icon: Icons.schedule_rounded,
+                ),
+            ],
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 6,
+              activeTrackColor: ks.brandPrimary,
+              inactiveTrackColor: ks.neutralSubtle,
+              thumbColor: ks.brandPrimary,
+              overlayColor: ks.brandPrimary.withValues(alpha: 0.12),
+            ),
+            child: Slider(
+              value: value.clamp(0.0, 1.0),
+              onChanged: enabled ? onChanged : null,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: KsTokens.space4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _tick('1d', ks.textTertiary),
+                _tick('2 weeks', ks.textTertiary),
+                _tick('1yr+', ks.textTertiary),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tick(String label, Color color) => Text(
+    label,
+    style: KsTokens.labelSmall.copyWith(
+      color: color,
+      fontSize: 9,
+      letterSpacing: 0,
+    ),
+  );
+}
+
+/// A removable-chip alias editor — type a name, add it, tap × to drop it.
+class _AliasEditor extends StatelessWidget {
+  const _AliasEditor({
+    required this.controller,
+    required this.aliases,
+    required this.enabled,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final TextEditingController controller;
+  final List<String> aliases;
+  final bool enabled;
+  final VoidCallback onAdd;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _PlainField(
+                controller: controller,
+                hintText: 'e.g. cilantro',
+                textInputAction: TextInputAction.done,
+                onSubmitted: enabled ? (_) => onAdd() : null,
+              ),
+            ),
+            const SizedBox(width: KsTokens.space8),
+            SizedBox(
+              height: 48,
+              child: OutlinedButton(
+                onPressed: enabled ? onAdd : null,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: ks.brandPrimary,
+                  side: BorderSide(color: ks.borderStrong),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(KsTokens.radius10),
+                  ),
+                ),
+                child: const Text('Add'),
+              ),
+            ),
+          ],
+        ),
+        if (aliases.isNotEmpty) ...[
+          const SizedBox(height: KsTokens.space10),
+          Wrap(
+            spacing: KsTokens.space8,
+            runSpacing: KsTokens.space8,
+            children: [
+              for (final alias in aliases)
+                _AliasChip(
+                  label: alias,
+                  onRemove: enabled ? () => onRemove(alias) : null,
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _AliasChip extends StatelessWidget {
+  const _AliasChip({required this.label, this.onRemove});
+
+  final String label;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Container(
+      padding: const EdgeInsets.only(
+        left: KsTokens.space12,
+        right: KsTokens.space6,
+        top: KsTokens.space8,
+        bottom: KsTokens.space8,
+      ),
+      decoration: BoxDecoration(
+        color: ks.neutralSubtle,
+        borderRadius: BorderRadius.circular(KsTokens.radiusFull),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Text(
             label,
-            style: KsTokens.labelLarge.copyWith(color: KsTokens.textSecondary),
+            style: KsTokens.labelMedium.copyWith(
+              color: ks.textSecondary,
+              letterSpacing: 0,
+            ),
           ),
-          const SizedBox(height: KsTokens.space12),
-          child,
+          const SizedBox(width: KsTokens.space4),
+          InkWell(
+            onTap: onRemove,
+            customBorder: const CircleBorder(),
+            child: Tooltip(
+              message: 'Remove $label',
+              child: Icon(
+                Icons.close_rounded,
+                size: 14,
+                color: ks.textTertiary,
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// The bottom-anchored "Create ingredient" action.
+class _CreateSaveBar extends StatelessWidget {
+  const _CreateSaveBar({required this.submitting, required this.onPressed});
+
+  final bool submitting;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space20,
+        KsTokens.space12,
+        KsTokens.space20,
+        KsTokens.space20,
+      ),
+      decoration: BoxDecoration(
+        color: ks.surfaceBase,
+        border: Border(top: BorderSide(color: ks.hairline)),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          onPressed: onPressed,
+          child: submitting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: KsTokens.textOnBrand,
+                  ),
+                )
+              : const Text('Create ingredient'),
+        ),
       ),
     );
   }

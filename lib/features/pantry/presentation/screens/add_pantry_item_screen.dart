@@ -12,6 +12,17 @@ import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 
+/// Screen 20 · Add to pantry — stocking what you already have.
+///
+/// The graduated form surface from "KitchenSync — P3 Accessibility & Forms":
+/// a close-topped sheet where you log a physical item into the pantry. The
+/// picked ingredient carries its own category colour and shelf-life hint, so
+/// the consequence of the choice is visible before saving.
+///
+/// The form binds only to fields the [AddPantryItem] use case actually
+/// persists — ingredient, quantity, unit and section. The category tag and the
+/// "keeps ~N days" hint are read straight off the chosen ingredient (intrinsic
+/// catalog data), not new pantry-item fields.
 class AddPantryItemScreen extends ConsumerStatefulWidget {
   const AddPantryItemScreen({super.key});
 
@@ -22,7 +33,7 @@ class AddPantryItemScreen extends ConsumerStatefulWidget {
 
 class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
   Ingredient? _selected;
-  final TextEditingController _qty = TextEditingController();
+  final TextEditingController _qty = TextEditingController(text: '1');
   Unit _unit = Unit.piece;
   PantrySection _section = PantrySection.food;
   bool _submitting = false;
@@ -43,6 +54,17 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
       _section = picked.isNonFood ? PantrySection.nonFood : PantrySection.food;
       _error = null;
     });
+  }
+
+  void _stepQuantity(int delta) {
+    final current = double.tryParse(_qty.text) ?? 0;
+    final next = (current + delta).clamp(0, double.infinity);
+    // Keep whole steps clean (2) but preserve typed decimals elsewhere.
+    final text = next == next.roundToDouble()
+        ? next.toStringAsFixed(0)
+        : next.toString();
+    _qty.text = text;
+    setState(() {});
   }
 
   Future<void> _save() async {
@@ -96,205 +118,192 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allowedUnits = _selected?.allowedUnits ?? Unit.values;
+    final ks = context.ksColors;
+    final selected = _selected;
+    final allowedUnits = selected?.allowedUnits ?? Unit.values;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add pantry item')),
-      body: ListView(
-        padding: const EdgeInsets.all(KsTokens.space20),
-        children: [
-          _SectionCard(
-            label: 'Ingredient',
-            child: _IngredientPickerRow(
-              selected: _selected,
-              onTap: _submitting ? null : _pickIngredient,
-            ),
-          ),
-          const SizedBox(height: KsTokens.space16),
-          _SectionCard(
-            label: 'Quantity',
-            child: Column(
-              children: [
-                TextField(
-                  controller: _qty,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Amount',
-                    hintText: '0',
-                  ),
+      backgroundColor: ks.surfaceBase,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _TopBar(title: 'Add to pantry', onClose: () => context.pop()),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  KsTokens.space20,
+                  KsTokens.space6,
+                  KsTokens.space20,
+                  KsTokens.space24,
                 ),
-                const SizedBox(height: KsTokens.space12),
-                DropdownButtonFormField<Unit>(
-                  value: allowedUnits.contains(_unit)
-                      ? _unit
-                      : allowedUnits.first,
-                  decoration: const InputDecoration(labelText: 'Unit'),
-                  items: allowedUnits
-                      .map(
-                        (u) => DropdownMenuItem(value: u, child: Text(u.name)),
-                      )
-                      .toList(),
-                  onChanged: _submitting
-                      ? null
-                      : (u) {
-                          if (u != null) setState(() => _unit = u);
-                        },
-                ),
-              ],
+                children: [
+                  const KsFieldLabel('Item'),
+                  _IngredientField(
+                    selected: selected,
+                    onTap: _submitting ? null : _pickIngredient,
+                  ),
+                  if (selected != null) ...[
+                    const SizedBox(height: KsTokens.space16),
+                    const KsFieldLabel('Category'),
+                    _CategoryReflection(ingredient: selected),
+                  ],
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Quantity'),
+                  _QuantityField(
+                    controller: _qty,
+                    enabled: !_submitting,
+                    onStep: _submitting ? null : _stepQuantity,
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Unit'),
+                  Wrap(
+                    spacing: KsTokens.space8,
+                    runSpacing: KsTokens.space8,
+                    children: [
+                      for (final unit in allowedUnits)
+                        KsSelectChip(
+                          label: unit.name,
+                          selected: unit == _unit,
+                          onTap: _submitting
+                              ? null
+                              : () => setState(() => _unit = unit),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Section'),
+                  Wrap(
+                    spacing: KsTokens.space8,
+                    runSpacing: KsTokens.space8,
+                    children: [
+                      for (final section in PantrySection.values)
+                        KsSelectChip(
+                          label: _labelFor(section),
+                          color: section.color,
+                          selected: section == _section,
+                          onTap: _submitting
+                              ? null
+                              : () => setState(() => _section = section),
+                        ),
+                    ],
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: KsTokens.space16),
+                    KsErrorAlert(message: _error!),
+                  ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: KsTokens.space16),
-          _SectionCard(
-            label: 'Section',
-            child: Wrap(
-              spacing: KsTokens.space8,
-              runSpacing: KsTokens.space8,
-              children: PantrySection.values.map((section) {
-                return ChoiceChip(
-                  label: Text(_labelFor(section)),
-                  selected: section == _section,
-                  onSelected: _submitting
-                      ? null
-                      : (_) => setState(() => _section = section),
-                  avatar: Icon(_iconFor(section), size: 18),
-                );
-              }).toList(),
+            _SaveBar(
+              label: 'Add to pantry',
+              icon: Icons.add_rounded,
+              submitting: _submitting,
+              onPressed: _submitting ? null : _save,
             ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: KsTokens.space16),
-            KsErrorAlert(message: _error!),
           ],
-          const SizedBox(height: KsTokens.space24),
-          FilledButton(
-            onPressed: _submitting ? null : _save,
-            child: _submitting
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: KsTokens.textOnBrand,
-                    ),
-                  )
-                : const Text('Save to pantry'),
-          ),
-          const SizedBox(height: KsTokens.space32),
-        ],
+        ),
       ),
     );
   }
-
-  IconData _iconFor(PantrySection section) => switch (section) {
-    PantrySection.food => Icons.restaurant_outlined,
-    PantrySection.bulk => Icons.inventory_2_outlined,
-    PantrySection.nonFood => Icons.cleaning_services_outlined,
-    PantrySection.leftover => Icons.lunch_dining_outlined,
-  };
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.label, required this.child});
+/// The close-topped header — an X that pops, with the serif screen title.
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.title, required this.onClose});
 
-  final String label;
-  final Widget child;
+  final String title;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(KsTokens.space16),
-      decoration: BoxDecoration(
-        color: KsTokens.surfaceRaised,
-        borderRadius: BorderRadius.circular(KsTokens.radius16),
-        border: Border.all(color: KsTokens.border),
+    final ks = context.ksColors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space12,
+        KsTokens.space4,
+        KsTokens.space20,
+        KsTokens.space12,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            label,
-            style: KsTokens.labelLarge.copyWith(color: KsTokens.textSecondary),
+          KsHeaderAction(
+            icon: Icons.close_rounded,
+            tooltip: 'Close',
+            size: 34,
+            onTap: onClose,
           ),
-          const SizedBox(height: KsTokens.space12),
-          child,
+          const SizedBox(width: KsTokens.space12),
+          Expanded(
+            child: Text(
+              title,
+              style: KsTokens.headlineLarge.copyWith(color: ks.textPrimary),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _IngredientPickerRow extends StatelessWidget {
-  const _IngredientPickerRow({this.selected, this.onTap});
+/// The "Item" control — a styled input row that opens the ingredient picker.
+class _IngredientField extends StatelessWidget {
+  const _IngredientField({required this.selected, required this.onTap});
 
   final Ingredient? selected;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected?.category.color ?? KsTokens.catOther;
+    final ks = context.ksColors;
+    final brightness = Theme.of(context).brightness;
+    final color = selected?.category.colorFor(brightness) ?? ks.textTertiary;
+    final name = selected?.displayNames['en'] ?? selected?.name;
+
     return Material(
-      color: Colors.transparent,
+      color: ks.surfaceRaised,
+      borderRadius: BorderRadius.circular(KsTokens.radius10),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(KsTokens.radius12),
-        child: Padding(
+        borderRadius: BorderRadius.circular(KsTokens.radius10),
+        child: Container(
           padding: const EdgeInsets.symmetric(
-            horizontal: KsTokens.space8,
+            horizontal: KsTokens.space12,
             vertical: KsTokens.space10,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(KsTokens.radius10),
+            border: Border.all(color: ks.borderStrong),
           ),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(KsTokens.radius10),
+                  borderRadius: BorderRadius.circular(KsTokens.radius8),
                 ),
+                clipBehavior: Clip.antiAlias,
                 child: selected?.imageUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(KsTokens.radius10),
-                        child: CachedNetworkImage(
-                          imageUrl: selected!.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) =>
-                              _PickerIcon(color: color),
-                        ),
+                    ? CachedNetworkImage(
+                        imageUrl: selected!.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => _PickerIcon(color: color),
                       )
                     : _PickerIcon(color: color),
               ),
               const SizedBox(width: KsTokens.space12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      selected?.displayNames['en'] ??
-                          selected?.name ??
-                          'Select ingredient',
-                      style: Theme.of(context).textTheme.titleMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (selected == null)
-                      Text(
-                        'Tap to pick from dictionary',
-                        style: KsTokens.bodySmall.copyWith(
-                          color: KsTokens.textTertiary,
-                        ),
-                      )
-                    else
-                      Text(
-                        selected!.category.name,
-                        style: KsTokens.bodySmall.copyWith(
-                          color: KsTokens.textSecondary,
-                        ),
-                      ),
-                  ],
+                child: Text(
+                  name ?? 'Select an ingredient',
+                  style: KsTokens.titleMedium.copyWith(
+                    color: name == null ? ks.textTertiary : ks.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(Icons.chevron_right, color: KsTokens.textTertiary),
+              Icon(Icons.chevron_right_rounded, color: ks.textTertiary),
             ],
           ),
         ),
@@ -312,8 +321,179 @@ class _PickerIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Icon(
       Icons.local_grocery_store_outlined,
-      size: 22,
-      color: color.withValues(alpha: 0.7),
+      size: 20,
+      color: color.withValues(alpha: 0.75),
+    );
+  }
+}
+
+/// The chosen ingredient's category, shown read-only — the hue that will colour
+/// it everywhere — plus its catalog shelf-life as a freshness hint when known.
+class _CategoryReflection extends StatelessWidget {
+  const _CategoryReflection({required this.ingredient});
+
+  final Ingredient ingredient;
+
+  @override
+  Widget build(BuildContext context) {
+    final shelfLife = ingredient.defaultShelfLifeDays;
+    return Wrap(
+      spacing: KsTokens.space8,
+      runSpacing: KsTokens.space8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        KsTag.category(ingredient.category),
+        if (shelfLife != null)
+          KsExpiryBadge(
+            freshness: _freshnessForShelfLife(shelfLife),
+            label: 'Keeps ~${shelfLife}d',
+          ),
+      ],
+    );
+  }
+
+  Freshness _freshnessForShelfLife(int days) {
+    if (days <= 3) return Freshness.expiringSoon;
+    return Freshness.fresh;
+  }
+}
+
+/// A quantity control — an editable numeric field flanked by 44pt −/+ steppers.
+///
+/// The buttons step in whole units; the field still accepts free decimal entry
+/// so fractional amounts (0.5 kg) aren't lost. Mirrors Screen 20's stepper.
+class _QuantityField extends StatelessWidget {
+  const _QuantityField({
+    required this.controller,
+    required this.enabled,
+    required this.onStep,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+  final ValueChanged<int>? onStep;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(KsTokens.radius10),
+        border: Border.all(color: ks.borderStrong),
+        color: ks.surfaceRaised,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          _StepBox(
+            icon: Icons.remove_rounded,
+            tooltip: 'Decrease quantity',
+            onTap: onStep == null ? null : () => onStep!(-1),
+          ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              enabled: enabled,
+              textAlign: TextAlign.center,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: KsTokens.titleMedium.copyWith(color: ks.textPrimary),
+              decoration: const InputDecoration(
+                hintText: '0',
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: KsTokens.space12,
+                ),
+              ),
+            ),
+          ),
+          _StepBox(
+            icon: Icons.add_rounded,
+            tooltip: 'Increase quantity',
+            onTap: onStep == null ? null : () => onStep!(1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepBox extends StatelessWidget {
+  const _StepBox({required this.icon, required this.tooltip, this.onTap});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Material(
+      color: ks.neutralSubtle,
+      child: InkWell(
+        onTap: onTap,
+        child: Tooltip(
+          message: tooltip,
+          child: SizedBox(
+            width: 46,
+            height: 46,
+            child: Icon(icon, size: 20, color: ks.textSecondary),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The bottom-anchored primary action, sitting in the thumb zone with a
+/// hairline over the scrolling content. Honours the safe-area inset.
+class _SaveBar extends StatelessWidget {
+  const _SaveBar({
+    required this.label,
+    required this.icon,
+    required this.submitting,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool submitting;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space20,
+        KsTokens.space12,
+        KsTokens.space20,
+        KsTokens.space20,
+      ),
+      decoration: BoxDecoration(
+        color: ks.surfaceBase,
+        border: Border(top: BorderSide(color: ks.hairline)),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: onPressed,
+          icon: submitting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: KsTokens.textOnBrand,
+                  ),
+                )
+              : Icon(icon, size: 18),
+          label: Text(submitting ? 'Saving…' : label),
+        ),
+      ),
     );
   }
 }

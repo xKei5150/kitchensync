@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/shell/ks_app_shell.dart';
 import 'package:kitchensync/features/calendar/presentation/screens/calendar_screen.dart';
+import 'package:kitchensync/features/dev_tools/accessibility_audit_screen.dart';
 import 'package:kitchensync/features/dev_tools/dev_tools_screen.dart';
 import 'package:kitchensync/features/household/presentation/screens/household_screen.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/create_custom_ingredient_screen.dart';
@@ -216,6 +217,16 @@ GoRouter router(Ref ref) {
           name: 'dev',
           parentNavigatorKey: _rootNavigatorKey,
           builder: (context, state) => const DevToolsScreen(),
+          routes: [
+            // P3 · the accessibility verification surface (Screens 17–19).
+            // Debug-only — a runtime contrast + colour-vision audit.
+            GoRoute(
+              path: 'a11y',
+              name: 'accessibilityAudit',
+              parentNavigatorKey: _rootNavigatorKey,
+              builder: (context, state) => const AccessibilityAuditScreen(),
+            ),
+          ],
         ),
     ],
   );

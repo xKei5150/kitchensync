@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kitchensync/core/usecases/usecase.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
@@ -50,6 +51,12 @@ class _DevToolsScreenState extends ConsumerState<DevToolsScreen> {
               icon: const Icon(Icons.cloud_upload),
               label: Text(_running ? 'Seeding...' : 'Seed global dictionary'),
               onPressed: _running ? null : _seed,
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.contrast),
+              label: const Text('Accessibility audit'),
+              onPressed: () => context.push('/dev/a11y'),
             ),
             const SizedBox(height: 16),
             Text(_status, textAlign: TextAlign.center),
