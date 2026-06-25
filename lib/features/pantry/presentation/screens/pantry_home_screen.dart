@@ -77,7 +77,7 @@ class PantryHomeScreen extends ConsumerWidget {
                     'pantry\nis waiting',
                 emptyIcon: _iconFor(selectedSection),
               ),
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const _PantrySkeleton(),
               error: (error, _) => Padding(
                 padding: const EdgeInsets.all(KsTokens.space16),
                 child: KsErrorAlert(
@@ -215,6 +215,82 @@ class _SpoilageBanner extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Screen 27 · the pantry shelf, loading. A skeleton that mirrors the real
+/// shelf rows — left freshness bar, a title + meta line, a trailing badge — so
+/// nothing jumps when the live stream lands. Replaces a bare spinner.
+class _PantrySkeleton extends StatelessWidget {
+  const _PantrySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space16,
+        KsTokens.space12,
+        KsTokens.space16,
+        KsTokens.space24,
+      ),
+      children: const [
+        _SkeletonRow(titleWidth: 0.62, metaWidth: 0.42),
+        SizedBox(height: KsTokens.space8),
+        _SkeletonRow(titleWidth: 0.48, metaWidth: 0.55),
+        SizedBox(height: KsTokens.space8),
+        _SkeletonRow(titleWidth: 0.70, metaWidth: 0.38),
+        SizedBox(height: KsTokens.space8),
+        _SkeletonRow(titleWidth: 0.54, metaWidth: 0.46),
+        SizedBox(height: KsTokens.space8),
+        _SkeletonRow(titleWidth: 0.60, metaWidth: 0.40),
+      ],
+    );
+  }
+}
+
+class _SkeletonRow extends StatelessWidget {
+  const _SkeletonRow({required this.titleWidth, required this.metaWidth});
+
+  /// Title / meta line widths as a fraction of the available row width — the
+  /// gentle raggedness that makes a skeleton read as content, not a grid.
+  final double titleWidth;
+  final double metaWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: ks.surfaceRaised,
+        borderRadius: BorderRadius.circular(KsTokens.radius12),
+        border: Border.all(color: ks.border),
+      ),
+      child: Row(
+        children: [
+          const KsSkeleton(width: 4, height: 34, radius: 2),
+          const SizedBox(width: KsTokens.space12),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  KsSkeleton.line(width: constraints.maxWidth * titleWidth),
+                  const SizedBox(height: KsTokens.space8),
+                  KsSkeleton.line(
+                    width: constraints.maxWidth * metaWidth,
+                    height: 10,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: KsTokens.space12),
+          const KsSkeleton(width: 52, height: 24, radius: KsTokens.radiusFull),
         ],
       ),
     );

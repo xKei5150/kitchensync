@@ -9,6 +9,7 @@ import 'package:kitchensync/features/calendar/presentation/screens/calendar_scre
 import 'package:kitchensync/features/dev_tools/accessibility_audit_screen.dart';
 import 'package:kitchensync/features/dev_tools/accessibility_states_screen.dart';
 import 'package:kitchensync/features/dev_tools/dev_tools_screen.dart';
+import 'package:kitchensync/features/dev_tools/system_states_screen.dart';
 import 'package:kitchensync/features/household/presentation/screens/household_screen.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/create_custom_ingredient_screen.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/ingredient_detail_screen.dart';
@@ -19,6 +20,7 @@ import 'package:kitchensync/features/notifications/presentation/screens/notifica
 import 'package:kitchensync/features/onboarding/presentation/screens/household_setup_screen.dart';
 import 'package:kitchensync/features/onboarding/presentation/screens/sign_in_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/add_pantry_item_screen.dart';
+import 'package:kitchensync/features/pantry/presentation/screens/insights_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/pantry_home_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/pantry_item_detail_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/waste_log_screen.dart';
@@ -204,6 +206,14 @@ GoRouter router(Ref ref) {
         parentNavigatorKey: _rootNavigatorKey,
         pageBuilder: (context, state) => _page(state, const HouseholdScreen()),
       ),
+      // P5 · the premium Insights surface (Screen 30), pushed full-screen over
+      // the shell. Real charts over the live pantry, behind the premium veil.
+      GoRoute(
+        path: '/insights',
+        name: 'insights',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) => _page(state, const InsightsScreen()),
+      ),
       GoRoute(
         path: '/settings',
         name: 'settings',
@@ -290,6 +300,16 @@ GoRouter router(Ref ref) {
               parentNavigatorKey: _rootNavigatorKey,
               pageBuilder: (context, state) =>
                   _page(state, const AccessibilityStatesScreen()),
+            ),
+            // P5 · the system-states gallery (Screens 26–30). Debug-only —
+            // the presentational conflict / queue / role surfaces beside live
+            // skeleton + chart demos.
+            GoRoute(
+              path: 'system-states',
+              name: 'systemStates',
+              parentNavigatorKey: _rootNavigatorKey,
+              pageBuilder: (context, state) =>
+                  _page(state, const SystemStatesScreen()),
             ),
           ],
         ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
@@ -143,6 +145,51 @@ Stream<List<PantryItem>> pantrySectionStream(Ref ref) {
 Stream<List<WasteEvent>> wasteHistoryStream(Ref ref) {
   final hid = ref.watch(activeHouseholdIdProvider);
   return ref.watch(watchWasteHistoryProvider).watch(hid);
+}
+
+/// Every pantry item across all four sections, combined into one live list.
+///
+/// The repository only exposes a per-section watch, so this fans out across
+/// [PantrySection.values] and emits the latest union whenever any section
+/// changes — the read the Insights surface (Screen 30) needs to measure the
+/// whole pantry's freshness and section balance at once.
+@riverpod
+Stream<List<PantryItem>> pantryAllItemsStream(Ref ref) {
+  final hid = ref.watch(activeHouseholdIdProvider);
+  final watch = ref.watch(watchPantrySectionProvider);
+
+  final latest = <PantrySection, List<PantryItem>>{};
+  final controller = StreamController<List<PantryItem>>();
+  final subs = <StreamSubscription<List<PantryItem>>>[];
+
+  List<PantryItem> union() => [
+    for (final section in PantrySection.values) ...?latest[section],
+  ];
+
+  for (final section in PantrySection.values) {
+    subs.add(
+      watch
+          .watch(hid, section)
+          .listen(
+            (items) {
+              latest[section] = items;
+              if (!controller.isClosed) controller.add(union());
+            },
+            onError: (Object error, StackTrace stack) {
+              if (!controller.isClosed) controller.addError(error, stack);
+            },
+          ),
+    );
+  }
+
+  ref.onDispose(() {
+    for (final sub in subs) {
+      unawaited(sub.cancel());
+    }
+    unawaited(controller.close());
+  });
+
+  return controller.stream;
 }
 
 @riverpod

@@ -94,6 +94,12 @@ class _PremiumScreenState extends State<PremiumScreen> {
               child: const Text('Start 7-day free trial'),
             ),
             const SizedBox(height: KsTokens.space8),
+            TextButton.icon(
+              onPressed: () => context.push('/insights'),
+              icon: const Icon(Icons.insights_outlined, size: 17),
+              label: const Text('Preview pantry insights'),
+            ),
+            const SizedBox(height: KsTokens.space8),
             Text(
               _plan == _Plan.annual
                   ? 'Cancel anytime · then £29/year'

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,5 +58,33 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('On the shelves'), findsOneWidget);
+  });
+
+  testWidgets('PantryHomeScreen shows a skeleton while the stream is loading', (
+    tester,
+  ) async {
+    // A stream that never emits keeps the section provider in its loading
+    // state, so the shelf shows the skeleton rather than a bare spinner.
+    final pending = Completer<List<PantryItem>>();
+    addTearDown(() => pending.complete(const <PantryItem>[]));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          pantrySectionStreamProvider.overrideWith(
+            (ref) => Stream.fromFuture(pending.future),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const PantryHomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(KsSkeleton), findsWidgets);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 }
