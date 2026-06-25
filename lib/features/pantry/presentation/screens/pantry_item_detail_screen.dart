@@ -277,6 +277,7 @@ class _MetadataCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           KsMetadataRow(
+            icon: Icons.inventory_2_outlined,
             label: 'Section',
             value: _sectionLabel(item.section),
             color: item.section.color,
@@ -284,15 +285,16 @@ class _MetadataCard extends StatelessWidget {
           if (expiryLabel.isNotEmpty) ...[
             const SizedBox(height: KsTokens.space12),
             KsMetadataRow(
+              icon: freshness.icon,
               label: 'Freshness',
               value: expiryLabel,
               color: freshness.color,
-              showDot: true,
             ),
           ],
           if (item.lastPurchaseDate != null) ...[
             const SizedBox(height: KsTokens.space12),
             KsMetadataRow(
+              icon: Icons.shopping_cart_outlined,
               label: 'Last purchased',
               value: _formatDate(item.lastPurchaseDate!),
             ),
@@ -300,6 +302,7 @@ class _MetadataCard extends StatelessWidget {
           if (ingredient?.defaultShelfLifeDays != null) ...[
             const SizedBox(height: KsTokens.space12),
             KsMetadataRow(
+              icon: Icons.schedule,
               label: 'Typical shelf life',
               value: '${ingredient!.defaultShelfLifeDays} days',
             ),
@@ -307,13 +310,18 @@ class _MetadataCard extends StatelessWidget {
           if (ingredient != null && ingredient!.allergens.isNotEmpty) ...[
             const SizedBox(height: KsTokens.space12),
             KsMetadataRow(
+              icon: Icons.warning_amber_rounded,
               label: 'Allergens',
               value: ingredient!.allergens.map((a) => a.name).join(', '),
             ),
           ],
           if (item.note != null && item.note!.isNotEmpty) ...[
             const SizedBox(height: KsTokens.space12),
-            KsMetadataRow(label: 'Note', value: item.note!),
+            KsMetadataRow(
+              icon: Icons.sticky_note_2_outlined,
+              label: 'Note',
+              value: item.note!,
+            ),
           ],
         ],
       ),
@@ -343,6 +351,7 @@ class _WasteButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
+        style: KsButtonStyles.destructiveOutline(context),
         icon: const Icon(Icons.delete_outline, size: 20),
         label: const Text('Mark as waste'),
         onPressed: () => showModalBottomSheet<void>(

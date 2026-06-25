@@ -368,6 +368,16 @@ extension FreshnessX on Freshness {
     Freshness.expired => 'Expired',
     Freshness.unknown => '',
   };
+
+  /// A redundant, non-colour glyph for each state so freshness never travels
+  /// by colour alone (accessibility). Pairs with the edge-bar + day-count in
+  /// freshness badges — see "Components I (Primitives)", Freshness indicators.
+  IconData get icon => switch (this) {
+    Freshness.fresh => Icons.check_circle_outline,
+    Freshness.expiringSoon => Icons.schedule,
+    Freshness.expired => Icons.warning_amber_rounded,
+    Freshness.unknown => Icons.help_outline,
+  };
 }
 
 /// Maps [IngredientCategory] to its brand color for tiles and badges.

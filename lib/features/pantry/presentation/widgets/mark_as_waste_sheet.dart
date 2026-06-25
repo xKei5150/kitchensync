@@ -143,10 +143,7 @@ class _MarkAsWasteSheetState extends ConsumerState<MarkAsWasteSheet> {
           const SizedBox(height: KsTokens.space24),
           FilledButton(
             onPressed: _submitting ? null : _submit,
-            style: FilledButton.styleFrom(
-              backgroundColor: ks.danger,
-              foregroundColor: KsTokens.textOnBrand,
-            ),
+            style: KsButtonStyles.destructive(context),
             child: _submitting
                 ? const SizedBox.square(
                     dimension: 20,

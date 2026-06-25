@@ -230,5 +230,157 @@ void main() {
       );
       expect(find.byType(KsStatusDot), findsOneWidget);
     });
+
+    testWidgets('icon layout renders a leading glyph, label, and value', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        const KsMetadataRow(
+          icon: Icons.inventory_2_outlined,
+          label: 'Section',
+          value: 'Food',
+        ),
+      );
+      expect(find.byIcon(Icons.inventory_2_outlined), findsOneWidget);
+      expect(find.text('Section'), findsOneWidget);
+      expect(find.text('Food'), findsOneWidget);
+      // The icon layout drops the legacy status dot.
+      expect(find.byType(KsStatusDot), findsNothing);
+    });
+  });
+
+  group('KsTag (elevated)', () {
+    testWidgets('lowStock leads with a down-arrow glyph', (tester) async {
+      await _pump(tester, KsTag.lowStock());
+      expect(find.text('Low'), findsOneWidget);
+      expect(find.byIcon(Icons.south_rounded), findsOneWidget);
+    });
+
+    testWidgets('renders an explicit leading icon when given', (tester) async {
+      await _pump(
+        tester,
+        const KsTag(label: 'premium', icon: Icons.star_rounded),
+      );
+      expect(find.byIcon(Icons.star_rounded), findsOneWidget);
+    });
+  });
+
+  group('KsExpiryBadge (accessible)', () {
+    testWidgets('expiring soon leads with the schedule glyph', (tester) async {
+      await _pump(
+        tester,
+        const KsExpiryBadge(
+          freshness: Freshness.expiringSoon,
+          label: '2 days left',
+        ),
+      );
+      expect(find.byIcon(Icons.schedule), findsOneWidget);
+      expect(find.byType(KsStatusDot), findsNothing);
+    });
+
+    testWidgets('expired leads with the warning glyph', (tester) async {
+      await _pump(
+        tester,
+        const KsExpiryBadge(freshness: Freshness.expired, label: 'Expired'),
+      );
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+    });
+  });
+
+  group('KsBadge', () {
+    testWidgets('proposed is an uppercased pill with a bolt glyph', (
+      tester,
+    ) async {
+      await _pump(tester, const KsBadge.proposed());
+      expect(find.text('PROPOSED'), findsOneWidget);
+      expect(find.byIcon(Icons.bolt), findsOneWidget);
+      final deco = _decorationOf(tester, find.byType(Container));
+      expect(deco.borderRadius, BorderRadius.circular(KsTokens.radiusFull));
+      expect(deco.border, isNotNull);
+    });
+
+    testWidgets('premium fills solid with the deep brand on light', (
+      tester,
+    ) async {
+      await _pump(tester, const KsBadge.premium());
+      expect(find.text('PREMIUM'), findsOneWidget);
+      expect(find.byIcon(Icons.star_rounded), findsOneWidget);
+      final deco = _decorationOf(tester, find.byType(Container));
+      expect(deco.color, KsTokens.brandPrimaryDark);
+    });
+
+    testWidgets('custom tonal uses a colour@14% fill', (tester) async {
+      await _pump(
+        tester,
+        const KsBadge.custom(label: 'New', color: KsTokens.fresh),
+      );
+      expect(find.text('NEW'), findsOneWidget);
+      final deco = _decorationOf(tester, find.byType(Container));
+      expect(deco.color, KsTokens.fresh.withValues(alpha: 0.14));
+    });
+  });
+
+  group('KsSearchField', () {
+    testWidgets('renders a hint, a search glyph, and forwards input', (
+      tester,
+    ) async {
+      var typed = '';
+      await _pump(
+        tester,
+        KsSearchField(
+          hintText: 'Search ingredients…',
+          onChanged: (v) => typed = v,
+        ),
+      );
+      expect(find.byIcon(Icons.search), findsOneWidget);
+      expect(find.text('Search ingredients…'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'rice');
+      expect(typed, 'rice');
+    });
+  });
+
+  group('KsFocusRing', () {
+    testWidgets('paints a ring shadow only while focused', (tester) async {
+      final node = FocusNode();
+      addTearDown(node.dispose);
+      await _pump(
+        tester,
+        KsFocusRing(
+          focusNode: node,
+          child: Focus(focusNode: node, child: const SizedBox(width: 80)),
+        ),
+      );
+
+      BoxDecoration ringDeco() =>
+          tester
+                  .widget<AnimatedContainer>(find.byType(AnimatedContainer))
+                  .decoration!
+              as BoxDecoration;
+      expect(ringDeco().boxShadow, isEmpty);
+
+      node.requestFocus();
+      await tester.pumpAndSettle();
+      expect(ringDeco().boxShadow, isNotEmpty);
+    });
+  });
+
+  group('KsButtonStyles', () {
+    testWidgets('destructive fills with the theme danger colour', (
+      tester,
+    ) async {
+      late ButtonStyle style;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              style = KsButtonStyles.destructive(context);
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      expect(style.backgroundColor?.resolve({}), KsColors.light.danger);
+    });
   });
 }

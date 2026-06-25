@@ -46,7 +46,11 @@ class KsStatusDot extends StatelessWidget {
   }
 }
 
-/// Freshness dot + relative-expiry label (e.g. "2 days left").
+/// Freshness icon + relative-expiry label (e.g. "2 days left").
+///
+/// Leads with the per-state [FreshnessX.icon] — not a bare colour dot — so the
+/// state is legible without relying on hue. The redundant icon + day-count is
+/// the accessible pairing from "Components I (Primitives)", Freshness.
 class KsExpiryBadge extends StatelessWidget {
   const KsExpiryBadge({
     required this.freshness,
@@ -59,19 +63,20 @@ class KsExpiryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = freshness.color;
+    final isUnknown = freshness == Freshness.unknown;
+    final color = isUnknown
+        ? context.ksColors.textTertiary
+        : freshness.color.withValues(alpha: 0.85);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        KsStatusDot(color: color),
-        const SizedBox(width: KsTokens.space6),
+        Icon(freshness.icon, size: 14, color: color),
+        const SizedBox(width: KsTokens.space4),
         Text(
           label,
           style: KsTokens.bodySmall.copyWith(
-            color: freshness == Freshness.unknown
-                ? context.ksColors.textTertiary
-                : color.withValues(alpha: 0.85),
-            fontWeight: FontWeight.w500,
+            color: color,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],

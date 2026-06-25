@@ -86,7 +86,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(KsTokens.radius12),
-        borderSide: const BorderSide(color: KsTokens.brandPrimary, width: 1.5),
+        borderSide: const BorderSide(color: KsTokens.brandPrimary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(KsTokens.radius12),
@@ -99,6 +99,8 @@ class AppTheme {
       style: FilledButton.styleFrom(
         backgroundColor: KsTokens.brandPrimary,
         foregroundColor: KsTokens.textOnBrand,
+        disabledBackgroundColor: KsColors.light.disabledFill,
+        disabledForegroundColor: KsColors.light.disabledText,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(KsTokens.radius12),
         ),
@@ -272,7 +274,7 @@ class AppTheme {
         borderRadius: BorderRadius.circular(KsTokens.radius12),
         borderSide: const BorderSide(
           color: KsTokens.brandPrimaryLight,
-          width: 1.5,
+          width: 2,
         ),
       ),
       errorBorder: OutlineInputBorder(
@@ -286,6 +288,8 @@ class AppTheme {
       style: FilledButton.styleFrom(
         backgroundColor: KsTokens.brandPrimaryLight,
         foregroundColor: KsTokens.textPrimary,
+        disabledBackgroundColor: KsColors.dark.disabledFill,
+        disabledForegroundColor: KsColors.dark.disabledText,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(KsTokens.radius12),
         ),

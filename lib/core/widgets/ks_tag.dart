@@ -21,6 +21,7 @@ class KsTag extends StatelessWidget {
   const KsTag({
     required this.label,
     this.color,
+    this.icon,
     this.size = KsTagSize.md,
     this.tone = KsTagTone.tonal,
     super.key,
@@ -34,9 +35,15 @@ class KsTag extends StatelessWidget {
   }) =>
       KsTag(label: category.name, color: category.color, size: size, key: key);
 
-  /// The "Low" stock pill.
-  factory KsTag.lowStock({KsTagSize size = KsTagSize.sm, Key? key}) =>
-      KsTag(label: 'Low', color: KsTokens.lowStock, size: size, key: key);
+  /// The "Low" stock pill — leads with a down-arrow so low stock reads
+  /// without relying on the brown tint alone (accessibility).
+  factory KsTag.lowStock({KsTagSize size = KsTagSize.sm, Key? key}) => KsTag(
+    label: 'Low',
+    color: KsTokens.lowStock,
+    icon: Icons.south_rounded,
+    size: size,
+    key: key,
+  );
 
   /// A neutral alias chip (e.g. "also: scallion").
   factory KsTag.alias(String label, {Key? key}) =>
@@ -48,6 +55,9 @@ class KsTag extends StatelessWidget {
   /// Drives tonal / solid / outline colouring. Ignored by [KsTagTone.neutral].
   /// Defaults to the theme's brand green when null.
   final Color? color;
+
+  /// Optional leading glyph, tinted to match the label.
+  final IconData? icon;
 
   /// Padding + radius preset.
   final KsTagSize size;
@@ -94,6 +104,8 @@ class KsTag extends StatelessWidget {
       ),
     };
 
+    final iconSize = size == KsTagSize.sm ? 11.0 : 13.0;
+
     return Container(
       padding: padding,
       decoration: BoxDecoration(
@@ -101,7 +113,16 @@ class KsTag extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
         border: border,
       ),
-      child: Text(label, style: KsTokens.labelSmall.copyWith(color: textColor)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: iconSize, color: textColor),
+            const SizedBox(width: KsTokens.space2),
+          ],
+          Text(label, style: KsTokens.labelSmall.copyWith(color: textColor)),
+        ],
+      ),
     );
   }
 }

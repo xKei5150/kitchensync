@@ -30,14 +30,18 @@ class KsCard extends StatelessWidget {
   }
 }
 
-/// A fixed-label / value row for use inside a [KsCard].
+/// A label / value row for use inside a [KsCard].
 ///
-/// When [color] is set the value renders in that colour at [FontWeight.w600];
-/// pass [showDot] to prefix a [KsStatusDot] (e.g. for freshness).
+/// Two layouts share one widget. Pass an [icon] for the spec's
+/// `icon · label · value` row (icon + flexed secondary label + trailing
+/// value); omit it for the legacy fixed-width label column. When [color] is
+/// set the value renders in that colour at [FontWeight.w600]; [showDot]
+/// prefixes a [KsStatusDot] in the icon-less layout.
 class KsMetadataRow extends StatelessWidget {
   const KsMetadataRow({
     required this.label,
     required this.value,
+    this.icon,
     this.color,
     this.showDot = false,
     super.key,
@@ -45,6 +49,10 @@ class KsMetadataRow extends StatelessWidget {
 
   final String label;
   final String value;
+
+  /// Optional leading glyph. When set, switches to the icon · label · value
+  /// layout from "Components I (Primitives)", Cards & metadata rows.
+  final IconData? icon;
   final Color? color;
   final bool showDot;
 
@@ -52,6 +60,30 @@ class KsMetadataRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final ks = context.ksColors;
     final valueColor = color;
+    final valueStyle = KsTokens.bodyMedium.copyWith(
+      color: valueColor ?? ks.textPrimary,
+      fontWeight: valueColor != null ? FontWeight.w600 : FontWeight.w400,
+    );
+
+    if (icon != null) {
+      return Row(
+        children: [
+          Icon(icon, size: 15, color: ks.textTertiary),
+          const SizedBox(width: KsTokens.space8),
+          Expanded(
+            child: Text(
+              label,
+              style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
+            ),
+          ),
+          const SizedBox(width: KsTokens.space8),
+          Flexible(
+            child: Text(value, style: valueStyle, textAlign: TextAlign.end),
+          ),
+        ],
+      );
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -72,17 +104,7 @@ class KsMetadataRow extends StatelessWidget {
                 KsStatusDot(color: valueColor),
                 const SizedBox(width: KsTokens.space6),
               ],
-              Flexible(
-                child: Text(
-                  value,
-                  style: KsTokens.bodyMedium.copyWith(
-                    color: valueColor ?? ks.textPrimary,
-                    fontWeight: valueColor != null
-                        ? FontWeight.w600
-                        : FontWeight.w400,
-                  ),
-                ),
-              ),
+              Flexible(child: Text(value, style: valueStyle)),
             ],
           ),
         ),

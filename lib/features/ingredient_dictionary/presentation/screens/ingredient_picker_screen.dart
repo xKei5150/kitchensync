@@ -71,25 +71,9 @@ class _IngredientPickerScreenState
               KsTokens.space16,
               KsTokens.space12,
             ),
-            child: TextField(
+            child: KsSearchField(
               autofocus: true,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
-                hintText: 'Search ingredients...',
-                filled: true,
-                fillColor: KsTokens.surfaceRaised,
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(KsTokens.radius12),
-                  borderSide: const BorderSide(color: KsTokens.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(KsTokens.radius12),
-                  borderSide: const BorderSide(
-                    color: KsTokens.brandPrimary,
-                    width: 1.5,
-                  ),
-                ),
-              ),
+              hintText: 'Search ingredients…',
               onChanged: _onChanged,
             ),
           ),
