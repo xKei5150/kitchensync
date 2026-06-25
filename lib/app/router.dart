@@ -12,7 +12,9 @@ import 'package:kitchensync/features/pantry/presentation/screens/add_pantry_item
 import 'package:kitchensync/features/pantry/presentation/screens/pantry_home_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/pantry_item_detail_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/waste_log_screen.dart';
+import 'package:kitchensync/features/recipes/presentation/screens/recipe_detail_screen.dart';
 import 'package:kitchensync/features/recipes/presentation/screens/recipes_screen.dart';
+import 'package:kitchensync/features/shopping/presentation/screens/shopping_list_screen.dart';
 import 'package:kitchensync/features/shopping/presentation/screens/shopping_screen.dart';
 import 'package:kitchensync/features/today/presentation/screens/day_view_screen.dart';
 import 'package:kitchensync/features/today/presentation/screens/today_screen.dart';
@@ -58,6 +60,14 @@ GoRouter router(Ref ref) {
                 path: '/shop',
                 name: 'shop',
                 builder: (context, state) => const ShoppingScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'list',
+                    name: 'shopList',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (context, state) => const ShoppingListScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -110,6 +120,12 @@ GoRouter router(Ref ref) {
         name: 'dayView',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const DayViewScreen(),
+      ),
+      GoRoute(
+        path: '/recipe',
+        name: 'recipeDetail',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const RecipeDetailScreen(),
       ),
       GoRoute(
         path: '/ingredient/pick',

@@ -84,13 +84,12 @@ class KsTag extends StatelessWidget {
 
     final ks = context.ksColors;
     final base = color ?? ks.brandPrimary;
+    // Bright category pastels (dairy yellow especially) wash out when used raw
+    // as label text; clamp them to a legible ink while keeping the soft tint.
+    final ink = base.readableInk(Theme.of(context).brightness);
 
     final (Color fill, Color textColor, BoxBorder? border) = switch (tone) {
-      KsTagTone.tonal => (
-        base.withValues(alpha: 0.12),
-        base.withValues(alpha: 0.85),
-        null,
-      ),
+      KsTagTone.tonal => (base.withValues(alpha: 0.12), ink, null),
       KsTagTone.neutral => (
         ks.neutralSubtle,
         ks.textSecondary,
@@ -99,8 +98,8 @@ class KsTag extends StatelessWidget {
       KsTagTone.solid => (base, KsTokens.textOnBrand, null),
       KsTagTone.outline => (
         Colors.transparent,
-        base.withValues(alpha: 0.9),
-        Border.all(color: base.withValues(alpha: 0.55)),
+        ink,
+        Border.all(color: ink.withValues(alpha: 0.55)),
       ),
     };
 

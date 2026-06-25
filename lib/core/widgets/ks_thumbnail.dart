@@ -5,8 +5,9 @@ import 'package:kitchensync/app/design_tokens.dart';
 /// A rounded image thumbnail with a category-tinted placeholder fallback.
 ///
 /// Used at 56px on pantry tiles and 44px on ingredient list tiles. The
-/// placeholder fills with `categoryColor@15%` behind a `categoryColor@70%`
-/// glyph. Callers apply their own surrounding padding.
+/// placeholder fills with `categoryColor@15%` behind a luminance-corrected
+/// glyph (so light pastels like dairy yellow stay legible). Callers apply their
+/// own surrounding padding.
 class KsThumbnail extends StatelessWidget {
   const KsThumbnail({
     required this.categoryColor,
@@ -28,6 +29,7 @@ class KsThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = imageUrl;
+    final glyphColor = categoryColor.readableInk(Theme.of(context).brightness);
     return SizedBox(
       width: size,
       height: size,
@@ -37,23 +39,19 @@ class KsThumbnail extends StatelessWidget {
               child: CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => _placeholder(),
-                errorWidget: (_, __, ___) => _placeholder(),
+                placeholder: (_, __) => _placeholder(glyphColor),
+                errorWidget: (_, __, ___) => _placeholder(glyphColor),
               ),
             )
-          : _placeholder(),
+          : _placeholder(glyphColor),
     );
   }
 
-  Widget _placeholder() => Container(
+  Widget _placeholder(Color glyphColor) => Container(
     decoration: BoxDecoration(
       color: categoryColor.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(radius),
     ),
-    child: Icon(
-      icon,
-      size: iconSize,
-      color: categoryColor.withValues(alpha: 0.7),
-    ),
+    child: Icon(icon, size: iconSize, color: glyphColor),
   );
 }

@@ -1,0 +1,65 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kitchensync/app/theme.dart';
+import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
+import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
+import 'package:kitchensync/features/pantry/presentation/screens/waste_log_screen.dart';
+
+void main() {
+  testWidgets('WasteLogScreen renders the savings hero and weekly almanac', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          wasteHistoryStreamProvider.overrideWith(
+            (ref) => Stream.value(<WasteEvent>[]),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const WasteLogScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('£42'), findsOneWidget);
+    expect(
+      find.text('saved this month by shopping what you had'),
+      findsOneWidget,
+    );
+    expect(find.text('WASTE THIS WEEK'), findsOneWidget);
+    expect(
+      find.text('Three things saved from the bin this week.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('WasteLogScreen renders in dark theme without error', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          wasteHistoryStreamProvider.overrideWith(
+            (ref) => Stream.value(<WasteEvent>[]),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const WasteLogScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+  });
+}

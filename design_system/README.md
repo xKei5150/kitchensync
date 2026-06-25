@@ -131,6 +131,30 @@ it is unbuilt, but the token itself now exists in the Flutter app.
 
 ---
 
+## Readable ink (category foregrounds)
+
+Several category hues are deliberately light pastels — dairy `--cat-dairy` (#FFF176)
+worst of all, plus produce, beverage, frozen. Used **raw as a foreground** (tag label,
+outline border, thumbnail glyph) they wash out on a light surface, and the
+luminance-lifted `--cat-*-dark` variant only makes them brighter. So category
+**foregrounds derive a "readable ink"**, while category **fills/tints stay the raw hue**:
+
+```css
+/* fill / tint — raw hue, unchanged */
+background: color-mix(in srgb, var(--c) 12%, transparent);
+/* foreground — readable ink: blend the hue toward the theme's text colour */
+color: color-mix(in srgb, var(--c) 55%, var(--text-primary));
+```
+
+Because `--text-primary` flips per theme (near-black on light, near-white on dark), the
+one rule darkens the hue on light and lightens it on dark — keeping the identifying hue
+while staying legible. In Flutter this is `Color.readableInk(Brightness)` in
+`design_tokens.dart`, applied by `KsTag` (tonal/outline text + border) and `KsThumbnail`
+(placeholder glyph). Freshness, section, and brand foregrounds are already dark enough and
+are **not** routed through it.
+
+---
+
 ## Re-sync
 
 The folder maps to Claude Design through the **DesignSync** tool:

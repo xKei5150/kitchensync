@@ -1,77 +1,37 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
-/// Screen 04 · Shopping · in-store checklist — buying ahead pays down the
-/// future.
+/// Screen 09 · Shopping home + Shop Now.
 ///
-/// A tactile, receipt-like list — shared, with per-member ticks and a
-/// substitution. Presentational P0 with representative sample data; ticking is
-/// wired to ephemeral local state so the list feels alive.
-class ShoppingScreen extends StatefulWidget {
+/// The Shop tab landing: scheduled shop dates, a slim history, and a prominent
+/// Shop Now that opens the "how far ahead?" setup before building a list.
+/// Presentational P1 with representative sample data; the in-store checklist
+/// lives at `/shop/list`.
+class ShoppingScreen extends StatelessWidget {
   const ShoppingScreen({super.key});
 
-  @override
-  State<ShoppingScreen> createState() => _ShoppingScreenState();
-}
-
-class _ShoppingScreenState extends State<ShoppingScreen> {
-  // The four visible lines; the wider list is 11 items, 7 already done.
-  late final List<_ShopLine> _lines = [
-    const _ShopLine(
-      name: 'Tomatoes',
-      state: ChecklistItemState.toBuy,
-      quantity: '1 kg',
-    ),
-    const _ShopLine(
-      name: 'White beans · 2 tins',
-      state: ChecklistItemState.bought,
-      memberInitial: 'B',
-      memberSeat: 1,
-    ),
-    const _ShopLine(
-      name: 'Orzo',
-      state: ChecklistItemState.substituted,
-      note: 'risoni',
-      memberInitial: 'A',
-      memberSeat: 0,
-    ),
-    const _ShopLine(
-      name: 'Fresh dill',
-      state: ChecklistItemState.unavailable,
-      note: 'none left',
-    ),
+  static const _upcoming = [
+    _UpcomingShop(title: 'Weekly shop', when: 'Fri 27 · 11 items'),
+    _UpcomingShop(title: 'Next week', when: 'Fri 4 Jul · 9 items'),
   ];
 
-  static const int _total = 11;
-
-  // Five of the eleven are done off-screen; the two visible done lines (a
-  // bought tin, a substitution) lift the live count to the design's 7 / 11,
-  // and local toggles move it from there.
-  int get _done =>
-      5 +
-      _lines
-          .where(
-            (l) =>
-                l.state == ChecklistItemState.bought ||
-                l.state == ChecklistItemState.substituted,
-          )
-          .length;
-
-  void _toggle(int index) {
-    setState(() {
-      final line = _lines[index];
-      _lines[index] = line.copyWith(
-        state: line.state == ChecklistItemState.bought
-            ? ChecklistItemState.toBuy
-            : ChecklistItemState.bought,
-      );
-    });
+  Future<void> _openShopNow(BuildContext context) async {
+    final start = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _ShopNowSheet(),
+    );
+    if ((start ?? false) && context.mounted) {
+      unawaited(context.push('/shop/list'));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final ks = context.ksColors;
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -82,119 +42,234 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
           KsTokens.space24,
         ),
         children: [
-          const KsFolioHeader(
-            eyebrow: 'In-store · Fri 27',
-            title: 'Weekly shop',
-            actions: [
-              KsMemberAvatar(initial: 'A', seat: 0, size: 26),
-              KsMemberAvatar(initial: 'B', seat: 1, size: 26),
-            ],
-          ),
+          const KsFolioHeader(eyebrow: 'The Shop', title: 'Shopping'),
+          const SizedBox(height: KsTokens.space16),
+          _ShopNowCard(onStart: () => _openShopNow(context)),
+          const SizedBox(height: KsTokens.space20),
+          const _SectionLabel('Upcoming'),
+          const SizedBox(height: KsTokens.space10),
+          for (final shop in _upcoming) ...[
+            _UpcomingTile(shop: shop, onTap: () => context.push('/shop/list')),
+            const SizedBox(height: KsTokens.space8),
+          ],
           const SizedBox(height: KsTokens.space12),
-          _ProgressBar(done: _done, total: _total),
-          const SizedBox(height: KsTokens.space16),
-          const _PayoffLedger(),
-          const SizedBox(height: KsTokens.space16),
-          Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: ks.surfaceRaised,
-              borderRadius: BorderRadius.circular(KsTokens.radius16),
-              border: Border.all(color: ks.border),
-            ),
-            child: Column(
-              children: [
-                for (var i = 0; i < _lines.length; i++) ...[
-                  if (i > 0)
-                    Divider(height: 1, thickness: 1, color: ks.hairline),
-                  KsChecklistRow(
-                    name: _lines[i].name,
-                    state: _lines[i].state,
-                    quantity: _lines[i].quantity,
-                    note: _lines[i].note,
-                    memberInitial: _lines[i].memberInitial,
-                    memberSeat: _lines[i].memberSeat,
-                    onToggle: () => _toggle(i),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: KsTokens.space16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () {},
-              child: const Text('Done shopping'),
-            ),
-          ),
+          const _SectionLabel('History'),
+          const SizedBox(height: KsTokens.space10),
+          const _HistoryRow(label: 'Fri 20 Jun · 13 items · £58'),
         ],
       ),
     );
   }
 }
 
-/// Immutable shopping-line view model for the local toggle state.
-@immutable
-class _ShopLine {
-  const _ShopLine({
-    required this.name,
-    required this.state,
-    this.quantity,
-    this.note,
-    this.memberInitial,
-    this.memberSeat,
-  });
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
 
-  final String name;
-  final ChecklistItemState state;
-  final String? quantity;
-  final String? note;
-  final String? memberInitial;
-  final int? memberSeat;
+  final String label;
 
-  _ShopLine copyWith({ChecklistItemState? state}) => _ShopLine(
-    name: name,
-    state: state ?? this.state,
-    quantity: quantity,
-    note: note,
-    memberInitial: memberInitial,
-    memberSeat: memberSeat,
-  );
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label.toUpperCase(),
+      style: KsTokens.labelSmall.copyWith(
+        color: context.ksColors.textTertiary,
+        fontWeight: FontWeight.w700,
+        fontSize: 10,
+        letterSpacing: 1,
+      ),
+    );
+  }
 }
 
-class _ProgressBar extends StatelessWidget {
-  const _ProgressBar({required this.done, required this.total});
+/// The prominent Shop Now banner — a brand-green gradient card inviting the
+/// household to buy ahead and shrink future lists.
+class _ShopNowCard extends StatelessWidget {
+  const _ShopNowCard({required this.onStart});
 
-  final int done;
-  final int total;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [KsTokens.brandPrimary, KsTokens.brandPrimaryDark],
+        ),
+        borderRadius: BorderRadius.circular(KsTokens.radius16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Shop Now'.toUpperCase(),
+            style: KsTokens.labelSmall.copyWith(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w700,
+              fontSize: 9,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: KsTokens.space6),
+          Text(
+            'Knock out next week early?',
+            style: KsTokens.displaySmall.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 21,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: KsTokens.space4),
+          Text(
+            'Buy ahead and future lists shrink as you go.',
+            style: KsTokens.bodySmall.copyWith(
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
+          ),
+          const SizedBox(height: 13),
+          _OnBrandButton(label: 'Start a shop', onTap: onStart),
+        ],
+      ),
+    );
+  }
+}
+
+/// A white pill button reading on the brand gradient.
+class _OnBrandButton extends StatelessWidget {
+  const _OnBrandButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(KsTokens.radius10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+          child: Text(
+            label,
+            style: KsTokens.labelMedium.copyWith(
+              color: KsTokens.brandPrimaryDark,
+              fontSize: 13,
+              letterSpacing: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UpcomingShop {
+  const _UpcomingShop({required this.title, required this.when});
+
+  final String title;
+  final String when;
+}
+
+class _UpcomingTile extends StatelessWidget {
+  const _UpcomingTile({required this.shop, required this.onTap});
+
+  final _UpcomingShop shop;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
-    final fraction = (done / total).clamp(0.0, 1.0);
-    return Row(
-      children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(KsTokens.radiusFull),
-            child: Stack(
-              children: [
-                Container(height: 8, color: ks.neutralSubtle),
-                FractionallySizedBox(
-                  widthFactor: fraction,
-                  child: Container(height: 8, color: ks.brandPrimary),
+    return Material(
+      color: ks.surfaceRaised,
+      borderRadius: BorderRadius.circular(KsTokens.radius12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: KsTokens.space12,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(KsTokens.radius12),
+            border: Border.all(color: ks.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: ks.calShopping.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(KsTokens.radius10),
                 ),
-              ],
-            ),
+                child: Icon(
+                  Icons.shopping_bag_outlined,
+                  size: 18,
+                  color: ks.calShopping,
+                ),
+              ),
+              const SizedBox(width: KsTokens.space12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      shop.title,
+                      style: KsTokens.titleSmall.copyWith(
+                        color: ks.textPrimary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: KsTokens.space2),
+                    Text(
+                      shop.when,
+                      style: KsTokens.labelSmall.copyWith(
+                        color: ks.textTertiary,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: ks.textTertiary,
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: KsTokens.space12),
-        Text(
-          '$done / $total',
-          style: KsTokens.labelMedium.copyWith(
-            color: ks.textSecondary,
-            letterSpacing: 0,
+      ),
+    );
+  }
+}
+
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Row(
+      children: [
+        const Icon(Icons.check_rounded, size: 16, color: KsTokens.fresh),
+        const SizedBox(width: KsTokens.space10),
+        Expanded(
+          child: Text(
+            label,
+            style: KsTokens.bodySmall.copyWith(
+              color: ks.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -202,81 +277,163 @@ class _ProgressBar extends StatelessWidget {
   }
 }
 
-/// The "you paid down the future" ledger — ticking an item early strikes it
-/// from next week's list and shrinks the count.
-class _PayoffLedger extends StatelessWidget {
-  const _PayoffLedger();
+/// The Shop Now setup — "how far ahead?" — a bottom sheet that pulls future
+/// lists forward; only what you actually buy is paid down.
+class _ShopNowSheet extends StatefulWidget {
+  const _ShopNowSheet();
+
+  @override
+  State<_ShopNowSheet> createState() => _ShopNowSheetState();
+}
+
+class _ShopNowSheetState extends State<_ShopNowSheet> {
+  static const _options = [
+    _AheadOption(label: 'This week only', items: 11, ahead: 0),
+    _AheadOption(label: '+ 1 week ahead', items: 20, ahead: 1),
+    _AheadOption(label: '+ 2 weeks ahead', items: 28, ahead: 2),
+  ];
+
+  int _selected = 1;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
-    return Container(
-      padding: const EdgeInsets.all(KsTokens.space16),
-      decoration: BoxDecoration(
-        color: ks.surfaceSunken,
-        borderRadius: BorderRadius.circular(KsTokens.radius16),
-        border: Border.all(color: ks.hairline),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          KsTokens.space20,
+          KsTokens.space12,
+          KsTokens.space20,
+          KsTokens.space24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: KsTokens.space16),
+                decoration: BoxDecoration(
+                  color: ks.borderStrong,
+                  borderRadius: BorderRadius.circular(KsTokens.radiusFull),
+                ),
+              ),
+            ),
+            Text(
+              'Shop how far ahead?',
+              style: KsTokens.displaySmall.copyWith(
+                color: ks.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 21,
+                height: 1.15,
+              ),
+            ),
+            const SizedBox(height: KsTokens.space6),
+            Text(
+              'Pull future lists forward — only what you actually buy is paid '
+              'down.',
+              style: KsTokens.bodySmall.copyWith(
+                color: ks.textSecondary,
+                fontSize: 13,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: KsTokens.space16),
+            for (var i = 0; i < _options.length; i++) ...[
+              _AheadTile(
+                option: _options[i],
+                selected: i == _selected,
+                onTap: () => setState(() => _selected = i),
+              ),
+              if (i != _options.length - 1) const SizedBox(height: 9),
+            ],
+            const SizedBox(height: KsTokens.space16),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(
+                'Build the list · ${_options[_selected].items} items',
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.auto_awesome, size: 14, color: ks.calShopping),
-              const SizedBox(width: KsTokens.space6),
-              Text(
-                'You paid down the future'.toUpperCase(),
-                style: KsTokens.labelSmall.copyWith(
-                  color: ks.calShopping,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: KsTokens.space8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                'Next week',
-                style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
-              ),
-              const SizedBox(width: KsTokens.space10),
-              Text(
-                '11',
-                style: KsTokens.titleMedium.copyWith(
-                  color: ks.textTertiary,
-                  decoration: TextDecoration.lineThrough,
-                ),
-              ),
-              const SizedBox(width: KsTokens.space6),
-              Icon(
-                Icons.arrow_forward_rounded,
-                size: 14,
-                color: ks.textTertiary,
-              ),
-              const SizedBox(width: KsTokens.space6),
-              Text(
-                '10 items',
-                style: KsTokens.titleMedium.copyWith(color: ks.textPrimary),
-              ),
-            ],
-          ),
-          const SizedBox(height: KsTokens.space2),
-          Text(
-            "that's one less trip to make later",
-            style: KsTokens.displaySmall.copyWith(
-              color: ks.textTertiary,
-              fontStyle: FontStyle.italic,
-              fontWeight: FontWeight.w400,
-              fontSize: 12,
-              height: 1.3,
+    );
+  }
+}
+
+class _AheadOption {
+  const _AheadOption({
+    required this.label,
+    required this.items,
+    required this.ahead,
+  });
+
+  final String label;
+  final int items;
+  final int ahead;
+}
+
+class _AheadTile extends StatelessWidget {
+  const _AheadTile({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _AheadOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final fill = selected
+        ? Color.alphaBlend(
+            ks.brandPrimary.withValues(alpha: 0.14),
+            ks.surfaceRaised,
+          )
+        : ks.surfaceRaised;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(KsTokens.radius12),
+            border: Border.all(
+              color: selected ? ks.brandPrimary : ks.border,
+              width: selected ? 1.5 : 1,
             ),
           ),
-        ],
+          child: Row(
+            children: [
+              if (selected) ...[
+                Icon(Icons.check_rounded, size: 16, color: ks.brandPrimary),
+                const SizedBox(width: KsTokens.space8),
+              ],
+              Expanded(
+                child: Text(
+                  option.label,
+                  style: KsTokens.titleSmall.copyWith(color: ks.textPrimary),
+                ),
+              ),
+              Text(
+                '${option.items} items',
+                style: KsTokens.labelMedium.copyWith(
+                  color: selected ? ks.brandPrimary : ks.textTertiary,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

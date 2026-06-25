@@ -53,7 +53,11 @@ class DayViewScreen extends StatelessWidget {
               isLast: true,
               child: _TonightExpanded(
                 onMarkCooked: () => context.pop(),
-                onRecipe: () => context.push('/recipes'),
+                // The recipe detail ("Closer Look") is a full-screen route over
+                // the root navigator, so it pushes cleanly without re-entering
+                // the shell — unlike the `/recipes` branch, which must be
+                // switched with `go`.
+                onRecipe: () => context.push('/recipe'),
               ),
             ),
           ],
