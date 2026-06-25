@@ -37,13 +37,44 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
   Unit _unit = Unit.piece;
   PantrySection _section = PantrySection.food;
   bool _submitting = false;
+
+  /// Flipped true on the first save attempt; from then on field errors are
+  /// shown and re-evaluated live as the user fixes them (Screen 25).
+  bool _validated = false;
+
+  /// A failure surfaced by the use case (not field validation).
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Once a submit has surfaced errors, keep the quantity error in sync as the
+    // user types — so it clears the instant the value becomes valid.
+    _qty.addListener(() {
+      if (_validated && mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
     _qty.dispose();
     super.dispose();
   }
+
+  /// The "Item" field is invalid until an ingredient is picked.
+  String? get _itemError => _selected == null
+      ? 'Pick an ingredient so it lands on the right shelf.'
+      : null;
+
+  /// The "Quantity" field needs a number greater than zero.
+  String? get _quantityError {
+    final qty = double.tryParse(_qty.text.trim());
+    if (qty == null || qty <= 0) return 'Enter an amount greater than zero.';
+    return null;
+  }
+
+  int get _errorCount =>
+      [_itemError, _quantityError].where((e) => e != null).length;
 
   Future<void> _pickIngredient() async {
     final picked = await context.push<Ingredient>('/ingredient/pick');
@@ -68,19 +99,21 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
   }
 
   Future<void> _save() async {
-    final selected = _selected;
-    if (selected == null) {
-      setState(() => _error = 'Please select an ingredient.');
+    // Validate every field at once so the summary can count them, and surface
+    // the per-field messages rather than a single generic line.
+    if (_errorCount > 0) {
+      setState(() {
+        _validated = true;
+        _error = null;
+      });
       return;
     }
-    final qty = double.tryParse(_qty.text);
-    if (qty == null || qty <= 0) {
-      setState(() => _error = 'Enter a quantity greater than zero.');
-      return;
-    }
+    final selected = _selected!;
+    final qty = double.parse(_qty.text.trim());
 
     setState(() {
       _submitting = true;
+      _validated = true;
       _error = null;
     });
 
@@ -137,10 +170,15 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
                   KsTokens.space24,
                 ),
                 children: [
+                  if (_validated && _errorCount > 0) ...[
+                    KsErrorSummary(errorCount: _errorCount),
+                    const SizedBox(height: KsTokens.space16),
+                  ],
                   const KsFieldLabel('Item'),
                   _IngredientField(
                     selected: selected,
                     onTap: _submitting ? null : _pickIngredient,
+                    errorText: _validated ? _itemError : null,
                   ),
                   if (selected != null) ...[
                     const SizedBox(height: KsTokens.space16),
@@ -153,6 +191,7 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
                     controller: _qty,
                     enabled: !_submitting,
                     onStep: _submitting ? null : _stepQuantity,
+                    errorText: _validated ? _quantityError : null,
                   ),
                   const SizedBox(height: KsTokens.space16),
                   const KsFieldLabel('Unit'),
@@ -247,10 +286,15 @@ class _TopBar extends StatelessWidget {
 
 /// The "Item" control — a styled input row that opens the ingredient picker.
 class _IngredientField extends StatelessWidget {
-  const _IngredientField({required this.selected, required this.onTap});
+  const _IngredientField({
+    required this.selected,
+    required this.onTap,
+    this.errorText,
+  });
 
   final Ingredient? selected;
   final VoidCallback? onTap;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -258,8 +302,9 @@ class _IngredientField extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final color = selected?.category.colorFor(brightness) ?? ks.textTertiary;
     final name = selected?.displayNames['en'] ?? selected?.name;
+    final hasError = errorText != null;
 
-    return Material(
+    final field = Material(
       color: ks.surfaceRaised,
       borderRadius: BorderRadius.circular(KsTokens.radius10),
       child: InkWell(
@@ -272,7 +317,15 @@ class _IngredientField extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(KsTokens.radius10),
-            border: Border.all(color: ks.borderStrong),
+            border: Border.all(color: hasError ? ks.danger : ks.borderStrong),
+            boxShadow: hasError
+                ? [
+                    BoxShadow(
+                      color: ks.danger.withValues(alpha: 0.12),
+                      spreadRadius: 3,
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             children: [
@@ -308,6 +361,12 @@ class _IngredientField extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    if (!hasError) return field;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [field, KsFieldError(errorText!)],
     );
   }
 }
@@ -367,20 +426,31 @@ class _QuantityField extends StatelessWidget {
     required this.controller,
     required this.enabled,
     required this.onStep,
+    this.errorText,
   });
 
   final TextEditingController controller;
   final bool enabled;
   final ValueChanged<int>? onStep;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
-    return Container(
+    final hasError = errorText != null;
+    final field = Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(KsTokens.radius10),
-        border: Border.all(color: ks.borderStrong),
+        border: Border.all(color: hasError ? ks.danger : ks.borderStrong),
         color: ks.surfaceRaised,
+        boxShadow: hasError
+            ? [
+                BoxShadow(
+                  color: ks.danger.withValues(alpha: 0.12),
+                  spreadRadius: 3,
+                ),
+              ]
+            : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: Row(
@@ -418,6 +488,12 @@ class _QuantityField extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    if (!hasError) return field;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [field, KsFieldError(errorText!)],
     );
   }
 }

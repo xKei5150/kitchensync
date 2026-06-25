@@ -1,6 +1,135 @@
 import 'package:flutter/material.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 
+/// A field-scoped validation message — a small danger glyph beside specific,
+/// house-voice copy, sitting directly beneath the input it belongs to.
+///
+/// From "KitchenSync — P4 Accessibility States", Screen 25: errors are
+/// "attached to the field that owns them — never a colour-only signal." The
+/// leading icon and the explicit text are what carry the meaning, so the error
+/// survives colour-blindness and greyscale; it is announced as a live region.
+class KsFieldError extends StatelessWidget {
+  const KsFieldError(this.message, {super.key});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final danger = context.ksColors.danger;
+    return Padding(
+      padding: const EdgeInsets.only(
+        top: KsTokens.space6,
+        left: KsTokens.space2,
+      ),
+      child: Semantics(
+        liveRegion: true,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Icon(Icons.error_outline, size: 13, color: danger),
+            ),
+            const SizedBox(width: KsTokens.space6),
+            Expanded(
+              child: Text(
+                message,
+                style: KsTokens.bodySmall.copyWith(
+                  color: danger,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The error-summary banner shown at the top of a form once a submit attempt
+/// surfaces validation problems — a count, a danger glyph, and a pointer to the
+/// highlighted fields below.
+///
+/// From "KitchenSync — P4 Accessibility States", Screen 25 ("Two things need a
+/// look · Fix the highlighted fields below to save"). The count is spoken in
+/// the house voice; the [errorCount] drives the headline.
+class KsErrorSummary extends StatelessWidget {
+  const KsErrorSummary({
+    required this.errorCount,
+    this.message = 'Fix the highlighted fields below to save.',
+    super.key,
+  });
+
+  final int errorCount;
+  final String message;
+
+  String get _headline => errorCount == 1
+      ? 'One thing needs a look'
+      : '$errorCount things need a look';
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final danger = ks.danger;
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: KsTokens.space12,
+          vertical: KsTokens.space12,
+        ),
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(
+            danger.withValues(alpha: 0.09),
+            ks.surfaceRaised,
+          ),
+          borderRadius: BorderRadius.circular(KsTokens.radius12),
+          border: Border.all(color: danger.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Icon(Icons.error_outline, size: 17, color: danger),
+            ),
+            const SizedBox(width: KsTokens.space10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _headline,
+                    style: KsTokens.labelMedium.copyWith(
+                      color: danger,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  const SizedBox(height: KsTokens.space2),
+                  Text(
+                    message,
+                    style: KsTokens.bodySmall.copyWith(
+                      color: ks.textSecondary,
+                      fontSize: 11,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// The small uppercase caps label that sits above every input on the graduated
 /// form surfaces ("Add to pantry", "Create ingredient").
 ///

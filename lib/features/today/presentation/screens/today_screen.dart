@@ -134,7 +134,8 @@ class _GreetingHeader extends StatelessWidget {
 }
 
 /// A header chrome entry point — keeps the small disc / avatar visual but
-/// guarantees a 48×48 tap target and an accessible label (WCAG 2.5.5).
+/// guarantees a 48×48 tap target and an accessible label (WCAG 2.5.5), via the
+/// shared [KsHitTarget].
 class _HeaderTapTarget extends StatelessWidget {
   const _HeaderTapTarget({
     required this.label,
@@ -148,18 +149,7 @@ class _HeaderTapTarget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: label,
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: SizedBox(width: 48, height: 48, child: Center(child: child)),
-        ),
-      ),
-    );
+    return KsHitTarget(label: label, onTap: onTap, child: child);
   }
 }
 

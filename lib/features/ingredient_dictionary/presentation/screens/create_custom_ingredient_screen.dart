@@ -45,7 +45,18 @@ class _CreateCustomIngredientScreenState
   final Set<DietaryTag> _diet = {};
   int _shelfLifeDays = 7;
   bool _submitting = false;
+
+  /// Flipped true on the first save attempt; thereafter the name error is shown
+  /// and re-evaluated live as the field changes (Screen 25).
+  bool _validated = false;
+
+  /// A failure surfaced by the use case (not field validation).
   String? _error;
+
+  /// A new ingredient needs a name to be findable later.
+  String? get _nameError => _name.text.trim().isEmpty
+      ? 'Give it a name so you can find it later.'
+      : null;
 
   @override
   void dispose() {
@@ -93,17 +104,21 @@ class _CreateCustomIngredientScreenState
   }
 
   Future<void> _submit() async {
-    final name = _name.text.trim();
-    if (name.isEmpty) {
-      setState(() => _error = 'Give the ingredient a name.');
+    if (_nameError != null) {
+      setState(() {
+        _validated = true;
+        _error = null;
+      });
       return;
     }
+    final name = _name.text.trim();
     if (!_allowedUnits.contains(_defaultUnit)) {
       setState(() => _error = 'The default unit must be an allowed unit.');
       return;
     }
     setState(() {
       _submitting = true;
+      _validated = true;
       _error = null;
     });
     final useCase = ref.read(createCustomIngredientProvider);
@@ -158,12 +173,17 @@ class _CreateCustomIngredientScreenState
                     shelfLifeDays: _shelfLifeDays,
                     placeholder: name.isEmpty,
                   ),
+                  if (_validated && _nameError != null) ...[
+                    const SizedBox(height: KsTokens.space20),
+                    const KsErrorSummary(errorCount: 1),
+                  ],
                   const SizedBox(height: KsTokens.space20),
                   const KsFieldLabel('Name'),
                   _PlainField(
                     controller: _name,
                     hintText: 'e.g. Sweet potato',
                     textInputAction: TextInputAction.next,
+                    errorText: _validated ? _nameError : null,
                   ),
                   const SizedBox(height: KsTokens.space16),
                   const KsFieldLabel('Category — sets the colour everywhere'),
@@ -458,17 +478,20 @@ class _PlainField extends StatelessWidget {
     this.hintText,
     this.textInputAction,
     this.onSubmitted,
+    this.errorText,
   });
 
   final TextEditingController controller;
   final String? hintText;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
-    return TextField(
+    final hasError = errorText != null;
+    final field = TextField(
       controller: controller,
       textInputAction: textInputAction,
       onSubmitted: onSubmitted,
@@ -483,13 +506,22 @@ class _PlainField extends StatelessWidget {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(KsTokens.radius10),
-          borderSide: BorderSide(color: ks.borderStrong),
+          borderSide: BorderSide(color: hasError ? ks.danger : ks.borderStrong),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(KsTokens.radius10),
-          borderSide: BorderSide(color: ks.brandPrimary, width: 2),
+          borderSide: BorderSide(
+            color: hasError ? ks.danger : ks.brandPrimary,
+            width: 2,
+          ),
         ),
       ),
+    );
+
+    if (!hasError) return field;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [field, KsFieldError(errorText!)],
     );
   }
 }

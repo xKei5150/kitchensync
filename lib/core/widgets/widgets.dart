@@ -16,6 +16,7 @@ export 'ks_empty_state.dart';
 export 'ks_error_alert.dart';
 export 'ks_form_field.dart';
 export 'ks_freshness.dart';
+export 'ks_hit_target.dart';
 export 'ks_inputs.dart';
 export 'ks_insight_tile.dart';
 export 'ks_member.dart';

@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 
-/// Wraps a focusable [child] (typically a [TextField]) in an accessible focus
-/// ring — a solid 3px [KsColors.focusRing] band painted around the field when
-/// its [focusNode] holds focus.
+/// Wraps a focusable [child] (typically a [TextField]) in the app-wide
+/// focus-visible treatment — a 2px [KsColors.focusRing] ring with a 2px
+/// surface-coloured offset, painted around the [child] while its [focusNode]
+/// holds focus.
 ///
-/// Mirrors the spec's `box-shadow: 0 0 0 3px focus-ring@24%` — a dual-tone
-/// indicator that clears 3:1 contrast on any surface. From
-/// "KitchenSync — Components I (Primitives)", Inputs.
+/// This is the single focus treatment used across every interactive primitive
+/// (the rule from "KitchenSync — P4 Accessibility States", Screen 22). The 2px
+/// offset gap is what makes it read on *any* fill — including a brand-green
+/// button, where a ring drawn flush to the edge would otherwise disappear.
+/// Mirrors the spec's `box-shadow: 0 0 0 2px <surface>, 0 0 0 4px <ring>`.
 class KsFocusRing extends StatefulWidget {
   const KsFocusRing({
     required this.focusNode,
     required this.child,
     this.borderRadius = KsTokens.radius10,
+    this.offsetColor,
     super.key,
   });
 
@@ -24,6 +28,11 @@ class KsFocusRing extends StatefulWidget {
 
   /// Corner radius of the ring — match the field's own radius.
   final double borderRadius;
+
+  /// Colour of the 2px gap between the [child] and the ring. Defaults to the
+  /// base surface; override when the field sits on a raised card so the gap
+  /// stays invisible against its real backdrop.
+  final Color? offsetColor;
 
   @override
   State<KsFocusRing> createState() => _KsFocusRingState();
@@ -64,14 +73,22 @@ class _KsFocusRingState extends State<KsFocusRing> {
 
   @override
   Widget build(BuildContext context) {
-    final ring = context.ksColors.focusRing;
+    final ks = context.ksColors;
+    final ring = ks.focusRing;
+    final offset = widget.offsetColor ?? ks.surfaceBase;
     return AnimatedContainer(
       duration: KsTokens.durationFast,
       curve: KsTokens.curveStandard,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(widget.borderRadius),
+        // Painted back-to-front: the 4px ring sits behind, then a 2px gap of
+        // the surrounding surface covers its inner edge — leaving a crisp 2px
+        // ring floating clear of the field on any fill.
         boxShadow: _focused
-            ? [BoxShadow(color: ring.withValues(alpha: 0.24), spreadRadius: 3)]
+            ? [
+                BoxShadow(color: ring, spreadRadius: 4),
+                BoxShadow(color: offset, spreadRadius: 2),
+              ]
             : const [],
       ),
       child: widget.child,

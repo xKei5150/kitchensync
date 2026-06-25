@@ -43,7 +43,7 @@ void main() {
     expect(find.text('Sweet potato'), findsWidgets);
   });
 
-  testWidgets('blocks save with a message when the name is empty', (
+  testWidgets('surfaces a summary and field error when the name is empty', (
     tester,
   ) async {
     await pump(tester, AppTheme.light());
@@ -51,7 +51,29 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Create ingredient'));
     await tester.pump();
 
-    expect(find.text('Give the ingredient a name.'), findsOneWidget);
+    expect(find.text('One thing needs a look'), findsOneWidget);
+    expect(
+      find.text('Give it a name so you can find it later.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('clears the name error live once a name is typed', (
+    tester,
+  ) async {
+    await pump(tester, AppTheme.light());
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Create ingredient'));
+    await tester.pump();
+    expect(
+      find.text('Give it a name so you can find it later.'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(find.byType(TextField).first, 'Sweet potato');
+    await tester.pump();
+
+    expect(find.text('Give it a name so you can find it later.'), findsNothing);
   });
 
   testWidgets('renders in dark theme without error', (tester) async {

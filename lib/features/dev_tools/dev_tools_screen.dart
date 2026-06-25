@@ -59,6 +59,12 @@ class _DevToolsScreenState extends ConsumerState<DevToolsScreen> {
               onPressed: () => context.push('/dev/a11y'),
             ),
             const SizedBox(height: 16),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.accessibility_new),
+              label: const Text('Accessibility states'),
+              onPressed: () => context.push('/dev/a11y-states'),
+            ),
+            const SizedBox(height: 16),
             Text(_status, textAlign: TextAlign.center),
           ],
         ),
