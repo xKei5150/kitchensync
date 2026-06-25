@@ -75,3 +75,6 @@ tools/seed_uploader/node_modules/
 .entire/
 .omo/
 .superpowers/
+
+# Local visual-verification screenshots (flutter drive gallery)
+screenshots/

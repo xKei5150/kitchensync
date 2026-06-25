@@ -73,6 +73,11 @@ class CalendarScreen extends StatelessWidget {
             title: 'June 2025',
             actions: [
               KsHeaderAction(
+                icon: Icons.dashboard_customize_outlined,
+                tooltip: 'Menu Sets',
+                onTap: () => context.push('/menu-sets'),
+              ),
+              KsHeaderAction(
                 icon: Icons.chevron_left_rounded,
                 tooltip: 'Previous month',
                 onTap: () {},

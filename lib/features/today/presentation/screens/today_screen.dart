@@ -90,7 +90,21 @@ class _GreetingHeader extends StatelessWidget {
                 ),
               ),
             ),
-            const KsMemberAvatar(initial: 'A', seat: 0, size: 32),
+            _HeaderTapTarget(
+              label: 'Notifications',
+              onTap: () => context.push('/notifications'),
+              child: const _HeaderDisc(icon: Icons.notifications_none_rounded),
+            ),
+            _HeaderTapTarget(
+              label: 'Settings',
+              onTap: () => context.push('/settings'),
+              child: const _HeaderDisc(icon: Icons.settings_outlined),
+            ),
+            _HeaderTapTarget(
+              label: 'Account · Ana',
+              onTap: () => context.push('/settings'),
+              child: const KsMemberAvatar(initial: 'A', seat: 0, size: 32),
+            ),
           ],
         ),
         const SizedBox(height: KsTokens.space12),
@@ -115,6 +129,58 @@ class _GreetingHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A header chrome entry point — keeps the small disc / avatar visual but
+/// guarantees a 48×48 tap target and an accessible label (WCAG 2.5.5).
+class _HeaderTapTarget extends StatelessWidget {
+  const _HeaderTapTarget({
+    required this.label,
+    required this.onTap,
+    required this.child,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(width: 48, height: 48, child: Center(child: child)),
+        ),
+      ),
+    );
+  }
+}
+
+/// The small neutral disc behind a header glyph, matching `KsHeaderAction`.
+class _HeaderDisc extends StatelessWidget {
+  const _HeaderDisc({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: ks.neutralSubtle,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, size: 16, color: ks.textSecondary),
     );
   }
 }
