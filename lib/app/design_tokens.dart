@@ -100,6 +100,27 @@ final class KsTokens {
   static const Color catNonFood = Color(0xFF90A4AE);
   static const Color catOther = Color(0xFFBDBDBD);
 
+  // ─── Ingredient Category Colors — Dark (luminance-lifted) ───────
+  //
+  // Lifted variants for the dark walnut surface (≈#272822) so category
+  // tints keep legible contrast instead of reusing the light hues.
+  // Resolved per-theme via [IngredientCategoryColor.colorFor].
+
+  static const Color catProduceDark = Color(0xFF8FD392);
+  static const Color catMeatDark = Color(0xFFF0938E);
+  static const Color catSeafoodDark = Color(0xFF7FD6F9);
+  static const Color catDairyDark = Color(0xFFFFF4A0);
+  static const Color catGrainDark = Color(0xFFE3BC95);
+  static const Color catBakeryDark = Color(0xFFEACBA6);
+  static const Color catSpiceDark = Color(0xFFFFA68C);
+  static const Color catCondimentDark = Color(0xFFD08FDB);
+  static const Color catBakingDark = Color(0xFFC0A89F);
+  static const Color catBeverageDark = Color(0xFF82E0EC);
+  static const Color catFrozenDark = Color(0xFFB3DAFB);
+  static const Color catBulkStapleDark = Color(0xFFC7E4A8);
+  static const Color catNonFoodDark = Color(0xFFB3C2CB);
+  static const Color catOtherDark = Color(0xFFD4D4D4);
+
   // ─── Pantry Section Colors ──────────────────────────────────────
   //
   // Top-level pantry tabs. Each section gets a clear identity.
@@ -108,6 +129,59 @@ final class KsTokens {
   static const Color sectionBulk = Color(0xFF6D4C41);
   static const Color sectionNonFood = Color(0xFF546E7A);
   static const Color sectionLeftover = Color(0xFFEF6C00);
+
+  // ─── Calendar Status (4th semantic system) ──────────────────────
+  //
+  // Carried by the day-cell FILL / EDGE only — never collides with the
+  // freshness edge-bar or category chips. "Missed" is a muted mustard,
+  // kept clear of the brand/expiring ambers and encoded chiefly by form
+  // (dashed edge + clock-slash glyph). Light + lifted-dark pairs.
+
+  static const Color calPlanned = Color(0xFF3D8B40);
+  static const Color calProblem = Color(0xFFC44536);
+  static const Color calShopping = Color(0xFF3F76A8);
+  static const Color calMissed = Color(0xFFC9A227);
+
+  static const Color calPlannedDark = Color(0xFF6FBF73);
+  static const Color calProblemDark = Color(0xFFE58373);
+  static const Color calShoppingDark = Color(0xFF7FAAD4);
+  static const Color calMissedDark = Color(0xFFE0C04A);
+
+  // ─── Editorial Surfaces ─────────────────────────────────────────
+  //
+  // A deeper linen for full-bleed editorial bands and sunken wells, plus
+  // the recurring hairline divider rule. Hero / chrome surfaces only —
+  // never behind body text or dense data rows.
+
+  static const Color surfaceSunken = Color(0xFFF2EFE7);
+  static const Color hairline = Color(0xFFE2DDD2);
+
+  static const Color surfaceSunkenDark = Color(0xFF232420);
+  static const Color hairlineDark = Color(0xFF3A3C34);
+
+  // ─── Household Member Ticks (premium per-member ticks) ──────────
+  //
+  // A 6-way qualitative set, CVD-tuned and kept off the reserved status
+  // hues. Always paired with an avatar/initial — never colour-only.
+  // Resolve per-theme via [KsColors.memberTicks] / [KsColors.memberTick].
+
+  static const List<Color> memberTicksLight = [
+    Color(0xFF8E5A9E), // plum
+    Color(0xFF2F8F83), // teal
+    Color(0xFFB5612F), // clay
+    Color(0xFF4F5D9E), // indigo
+    Color(0xFFBC4E7E), // rose
+    Color(0xFF6E7E33), // moss
+  ];
+
+  static const List<Color> memberTicksDark = [
+    Color(0xFFC39AD0),
+    Color(0xFF6DC2B6),
+    Color(0xFFDE9466),
+    Color(0xFF8E9AD6),
+    Color(0xFFE588AC),
+    Color(0xFFAEBD6E),
+  ];
 
   // ─── Spacing Scale (4-base) ─────────────────────────────────────
 
@@ -167,6 +241,24 @@ final class KsTokens {
   //   Highly readable, neutral, works at all sizes.
   //
   // Both are on Google Fonts, loaded at runtime via google_fonts.
+
+  /// Display-XL — empty-state headlines & key hero numerals. Extends the
+  /// former 36px ceiling; the largest Fraunces on any screen. (`--display-xl`)
+  static TextStyle get displayXl => GoogleFonts.fraunces(
+    fontSize: 56,
+    fontWeight: FontWeight.w600,
+    height: 0.96,
+    letterSpacing: -1.6,
+  );
+
+  /// Display-2XL — the standout hero numeral (money saved, days-until-empty,
+  /// servings). Reserve for one focal number per surface. (`--display-2xl`)
+  static TextStyle get display2xl => GoogleFonts.fraunces(
+    fontSize: 84,
+    fontWeight: FontWeight.w600,
+    height: 0.92,
+    letterSpacing: -2.4,
+  );
 
   static TextStyle get displayLarge => GoogleFonts.fraunces(
     fontSize: 36,
@@ -296,6 +388,29 @@ extension IngredientCategoryColor on IngredientCategory {
     IngredientCategory.nonFood => KsTokens.catNonFood,
     IngredientCategory.other => KsTokens.catOther,
   };
+
+  /// Luminance-lifted variant for the dark walnut surface.
+  Color get darkColor => switch (this) {
+    IngredientCategory.produce => KsTokens.catProduceDark,
+    IngredientCategory.meat => KsTokens.catMeatDark,
+    IngredientCategory.seafood => KsTokens.catSeafoodDark,
+    IngredientCategory.dairy => KsTokens.catDairyDark,
+    IngredientCategory.grain => KsTokens.catGrainDark,
+    IngredientCategory.bakery => KsTokens.catBakeryDark,
+    IngredientCategory.spice => KsTokens.catSpiceDark,
+    IngredientCategory.condiment => KsTokens.catCondimentDark,
+    IngredientCategory.baking => KsTokens.catBakingDark,
+    IngredientCategory.beverage => KsTokens.catBeverageDark,
+    IngredientCategory.frozen => KsTokens.catFrozenDark,
+    IngredientCategory.bulkStaple => KsTokens.catBulkStapleDark,
+    IngredientCategory.nonFood => KsTokens.catNonFoodDark,
+    IngredientCategory.other => KsTokens.catOtherDark,
+  };
+
+  /// Theme-aware category hue: the light tint on light surfaces, the
+  /// luminance-lifted [darkColor] on dark surfaces.
+  Color colorFor(Brightness brightness) =>
+      brightness == Brightness.dark ? darkColor : color;
 }
 
 /// Maps [PantrySection] to its brand color for tabs and headers.
@@ -337,6 +452,13 @@ class KsColors extends ThemeExtension<KsColors> {
     required this.disabledFill,
     required this.disabledText,
     required this.focusRing,
+    required this.surfaceSunken,
+    required this.hairline,
+    required this.calPlanned,
+    required this.calProblem,
+    required this.calShopping,
+    required this.calMissed,
+    required this.memberTicks,
   });
 
   final Color surfaceBase;
@@ -375,6 +497,31 @@ class KsColors extends ThemeExtension<KsColors> {
   /// Accessible keyboard focus ring.
   final Color focusRing;
 
+  /// Editorial sunken surface — a deeper linen for full-bleed bands & wells.
+  final Color surfaceSunken;
+
+  /// The recurring hairline divider rule.
+  final Color hairline;
+
+  /// Calendar status — planned + ingredients available (day-cell fill).
+  final Color calPlanned;
+
+  /// Calendar status — unplanned / missing ingredients / a cooking problem.
+  final Color calProblem;
+
+  /// Calendar status — a shopping day.
+  final Color calShopping;
+
+  /// Calendar status — a shopping date that passed un-shopped (a warning).
+  final Color calMissed;
+
+  /// Per-member shopping-tick palette (premium): six CVD-tuned hues, always
+  /// shown with an avatar/initial. Index by seat via [memberTick].
+  final List<Color> memberTicks;
+
+  /// Colour for household member [seat] (0-based), wrapping the 6-way set.
+  Color memberTick(int seat) => memberTicks[seat % memberTicks.length];
+
   /// Light theme — mirrors the [KsTokens] light constants.
   static const KsColors light = KsColors(
     surfaceBase: KsTokens.surfaceBase,
@@ -394,6 +541,13 @@ class KsColors extends ThemeExtension<KsColors> {
     disabledFill: KsTokens.neutralSubtle,
     disabledText: Color(0xFFA8A496),
     focusRing: KsTokens.brandPrimary,
+    surfaceSunken: KsTokens.surfaceSunken,
+    hairline: KsTokens.hairline,
+    calPlanned: KsTokens.calPlanned,
+    calProblem: KsTokens.calProblem,
+    calShopping: KsTokens.calShopping,
+    calMissed: KsTokens.calMissed,
+    memberTicks: KsTokens.memberTicksLight,
   );
 
   /// Dark theme — mirrors the dark `ColorScheme` in `AppTheme.dark()`;
@@ -416,6 +570,13 @@ class KsColors extends ThemeExtension<KsColors> {
     disabledFill: Color(0xFF2F302A),
     disabledText: Color(0xFF6E7468),
     focusRing: KsTokens.brandPrimaryLight,
+    surfaceSunken: KsTokens.surfaceSunkenDark,
+    hairline: KsTokens.hairlineDark,
+    calPlanned: KsTokens.calPlannedDark,
+    calProblem: KsTokens.calProblemDark,
+    calShopping: KsTokens.calShoppingDark,
+    calMissed: KsTokens.calMissedDark,
+    memberTicks: KsTokens.memberTicksDark,
   );
 
   @override
@@ -437,6 +598,13 @@ class KsColors extends ThemeExtension<KsColors> {
     Color? disabledFill,
     Color? disabledText,
     Color? focusRing,
+    Color? surfaceSunken,
+    Color? hairline,
+    Color? calPlanned,
+    Color? calProblem,
+    Color? calShopping,
+    Color? calMissed,
+    List<Color>? memberTicks,
   }) => KsColors(
     surfaceBase: surfaceBase ?? this.surfaceBase,
     surfaceRaised: surfaceRaised ?? this.surfaceRaised,
@@ -455,6 +623,13 @@ class KsColors extends ThemeExtension<KsColors> {
     disabledFill: disabledFill ?? this.disabledFill,
     disabledText: disabledText ?? this.disabledText,
     focusRing: focusRing ?? this.focusRing,
+    surfaceSunken: surfaceSunken ?? this.surfaceSunken,
+    hairline: hairline ?? this.hairline,
+    calPlanned: calPlanned ?? this.calPlanned,
+    calProblem: calProblem ?? this.calProblem,
+    calShopping: calShopping ?? this.calShopping,
+    calMissed: calMissed ?? this.calMissed,
+    memberTicks: memberTicks ?? this.memberTicks,
   );
 
   @override
@@ -478,6 +653,16 @@ class KsColors extends ThemeExtension<KsColors> {
       disabledFill: Color.lerp(disabledFill, other.disabledFill, t)!,
       disabledText: Color.lerp(disabledText, other.disabledText, t)!,
       focusRing: Color.lerp(focusRing, other.focusRing, t)!,
+      surfaceSunken: Color.lerp(surfaceSunken, other.surfaceSunken, t)!,
+      hairline: Color.lerp(hairline, other.hairline, t)!,
+      calPlanned: Color.lerp(calPlanned, other.calPlanned, t)!,
+      calProblem: Color.lerp(calProblem, other.calProblem, t)!,
+      calShopping: Color.lerp(calShopping, other.calShopping, t)!,
+      calMissed: Color.lerp(calMissed, other.calMissed, t)!,
+      memberTicks: [
+        for (var i = 0; i < memberTicks.length; i++)
+          Color.lerp(memberTicks[i], other.memberTicks[i], t)!,
+      ],
     );
   }
 }

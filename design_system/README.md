@@ -103,23 +103,31 @@ No JavaScript: cards are pure CSS mockups (a subtle CSS-only hover/transition is
 | `[data-theme="dark"] { … }`      | `theme.dart` dark `ColorScheme` overrides       |
 | `--brand-*`, `--fresh`, …        | the corresponding `KsTokens` constants          |
 | `--cat-*` (14), `--section-*` (4)| ingredient category + pantry section colors     |
+| `--cat-*-dark` (14)              | `KsTokens` dark set · `IngredientCategoryColor.colorFor` |
+| `--cal-*` (4)                    | `KsColors` calendar status (brightness-aware)   |
+| `--surface-sunken`, `--hairline` | `KsColors` editorial surfaces (brightness-aware)|
+| `--member-1..6`                  | `KsColors.memberTicks` / `memberTick(seat)`     |
+| `--proposed-*`                   | `KsColors` semantic set (success/info/warning/…)|
 | `--space-*`, `--radius-*`        | `KsTokens` spacing / radius scales              |
 | `--*-size/-weight/-lh/-ls`       | `KsTokens` text-style ramp                      |
+| `--display-xl/-2xl-*`            | `KsTokens.displayXl` / `KsTokens.display2xl`    |
 | `--dur-*`, `--curve-*`           | `KsTokens` motion (durations + easing curves)   |
 
-**In code today vs. proposed.** A few token families exist only in the mirror and are
-**not** in `design_tokens.dart` yet — they are candidates for the Flutter port and are
-always badged `proposed` wherever a card uses them:
+**In code today.** The editorial-farmhouse Foundations are now graduated into the
+Flutter design system — every token family in the mirror exists in `design_tokens.dart`:
 
-- `--proposed-*` — semantic tokens not in code: `--proposed-disabled-fill` /
-  `--proposed-disabled-text`, `--proposed-focus-ring`, `--proposed-success` /
-  `--proposed-info` / `--proposed-warning`, `--proposed-scrim`.
-- `--cat-*-dark` — a luminance-lifted dark-mode category set (e.g. `--cat-produce-dark`).
-  The current code reuses the light category hues in dark mode; this tuned set is a
-  proposal for legible fills on dark surfaces.
+- `--proposed-*` — the semantic set (`disabledFill` / `disabledText`, `focusRing`,
+  `success` / `info` / `warning`, `scrim`) ships on the `KsColors` theme extension. The
+  `--proposed-*` alias names are kept only so existing cards keep resolving.
+- `--cat-*-dark` — the luminance-lifted dark category set ships as `KsTokens.cat*Dark`,
+  resolved per-theme by `IngredientCategoryColor.colorFor(Brightness)`.
+- `--cal-*`, `--surface-sunken` / `--hairline`, `--member-1..6` — calendar status,
+  editorial surfaces, and member ticks ship on the brightness-aware `KsColors`.
+- `--display-xl-*` / `--display-2xl-*` — the hero ramp ships as `KsTokens.displayXl`
+  and `KsTokens.display2xl`.
 
-Anything badged `proposed` is a design idea, not shipped behavior. Treat unbadged
-tokens as ground truth that already exists in the Flutter app.
+A card may still badge a token `proposed` while the *component or screen* that consumes
+it is unbuilt, but the token itself now exists in the Flutter app.
 
 ---
 

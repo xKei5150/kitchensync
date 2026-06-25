@@ -6,7 +6,8 @@
 
    :root            → light theme (KsTokens light values)
    [data-theme=dark]→ dark theme (theme.dart dark ColorScheme)
-   --proposed-*     → NOT YET IN CODE. Badged "proposed" in the system.
+   --proposed-*     → semantic set, now graduated into KsColors; the alias
+                      names are kept so existing cards keep resolving.
    ============================================================================ */
 
 :root {
@@ -99,7 +100,7 @@
   --label-medium-size: 12px;   --label-medium-weight: 600;  --label-medium-lh: 1.35;  --label-medium-ls: 0.5px;
   --label-small-size: 11px;    --label-small-weight: 600;   --label-small-lh: 1.35;   --label-small-ls: 0.5px;
 
-  /* ── PROPOSED — not yet in design_tokens.dart ───────────────────────── */
+  /* ── Semantic set — graduated into KsColors (alias names kept for cards) ─ */
   --proposed-disabled-fill: #F5F3EE;
   --proposed-disabled-text: #A8A496;
   --proposed-focus-ring: #2E7D32;
@@ -108,8 +109,8 @@
   --proposed-warning: #EF6C00;
   --proposed-scrim: rgba(0, 0, 0, 0.55);
 
-  /* Proposed dark-mode category set (luminance-lifted for >=4.5:1 on #272822).
-     Kept as separate vars so cards can show "current (reused)" vs "proposed". */
+  /* Dark-mode category set (luminance-lifted for >=4.5:1 on #272822).
+     Graduated into KsTokens + IngredientCategoryColor.colorFor(Brightness). */
   --cat-produce-dark: #8FD392;
   --cat-meat-dark: #F0938E;
   --cat-seafood-dark: #7FD6F9;
@@ -130,7 +131,7 @@
    DARK THEME — overrides only the tokens that change.
    Category/section colors are intentionally NOT overridden here: that mirrors
    the current code, which reuses the light hues in dark mode. The tuned dark
-   set lives in the --cat-*-dark proposed vars above.
+   set lives in the --cat-*-dark vars above.
    ============================================================================ */
 [data-theme="dark"] {
   --surface-base: #1E1F1B;
@@ -155,4 +156,56 @@
 
   --elevation-1: 0 2px 8px rgba(0, 0, 0, 0.25);
   --elevation-2: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* ============================================================================
+   EDITORIAL-FARMHOUSE EXTENSION (Phase 0 Foundations).
+   Graduated into lib/app/design_tokens.dart: calendar status + member ticks
+   live on the brightness-aware KsColors extension; the Display-XL ramp and the
+   editorial surfaces live on KsTokens. Kept here as the CSS mirror cards read.
+   ============================================================================ */
+:root {
+  /* ── Calendar status — 4th semantic system, day-cell FILL / EDGE only ───
+     Kept off the brand + expiring ambers. "Missed" is a muted mustard,
+     encoded primarily by FORM (dashed edge + clock-slash glyph). */
+  --cal-planned: #3D8B40;   /* planned + ingredients available */
+  --cal-problem: #C44536;   /* unplanned / missing ingredients / cooking problem */
+  --cal-shopping: #3F76A8;  /* a shopping day */
+  --cal-missed: #C9A227;    /* a shopping date that passed un-shopped (warning) */
+
+  /* ── Editorial surfaces — deeper linen band + the divider hairline ────── */
+  --surface-sunken: #F2EFE7;
+  --hairline: #E2DDD2;
+
+  /* ── Display-XL ramp — empty-state headlines + hero numerals ──────────── */
+  --display-xl-size: 56px;  --display-xl-weight: 600; --display-xl-lh: 0.96; --display-xl-ls: -1.6px;
+  --display-2xl-size: 84px; --display-2xl-weight: 600; --display-2xl-lh: 0.92; --display-2xl-ls: -2.4px;
+
+  /* ── Household member ticks — per-member shopping ticks (premium) ───────
+     6-way qualitative, CVD-tuned, always paired with an avatar/initial. */
+  --member-1: #8E5A9E;  /* plum   */
+  --member-2: #2F8F83;  /* teal   */
+  --member-3: #B5612F;  /* clay   */
+  --member-4: #4F5D9E;  /* indigo */
+  --member-5: #BC4E7E;  /* rose   */
+  --member-6: #6E7E33;  /* moss   */
+}
+
+[data-theme="dark"] {
+  /* Calendar status — luminance-lifted for legibility on the dark walnut. */
+  --cal-planned: #6FBF73;
+  --cal-problem: #E58373;
+  --cal-shopping: #7FAAD4;
+  --cal-missed: #E0C04A;
+
+  --surface-sunken: #232420;
+  --hairline: #3A3C34;
+
+  /* Member ticks — softened for the candlelit dark surface. */
+  --member-1: #C39AD0;
+  --member-2: #6DC2B6;
+  --member-3: #DE9466;
+  --member-4: #8E9AD6;
+  --member-5: #E588AC;
+  --member-6: #AEBD6E;
 }
