@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/app/router.dart';
 import 'package:kitchensync/app/theme.dart';
+import 'package:kitchensync/app/theme_mode_controller.dart';
 import 'package:kitchensync/core/widgets/connectivity_banner.dart';
 
 class KitchenSyncApp extends ConsumerWidget {
@@ -10,10 +11,12 @@ class KitchenSyncApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeModeControllerProvider);
     return MaterialApp.router(
       title: 'KitchenSync',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
       routerConfig: router,
       builder: (context, child) =>
           ConnectivityBanner(child: child ?? const SizedBox.shrink()),

@@ -1,8 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
+import 'package:kitchensync/app/theme_mode_controller.dart';
+import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/features/settings/presentation/screens/premium_screen.dart';
 import 'package:kitchensync/features/settings/presentation/screens/settings_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+Future<Widget> _wrap(
+  Widget child, {
+  Map<String, Object> prefs = const {},
+  ThemeData? theme,
+}) async {
+  SharedPreferences.setMockInitialValues(prefs);
+  final instance = await SharedPreferences.getInstance();
+  return ProviderScope(
+    overrides: [sharedPreferencesProvider.overrideWithValue(instance)],
+    child: MaterialApp(theme: theme ?? AppTheme.light(), home: child),
+  );
+}
 
 void main() {
   testWidgets('SettingsScreen shows the profile, premium banner and list', (
@@ -13,15 +30,67 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light(), home: const SettingsScreen()),
-    );
+    await tester.pumpWidget(await _wrap(const SettingsScreen()));
 
     expect(find.text('Ana Holloway'), findsOneWidget);
     expect(find.text('Try Premium'), findsOneWidget);
     expect(find.text('Household & roles'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
+  });
+
+  testWidgets('Appearance row reflects the stored choice', (tester) async {
+    tester.view.physicalSize = const Size(400, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      await _wrap(
+        const SettingsScreen(),
+        prefs: {themeModePrefKey: 'dark'},
+        theme: AppTheme.dark(),
+      ),
+    );
+
+    // Trailing value on the Appearance row.
+    expect(find.text('Dark'), findsOneWidget);
+  });
+
+  testWidgets('picking Dark from the Appearance sheet updates and persists', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const SettingsScreen(),
+        ),
+      ),
+    );
+
+    // Default appearance is Auto.
+    expect(find.text('Auto'), findsOneWidget);
+
+    await tester.tap(find.text('Appearance'));
+    await tester.pumpAndSettle();
+
+    // The sheet offers the three modes.
+    expect(find.text('Light'), findsOneWidget);
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+
+    // Choice is reflected in the row and written to preferences.
+    expect(find.text('Dark'), findsOneWidget);
+    expect(prefs.getString(themeModePrefKey), 'dark');
   });
 
   testWidgets('PremiumScreen lists benefits and toggles the plan', (
@@ -32,9 +101,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light(), home: const PremiumScreen()),
-    );
+    await tester.pumpWidget(await _wrap(const PremiumScreen()));
 
     expect(find.text('KitchenSync Premium'), findsOneWidget);
     expect(find.text('Start 7-day free trial'), findsOneWidget);
@@ -50,12 +117,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.dark(), home: const SettingsScreen()),
+      await _wrap(const SettingsScreen(), theme: AppTheme.dark()),
     );
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.dark(), home: const PremiumScreen()),
+      await _wrap(const PremiumScreen(), theme: AppTheme.dark()),
     );
     expect(tester.takeException(), isNull);
   });

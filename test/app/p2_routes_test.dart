@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/router.dart';
 import 'package:kitchensync/app/theme.dart';
+import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<GoRouter> _pumpApp(WidgetTester tester) async {
   tester.view.physicalSize = const Size(400, 1600);
@@ -13,7 +15,11 @@ Future<GoRouter> _pumpApp(WidgetTester tester) async {
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
-  final container = ProviderContainer();
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
+  final container = ProviderContainer(
+    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+  );
   addTearDown(container.dispose);
   final router = container.read(routerProvider);
   await tester.pumpWidget(

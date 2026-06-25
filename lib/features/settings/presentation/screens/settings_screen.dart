@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/app/theme_mode_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
 /// Screen 15 · Settings — the quiet, useful corners.
 ///
 /// A calm profile header, a Premium invitation that sells capability, and the
-/// grouped settings list. Presentational P2; "Sign out" returns to the front
-/// door so the onboarding flow stays reachable.
-class SettingsScreen extends StatelessWidget {
+/// grouped settings list. "Sign out" returns to the front door so the
+/// onboarding flow stays reachable.
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
+    final themeMode = ref.watch(themeModeControllerProvider);
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -60,10 +63,11 @@ class SettingsScreen extends StatelessWidget {
                   label: 'Notifications',
                   onTap: () => context.push('/notifications'),
                 ),
-                const _SettingsRow(
+                _SettingsRow(
                   icon: Icons.brightness_6_outlined,
                   label: 'Appearance',
-                  trailingText: 'Auto',
+                  trailingText: _appearanceLabel(themeMode),
+                  onTap: () => _showAppearancePicker(context, ref, themeMode),
                 ),
                 const _SettingsRow(
                   icon: Icons.public_rounded,
@@ -233,6 +237,148 @@ class _SettingsGroup extends StatelessWidget {
   }
 }
 
+/// Human label for the trailing value of the Appearance row.
+String _appearanceLabel(ThemeMode mode) => switch (mode) {
+  ThemeMode.system => 'Auto',
+  ThemeMode.light => 'Light',
+  ThemeMode.dark => 'Dark',
+};
+
+/// Opens the appearance picker and persists the choice via the controller.
+Future<void> _showAppearancePicker(
+  BuildContext context,
+  WidgetRef ref,
+  ThemeMode current,
+) async {
+  final selected = await showModalBottomSheet<ThemeMode>(
+    context: context,
+    builder: (_) => _AppearanceSheet(current: current),
+  );
+  if (selected != null) {
+    await ref.read(themeModeControllerProvider.notifier).set(selected);
+  }
+}
+
+/// Bottom-sheet selector for System / Light / Dark appearance.
+class _AppearanceSheet extends StatelessWidget {
+  const _AppearanceSheet({required this.current});
+
+  final ThemeMode current;
+
+  static const _options = [
+    (
+      mode: ThemeMode.system,
+      icon: Icons.brightness_auto_rounded,
+      label: 'Auto',
+    ),
+    (mode: ThemeMode.light, icon: Icons.light_mode_outlined, label: 'Light'),
+    (mode: ThemeMode.dark, icon: Icons.dark_mode_outlined, label: 'Dark'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          KsTokens.space16,
+          KsTokens.space12,
+          KsTokens.space16,
+          KsTokens.space16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: ks.hairline,
+                  borderRadius: BorderRadius.circular(KsTokens.radius8),
+                ),
+              ),
+            ),
+            const SizedBox(height: KsTokens.space16),
+            Text(
+              'Appearance',
+              style: KsTokens.headlineMedium.copyWith(
+                color: ks.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 17,
+              ),
+            ),
+            const SizedBox(height: KsTokens.space4),
+            Text(
+              'Auto follows your device setting.',
+              style: KsTokens.bodySmall.copyWith(color: ks.textTertiary),
+            ),
+            const SizedBox(height: KsTokens.space12),
+            for (final option in _options)
+              _AppearanceOption(
+                icon: option.icon,
+                label: option.label,
+                selected: option.mode == current,
+                onTap: () => Navigator.of(context).pop(option.mode),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AppearanceOption extends StatelessWidget {
+  const _AppearanceOption({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(KsTokens.radius12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: selected ? ks.brandPrimary : ks.textSecondary,
+              ),
+              const SizedBox(width: KsTokens.space12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: KsTokens.bodyMedium.copyWith(
+                    color: selected ? ks.brandPrimary : ks.textPrimary,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (selected)
+                Icon(Icons.check_rounded, size: 20, color: ks.brandPrimary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SettingsRow extends StatelessWidget {
   const _SettingsRow({
     required this.icon,
@@ -268,12 +414,20 @@ class _SettingsRow extends StatelessWidget {
                   ),
                 ),
               ),
-              if (trailingText != null)
+              if (trailingText != null) ...[
                 Text(
                   trailingText!,
                   style: KsTokens.bodySmall.copyWith(color: ks.textTertiary),
-                )
-              else
+                ),
+                if (onTap != null) ...[
+                  const SizedBox(width: KsTokens.space4),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: ks.textTertiary,
+                  ),
+                ],
+              ] else
                 Icon(
                   Icons.chevron_right_rounded,
                   size: 16,
