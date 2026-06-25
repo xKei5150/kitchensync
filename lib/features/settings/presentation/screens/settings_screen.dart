@@ -145,6 +145,14 @@ class _PremiumBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Warm amber-and-wheat tint over the active raised surface. Dark mode
+    // leans further into the accent so the card reads as an intentional gold
+    // invitation rather than a muddy brown, while keeping light text legible.
+    final accentBlend = isDark ? 0.34 : 0.26;
+    final grainBlend = isDark ? 0.30 : 0.26;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -157,21 +165,27 @@ class _PremiumBanner extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color.lerp(ks.surfaceRaised, KsTokens.brandAccent, 0.26)!,
-                Color.lerp(ks.surfaceRaised, KsTokens.catGrain, 0.26)!,
+                Color.lerp(
+                  ks.surfaceRaised,
+                  KsTokens.brandAccent,
+                  accentBlend,
+                )!,
+                Color.lerp(ks.surfaceRaised, KsTokens.catGrain, grainBlend)!,
               ],
             ),
             borderRadius: BorderRadius.circular(KsTokens.radius16),
             border: Border.all(
-              color: KsTokens.brandAccent.withValues(alpha: 0.4),
+              color: KsTokens.brandAccent.withValues(
+                alpha: isDark ? 0.55 : 0.4,
+              ),
             ),
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.auto_awesome_rounded,
                 size: 26,
-                color: KsTokens.brandPrimaryDark,
+                color: ks.brandPrimary,
               ),
               const SizedBox(width: KsTokens.space12),
               Expanded(
@@ -182,7 +196,7 @@ class _PremiumBanner extends StatelessWidget {
                     Text(
                       'Try Premium',
                       style: KsTokens.headlineMedium.copyWith(
-                        color: KsTokens.textPrimary,
+                        color: ks.textPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -190,17 +204,17 @@ class _PremiumBanner extends StatelessWidget {
                     Text(
                       'Menu Sets, insights & joint households',
                       style: KsTokens.bodySmall.copyWith(
-                        color: KsTokens.textSecondary,
+                        color: ks.textSecondary,
                         height: 1.3,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
-                color: KsTokens.textSecondary,
+                color: ks.textSecondary,
               ),
             ],
           ),
