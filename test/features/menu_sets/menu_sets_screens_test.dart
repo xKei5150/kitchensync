@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
+import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/menu_sets/presentation/screens/menu_set_editor_screen.dart';
 import 'package:kitchensync/features/menu_sets/presentation/screens/menu_sets_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+Future<Widget> _wrap(Widget home, {ThemeData? theme}) async {
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
+  return ProviderScope(
+    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+    child: MaterialApp(theme: theme ?? AppTheme.light(), home: home),
+  );
+}
 
 void main() {
   testWidgets('MenuSetsScreen shows the premium deck and save CTA', (
@@ -14,9 +26,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light(), home: const MenuSetsScreen()),
-    );
+    await tester.pumpWidget(await _wrap(const MenuSetsScreen()));
 
     expect(find.text('A deck of weeks'), findsOneWidget);
     expect(find.text('Cosy autumn week'), findsOneWidget);
@@ -32,9 +42,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light(), home: const MenuSetEditorScreen()),
-    );
+    await tester.pumpWidget(await _wrap(const MenuSetEditorScreen()));
 
     expect(find.byType(KsMenuSlotEditor), findsOneWidget);
     expect(find.text('Drop here'), findsOneWidget);
@@ -57,12 +65,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.dark(), home: const MenuSetsScreen()),
+      await _wrap(const MenuSetsScreen(), theme: AppTheme.dark()),
     );
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.dark(), home: const MenuSetEditorScreen()),
+      await _wrap(const MenuSetEditorScreen(), theme: AppTheme.dark()),
     );
     expect(tester.takeException(), isNull);
   });

@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/app/theme_mode_controller.dart';
+import 'package:kitchensync/core/locale/app_currency.dart';
+import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
+import 'package:kitchensync/core/locale/unit_system.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
 /// Screen 15 · Settings — the quiet, useful corners.
@@ -17,6 +20,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
     final themeMode = ref.watch(themeModeControllerProvider);
+    final locale = ref.watch(localePreferencesControllerProvider);
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -69,10 +73,11 @@ class SettingsScreen extends ConsumerWidget {
                   trailingText: _appearanceLabel(themeMode),
                   onTap: () => _showAppearancePicker(context, ref, themeMode),
                 ),
-                const _SettingsRow(
+                _SettingsRow(
                   icon: Icons.public_rounded,
                   label: 'Units & locale',
-                  trailingText: 'Metric · £',
+                  trailingText: locale.summary,
+                  onTap: () => _showUnitsLocalePicker(context),
                 ),
               ],
             ),
@@ -385,6 +390,174 @@ class _AppearanceOption extends StatelessWidget {
               ),
               if (selected)
                 Icon(Icons.check_rounded, size: 20, color: ks.brandPrimary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens the units-and-locale picker. Selections persist immediately via the
+/// controller, so the sheet stays open while both choices are set.
+Future<void> _showUnitsLocalePicker(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    builder: (_) => const _UnitsLocaleSheet(),
+  );
+}
+
+/// Bottom-sheet selector for measurement system and currency.
+class _UnitsLocaleSheet extends ConsumerWidget {
+  const _UnitsLocaleSheet();
+
+  static const _unitOptions = [
+    (system: UnitSystem.metric, icon: Icons.straighten_rounded),
+    (system: UnitSystem.imperial, icon: Icons.square_foot_rounded),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ks = context.ksColors;
+    final locale = ref.watch(localePreferencesControllerProvider);
+    final controller = ref.read(localePreferencesControllerProvider.notifier);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          KsTokens.space16,
+          KsTokens.space12,
+          KsTokens.space16,
+          KsTokens.space16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: ks.hairline,
+                  borderRadius: BorderRadius.circular(KsTokens.radius8),
+                ),
+              ),
+            ),
+            const SizedBox(height: KsTokens.space16),
+            Text(
+              'Units & locale',
+              style: KsTokens.headlineMedium.copyWith(
+                color: ks.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 17,
+              ),
+            ),
+            const SizedBox(height: KsTokens.space4),
+            Text(
+              'Recipes and pantry amounts convert to match.',
+              style: KsTokens.bodySmall.copyWith(color: ks.textTertiary),
+            ),
+            const SizedBox(height: KsTokens.space16),
+            const _SheetSectionLabel('Measurement'),
+            const SizedBox(height: KsTokens.space4),
+            for (final option in _unitOptions)
+              _AppearanceOption(
+                icon: option.icon,
+                label: option.system.label,
+                selected: option.system == locale.unitSystem,
+                onTap: () => controller.setUnitSystem(option.system),
+              ),
+            const SizedBox(height: KsTokens.space12),
+            const _SheetSectionLabel('Currency'),
+            const SizedBox(height: KsTokens.space4),
+            for (final currency in AppCurrency.values)
+              _CurrencyOption(
+                currency: currency,
+                selected: currency == locale.currency,
+                onTap: () => controller.setCurrency(currency),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Small uppercase section header inside the picker sheet.
+class _SheetSectionLabel extends StatelessWidget {
+  const _SheetSectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Text(
+      text.toUpperCase(),
+      style: KsTokens.labelSmall.copyWith(
+        color: ks.textTertiary,
+        letterSpacing: 1.2,
+      ),
+    );
+  }
+}
+
+/// One currency row — symbol glyph, name, and ISO code, with a check when
+/// active. Mirrors [_AppearanceOption] but leads with the currency symbol.
+class _CurrencyOption extends StatelessWidget {
+  const _CurrencyOption({
+    required this.currency,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppCurrency currency;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final accent = selected ? ks.brandPrimary : ks.textPrimary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(KsTokens.radius12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                child: Text(
+                  currency.symbol,
+                  textAlign: TextAlign.center,
+                  style: KsTokens.bodyMedium.copyWith(
+                    color: selected ? ks.brandPrimary : ks.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: KsTokens.space12),
+              Expanded(
+                child: Text(
+                  currency.label,
+                  style: KsTokens.bodyMedium.copyWith(
+                    color: accent,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              Text(
+                currency.code,
+                style: KsTokens.labelSmall.copyWith(color: ks.textTertiary),
+              ),
+              if (selected) ...[
+                const SizedBox(width: KsTokens.space8),
+                Icon(Icons.check_rounded, size: 20, color: ks.brandPrimary),
+              ],
             ],
           ),
         ),

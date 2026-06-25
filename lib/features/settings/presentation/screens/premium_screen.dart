@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/locale/currency_formatter.dart';
+import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
 /// Screen 15 (premium) · KitchenSync Premium — an upgrade that sells
@@ -8,17 +11,21 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 ///
 /// A centred star mark, the four headline capabilities, an annual/monthly
 /// price toggle, and the trial CTA. Presentational P2.
-class PremiumScreen extends StatefulWidget {
+class PremiumScreen extends ConsumerStatefulWidget {
   const PremiumScreen({super.key});
 
   @override
-  State<PremiumScreen> createState() => _PremiumScreenState();
+  ConsumerState<PremiumScreen> createState() => _PremiumScreenState();
 }
 
 enum _Plan { annual, monthly }
 
-class _PremiumScreenState extends State<PremiumScreen> {
+class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   _Plan _plan = _Plan.annual;
+
+  /// Plan prices, formatted in the active currency at build time.
+  static const _annualPrice = 29.0;
+  static const _monthlyPrice = 3.99;
 
   static const _benefits = [
     ('Menu Sets', 'reusable meal-plan templates'),
@@ -30,6 +37,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
+    final currency = ref.watch(localeFormattersProvider).currency;
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -83,6 +91,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
             const SizedBox(height: KsTokens.space8),
             _PlanToggle(
               plan: _plan,
+              annualPrice: _annualPrice,
+              monthlyPrice: _monthlyPrice,
+              currency: currency,
               onSelect: (p) => setState(() => _plan = p),
             ),
             const SizedBox(height: KsTokens.space16),
@@ -102,8 +113,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
             const SizedBox(height: KsTokens.space8),
             Text(
               _plan == _Plan.annual
-                  ? 'Cancel anytime · then £29/year'
-                  : 'Cancel anytime · then £3.99/month',
+                  ? 'Cancel anytime · then '
+                        '${currency.format(_annualPrice, decimals: false)}/year'
+                  : 'Cancel anytime · then '
+                        '${currency.format(_monthlyPrice)}/month',
               textAlign: TextAlign.center,
               style: KsTokens.labelSmall.copyWith(
                 color: ks.textTertiary,
@@ -166,9 +179,18 @@ class _BenefitRow extends StatelessWidget {
 
 /// The annual / monthly segmented price toggle.
 class _PlanToggle extends StatelessWidget {
-  const _PlanToggle({required this.plan, required this.onSelect});
+  const _PlanToggle({
+    required this.plan,
+    required this.annualPrice,
+    required this.monthlyPrice,
+    required this.currency,
+    required this.onSelect,
+  });
 
   final _Plan plan;
+  final double annualPrice;
+  final double monthlyPrice;
+  final CurrencyFormatter currency;
   final ValueChanged<_Plan> onSelect;
 
   @override
@@ -186,7 +208,8 @@ class _PlanToggle extends StatelessWidget {
           Expanded(
             child: _PlanOption(
               title: 'Annual',
-              subtitle: '£29 · save 40%',
+              subtitle:
+                  '${currency.format(annualPrice, decimals: false)} · save 40%',
               selected: plan == _Plan.annual,
               onTap: () => onSelect(_Plan.annual),
             ),
@@ -194,7 +217,7 @@ class _PlanToggle extends StatelessWidget {
           Expanded(
             child: _PlanOption(
               title: 'Monthly',
-              subtitle: '£3.99',
+              subtitle: currency.format(monthlyPrice),
               selected: plan == _Plan.monthly,
               onTap: () => onSelect(_Plan.monthly),
             ),

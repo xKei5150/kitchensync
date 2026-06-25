@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/locale/measurement_formatter.dart';
+import 'package:kitchensync/core/locale/unit_system.dart';
 
 /// One ingredient line in a [KsServingScaler], with a base amount measured at
 /// the recipe's base serving count.
@@ -31,6 +33,7 @@ class KsServingScaler extends StatefulWidget {
     this.initialServings,
     this.min = 1,
     this.max = 12,
+    this.unitSystem = UnitSystem.metric,
     this.onChanged,
     super.key,
   });
@@ -38,6 +41,10 @@ class KsServingScaler extends StatefulWidget {
   /// Serving count the [ingredients] amounts are quoted at.
   final int baseServings;
   final List<KsScalableIngredient> ingredients;
+
+  /// Measurement system the ingredient amounts (authored metric) render in.
+  /// The default is identity — metric in, metric out.
+  final UnitSystem unitSystem;
 
   /// Starting serving count; defaults to [baseServings].
   final int? initialServings;
@@ -147,7 +154,11 @@ class _KsServingScalerState extends State<KsServingScaler> {
           Divider(height: 1, thickness: 1, color: ks.hairline),
           const SizedBox(height: KsTokens.space16),
           for (final ingredient in widget.ingredients) ...[
-            _IngredientRow(ingredient: ingredient, ratio: ratio),
+            _IngredientRow(
+              ingredient: ingredient,
+              ratio: ratio,
+              unitSystem: widget.unitSystem,
+            ),
             if (ingredient != widget.ingredients.last)
               const SizedBox(height: 9),
           ],
@@ -165,23 +176,23 @@ class _KsServingScalerState extends State<KsServingScaler> {
 }
 
 class _IngredientRow extends StatelessWidget {
-  const _IngredientRow({required this.ingredient, required this.ratio});
+  const _IngredientRow({
+    required this.ingredient,
+    required this.ratio,
+    required this.unitSystem,
+  });
 
   final KsScalableIngredient ingredient;
   final double ratio;
-
-  static String _fmt(double v) {
-    if ((v - v.roundToDouble()).abs() < 0.05) return v.round().toString();
-    return v.toStringAsFixed(1);
-  }
+  final UnitSystem unitSystem;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
     final amount = ingredient.baseAmount * ratio;
-    final value = ingredient.unit.isEmpty
-        ? _fmt(amount)
-        : '${_fmt(amount)} ${ingredient.unit}';
+    final value = MeasurementFormatter(
+      unitSystem,
+    ).format(amount, ingredient.unit);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

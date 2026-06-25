@@ -1,7 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
+import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/features/shopping/presentation/screens/shopping_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+Future<Widget> _wrap(Widget home, {ThemeData? theme}) async {
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
+  return ProviderScope(
+    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+    child: MaterialApp(theme: theme ?? AppTheme.light(), home: home),
+  );
+}
 
 void main() {
   testWidgets(
@@ -12,9 +24,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        MaterialApp(theme: AppTheme.light(), home: const ShoppingScreen()),
-      );
+      await tester.pumpWidget(await _wrap(const ShoppingScreen()));
 
       expect(find.text('Shopping'), findsOneWidget);
       expect(find.text('Knock out next week early?'), findsOneWidget);
@@ -32,9 +42,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light(), home: const ShoppingScreen()),
-    );
+    await tester.pumpWidget(await _wrap(const ShoppingScreen()));
 
     await tester.tap(find.text('Start a shop'));
     await tester.pumpAndSettle();
@@ -48,7 +56,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.dark(), home: const ShoppingScreen()),
+      await _wrap(const ShoppingScreen(), theme: AppTheme.dark()),
     );
 
     expect(tester.takeException(), isNull);

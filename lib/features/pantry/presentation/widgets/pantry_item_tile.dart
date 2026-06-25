@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/utils/freshness_helper.dart';
-import 'package:kitchensync/core/utils/quantity_formatter.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
@@ -41,13 +41,13 @@ class PantryItemTile extends ConsumerWidget {
 
     final freshness = FreshnessHelper.fromExpiry(item.expiryDate);
     final expiryLabel = FreshnessHelper.relativeLabel(item.expiryDate);
-    final qty = QuantityFormatter.format(item.quantity);
-    final unit = item.unit.name;
+    final measurement = ref.watch(localeFormattersProvider).measurement;
+    final quantityLabel = measurement.format(item.quantity, item.unit.name);
     final isLowStock = item.quantity <= 1;
     final ks = context.ksColors;
 
     return Semantics(
-      label: '$name $qty $unit ${freshness.label}',
+      label: '$name $quantityLabel ${freshness.label}',
       button: onTap != null,
       child: Material(
         color: Colors.transparent,
@@ -89,8 +89,7 @@ class PantryItemTile extends ConsumerWidget {
                           _Header(name: name, category: category),
                           const SizedBox(height: KsTokens.space6),
                           _QuantityRow(
-                            qty: qty,
-                            unit: unit,
+                            text: quantityLabel,
                             isLowStock: isLowStock,
                           ),
                           if (expiryLabel.isNotEmpty) ...[
@@ -142,14 +141,10 @@ class _Header extends StatelessWidget {
 }
 
 class _QuantityRow extends StatelessWidget {
-  const _QuantityRow({
-    required this.qty,
-    required this.unit,
-    this.isLowStock = false,
-  });
+  const _QuantityRow({required this.text, this.isLowStock = false});
 
-  final String qty;
-  final String unit;
+  /// The formatted quantity and unit, e.g. `800 g` or `1.8 lb`.
+  final String text;
   final bool isLowStock;
 
   @override
@@ -159,7 +154,7 @@ class _QuantityRow extends StatelessWidget {
       textBaseline: TextBaseline.alphabetic,
       children: [
         Text(
-          '$qty $unit',
+          text,
           style: KsTokens.titleLarge.copyWith(
             fontWeight: FontWeight.w700,
             color: context.ksColors.textPrimary,

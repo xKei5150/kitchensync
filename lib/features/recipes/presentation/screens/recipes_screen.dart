@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
 /// Screen 07 · Recipes home — My Recipes & Discover.
@@ -145,7 +147,7 @@ class _DiscoverRecipe {
   const _DiscoverRecipe({
     required this.title,
     required this.author,
-    required this.price,
+    required this.priceValue,
     required this.likes,
     required this.comments,
     required this.colors,
@@ -153,20 +155,25 @@ class _DiscoverRecipe {
 
   final String title;
   final String author;
-  final String price;
+
+  /// Per-serving cost; formatted in the active currency at build time.
+  final double priceValue;
   final int likes;
   final int comments;
   final List<Color> colors;
 }
 
-class _DiscoverTab extends StatelessWidget {
+class _DiscoverTab extends ConsumerWidget {
   const _DiscoverTab();
+
+  /// The budget chip threshold, formatted in the active currency.
+  static const _budgetCeiling = 4.0;
 
   static const _recipes = [
     _DiscoverRecipe(
       title: 'Charred greens orzo',
       author: 'mira',
-      price: '£3.20',
+      priceValue: 3.20,
       likes: 248,
       comments: 12,
       colors: [KsTokens.catProduce, KsTokens.catBeverage],
@@ -174,7 +181,7 @@ class _DiscoverTab extends StatelessWidget {
     _DiscoverRecipe(
       title: 'Sunday lentil dal',
       author: 'theo',
-      price: '£2.10',
+      priceValue: 2.10,
       likes: 512,
       comments: 33,
       colors: [KsTokens.catGrain, KsTokens.catSpice],
@@ -182,7 +189,7 @@ class _DiscoverTab extends StatelessWidget {
     _DiscoverRecipe(
       title: 'Roast squash & sage',
       author: 'priya',
-      price: '£3.80',
+      priceValue: 3.80,
       likes: 176,
       comments: 8,
       colors: [KsTokens.catSpice, KsTokens.catGrain],
@@ -190,7 +197,7 @@ class _DiscoverTab extends StatelessWidget {
     _DiscoverRecipe(
       title: 'White bean braise',
       author: 'sam',
-      price: '£2.60',
+      priceValue: 2.60,
       likes: 401,
       comments: 21,
       colors: [KsTokens.catProduce, KsTokens.catCondiment],
@@ -198,7 +205,8 @@ class _DiscoverTab extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currency = ref.watch(localeFormattersProvider).currency;
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         KsTokens.space16,
@@ -209,16 +217,17 @@ class _DiscoverTab extends StatelessWidget {
       children: [
         const _SearchPill(),
         const SizedBox(height: KsTokens.space10),
-        const Wrap(
+        Wrap(
           spacing: KsTokens.space8,
           runSpacing: KsTokens.space8,
           children: [
             KsTag(
-              label: 'Under £4',
+              label:
+                  'Under ${currency.format(_budgetCeiling, decimals: false)}',
               icon: Icons.bolt_rounded,
               tone: KsTagTone.outline,
             ),
-            KsTag(
+            const KsTag(
               label: 'Serves 4',
               icon: Icons.bolt_rounded,
               tone: KsTagTone.outline,
@@ -244,7 +253,7 @@ class _DiscoverTab extends StatelessWidget {
               child: KsRecipeCard.public(
                 title: r.title,
                 author: r.author,
-                price: r.price,
+                price: currency.format(r.priceValue),
                 likeCount: r.likes,
                 commentCount: r.comments,
                 coverColors: r.colors,

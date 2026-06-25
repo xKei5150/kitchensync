@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
 /// Screen 11 · Menu Sets home — a deck of weeks you can re-live.
@@ -8,14 +10,14 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 /// A horizontal carousel, deliberately unlike every vertical list in the app:
 /// each [KsMenuSetCard] previews its seven days. Premium P2; the content is
 /// representative sample data, exactly as the design canvas frames it.
-class MenuSetsScreen extends StatefulWidget {
+class MenuSetsScreen extends ConsumerStatefulWidget {
   const MenuSetsScreen({super.key});
 
   @override
-  State<MenuSetsScreen> createState() => _MenuSetsScreenState();
+  ConsumerState<MenuSetsScreen> createState() => _MenuSetsScreenState();
 }
 
-class _MenuSetsScreenState extends State<MenuSetsScreen> {
+class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
   // viewportFraction keeps the next card peeking, so the row reads as a deck.
   final _controller = PageController(viewportFraction: 0.86);
   int _page = 0;
@@ -23,7 +25,8 @@ class _MenuSetsScreenState extends State<MenuSetsScreen> {
   static final List<_MenuSetSample> _sets = [
     _MenuSetSample(
       title: 'Cosy autumn week',
-      meta: '7 days · 14 meals · £61',
+      metaPrefix: '7 days · 14 meals',
+      priceValue: 61,
       days: const [
         KsMenuDay(weekday: 'M', dishColors: [KsTokens.catGrain]),
         KsMenuDay(weekday: 'T', dishColors: [KsTokens.catMeat]),
@@ -36,7 +39,8 @@ class _MenuSetsScreenState extends State<MenuSetsScreen> {
     ),
     _MenuSetSample(
       title: 'Quick weeknights',
-      meta: '5 days · 10 meals · £38',
+      metaPrefix: '5 days · 10 meals',
+      priceValue: 38,
       days: const [
         KsMenuDay(weekday: 'M', dishColors: [KsTokens.catSeafood]),
         KsMenuDay(weekday: 'T', dishColors: [KsTokens.catProduce]),
@@ -49,7 +53,8 @@ class _MenuSetsScreenState extends State<MenuSetsScreen> {
     ),
     _MenuSetSample(
       title: 'Batch-cook Sunday',
-      meta: '6 days · 12 meals · £47',
+      metaPrefix: '6 days · 12 meals',
+      priceValue: 47,
       days: const [
         KsMenuDay(weekday: 'M', dishColors: [KsTokens.catGrain]),
         KsMenuDay(weekday: 'T', dishColors: [KsTokens.catGrain]),
@@ -73,6 +78,7 @@ class _MenuSetsScreenState extends State<MenuSetsScreen> {
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
+    final currency = ref.watch(localeFormattersProvider).currency;
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -111,13 +117,16 @@ class _MenuSetsScreenState extends State<MenuSetsScreen> {
                 itemCount: _sets.length,
                 itemBuilder: (context, i) {
                   final set = _sets[i];
+                  final meta =
+                      '${set.metaPrefix} · '
+                      '${currency.format(set.priceValue, decimals: false)}';
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Align(
                       alignment: Alignment.topCenter,
                       child: KsMenuSetCard(
                         title: set.title,
-                        meta: set.meta,
+                        meta: meta,
                         days: set.days,
                         onApply: _openEditor,
                         onDuplicate: _openEditor,
@@ -145,10 +154,20 @@ class _MenuSetsScreenState extends State<MenuSetsScreen> {
 }
 
 class _MenuSetSample {
-  _MenuSetSample({required this.title, required this.meta, required this.days});
+  _MenuSetSample({
+    required this.title,
+    required this.metaPrefix,
+    required this.priceValue,
+    required this.days,
+  });
 
   final String title;
-  final String meta;
+
+  /// Everything in the summary line before the cost, e.g. `7 days · 14 meals`.
+  final String metaPrefix;
+
+  /// Estimated set cost; formatted in the active currency at build time.
+  final double priceValue;
   final List<KsMenuDay> days;
 }
 

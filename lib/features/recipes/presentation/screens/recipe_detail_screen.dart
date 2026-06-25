@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
 /// Screen 06 · Recipe detail · "Closer Look" — a cookbook spread that scales
@@ -10,7 +12,7 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 /// [KsServingScaler] rescaling the ingredient list in real time. Reused by the
 /// calendar when picking a meal. Presentational P1 with representative sample
 /// data.
-class RecipeDetailScreen extends StatelessWidget {
+class RecipeDetailScreen extends ConsumerWidget {
   const RecipeDetailScreen({super.key});
 
   /// The braise carried through from Today / the calendar's tonight card.
@@ -27,8 +29,11 @@ class RecipeDetailScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
+    final unitSystem = ref
+        .watch(localePreferencesControllerProvider)
+        .unitSystem;
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: ListView(
@@ -47,9 +52,10 @@ class RecipeDetailScreen extends StatelessWidget {
               children: [
                 const _DropCapIntro(initial: 'A', body: _intro),
                 const SizedBox(height: KsTokens.space16),
-                const KsServingScaler(
+                KsServingScaler(
                   baseServings: 4,
                   ingredients: _ingredients,
+                  unitSystem: unitSystem,
                 ),
                 const SizedBox(height: KsTokens.space20),
                 Row(

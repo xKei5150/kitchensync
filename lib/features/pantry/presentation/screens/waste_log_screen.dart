@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
@@ -66,18 +67,22 @@ class WasteLogScreen extends ConsumerWidget {
 }
 
 /// The hero numeral — money saved this month — over a climbing-bars motif.
-class _SavedHero extends StatelessWidget {
+class _SavedHero extends ConsumerWidget {
   const _SavedHero();
 
+  /// Sample savings figure for the hero; formatted in the active currency.
+  static const _savedThisMonth = 42.0;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currency = ref.watch(localeFormattersProvider).currency;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '£42',
+          currency.format(_savedThisMonth, decimals: false),
           style: KsTokens.displayLarge.copyWith(
             color: ks.textPrimary,
             fontSize: 64,

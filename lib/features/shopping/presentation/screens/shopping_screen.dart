@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
 /// Screen 09 · Shopping home + Shop Now.
@@ -11,13 +13,16 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 /// Shop Now that opens the "how far ahead?" setup before building a list.
 /// Presentational P1 with representative sample data; the in-store checklist
 /// lives at `/shop/list`.
-class ShoppingScreen extends StatelessWidget {
+class ShoppingScreen extends ConsumerWidget {
   const ShoppingScreen({super.key});
 
   static const _upcoming = [
     _UpcomingShop(title: 'Weekly shop', when: 'Fri 27 · 11 items'),
     _UpcomingShop(title: 'Next week', when: 'Fri 4 Jul · 9 items'),
   ];
+
+  /// Sample total for the most recent completed shop, formatted on build.
+  static const _lastShopTotal = 58.0;
 
   Future<void> _openShopNow(BuildContext context) async {
     final start = await showModalBottomSheet<bool>(
@@ -31,7 +36,10 @@ class ShoppingScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currency = ref.watch(localeFormattersProvider).currency;
+    final lastShopTotal = currency.format(_lastShopTotal, decimals: false);
+    final lastShopLabel = 'Fri 20 Jun · 13 items · $lastShopTotal';
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -55,7 +63,7 @@ class ShoppingScreen extends StatelessWidget {
           const SizedBox(height: KsTokens.space12),
           const _SectionLabel('History'),
           const SizedBox(height: KsTokens.space10),
-          const _HistoryRow(label: 'Fri 20 Jun · 13 items · £58'),
+          _HistoryRow(label: lastShopLabel),
         ],
       ),
     );
