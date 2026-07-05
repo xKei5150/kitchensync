@@ -7,11 +7,15 @@ import 'package:go_router/go_router.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/freshness_helper.dart';
 import 'package:kitchensync/core/utils/quantity_formatter.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
@@ -19,6 +23,8 @@ import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item_phot
 import 'package:kitchensync/features/pantry/domain/usecases/adjust_pantry_quantity.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/pantry/presentation/widgets/mark_as_waste_sheet.dart';
+import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
+import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 
 /// Screen 08 · Pantry item detail — one item, fully told.
 ///
@@ -135,7 +141,7 @@ class _BodyState extends ConsumerState<_Body> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final qty = QuantityFormatter.format(item.quantity);
-    final unit = item.unit.name;
+    final unit = _unitLabel(item.unit);
     final freshness = FreshnessHelper.fromExpiry(item.expiryDate);
     final expiryLabel = FreshnessHelper.relativeLabel(item.expiryDate);
 
@@ -206,6 +212,8 @@ class _BodyState extends ConsumerState<_Body> {
                 ),
               ),
               const SizedBox(height: KsTokens.space16),
+              _QuantitySummaryCard(item: item),
+              const SizedBox(height: KsTokens.space12),
               KsQuantityStepper(
                 qty: qty,
                 unit: unit,
@@ -219,6 +227,8 @@ class _BodyState extends ConsumerState<_Body> {
                 expiryLabel: expiryLabel,
                 ingredient: ingredient,
               ),
+              const SizedBox(height: KsTokens.space20),
+              _UsedByRecipesSection(item: item, ingredient: ingredient),
               const SizedBox(height: KsTokens.space20),
               _ActionRow(item: item),
             ],
@@ -257,6 +267,42 @@ String _sectionLabel(PantrySection section) => switch (section) {
   PantrySection.nonFood => 'Non-food',
   PantrySection.leftover => 'Leftover',
 };
+
+String _formatDate(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+String _unitLabel(Unit unit) => switch (unit) {
+  Unit.g => 'g',
+  Unit.kg => 'kg',
+  Unit.ml => 'ml',
+  Unit.l => 'l',
+  Unit.piece => 'pc',
+  Unit.tsp => 'tsp',
+  Unit.tbsp => 'tbsp',
+  Unit.cup => 'cup',
+};
+
+class _QuantitySummaryCard extends ConsumerWidget {
+  const _QuantitySummaryCard({required this.item});
+
+  final PantryItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final measurement = ref.watch(localeFormattersProvider).measurement;
+    final value = measurement.format(item.quantity, item.unit.name);
+    return KsCard(
+      child: KsMetadataRow(
+        icon: Icons.scale_outlined,
+        label: 'Current quantity',
+        value: value,
+        color: context.ksColors.brandPrimary,
+      ),
+    );
+  }
+}
 
 /// The category-tinted hero — the item's photo when present, otherwise a
 /// category gradient behind its glyph. Tapping anywhere opens the photo
@@ -407,15 +453,15 @@ class _MetadataCard extends StatelessWidget {
             value: _sectionLabel(item.section),
             color: item.section.color,
           ),
-          if (expiryLabel.isNotEmpty) ...[
-            const SizedBox(height: KsTokens.space12),
-            KsMetadataRow(
-              icon: freshness.icon,
-              label: 'Freshness',
-              value: expiryLabel,
-              color: freshness.color,
-            ),
-          ],
+          const SizedBox(height: KsTokens.space12),
+          KsMetadataRow(
+            icon: freshness.icon,
+            label: 'Freshness state',
+            value: expiryLabel.isEmpty
+                ? freshness.label
+                : '${freshness.label} · $expiryLabel',
+            color: freshness.color,
+          ),
           if (item.lastPurchaseDate != null) ...[
             const SizedBox(height: KsTokens.space12),
             KsMetadataRow(
@@ -444,7 +490,7 @@ class _MetadataCard extends StatelessWidget {
             const SizedBox(height: KsTokens.space12),
             KsMetadataRow(
               icon: Icons.sticky_note_2_outlined,
-              label: 'Note',
+              label: 'Notes',
               value: item.note!,
             ),
           ],
@@ -452,11 +498,304 @@ class _MetadataCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _formatDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
+class _UsedByRecipesSection extends ConsumerWidget {
+  const _UsedByRecipesSection({required this.item, this.ingredient});
+
+  final PantryItem item;
+  final Ingredient? ingredient;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recipesAsync = ref.watch(activeHouseholdRecipesProvider);
+    final today = DateTime.now();
+    final end = DateTime(today.year, today.month, today.day);
+    final mealsAsync = ref.watch(
+      activeCalendarMealsProvider((start: DateTime(2000), end: end)),
+    );
+
+    return recipesAsync.when(
+      loading: () => const _RecipeUsageLoadingCard(),
+      error: (error, _) =>
+          KsErrorAlert(message: 'Could not load recipe usage: $error'),
+      data: (recipes) => mealsAsync.when(
+        loading: () => const _RecipeUsageLoadingCard(),
+        error: (error, _) =>
+            KsErrorAlert(message: 'Could not load cooking history: $error'),
+        data: (meals) => _RecipeUsageCard(
+          usages: _buildUsages(recipes, meals),
+          substituteIngredientIds:
+              ingredient?.substituteIngredientIds ?? const [],
+        ),
+      ),
+    );
+  }
+
+  List<_RecipeUsage> _buildUsages(
+    List<Recipe> recipes,
+    List<MealScheduleEntry> meals,
+  ) {
+    final cookedMeals = meals
+        .where((meal) => meal.state == ScheduledMealState.cooked)
+        .toList(growable: false);
+    final usages = <_RecipeUsage>[];
+
+    for (final recipe in recipes) {
+      final usesIngredient = recipe.ingredients.any(
+        (ingredient) => ingredient.ingredientId == item.ingredientId,
+      );
+      final relevantMeals = cookedMeals
+          .where((meal) => meal.recipeId == recipe.id)
+          .toList(growable: false);
+      final usedSubstitutes = <String>{};
+
+      for (final meal in relevantMeals) {
+        for (final override in meal.ingredientOverrides) {
+          if (override.originalIngredientId == item.ingredientId) {
+            usedSubstitutes.add(override.substituteIngredientId);
+          }
+        }
+      }
+
+      if (!usesIngredient && usedSubstitutes.isEmpty) continue;
+
+      usages.add(
+        _RecipeUsage(
+          recipe: recipe,
+          lastCooked: _latestCookedDate(relevantMeals),
+          substituteIngredientIds: usedSubstitutes.toList(growable: false),
+        ),
+      );
+    }
+
+    usages.sort((a, b) {
+      final aDate = a.lastCooked;
+      final bDate = b.lastCooked;
+      if (aDate == null && bDate == null) {
+        return a.recipe.name.compareTo(b.recipe.name);
+      }
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+    return usages;
+  }
+
+  DateTime? _latestCookedDate(List<MealScheduleEntry> meals) {
+    DateTime? latest;
+    for (final meal in meals) {
+      if (latest == null || meal.date.isAfter(latest)) {
+        latest = meal.date;
+      }
+    }
+    return latest;
+  }
+}
+
+class _RecipeUsage {
+  const _RecipeUsage({
+    required this.recipe,
+    required this.lastCooked,
+    required this.substituteIngredientIds,
+  });
+
+  final Recipe recipe;
+  final DateTime? lastCooked;
+  final List<String> substituteIngredientIds;
+}
+
+class _RecipeUsageLoadingCard extends StatelessWidget {
+  const _RecipeUsageLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const KsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          KsSkeleton(width: 140, height: 16),
+          SizedBox(height: KsTokens.space12),
+          KsSkeleton(width: double.infinity, height: 44),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecipeUsageCard extends StatelessWidget {
+  const _RecipeUsageCard({
+    required this.usages,
+    required this.substituteIngredientIds,
+  });
+
+  final List<_RecipeUsage> usages;
+  final List<String> substituteIngredientIds;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return KsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.menu_book_outlined, size: 18, color: ks.brandPrimary),
+              const SizedBox(width: KsTokens.space8),
+              Text(
+                'Used by Recipes',
+                style: KsTokens.titleMedium.copyWith(color: ks.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: KsTokens.space12),
+          if (usages.isEmpty)
+            Text(
+              'No saved recipes use this pantry item yet.',
+              style: KsTokens.bodyMedium.copyWith(color: ks.textSecondary),
+            )
+          else
+            for (final usage in usages) ...[
+              _RecipeUsageTile(usage: usage),
+              if (usage != usages.last)
+                const SizedBox(height: KsTokens.space10),
+            ],
+          if (substituteIngredientIds.isNotEmpty) ...[
+            const SizedBox(height: KsTokens.space12),
+            _SubstituteOptions(ids: substituteIngredientIds),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RecipeUsageTile extends StatelessWidget {
+  const _RecipeUsageTile({required this.usage});
+
+  final _RecipeUsage usage;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final recipe = usage.recipe;
+    final meta = [
+      'Serves ${recipe.defaultServingSize}',
+      if (recipe.mealTimeTags.isNotEmpty) recipe.mealTimeTags.first,
+      if (usage.lastCooked != null)
+        'Last cooked ${_formatDate(usage.lastCooked!)}',
+    ].join(' · ');
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.push('/recipe/${recipe.id}'),
+        borderRadius: BorderRadius.circular(KsTokens.radius12),
+        child: Container(
+          padding: const EdgeInsets.all(KsTokens.space12),
+          decoration: BoxDecoration(
+            color: ks.surfaceSunken,
+            borderRadius: BorderRadius.circular(KsTokens.radius12),
+            border: Border.all(color: ks.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      recipe.name,
+                      style: KsTokens.titleSmall.copyWith(
+                        color: ks.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: KsTokens.space8),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: ks.textTertiary,
+                  ),
+                ],
+              ),
+              const SizedBox(height: KsTokens.space4),
+              Text(
+                meta,
+                style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
+              ),
+              if (usage.substituteIngredientIds.isNotEmpty) ...[
+                const SizedBox(height: KsTokens.space8),
+                _UsedSubstitutes(ids: usage.substituteIngredientIds),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UsedSubstitutes extends ConsumerWidget {
+  const _UsedSubstitutes({required this.ids});
+
+  final List<String> ids;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Wrap(
+      spacing: KsTokens.space6,
+      runSpacing: KsTokens.space6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const KsTag(
+          label: 'Used substitutes',
+          icon: Icons.swap_horiz_rounded,
+          tone: KsTagTone.outline,
+          size: KsTagSize.sm,
+        ),
+        for (final id in ids) KsTag.alias(_ingredientName(ref, id)),
+      ],
+    );
+  }
+}
+
+class _SubstituteOptions extends ConsumerWidget {
+  const _SubstituteOptions({required this.ids});
+
+  final List<String> ids;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Wrap(
+      spacing: KsTokens.space6,
+      runSpacing: KsTokens.space6,
+      children: [
+        const KsTag(
+          label: 'Ingredient substitutes',
+          icon: Icons.swap_calls_rounded,
+          tone: KsTagTone.outline,
+          size: KsTagSize.sm,
+        ),
+        for (final id in ids) KsTag.alias(_ingredientName(ref, id)),
+      ],
+    );
+  }
+}
+
+String _ingredientName(WidgetRef ref, String id) {
+  final async = ref.watch(pantryIngredientProvider(id));
+  return async.when(
+    data: (result) => switch (result) {
+      Success(:final value) => value.displayNames['en'] ?? value.name,
+      ResultFailure() => id,
+    },
+    loading: () => id,
+    error: (_, __) => id,
+  );
 }
 
 /// The thumb-zone action row — a calm Edit beside the filled, destructive

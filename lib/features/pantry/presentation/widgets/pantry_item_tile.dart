@@ -41,6 +41,9 @@ class PantryItemTile extends ConsumerWidget {
 
     final freshness = FreshnessHelper.fromExpiry(item.expiryDate);
     final expiryLabel = FreshnessHelper.relativeLabel(item.expiryDate);
+    final freshnessLabel = expiryLabel.isEmpty
+        ? freshness.label
+        : '${freshness.label} · $expiryLabel';
     final measurement = ref.watch(localeFormattersProvider).measurement;
     final quantityLabel = measurement.format(item.quantity, item.unit.name);
     final isLowStock = item.quantity <= 1;
@@ -96,8 +99,18 @@ class PantryItemTile extends ConsumerWidget {
                             const SizedBox(height: KsTokens.space6),
                             KsExpiryBadge(
                               freshness: freshness,
-                              label: expiryLabel,
+                              label: freshnessLabel,
                             ),
+                          ] else ...[
+                            const SizedBox(height: KsTokens.space6),
+                            KsExpiryBadge(
+                              freshness: freshness,
+                              label: freshness.label,
+                            ),
+                          ],
+                          if (item.lastPurchaseDate != null) ...[
+                            const SizedBox(height: KsTokens.space6),
+                            _LastPurchased(date: item.lastPurchaseDate!),
                           ],
                         ],
                       ),
@@ -111,6 +124,37 @@ class PantryItemTile extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _LastPurchased extends StatelessWidget {
+  const _LastPurchased({required this.date});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.shopping_bag_outlined, size: 14, color: ks.textTertiary),
+        const SizedBox(width: KsTokens.space4),
+        Flexible(
+          child: Text(
+            'Last purchased ${_formatDate(date)}',
+            style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 }
 
 class _Header extends StatelessWidget {
