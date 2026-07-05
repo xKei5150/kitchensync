@@ -251,12 +251,20 @@ class KsAlmanacDay {
 /// Pad the leading days of the month with [KsAlmanacDay.blank]. Real days
 /// number sequentially. From "Components II (Modules)", The almanac glance.
 class KsAlmanacGrid extends StatelessWidget {
-  const KsAlmanacGrid({required this.days, this.showLegend = true, super.key});
+  const KsAlmanacGrid({
+    required this.days,
+    this.showLegend = true,
+    this.onDayTap,
+    super.key,
+  });
 
   final List<KsAlmanacDay> days;
 
   /// Show the planned / problem / shop / missed legend beneath the grid.
   final bool showLegend;
+
+  /// Called with the day-of-month when a real day cell is tapped.
+  final ValueChanged<int>? onDayTap;
 
   static const List<String> _weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -279,17 +287,31 @@ class KsAlmanacGrid extends StatelessWidget {
           week.add(const Expanded(child: AspectRatio(aspectRatio: 1)));
         } else {
           dayNum++;
+          final cellDay = dayNum;
+          final cell = _AlmanacCell(
+            day: cellDay,
+            status: day.status!,
+            isToday: day.isToday,
+          );
           week.add(
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(2.5),
                 child: AspectRatio(
                   aspectRatio: 1,
-                  child: _AlmanacCell(
-                    day: dayNum,
-                    status: day.status!,
-                    isToday: day.isToday,
-                  ),
+                  child: onDayTap == null
+                      ? cell
+                      : Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(KsTokens.radius8),
+                          child: InkWell(
+                            onTap: () => onDayTap!(cellDay),
+                            borderRadius: BorderRadius.circular(
+                              KsTokens.radius8,
+                            ),
+                            child: cell,
+                          ),
+                        ),
                 ),
               ),
             ),

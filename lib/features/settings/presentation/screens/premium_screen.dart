@@ -1,16 +1,21 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/currency_formatter.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
 /// Screen 15 (premium) · KitchenSync Premium — an upgrade that sells
 /// capability, not a paywall.
 ///
 /// A centred star mark, the four headline capabilities, an annual/monthly
-/// price toggle, and the trial CTA. Presentational P2.
+/// price toggle, and the trial CTA. The CTA records the household-wide upgrade
+/// state used by the app's premium gates.
 class PremiumScreen extends ConsumerStatefulWidget {
   const PremiumScreen({super.key});
 
@@ -18,10 +23,11 @@ class PremiumScreen extends ConsumerStatefulWidget {
   ConsumerState<PremiumScreen> createState() => _PremiumScreenState();
 }
 
-enum _Plan { annual, monthly }
+enum PremiumPlan { annual, monthly }
 
 class _PremiumScreenState extends ConsumerState<PremiumScreen> {
-  _Plan _plan = _Plan.annual;
+  PremiumPlan _plan = PremiumPlan.annual;
+  bool _upgrading = false;
 
   /// Plan prices, formatted in the active currency at build time.
   static const _annualPrice = 29.0;
@@ -33,6 +39,32 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     ('Joint households', 'up to 6, per-member ticks'),
     ('Paste & Parse', '+ budget recipe search'),
   ];
+
+  Future<void> _startTrial() async {
+    setState(() => _upgrading = true);
+    try {
+      await ref.read(premiumUpgradeControllerProvider).startTrial(plan: _plan);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _upgrading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not start trial: $error')));
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Premium trial started for this household.'),
+      ),
+    );
+    final router = GoRouter.maybeOf(context);
+    if (router?.canPop() ?? false) {
+      router!.pop();
+    } else {
+      await Navigator.of(context).maybePop();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,11 +130,13 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
             ),
             const SizedBox(height: KsTokens.space16),
             FilledButton(
-              onPressed: () => context.pop(),
+              onPressed: _upgrading ? null : _startTrial,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
-              child: const Text('Start 7-day free trial'),
+              child: Text(
+                _upgrading ? 'Starting...' : 'Start 7-day free trial',
+              ),
             ),
             const SizedBox(height: KsTokens.space8),
             TextButton.icon(
@@ -112,7 +146,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
             ),
             const SizedBox(height: KsTokens.space8),
             Text(
-              _plan == _Plan.annual
+              _plan == PremiumPlan.annual
                   ? 'Cancel anytime · then '
                         '${currency.format(_annualPrice, decimals: false)}/year'
                   : 'Cancel anytime · then '
@@ -129,6 +163,80 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         ),
       ),
     );
+  }
+}
+
+final premiumUpgradeControllerProvider = Provider<PremiumUpgradeController>((
+  ref,
+) {
+  final auth = ref.watch(firebaseAuthProvider);
+  return PremiumUpgradeController(
+    auth: auth,
+    db: auth == null ? null : ref.watch(firestoreProvider),
+    activeHousehold: ref.watch(activeHouseholdContextProvider),
+  );
+});
+
+class PremiumUpgradeController {
+  const PremiumUpgradeController({
+    required this.auth,
+    required this.db,
+    required this.activeHousehold,
+  });
+
+  final FirebaseAuth? auth;
+  final FirebaseFirestore? db;
+  final ActiveHouseholdContext? activeHousehold;
+
+  Future<void> startTrial({required PremiumPlan plan}) async {
+    final auth = this.auth;
+    final db = this.db;
+    final household = activeHousehold;
+    if (auth == null || db == null) return;
+    final user = auth.currentUser;
+    if (user == null) {
+      throw StateError('Sign in before starting Premium.');
+    }
+    if (household == null) {
+      throw StateError('Select a household before starting Premium.');
+    }
+
+    final now = FieldValue.serverTimestamp();
+    final trialEndsAt = Timestamp.fromDate(
+      DateTime.now().toUtc().add(const Duration(days: 7)),
+    );
+    final planName = plan.name;
+    final userDoc = db.collection('users').doc(user.uid);
+    final householdDoc = db.collection('households').doc(household.id);
+    final subscriptionDoc = householdDoc
+        .collection('subscriptions')
+        .doc('premium');
+    final batch = db.batch()
+      ..set(userDoc, {
+        'isPremium': true,
+        'premiumPlan': planName,
+        'premiumTrialStartedAt': now,
+        'premiumTrialEndsAt': trialEndsAt,
+        'updatedAt': now,
+      }, SetOptions(merge: true))
+      ..set(householdDoc, {
+        'hasPremium': true,
+        'premiumPlan': planName,
+        'premiumOwnerUserId': user.uid,
+        'premiumTrialStartedAt': now,
+        'premiumTrialEndsAt': trialEndsAt,
+        'updatedAt': now,
+      }, SetOptions(merge: true))
+      ..set(subscriptionDoc, {
+        'status': 'trialing',
+        'plan': planName,
+        'ownerUserId': user.uid,
+        'startedAt': now,
+        'trialEndsAt': trialEndsAt,
+        'provider': 'in_app_trial',
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+    await batch.commit();
   }
 }
 
@@ -187,11 +295,11 @@ class _PlanToggle extends StatelessWidget {
     required this.onSelect,
   });
 
-  final _Plan plan;
+  final PremiumPlan plan;
   final double annualPrice;
   final double monthlyPrice;
   final CurrencyFormatter currency;
-  final ValueChanged<_Plan> onSelect;
+  final ValueChanged<PremiumPlan> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -210,16 +318,16 @@ class _PlanToggle extends StatelessWidget {
               title: 'Annual',
               subtitle:
                   '${currency.format(annualPrice, decimals: false)} · save 40%',
-              selected: plan == _Plan.annual,
-              onTap: () => onSelect(_Plan.annual),
+              selected: plan == PremiumPlan.annual,
+              onTap: () => onSelect(PremiumPlan.annual),
             ),
           ),
           Expanded(
             child: _PlanOption(
               title: 'Monthly',
               subtitle: currency.format(monthlyPrice),
-              selected: plan == _Plan.monthly,
-              onTap: () => onSelect(_Plan.monthly),
+              selected: plan == PremiumPlan.monthly,
+              onTap: () => onSelect(PremiumPlan.monthly),
             ),
           ),
         ],

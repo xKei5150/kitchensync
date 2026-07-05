@@ -4,12 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/menu_sets/presentation/providers/menu_set_repository_providers.dart';
 
 /// Screen 11 · Menu Sets home — a deck of weeks you can re-live.
 ///
 /// A horizontal carousel, deliberately unlike every vertical list in the app:
-/// each [KsMenuSetCard] previews its seven days. Premium P2; the content is
-/// representative sample data, exactly as the design canvas frames it.
+/// each [KsMenuSetCard] previews its seven days. Premium P2 backed by the menu
+/// set repository, with a design-canvas fallback when no saved sets exist.
 class MenuSetsScreen extends ConsumerStatefulWidget {
   const MenuSetsScreen({super.key});
 
@@ -75,6 +76,35 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
 
   void _openEditor() => context.push('/menu-sets/edit');
 
+  Future<void> _createFromPastCalendar() async {
+    final today = DateTime.now();
+    final end = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).subtract(const Duration(days: 1));
+    final start = end.subtract(const Duration(days: 6));
+    try {
+      await ref
+          .read(menuSetEditorControllerProvider)
+          .createFromPastCalendar(
+            startDate: start,
+            endDate: end,
+            name: 'Last week',
+          );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create menu set: $error')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Created a menu set from last week.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
@@ -100,7 +130,13 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
                   KsHeaderAction(
                     icon: Icons.arrow_back_rounded,
                     tooltip: 'Back',
-                    onTap: () => context.pop(),
+                    onTap: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/calendar');
+                      }
+                    },
                   ),
                 ],
               ),
@@ -144,7 +180,7 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
                 KsTokens.space16,
                 KsTokens.space20,
               ),
-              child: _SaveAsSetButton(onTap: _openEditor),
+              child: _SaveAsSetButton(onTap: _createFromPastCalendar),
             ),
           ],
         ),

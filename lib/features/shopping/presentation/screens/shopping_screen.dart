@@ -6,13 +6,14 @@ import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/planning_providers.dart';
+import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
 /// Screen 09 · Shopping home + Shop Now.
 ///
 /// The Shop tab landing: scheduled shop dates, a slim history, and a prominent
-/// Shop Now that opens the "how far ahead?" setup before building a list.
-/// Presentational P1 with representative sample data; the in-store checklist
-/// lives at `/shop/list`.
+/// Shop Now that opens the "how far ahead?" setup before building a generated
+/// list. The in-store checklist lives at `/shop/list`.
 class ShoppingScreen extends ConsumerWidget {
   const ShoppingScreen({super.key});
 
@@ -24,20 +25,31 @@ class ShoppingScreen extends ConsumerWidget {
   /// Sample total for the most recent completed shop, formatted on build.
   static const _lastShopTotal = 58.0;
 
-  Future<void> _openShopNow(BuildContext context) async {
-    final start = await showModalBottomSheet<bool>(
+  Future<void> _openShopNow(BuildContext context, WidgetRef ref) async {
+    final weeksAhead = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
       builder: (_) => const _ShopNowSheet(),
     );
-    if ((start ?? false) && context.mounted) {
-      unawaited(context.push('/shop/list'));
+    if (weeksAhead != null && context.mounted) {
+      final plan = ref
+          .read(planningControllerProvider.notifier)
+          .buildShopNowList(weeksAhead: weeksAhead);
+      final record = await ref
+          .read(shoppingPlanningControllerProvider)
+          .persistGeneratedList(plan);
+      if (context.mounted) {
+        unawaited(context.push('/shop/list/${record.id}'));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currency = ref.watch(localeFormattersProvider).currency;
+    final activeShoppingList = ref.watch(
+      planningControllerProvider.select((state) => state.activeShoppingList),
+    );
     final lastShopTotal = currency.format(_lastShopTotal, decimals: false);
     final lastShopLabel = 'Fri 20 Jun · 13 items · $lastShopTotal';
     return SafeArea(
@@ -52,10 +64,20 @@ class ShoppingScreen extends ConsumerWidget {
         children: [
           const KsFolioHeader(eyebrow: 'The Shop', title: 'Shopping'),
           const SizedBox(height: KsTokens.space16),
-          _ShopNowCard(onStart: () => _openShopNow(context)),
+          _ShopNowCard(onStart: () => _openShopNow(context, ref)),
           const SizedBox(height: KsTokens.space20),
           const _SectionLabel('Upcoming'),
           const SizedBox(height: KsTokens.space10),
+          if (activeShoppingList != null) ...[
+            _UpcomingTile(
+              shop: _UpcomingShop(
+                title: 'Ready list',
+                when: '${activeShoppingList.items.length} items',
+              ),
+              onTap: () => context.push('/shop/list'),
+            ),
+            const SizedBox(height: KsTokens.space8),
+          ],
           for (final shop in _upcoming) ...[
             _UpcomingTile(shop: shop, onTap: () => context.push('/shop/list')),
             const SizedBox(height: KsTokens.space8),
@@ -359,7 +381,8 @@ class _ShopNowSheetState extends State<_ShopNowSheet> {
             ],
             const SizedBox(height: KsTokens.space16),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () =>
+                  Navigator.of(context).pop(_options[_selected].ahead),
               child: Text(
                 'Build the list · ${_options[_selected].items} items',
               ),

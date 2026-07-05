@@ -1,19 +1,33 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
+import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
+import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
 /// Screen 03 · Dish-in-Date · daily view — a day as a lifecycle filmstrip.
 ///
 /// A vertical day-timeline, dishes threaded down a rail rather than stacked
-/// cards. Each shows its lifecycle state; tonight's dish expands to its full
-/// actions. Presentational P0 with representative sample data.
-class DayViewScreen extends StatelessWidget {
-  const DayViewScreen({super.key});
+/// cards. Each persisted meal shows its lifecycle state and actions.
+class DayViewScreen extends ConsumerWidget {
+  const DayViewScreen({super.key, this.selectedDate});
+
+  final DateTime? selectedDate;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
+    final day = _dateKey(selectedDate ?? ref.watch(clockProvider).now());
+    final mealsAsync = ref.watch(
+      activeCalendarMealsProvider((start: day, end: day)),
+    );
+    final meals = _orderedMeals(mealsAsync.valueOrNull ?? const []);
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -27,7 +41,7 @@ class DayViewScreen extends StatelessWidget {
           children: [
             KsFolioHeader(
               eyebrow: 'The Day',
-              title: 'Wednesday 25',
+              title: _dayTitle(day),
               actions: [
                 KsHeaderAction(
                   icon: Icons.arrow_back_rounded,
@@ -37,35 +51,239 @@ class DayViewScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: KsTokens.space20),
-            const _TimelineEntry(
-              time: '8a',
-              node: _NodeKind.done,
-              child: _ConsumedRow(name: 'Yogurt & berries'),
-            ),
-            const _TimelineEntry(
-              time: '1p',
-              node: _NodeKind.leftover,
-              child: _LeftoverBlock(),
-            ),
-            _TimelineEntry(
-              time: '7p',
-              node: _NodeKind.scheduled,
-              isLast: true,
-              child: _TonightExpanded(
-                onMarkCooked: () => context.pop(),
-                // The recipe detail ("Closer Look") is a full-screen route over
-                // the root navigator, so it pushes cleanly without re-entering
-                // the shell — unlike the `/recipes` branch, which must be
-                // switched with `go`.
-                onRecipe: () => context.push('/recipe'),
-              ),
-            ),
+            if (mealsAsync.isLoading)
+              const _TimelineEntry(
+                time: '',
+                node: _NodeKind.scheduled,
+                isLast: true,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (meals.isEmpty)
+              const _TimelineEntry(
+                time: '',
+                node: _NodeKind.scheduled,
+                isLast: true,
+                child: KsEmptyState(
+                  icon: Icons.event_busy_outlined,
+                  title: 'No meal planned',
+                  subtitle: 'Schedule a recipe to cook on this day.',
+                ),
+              )
+            else
+              for (var i = 0; i < meals.length; i++)
+                _mealTimelineEntry(
+                  context: context,
+                  ref: ref,
+                  meal: meals[i],
+                  isLast: i == meals.length - 1,
+                ),
           ],
         ),
       ),
     );
   }
+
+  Widget _mealTimelineEntry({
+    required BuildContext context,
+    required WidgetRef ref,
+    required MealScheduleEntry meal,
+    required bool isLast,
+  }) {
+    final recipe = ref.watch(recipeRecordProvider(meal.recipeId)).valueOrNull;
+    return _TimelineEntry(
+      time: _timeForMeal(meal.mealLabel),
+      node: _nodeForState(meal.state),
+      isLast: isLast,
+      child: _TonightExpanded(
+        mealLabel: meal.mealLabel,
+        stateLabel: _stateLabel(meal.state),
+        title: recipe?.name ?? meal.recipeId,
+        servingSize: meal.servingSize,
+        onMarkCooked: () async {
+          try {
+            await ref.read(cookingLifecycleControllerProvider).markCooked(meal);
+          } on MissingMealIngredientsException catch (error) {
+            final list = await ref
+                .read(shoppingPlanningControllerProvider)
+                .createEmergencyListFromMissing(
+                  date: error.meal.date,
+                  missingIngredients: error.missingIngredients,
+                );
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Emergency shopping list created.')),
+            );
+            final router = GoRouter.maybeOf(context);
+            if (router != null) {
+              unawaited(router.push('/shop/list/${list.id}'));
+            }
+            return;
+          } catch (error) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not mark cooked: $error')),
+            );
+            return;
+          }
+          if (!context.mounted) return;
+          final router = GoRouter.maybeOf(context);
+          if (router?.canPop() ?? false) {
+            router!.pop();
+          } else {
+            await Navigator.of(context).maybePop();
+          }
+        },
+        onChangeServings: () async {
+          await _runMealAction(
+            context,
+            () => ref
+                .read(cookingLifecycleControllerProvider)
+                .changeServingSize(meal, 6),
+            failureLabel: 'Could not change servings',
+          );
+        },
+        onMergeMeals: () async {
+          await _runMealAction(
+            context,
+            () => ref
+                .read(cookingLifecycleControllerProvider)
+                .mergeMeals(meal: meal, mealCount: 2),
+            failureLabel: 'Could not merge meals',
+          );
+        },
+        onSaveLeftovers: () async {
+          try {
+            await ref
+                .read(cookingLifecycleControllerProvider)
+                .saveLeftovers(meal: meal, servings: 2);
+          } catch (error) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not save leftovers: $error')),
+            );
+            return;
+          }
+          if (!context.mounted) return;
+          final router = GoRouter.maybeOf(context);
+          if (router?.canPop() ?? false) {
+            router!.pop();
+          } else {
+            await Navigator.of(context).maybePop();
+          }
+        },
+        onSwap: () async {
+          await _runMealAction(
+            context,
+            () => ref
+                .read(cookingLifecycleControllerProvider)
+                .swapRecipe(meal: meal, recipeId: 'pad-thai', servingSize: 4),
+            failureLabel: 'Could not swap recipe',
+          );
+        },
+        onCookNext: () async {
+          await _runMealAction(
+            context,
+            () => ref
+                .read(cookingLifecycleControllerProvider)
+                .rescheduleCookNext(meal),
+            failureLabel: 'Could not reschedule',
+          );
+        },
+        onCancel: () async {
+          await _runMealAction(
+            context,
+            () => ref.read(cookingLifecycleControllerProvider).cancelMeal(meal),
+            failureLabel: 'Could not cancel meal',
+          );
+        },
+        onRecipe: () => context.push('/recipe/${meal.recipeId}'),
+      ),
+    );
+  }
+
+  Future<void> _runMealAction(
+    BuildContext context,
+    Future<void> Function() action, {
+    required String failureLabel,
+  }) async {
+    try {
+      await action();
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$failureLabel: $error')));
+      return;
+    }
+    if (!context.mounted) return;
+    final router = GoRouter.maybeOf(context);
+    if (router?.canPop() ?? false) {
+      router!.pop();
+    } else {
+      await Navigator.of(context).maybePop();
+    }
+  }
 }
+
+List<MealScheduleEntry> _orderedMeals(List<MealScheduleEntry> meals) {
+  return [...meals]..sort((a, b) {
+    final slot = _mealOrder(a.mealLabel).compareTo(_mealOrder(b.mealLabel));
+    if (slot != 0) return slot;
+    return a.id.compareTo(b.id);
+  });
+}
+
+int _mealOrder(String mealLabel) {
+  return switch (mealLabel.toLowerCase()) {
+    'breakfast' => 0,
+    'lunch' => 1,
+    'dinner' => 2,
+    _ => 3,
+  };
+}
+
+String _timeForMeal(String mealLabel) {
+  return switch (mealLabel.toLowerCase()) {
+    'breakfast' => '8a',
+    'lunch' => '1p',
+    'dinner' => '7p',
+    _ => '',
+  };
+}
+
+_NodeKind _nodeForState(ScheduledMealState state) {
+  return switch (state) {
+    ScheduledMealState.cooked => _NodeKind.done,
+    ScheduledMealState.leftover => _NodeKind.leftover,
+    ScheduledMealState.scheduled ||
+    ScheduledMealState.cancelled => _NodeKind.scheduled,
+  };
+}
+
+String _stateLabel(ScheduledMealState state) {
+  return switch (state) {
+    ScheduledMealState.scheduled => 'Scheduled',
+    ScheduledMealState.cooked => 'Cooked',
+    ScheduledMealState.leftover => 'Leftover',
+    ScheduledMealState.cancelled => 'Cancelled',
+  };
+}
+
+DateTime _dateKey(DateTime date) {
+  return DateTime(date.year, date.month, date.day);
+}
+
+String _dayTitle(DateTime date) => '${_weekdays[date.weekday - 1]} ${date.day}';
+
+const _weekdays = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
 
 enum _NodeKind { done, leftover, scheduled }
 
@@ -152,89 +370,34 @@ class _Rail extends StatelessWidget {
   }
 }
 
-class _ConsumedRow extends StatelessWidget {
-  const _ConsumedRow({required this.name});
-
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    final ks = context.ksColors;
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            name,
-            style: KsTokens.titleSmall.copyWith(
-              color: ks.textSecondary,
-              fontSize: 13,
-            ),
-          ),
-        ),
-        Text(
-          'Eaten',
-          style: KsTokens.labelSmall.copyWith(
-            color: ks.textTertiary,
-            letterSpacing: 0,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LeftoverBlock extends StatelessWidget {
-  const _LeftoverBlock();
-
-  @override
-  Widget build(BuildContext context) {
-    final ks = context.ksColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Leftover pad thai',
-                style: KsTokens.titleSmall.copyWith(
-                  color: ks.textPrimary,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.room_service_outlined,
-              size: 12,
-              color: KsTokens.sectionLeftover,
-            ),
-            const SizedBox(width: KsTokens.space4),
-            Text(
-              'Leftover',
-              style: KsTokens.labelSmall.copyWith(
-                color: KsTokens.sectionLeftover,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: KsTokens.space2),
-        Text(
-          '2 portions — eat by tomorrow',
-          style: KsTokens.bodySmall.copyWith(color: ks.textTertiary),
-        ),
-      ],
-    );
-  }
-}
-
 /// Tonight's dish, expanded to its full action surface.
 class _TonightExpanded extends StatelessWidget {
-  const _TonightExpanded({required this.onMarkCooked, required this.onRecipe});
+  const _TonightExpanded({
+    required this.mealLabel,
+    required this.stateLabel,
+    required this.title,
+    required this.servingSize,
+    required this.onMarkCooked,
+    required this.onChangeServings,
+    required this.onMergeMeals,
+    required this.onSaveLeftovers,
+    required this.onSwap,
+    required this.onCookNext,
+    required this.onCancel,
+    required this.onRecipe,
+  });
 
+  final String mealLabel;
+  final String stateLabel;
+  final String title;
+  final int servingSize;
   final VoidCallback onMarkCooked;
+  final VoidCallback onChangeServings;
+  final VoidCallback onMergeMeals;
+  final VoidCallback onSaveLeftovers;
+  final VoidCallback onSwap;
+  final VoidCallback onCookNext;
+  final VoidCallback onCancel;
   final VoidCallback onRecipe;
 
   @override
@@ -256,7 +419,7 @@ class _TonightExpanded extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Tonight · Dinner'.toUpperCase(),
+                  '$mealLabel · $stateLabel'.toUpperCase(),
                   style: KsTokens.labelSmall.copyWith(
                     color: ks.brandPrimary,
                     fontWeight: FontWeight.w700,
@@ -283,7 +446,7 @@ class _TonightExpanded extends StatelessWidget {
           ),
           const SizedBox(height: KsTokens.space8),
           Text(
-            'Tomato & white bean braise',
+            title,
             style: KsTokens.displaySmall.copyWith(
               color: ks.textPrimary,
               fontWeight: FontWeight.w600,
@@ -294,7 +457,7 @@ class _TonightExpanded extends StatelessWidget {
           ),
           const SizedBox(height: KsTokens.space3),
           Text(
-            '45 min · serves 4',
+            'serves $servingSize',
             style: KsTokens.bodySmall.copyWith(
               color: ks.textSecondary,
               fontWeight: FontWeight.w500,
@@ -315,13 +478,40 @@ class _TonightExpanded extends StatelessWidget {
             ],
           ),
           const SizedBox(height: KsTokens.space8),
-          const Wrap(
+          Wrap(
             spacing: KsTokens.space16,
             runSpacing: KsTokens.space8,
             children: [
-              _MiniAction(icon: Icons.tune_rounded, label: 'Servings'),
-              _MiniAction(icon: Icons.swap_horiz_rounded, label: 'Swap'),
-              _MiniAction(icon: Icons.close_rounded, label: 'Cancel'),
+              _MiniAction(
+                icon: Icons.tune_rounded,
+                label: 'Servings',
+                onTap: onChangeServings,
+              ),
+              _MiniAction(
+                icon: Icons.call_merge_rounded,
+                label: 'Merge 2 meals',
+                onTap: onMergeMeals,
+              ),
+              _MiniAction(
+                icon: Icons.room_service_outlined,
+                label: 'Leftovers',
+                onTap: onSaveLeftovers,
+              ),
+              _MiniAction(
+                icon: Icons.swap_horiz_rounded,
+                label: 'Swap',
+                onTap: onSwap,
+              ),
+              _MiniAction(
+                icon: Icons.skip_next_rounded,
+                label: 'Cook next',
+                onTap: onCookNext,
+              ),
+              _MiniAction(
+                icon: Icons.close_rounded,
+                label: 'Cancel',
+                onTap: onCancel,
+              ),
             ],
           ),
         ],
@@ -331,27 +521,35 @@ class _TonightExpanded extends StatelessWidget {
 }
 
 class _MiniAction extends StatelessWidget {
-  const _MiniAction({required this.icon, required this.label});
+  const _MiniAction({required this.icon, required this.label, this.onTap});
 
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: ks.textSecondary),
-        const SizedBox(width: KsTokens.space4),
-        Text(
-          label,
-          style: KsTokens.labelSmall.copyWith(
-            color: ks.textSecondary,
-            letterSpacing: 0,
-          ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(KsTokens.radius8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: KsTokens.space2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: ks.textSecondary),
+            const SizedBox(width: KsTokens.space4),
+            Text(
+              label,
+              style: KsTokens.labelSmall.copyWith(
+                color: ks.textSecondary,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

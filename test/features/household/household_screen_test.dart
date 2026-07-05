@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/household/presentation/screens/household_screen.dart';
+
+Widget _wrap({required ThemeData theme}) {
+  return ProviderScope(
+    child: MaterialApp(theme: theme, home: const HouseholdScreen()),
+  );
+}
 
 void main() {
   testWidgets('HouseholdScreen lists members and the invite code', (
@@ -13,9 +20,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light(), home: const HouseholdScreen()),
-    );
+    await tester.pumpWidget(_wrap(theme: AppTheme.light()));
 
     expect(find.text("Who's in the kitchen"), findsOneWidget);
     expect(find.byType(KsMemberRow), findsNWidgets(3));
@@ -31,9 +36,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light(), home: const HouseholdScreen()),
-    );
+    await tester.pumpWidget(_wrap(theme: AppTheme.light()));
 
     await tester.tap(find.text('Ben'));
     await tester.pumpAndSettle();
@@ -50,9 +53,7 @@ void main() {
   testWidgets('HouseholdScreen renders in dark theme without error', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.dark(), home: const HouseholdScreen()),
-    );
+    await tester.pumpWidget(_wrap(theme: AppTheme.dark()));
     expect(tester.takeException(), isNull);
   });
 }

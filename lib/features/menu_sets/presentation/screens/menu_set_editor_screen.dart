@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/planning_providers.dart';
+import 'package:kitchensync/features/menu_sets/domain/services/menu_set_application_engine.dart';
+import 'package:kitchensync/features/menu_sets/presentation/providers/menu_set_repository_providers.dart';
 
 /// Screen 12 · Menu Set editor + Apply — build a week, then cast it across the
 /// calendar.
 ///
 /// Drag recipes into day slots (presented via [KsMenuSlotEditor]); "Apply to
 /// calendar" opens a sheet that casts the set with modulo cycling over a date
-/// range, in Replace or Fill-empty mode. Presentational P2.
-class MenuSetEditorScreen extends StatelessWidget {
+/// range, in Replace or Fill-empty mode.
+class MenuSetEditorScreen extends ConsumerWidget {
   const MenuSetEditorScreen({super.key});
 
   static const _slots = [
@@ -50,7 +54,7 @@ class MenuSetEditorScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
     return Scaffold(
       backgroundColor: ks.surfaceBase,
@@ -78,8 +82,47 @@ class MenuSetEditorScreen extends StatelessWidget {
             const SizedBox(height: KsTokens.space16),
             const KsMenuSlotEditor(slots: _slots),
             const SizedBox(height: KsTokens.space20),
-            const _RecipeTray(),
+            _RecipeTray(
+              onAddOrzo: () async {
+                await _runEditorAction(
+                  context,
+                  () => ref
+                      .read(menuSetEditorControllerProvider)
+                      .addRecipeToDraft(recipeId: 'orzo', mealSlot: 'Dinner'),
+                  successMessage: 'Added Orzo to Wednesday.',
+                  failureMessage: 'Could not update menu set',
+                );
+              },
+            ),
+            const SizedBox(height: KsTokens.space12),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await _runEditorAction(
+                  context,
+                  () => ref
+                      .read(menuSetEditorControllerProvider)
+                      .removeEntryFromDraft(entryId: 'menu-entry-0'),
+                  successMessage: 'Removed Lentil dal.',
+                  failureMessage: 'Could not remove recipe',
+                );
+              },
+              icon: const Icon(Icons.remove_circle_outline_rounded, size: 16),
+              label: const Text('Remove Lentil dal'),
+            ),
             const SizedBox(height: KsTokens.space20),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await _runEditorAction(
+                  context,
+                  () => ref.read(menuSetEditorControllerProvider).saveDraft(),
+                  successMessage: 'Menu set saved.',
+                  failureMessage: 'Could not save menu set',
+                );
+              },
+              icon: const Icon(Icons.save_outlined, size: 16),
+              label: const Text('Save draft'),
+            ),
+            const SizedBox(height: KsTokens.space8),
             FilledButton(
               onPressed: () => _openApplySheet(context),
               child: const Text('Apply to calendar'),
@@ -89,12 +132,35 @@ class MenuSetEditorScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _runEditorAction(
+    BuildContext context,
+    Future<Object?> Function() action, {
+    required String successMessage,
+    required String failureMessage,
+  }) async {
+    try {
+      await action();
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$failureMessage: $error')));
+      return;
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(successMessage)));
+  }
 }
 
 /// The "drag from your recipes" tray — colour-coded recipe chips to drop into
 /// the week above.
 class _RecipeTray extends StatelessWidget {
-  const _RecipeTray();
+  const _RecipeTray({required this.onAddOrzo});
+
+  final VoidCallback onAddOrzo;
 
   static const _chips = [
     KsMenuSlotEntry(label: 'Orzo', color: KsTokens.catProduce),
@@ -130,22 +196,26 @@ class _RecipeTray extends StatelessWidget {
             runSpacing: KsTokens.space8,
             children: [
               for (final chip in _chips)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: KsTokens.space8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: chip.color.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(KsTokens.radius8),
-                  ),
-                  child: Text(
-                    chip.label,
-                    style: KsTokens.labelMedium.copyWith(
-                      color: chip.color,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0,
-                      height: 1,
+                InkWell(
+                  onTap: chip.label == 'Orzo' ? onAddOrzo : null,
+                  borderRadius: BorderRadius.circular(KsTokens.radius8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: KsTokens.space8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: chip.color.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(KsTokens.radius8),
+                    ),
+                    child: Text(
+                      chip.label,
+                      style: KsTokens.labelMedium.copyWith(
+                        color: chip.color,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0,
+                        height: 1,
+                      ),
                     ),
                   ),
                 ),
@@ -159,16 +229,25 @@ class _RecipeTray extends StatelessWidget {
 
 /// The "Apply to the calendar" bottom sheet — a date range, a modulo-cycling
 /// note, and a Fill-empty / Replace mode toggle.
-class _ApplySheet extends StatefulWidget {
+class _ApplySheet extends ConsumerStatefulWidget {
   const _ApplySheet();
 
   @override
-  State<_ApplySheet> createState() => _ApplySheetState();
+  ConsumerState<_ApplySheet> createState() => _ApplySheetState();
 }
 
 enum _ApplyMode { fillEmpty, replace }
 
-class _ApplySheetState extends State<_ApplySheet> {
+extension on _ApplyMode {
+  MenuSetApplyMode get domainMode {
+    return switch (this) {
+      _ApplyMode.fillEmpty => MenuSetApplyMode.fillEmpty,
+      _ApplyMode.replace => MenuSetApplyMode.replace,
+    };
+  }
+}
+
+class _ApplySheetState extends ConsumerState<_ApplySheet> {
   _ApplyMode _mode = _ApplyMode.fillEmpty;
 
   @override
@@ -266,7 +345,30 @@ class _ApplySheetState extends State<_ApplySheet> {
           ),
           const SizedBox(height: KsTokens.space16),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () async {
+              final result = ref
+                  .read(planningControllerProvider.notifier)
+                  .applyFeaturedMenuSet(_mode.domainMode);
+              final shoppingList = ref
+                  .read(planningControllerProvider)
+                  .activeShoppingList;
+              try {
+                await ref
+                    .read(menuSetApplyPersistenceControllerProvider)
+                    .persistApplication(
+                      result: result,
+                      shoppingList: shoppingList,
+                    );
+              } catch (error) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Could not persist menu set: $error')),
+                );
+                return;
+              }
+              if (!context.mounted) return;
+              Navigator.of(context).pop();
+            },
             child: const Text('Apply · 28 meals'),
           ),
         ],

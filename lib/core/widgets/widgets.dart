@@ -5,6 +5,9 @@
 /// instead of re-implementing tags, cards, badges, and empty states per screen.
 library;
 
+export 'package:kitchensync/features/household/domain/entities/household_policy_models.dart'
+    show HouseholdRole, HouseholdRoleX;
+
 export 'connectivity_banner.dart';
 export 'ks_badge.dart';
 export 'ks_buttons.dart';

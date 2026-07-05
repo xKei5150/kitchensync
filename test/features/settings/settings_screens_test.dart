@@ -22,6 +22,18 @@ Future<Widget> _wrap(
   );
 }
 
+class _FakePremiumUpgradeController extends PremiumUpgradeController {
+  _FakePremiumUpgradeController()
+    : super(auth: null, db: null, activeHousehold: null);
+
+  PremiumPlan? startedPlan;
+
+  @override
+  Future<void> startTrial({required PremiumPlan plan}) async {
+    startedPlan = plan;
+  }
+}
+
 void main() {
   testWidgets('SettingsScreen shows the profile, premium banner and list', (
     tester,
@@ -185,6 +197,42 @@ void main() {
     await tester.tap(find.text('Monthly'));
     await tester.pump();
     expect(find.textContaining('then £3.99/month'), findsOneWidget);
+  });
+
+  testWidgets('PremiumScreen starts a household trial for the selected plan', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final upgradeController = _FakePremiumUpgradeController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          premiumUpgradeControllerProvider.overrideWithValue(upgradeController),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const PremiumScreen(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Monthly'));
+    await tester.pump();
+    await tester.tap(find.text('Start 7-day free trial'));
+    await tester.pump();
+
+    expect(upgradeController.startedPlan, PremiumPlan.monthly);
+    expect(
+      find.text('Premium trial started for this household.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Settings screens render in dark theme without error', (

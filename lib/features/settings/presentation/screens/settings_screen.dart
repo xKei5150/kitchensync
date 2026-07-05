@@ -38,7 +38,13 @@ class SettingsScreen extends ConsumerWidget {
                 KsHeaderAction(
                   icon: Icons.arrow_back_rounded,
                   tooltip: 'Back',
-                  onTap: () => context.pop(),
+                  onTap: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/today');
+                    }
+                  },
                 ),
                 const Spacer(),
                 Text(

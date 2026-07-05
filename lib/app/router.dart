@@ -4,12 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/app/shell/ks_app_shell.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/motion.dart';
 import 'package:kitchensync/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kitchensync/features/dev_tools/accessibility_audit_screen.dart';
 import 'package:kitchensync/features/dev_tools/accessibility_states_screen.dart';
 import 'package:kitchensync/features/dev_tools/dev_tools_screen.dart';
 import 'package:kitchensync/features/dev_tools/system_states_screen.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/household/presentation/screens/household_screen.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/create_custom_ingredient_screen.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/ingredient_detail_screen.dart';
@@ -72,13 +75,75 @@ CustomTransitionPage<void> _page(GoRouterState state, Widget child) {
   );
 }
 
+DateTime? _parseRouteDate(String? value) {
+  if (value == null || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
+    return null;
+  }
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null) return null;
+  final normalized =
+      '${parsed.year.toString().padLeft(4, '0')}-'
+      '${parsed.month.toString().padLeft(2, '0')}-'
+      '${parsed.day.toString().padLeft(2, '0')}';
+  return normalized == value
+      ? DateTime(parsed.year, parsed.month, parsed.day)
+      : null;
+}
+
 @Riverpod(keepAlive: true)
 GoRouter router(Ref ref) {
+  final activeHousehold = ref.watch(activeHouseholdContextProvider);
+  const householdPolicy = HouseholdPolicy();
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/today',
+    redirect: (context, state) {
+      final path = state.uri.path;
+      final isOnboarding =
+          path == '/onboarding' || path.startsWith('/onboarding/');
+      if (activeHousehold == null && !isOnboarding) {
+        return '/onboarding/household';
+      }
+      if (activeHousehold != null &&
+          !activeHousehold.hasPremium &&
+          path.startsWith('/menu-sets')) {
+        return '/settings/premium';
+      }
+      if (activeHousehold != null) {
+        final role = activeHousehold.role;
+        final isSolo = activeHousehold.isSolo;
+        bool can(HouseholdCapability capability) {
+          return householdPolicy.roleCan(
+            role,
+            capability,
+            isSoloHousehold: isSolo,
+          );
+        }
+
+        if (path == '/shop/list' &&
+            !can(HouseholdCapability.completeShopping)) {
+          return '/shop';
+        }
+        if (path == '/pantry/add' && !can(HouseholdCapability.addPantryItems)) {
+          return '/pantry';
+        }
+        if (path == '/pantry/waste' &&
+            !can(HouseholdCapability.markPantryWaste)) {
+          return '/pantry';
+        }
+        if (path == '/menu-sets/edit' &&
+            !can(HouseholdCapability.applyMenuSets)) {
+          return '/menu-sets';
+        }
+        if (path == '/ingredient/create' &&
+            !can(HouseholdCapability.addPantryItems)) {
+          return '/ingredient/pick';
+        }
+      }
+      return null;
+    },
     routes: [
-      // The persistent five-tab spine. Each branch keeps its own navigator
+      // The persistent dashboard spine. Each branch keeps its own navigator
       // and state; [KsAppShell] pins the bottom nav beneath them. Tab switches
       // are an indexed stack (no page transition), so these stay builders.
       StatefulShellRoute.indexedStack(
@@ -91,6 +156,15 @@ GoRouter router(Ref ref) {
                 path: '/today',
                 name: 'today',
                 builder: (context, state) => const TodayScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/recipes',
+                name: 'recipes',
+                builder: (context, state) => const RecipesScreen(),
               ),
             ],
           ),
@@ -116,6 +190,17 @@ GoRouter router(Ref ref) {
                     parentNavigatorKey: _rootNavigatorKey,
                     pageBuilder: (context, state) =>
                         _page(state, const ShoppingListScreen()),
+                  ),
+                  GoRoute(
+                    path: 'list/:listId',
+                    name: 'shopListById',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    pageBuilder: (context, state) => _page(
+                      state,
+                      ShoppingListScreen(
+                        listId: state.pathParameters['listId'],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -160,9 +245,36 @@ GoRouter router(Ref ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/recipes',
-                name: 'recipes',
-                builder: (context, state) => const RecipesScreen(),
+                path: '/menu-sets',
+                name: 'menuSets',
+                builder: (context, state) => const MenuSetsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'edit',
+                    name: 'menuSetEditor',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    pageBuilder: (context, state) =>
+                        _page(state, const MenuSetEditorScreen()),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/settings',
+                name: 'settings',
+                builder: (context, state) => const SettingsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'premium',
+                    name: 'premium',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    pageBuilder: (context, state) =>
+                        _page(state, const PremiumScreen()),
+                  ),
+                ],
               ),
             ],
           ),
@@ -172,8 +284,22 @@ GoRouter router(Ref ref) {
       // Full-screen routes pushed over the shell (no bottom nav), each using
       // the shared reduced-motion-aware [_page] transition.
       GoRoute(
-        path: '/day',
+        path: '/day/:date',
         name: 'dayView',
+        parentNavigatorKey: _rootNavigatorKey,
+        redirect: (context, state) {
+          final date = _parseRouteDate(state.pathParameters['date']);
+          return date == null ? '/calendar' : null;
+        },
+        pageBuilder: (context, state) => _page(
+          state,
+          DayViewScreen(
+            selectedDate: _parseRouteDate(state.pathParameters['date']),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/day',
         parentNavigatorKey: _rootNavigatorKey,
         pageBuilder: (context, state) => _page(state, const DayViewScreen()),
       ),
@@ -184,21 +310,14 @@ GoRouter router(Ref ref) {
         pageBuilder: (context, state) =>
             _page(state, const RecipeDetailScreen()),
       ),
-      // P2 · Premium & system. Pushed full-screen over the shell.
       GoRoute(
-        path: '/menu-sets',
-        name: 'menuSets',
+        path: '/recipe/:recipeId',
+        name: 'recipeDetailById',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => _page(state, const MenuSetsScreen()),
-        routes: [
-          GoRoute(
-            path: 'edit',
-            name: 'menuSetEditor',
-            parentNavigatorKey: _rootNavigatorKey,
-            pageBuilder: (context, state) =>
-                _page(state, const MenuSetEditorScreen()),
-          ),
-        ],
+        pageBuilder: (context, state) => _page(
+          state,
+          RecipeDetailScreen(recipeId: state.pathParameters['recipeId']),
+        ),
       ),
       GoRoute(
         path: '/household',
@@ -213,21 +332,6 @@ GoRouter router(Ref ref) {
         name: 'insights',
         parentNavigatorKey: _rootNavigatorKey,
         pageBuilder: (context, state) => _page(state, const InsightsScreen()),
-      ),
-      GoRoute(
-        path: '/settings',
-        name: 'settings',
-        parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => _page(state, const SettingsScreen()),
-        routes: [
-          GoRoute(
-            path: 'premium',
-            name: 'premium',
-            parentNavigatorKey: _rootNavigatorKey,
-            pageBuilder: (context, state) =>
-                _page(state, const PremiumScreen()),
-          ),
-        ],
       ),
       GoRoute(
         path: '/notifications',

@@ -1,16 +1,20 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
 /// Screen 14 · Household & roles — who's in the kitchen.
 ///
 /// Members with their roles + a shareable invite code. Tapping a member opens
 /// the role-assignment sheet. Presentational P2 with representative members.
-class HouseholdScreen extends StatelessWidget {
+class HouseholdScreen extends ConsumerWidget {
   const HouseholdScreen({super.key});
 
-  static const _members = [
+  static const _previewMembers = [
     _Member(name: 'Ana', handle: 'you', role: HouseholdRole.admin, seat: 0),
     _Member(name: 'Ben', handle: 'ben@home', role: HouseholdRole.cook, seat: 1),
     _Member(
@@ -21,20 +25,49 @@ class HouseholdScreen extends StatelessWidget {
     ),
   ];
 
-  void _assignRole(BuildContext context, _Member member) {
+  void _assignRole(BuildContext context, WidgetRef ref, _Member member) {
     final ks = context.ksColors;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: ks.scrim,
-      builder: (_) => _RoleSheet(member: member),
+      builder: (_) => _RoleSheet(
+        member: member,
+        onSave: (role) => _saveRole(ref, member, role),
+      ),
     );
   }
 
+  Future<void> _saveRole(
+    WidgetRef ref,
+    _Member member,
+    HouseholdRole role,
+  ) async {
+    final auth = ref.read(firebaseAuthProvider);
+    if (auth == null || member.userId == null) return;
+    final household = ref.read(activeHouseholdContextProvider);
+    if (household == null) return;
+    await ref
+        .read(firestoreProvider)
+        .collection('households')
+        .doc(household.id)
+        .collection('members')
+        .doc(member.userId)
+        .set({
+          'role': role.name,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
+    final snapshot = ref.watch(householdDetailsProvider);
+    final details = snapshot.valueOrNull ?? _HouseholdDetails.preview();
+    final members = details.members;
+    final headerEyebrow =
+        '${details.name} · ${members.length} of ${details.maxMembers}';
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -48,7 +81,7 @@ class HouseholdScreen extends StatelessWidget {
           ),
           children: [
             KsFolioHeader(
-              eyebrow: 'The Holloway kitchen · 3 of 6',
+              eyebrow: headerEyebrow,
               title: "Who's in the kitchen",
               actions: [
                 KsHeaderAction(
@@ -59,22 +92,107 @@ class HouseholdScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: KsTokens.space16),
-            for (var i = 0; i < _members.length; i++) ...[
+            if (snapshot.isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: KsTokens.space8),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+            for (var i = 0; i < members.length; i++) ...[
               if (i > 0) const SizedBox(height: KsTokens.space10),
               _MemberTile(
-                member: _members[i],
-                onTap: _members[i].role == HouseholdRole.admin
+                member: members[i],
+                onTap: members[i].isCurrentUser
                     ? null
-                    : () => _assignRole(context, _members[i]),
+                    : () => _assignRole(context, ref, members[i]),
               ),
             ],
             const SizedBox(height: KsTokens.space20),
-            const KsInviteCode(code: 'SAGE-417', label: 'Invite code'),
+            KsInviteCode(code: details.inviteCode, label: 'Invite code'),
           ],
         ),
       ),
     );
   }
+}
+
+final householdDetailsProvider = StreamProvider<_HouseholdDetails>((ref) {
+  final auth = ref.watch(firebaseAuthProvider);
+  if (auth == null) return Stream.value(_HouseholdDetails.preview());
+  final household = ref.watch(activeHouseholdContextProvider);
+  if (household == null) return Stream.value(_HouseholdDetails.preview());
+  final uid = auth.currentUser?.uid ?? '';
+  final db = ref.watch(firestoreProvider);
+  final householdDoc = db.collection('households').doc(household.id);
+  return householdDoc.snapshots().asyncExpand((householdSnapshot) {
+    final data = householdSnapshot.data() ?? const <String, dynamic>{};
+    final inviteCode = data['inviteCode'] as String? ?? 'SOLO';
+    final maxMembers =
+        data['maxMembers'] as int? ?? (household.isJoint ? 6 : 1);
+    final name = data['name'] as String? ?? household.name;
+    return householdDoc.collection('members').snapshots().map((snapshot) {
+      final members =
+          [
+            for (var i = 0; i < snapshot.docs.length; i++)
+              _memberFromDoc(snapshot.docs[i], index: i, currentUserId: uid),
+          ]..sort((a, b) {
+            if (a.isCurrentUser != b.isCurrentUser) {
+              return a.isCurrentUser ? -1 : 1;
+            }
+            return a.name.compareTo(b.name);
+          });
+      return _HouseholdDetails(
+        name: name,
+        maxMembers: maxMembers,
+        inviteCode: inviteCode,
+        members: members.isEmpty ? HouseholdScreen._previewMembers : members,
+      );
+    });
+  });
+});
+
+_Member _memberFromDoc(
+  QueryDocumentSnapshot<Map<String, dynamic>> doc, {
+  required int index,
+  required String currentUserId,
+}) {
+  final data = doc.data();
+  final roleName = data['role'] as String? ?? 'member';
+  final name =
+      data['displayName'] as String? ??
+      (doc.id == currentUserId ? 'You' : 'Member ${index + 1}');
+  final handle = data['email'] as String? ?? doc.id;
+  return _Member(
+    userId: doc.id,
+    name: name,
+    handle: doc.id == currentUserId ? 'you' : handle,
+    role: HouseholdRole.values.firstWhere(
+      (role) => role.name == roleName,
+      orElse: () => HouseholdRole.member,
+    ),
+    seat: index,
+    isCurrentUser: doc.id == currentUserId,
+  );
+}
+
+class _HouseholdDetails {
+  const _HouseholdDetails({
+    required this.name,
+    required this.maxMembers,
+    required this.inviteCode,
+    required this.members,
+  });
+
+  factory _HouseholdDetails.preview() => const _HouseholdDetails(
+    name: 'The Holloway kitchen',
+    maxMembers: 6,
+    inviteCode: 'SAGE-417',
+    members: HouseholdScreen._previewMembers,
+  );
+
+  final String name;
+  final int maxMembers;
+  final String inviteCode;
+  final List<_Member> members;
 }
 
 class _Member {
@@ -83,12 +201,16 @@ class _Member {
     required this.handle,
     required this.role,
     required this.seat,
+    this.userId,
+    this.isCurrentUser = false,
   });
 
+  final String? userId;
   final String name;
   final String handle;
   final HouseholdRole role;
   final int seat;
+  final bool isCurrentUser;
 }
 
 /// A tappable member row. The admin (you) is non-interactive; everyone else
@@ -123,9 +245,10 @@ class _MemberTile extends StatelessWidget {
 
 /// The role-assignment bottom sheet — a radio list of the four roles.
 class _RoleSheet extends StatefulWidget {
-  const _RoleSheet({required this.member});
+  const _RoleSheet({required this.member, required this.onSave});
 
   final _Member member;
+  final Future<void> Function(HouseholdRole role) onSave;
 
   @override
   State<_RoleSheet> createState() => _RoleSheetState();
@@ -133,6 +256,7 @@ class _RoleSheet extends StatefulWidget {
 
 class _RoleSheetState extends State<_RoleSheet> {
   late HouseholdRole _role = widget.member.role;
+  bool _saving = false;
 
   static const _descriptions = {
     HouseholdRole.admin: 'Manage members & settings',
@@ -204,8 +328,23 @@ class _RoleSheetState extends State<_RoleSheet> {
           ],
           const SizedBox(height: KsTokens.space16),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Save role'),
+            onPressed: _saving
+                ? null
+                : () async {
+                    setState(() => _saving = true);
+                    try {
+                      await widget.onSave(_role);
+                    } catch (error) {
+                      if (!context.mounted) return;
+                      setState(() => _saving = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Could not save role: $error')),
+                      );
+                      return;
+                    }
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+            child: Text(_saving ? 'Saving...' : 'Save role'),
           ),
         ],
       ),

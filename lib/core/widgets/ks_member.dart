@@ -2,23 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/widgets/ks_dashed.dart';
-
-/// A household role, shown as a pill beside a member.
-///
-/// [admin] carries the household's permissions and renders as a tonal brand
-/// badge; the rest are neutral outline pills. Mirrors the role set in
-/// "KitchenSync — Components II (Modules)", Members · roles · invite.
-enum HouseholdRole { admin, cook, shopper, member }
-
-extension HouseholdRoleX on HouseholdRole {
-  /// Capitalised pill label.
-  String get label => switch (this) {
-    HouseholdRole.admin => 'Admin',
-    HouseholdRole.cook => 'Cook',
-    HouseholdRole.shopper => 'Shopper',
-    HouseholdRole.member => 'Member',
-  };
-}
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 
 /// A circular member avatar carrying the member's [seat] tick colour and a
 /// single uppercased [initial].

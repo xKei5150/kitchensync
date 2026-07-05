@@ -7,6 +7,7 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
+import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 
 /// Screen 30 · Reading the pantry back — the premium Insights surface.
@@ -18,8 +19,8 @@ import 'package:kitchensync/features/pantry/presentation/providers/pantry_provid
 /// greyscale and colour-vision deficiency.
 ///
 /// It is wrapped in [KsPremiumLock]: the feature renders, working, beneath the
-/// warm veil. The lock is presentational — there is no billing yet — but it
-/// keeps the premium framing honest rather than shipping a dead paywall.
+/// warm veil. The unlock path writes the same household premium state used by
+/// Menu Sets and other premium gates.
 class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
 
@@ -43,6 +44,7 @@ class InsightsScreen extends ConsumerWidget {
     final ks = context.ksColors;
     final itemsAsync = ref.watch(pantryAllItemsStreamProvider);
     final wasteAsync = ref.watch(wasteHistoryStreamProvider);
+    final bulkStatuses = ref.watch(bulkPantryStatusesProvider);
 
     final items = itemsAsync.asData?.value ?? const <PantryItem>[];
     final events = wasteAsync.asData?.value ?? const <WasteEvent>[];
@@ -106,12 +108,124 @@ class InsightsScreen extends ConsumerWidget {
                   _SectionBalanceCard(items: items),
                   const SizedBox(height: KsTokens.space12),
                   _WasteTrendCard(events: events),
+                  const SizedBox(height: KsTokens.space12),
+                  _BulkPredictionCard(statuses: bulkStatuses),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _BulkPredictionCard extends StatelessWidget {
+  const _BulkPredictionCard({required this.statuses});
+
+  final List<BulkPantryStatus> statuses;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final visible = statuses.take(3).toList(growable: false);
+    final dueCount = statuses
+        .where((status) => status.needsPurchaseSoon)
+        .length;
+    return _InsightCard(
+      title: 'Bulk timing',
+      trailing: Text(
+        dueCount == 1 ? '1 due' : '$dueCount due',
+        style: KsTokens.titleSmall.copyWith(
+          color: dueCount > 0 ? KsTokens.expiringSoon : ks.textPrimary,
+          fontSize: 13,
+        ),
+      ),
+      child: Column(
+        children: [
+          if (visible.isEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'No bulk items yet',
+                style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
+              ),
+            )
+          else
+            for (var i = 0; i < visible.length; i++) ...[
+              if (i > 0) const SizedBox(height: KsTokens.space10),
+              _BulkPredictionRow(status: visible[i]),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BulkPredictionRow extends StatelessWidget {
+  const _BulkPredictionRow({required this.status});
+
+  final BulkPantryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final now = DateTime.now();
+    final daysLeft = status.daysLeftFrom(now);
+    final interval = status.recommendedPurchaseIntervalDays;
+    final leadingColor = status.needsPurchaseSoon
+        ? KsTokens.expiringSoon
+        : status.item.section.color;
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 42,
+          decoration: BoxDecoration(
+            color: leadingColor,
+            borderRadius: BorderRadius.circular(KsTokens.radiusFull),
+          ),
+        ),
+        const SizedBox(width: KsTokens.space10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                status.item.ingredientId,
+                style: KsTokens.titleSmall.copyWith(
+                  color: ks.textPrimary,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: KsTokens.space2),
+              Text(
+                interval == null
+                    ? 'Learning purchase rhythm'
+                    : 'Buy every $interval days',
+                style: KsTokens.labelSmall.copyWith(
+                  color: ks.textSecondary,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: KsTokens.space10),
+        Text(
+          daysLeft == null
+              ? '--'
+              : daysLeft <= 0
+              ? '0d'
+              : '${daysLeft}d',
+          style: KsTokens.headlineLarge.copyWith(
+            color: status.needsPurchaseSoon
+                ? KsTokens.expiringSoon
+                : ks.textPrimary,
+            fontSize: 20,
+          ),
+        ),
+      ],
     );
   }
 }

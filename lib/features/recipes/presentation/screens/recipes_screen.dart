@@ -4,44 +4,80 @@ import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
+import 'package:kitchensync/features/recipes/domain/services/recipe_import_parser.dart';
+import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 
 /// Screen 07 · Recipes home — My Recipes & Discover.
 ///
 /// Two tabs over the shared chrome: Discover carries the premium budget +
-/// target-servings search and a grid of public recipe cards; My Recipes wears
-/// the load-bearing empty state until the household saves its first recipe.
-/// Presentational P1 with representative sample data.
-class RecipesScreen extends StatefulWidget {
+/// target-servings search and a grid of public recipe cards; My Recipes shows
+/// repository-backed household recipes and local copies.
+class RecipesScreen extends ConsumerStatefulWidget {
   const RecipesScreen({super.key});
 
   @override
-  State<RecipesScreen> createState() => _RecipesScreenState();
+  ConsumerState<RecipesScreen> createState() => _RecipesScreenState();
 }
 
 enum _RecipesTab { mine, discover }
 
-class _RecipesScreenState extends State<RecipesScreen> {
+class _RecipesScreenState extends ConsumerState<RecipesScreen> {
   _RecipesTab _tab = _RecipesTab.discover;
+
+  Future<void> _openAddRecipeSheet() async {
+    final drafts = await showModalBottomSheet<List<RecipeDraft>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _RecipeImportSheet(),
+    );
+    if (drafts == null || drafts.isEmpty || !mounted) {
+      return;
+    }
+    try {
+      await ref.read(recipeImportControllerProvider).importDrafts(drafts);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _tab = _RecipesTab.mine);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not import recipes: $error')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final header = KsFolioHeader(
+      eyebrow: 'The Cookbook',
+      title: 'Recipes',
+      actions: [
+        KsHeaderAction(
+          icon: Icons.add_rounded,
+          tooltip: 'Add recipe',
+          onTap: _openAddRecipeSheet,
+        ),
+        const KsHeaderAction(icon: Icons.search_rounded),
+      ],
+    );
     return SafeArea(
       bottom: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
               KsTokens.space16,
               KsTokens.space8,
               KsTokens.space16,
               0,
             ),
-            child: KsFolioHeader(
-              eyebrow: 'The Cookbook',
-              title: 'Recipes',
-              actions: [KsHeaderAction(icon: Icons.search_rounded)],
-            ),
+            child: header,
           ),
           const SizedBox(height: KsTokens.space12),
           Padding(
@@ -54,14 +90,55 @@ class _RecipesScreenState extends State<RecipesScreen> {
           Expanded(
             child: switch (_tab) {
               _RecipesTab.discover => const _DiscoverTab(),
-              _RecipesTab.mine => _MyRecipesTab(
-                onAdd: () => setState(() => _tab = _RecipesTab.discover),
-              ),
+              _RecipesTab.mine => _MyRecipesTab(onAdd: _openAddRecipeSheet),
             },
           ),
         ],
       ),
     );
+  }
+}
+
+class _MyRecipe {
+  const _MyRecipe({
+    required this.record,
+    required this.id,
+    required this.title,
+    required this.meta,
+    required this.colors,
+  });
+
+  factory _MyRecipe.fromRecipe(Recipe recipe) {
+    final visibility = recipe.visibility == RecipeVisibility.public
+        ? 'Public'
+        : 'Private';
+    return _MyRecipe(
+      record: recipe,
+      id: recipe.id,
+      title: recipe.name,
+      meta: '$visibility · Serves ${recipe.defaultServingSize}',
+      colors: _colorsForTags(recipe.recipeTags),
+    );
+  }
+
+  final Recipe record;
+  final String id;
+  final String title;
+  final String meta;
+  final List<Color> colors;
+
+  static List<Color> _colorsForTags(List<String> tags) {
+    final joined = tags.join(' ').toLowerCase();
+    if (joined.contains('chicken') || joined.contains('meat')) {
+      return [KsTokens.catMeat, KsTokens.catSpice];
+    }
+    if (joined.contains('fried') || joined.contains('comfort')) {
+      return [KsTokens.catBaking, KsTokens.catGrain];
+    }
+    if (joined.contains('lentil') || joined.contains('budget')) {
+      return [KsTokens.catGrain, KsTokens.catProduce];
+    }
+    return [KsTokens.catProduce, KsTokens.catCondiment];
   }
 }
 
@@ -142,71 +219,14 @@ class _TabItem extends StatelessWidget {
   }
 }
 
-/// One discoverable recipe in the sample feed.
-class _DiscoverRecipe {
-  const _DiscoverRecipe({
-    required this.title,
-    required this.author,
-    required this.priceValue,
-    required this.likes,
-    required this.comments,
-    required this.colors,
-  });
-
-  final String title;
-  final String author;
-
-  /// Per-serving cost; formatted in the active currency at build time.
-  final double priceValue;
-  final int likes;
-  final int comments;
-  final List<Color> colors;
-}
-
 class _DiscoverTab extends ConsumerWidget {
   const _DiscoverTab();
-
-  /// The budget chip threshold, formatted in the active currency.
-  static const _budgetCeiling = 4.0;
-
-  static const _recipes = [
-    _DiscoverRecipe(
-      title: 'Charred greens orzo',
-      author: 'mira',
-      priceValue: 3.20,
-      likes: 248,
-      comments: 12,
-      colors: [KsTokens.catProduce, KsTokens.catBeverage],
-    ),
-    _DiscoverRecipe(
-      title: 'Sunday lentil dal',
-      author: 'theo',
-      priceValue: 2.10,
-      likes: 512,
-      comments: 33,
-      colors: [KsTokens.catGrain, KsTokens.catSpice],
-    ),
-    _DiscoverRecipe(
-      title: 'Roast squash & sage',
-      author: 'priya',
-      priceValue: 3.80,
-      likes: 176,
-      comments: 8,
-      colors: [KsTokens.catSpice, KsTokens.catGrain],
-    ),
-    _DiscoverRecipe(
-      title: 'White bean braise',
-      author: 'sam',
-      priceValue: 2.60,
-      likes: 401,
-      comments: 21,
-      colors: [KsTokens.catProduce, KsTokens.catCondiment],
-    ),
-  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currency = ref.watch(localeFormattersProvider).currency;
+    final filter = ref.watch(publicRecipeSearchFilterProvider);
+    final recipesAsync = ref.watch(publicRecipeSearchProvider);
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         KsTokens.space16,
@@ -217,53 +237,160 @@ class _DiscoverTab extends ConsumerWidget {
       children: [
         const _SearchPill(),
         const SizedBox(height: KsTokens.space10),
-        Wrap(
-          spacing: KsTokens.space8,
-          runSpacing: KsTokens.space8,
-          children: [
-            KsTag(
-              label:
-                  'Under ${currency.format(_budgetCeiling, decimals: false)}',
-              icon: Icons.bolt_rounded,
-              tone: KsTagTone.outline,
-            ),
-            const KsTag(
-              label: 'Serves 4',
-              icon: Icons.bolt_rounded,
-              tone: KsTagTone.outline,
-            ),
-          ],
-        ),
+        _DiscoverFilterChips(filter: filter),
         const SizedBox(height: KsTokens.space16),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _recipes.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: KsTokens.space10,
-            mainAxisSpacing: KsTokens.space10,
-            childAspectRatio: 0.74,
+        recipesAsync.when(
+          data: (recipes) => _PublicRecipeGrid(
+            recipes: recipes,
+            filter: filter,
+            formatPrice: currency.format,
+            onSave: (recipe) => _saveRecipe(context, ref, recipe),
           ),
-          itemBuilder: (context, index) {
-            final r = _recipes[index];
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => context.push('/recipe'),
-              child: KsRecipeCard.public(
-                title: r.title,
-                author: r.author,
-                price: currency.format(r.priceValue),
-                likeCount: r.likes,
-                commentCount: r.comments,
-                coverColors: r.colors,
-                onSave: () {},
-              ),
-            );
-          },
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: KsTokens.space24),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, _) =>
+              KsErrorAlert(message: 'Could not search public recipes: $error'),
         ),
       ],
     );
+  }
+
+  Future<void> _saveRecipe(
+    BuildContext context,
+    WidgetRef ref,
+    Recipe recipe,
+  ) async {
+    try {
+      await ref
+          .read(recipeDiscoveryControllerProvider)
+          .savePublicRecipe(recipe);
+      ref.invalidate(activeHouseholdRecipesProvider);
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${recipe.name} saved to My Recipes')),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save recipe: $error')));
+    }
+  }
+}
+
+class _DiscoverFilterChips extends ConsumerWidget {
+  const _DiscoverFilterChips({required this.filter});
+
+  final RecipeSearchFilter filter;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currency = ref.watch(localeFormattersProvider).currency;
+    if (!filter.isCompletePremiumFilter) {
+      return const Wrap(
+        spacing: KsTokens.space8,
+        runSpacing: KsTokens.space8,
+        children: [
+          KsTag(
+            label: 'Public recipes',
+            icon: Icons.public_rounded,
+            tone: KsTagTone.outline,
+          ),
+        ],
+      );
+    }
+
+    return Wrap(
+      spacing: KsTokens.space8,
+      runSpacing: KsTokens.space8,
+      children: [
+        KsTag(
+          label: 'Under ${currency.format(filter.budget!, decimals: false)}',
+          icon: Icons.bolt_rounded,
+          tone: KsTagTone.outline,
+        ),
+        KsTag(
+          label: 'Serves ${filter.targetServings}',
+          icon: Icons.bolt_rounded,
+          tone: KsTagTone.outline,
+        ),
+      ],
+    );
+  }
+}
+
+class _PublicRecipeGrid extends StatelessWidget {
+  const _PublicRecipeGrid({
+    required this.recipes,
+    required this.filter,
+    required this.formatPrice,
+    required this.onSave,
+  });
+
+  final List<Recipe> recipes;
+  final RecipeSearchFilter filter;
+  final String Function(double value, {bool decimals}) formatPrice;
+  final ValueChanged<Recipe> onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    if (recipes.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.only(top: KsTokens.space32),
+        child: KsEmptyState(
+          icon: Icons.search_off_rounded,
+          title: 'No public recipes found',
+          subtitle: 'Try relaxing the budget or serving filters.',
+        ),
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: recipes.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: KsTokens.space10,
+        mainAxisSpacing: KsTokens.space10,
+        childAspectRatio: 0.74,
+      ),
+      itemBuilder: (context, index) {
+        final recipe = recipes[index];
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => context.push('/recipe/${recipe.id}'),
+          child: KsRecipeCard.public(
+            key: ValueKey('public-recipe-${recipe.id}'),
+            title: recipe.name,
+            author: recipe.authorUserId,
+            price: _priceLabel(recipe),
+            priceUnit: filter.targetServings == null
+                ? '/recipe'
+                : 'for ${filter.targetServings}',
+            coverColors: _MyRecipe._colorsForTags(recipe.recipeTags),
+            onSave: () => onSave(recipe),
+          ),
+        );
+      },
+    );
+  }
+
+  String _priceLabel(Recipe recipe) {
+    final servings = filter.targetServings;
+    final price = servings == null
+        ? recipe.priceEstimate
+        : recipe.priceForServings(servings);
+    if (price == null) {
+      return 'N/A';
+    }
+    return formatPrice(price);
   }
 }
 
@@ -302,23 +429,670 @@ class _SearchPill extends StatelessWidget {
   }
 }
 
-class _MyRecipesTab extends StatelessWidget {
+class _MyRecipesTab extends ConsumerWidget {
   const _MyRecipesTab({required this.onAdd});
 
   final VoidCallback onAdd;
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recipesAsync = ref.watch(activeHouseholdRecipesProvider);
+    return recipesAsync.when(
+      data: (recipes) => _MyRecipeGrid(
+        recipes: recipes.map(_MyRecipe.fromRecipe).toList(growable: false),
+        onAdd: onAdd,
+      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Padding(
+        padding: const EdgeInsets.all(KsTokens.space16),
+        child: KsErrorAlert(message: 'Could not load recipes: $error'),
+      ),
+    );
+  }
+}
+
+class _MyRecipeGrid extends ConsumerWidget {
+  const _MyRecipeGrid({required this.recipes, required this.onAdd});
+
+  final List<_MyRecipe> recipes;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (recipes.isEmpty) {
+      return Center(
+        child: KsEmptyState(
+          icon: Icons.menu_book_outlined,
+          title: 'Your shelf of recipes is bare',
+          subtitle:
+              'Save one from Discover, or paste a recipe you already love.',
+          action: FilledButton(
+            onPressed: onAdd,
+            child: const Text('Add a recipe'),
+          ),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space16,
+        KsTokens.space12,
+        KsTokens.space16,
+        KsTokens.space24,
+      ),
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_rounded, size: 17),
+            label: const Text('Add a recipe'),
+          ),
+        ),
+        const SizedBox(height: KsTokens.space12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: recipes.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: KsTokens.space10,
+            mainAxisSpacing: KsTokens.space10,
+            childAspectRatio: 0.76,
+          ),
+          itemBuilder: (context, index) {
+            final recipe = recipes[index];
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.push('/recipe/${recipe.id}'),
+              child: KsRecipeCard.private(
+                title: recipe.title,
+                meta: recipe.meta,
+                coverColors: recipe.colors,
+                onEdit: () {},
+                onDelete: () => _deleteRecipe(context, ref, recipe.record),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _deleteRecipe(
+    BuildContext context,
+    WidgetRef ref,
+    Recipe recipe,
+  ) async {
+    try {
+      await ref.read(recipeLibraryControllerProvider).deleteLocalRecipe(recipe);
+      ref.invalidate(activeHouseholdRecipesProvider);
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${recipe.name} deleted from My Recipes')),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete recipe: $error')),
+      );
+    }
+  }
+}
+
+class _RecipeImportSheet extends StatefulWidget {
+  const _RecipeImportSheet();
+
+  @override
+  State<_RecipeImportSheet> createState() => _RecipeImportSheetState();
+}
+
+class _RecipeImportSheetState extends State<_RecipeImportSheet> {
+  static const _template = '''
+=== RECIPE START ===
+Name: Fried Chicken
+Servings: 4
+Time Tags: Lunch, Dinner
+Recipe Tags: Chicken, Fried, Comfort Food
+Price Estimate: 250
+Ingredients:
+- Chicken Thighs | 1 kg | pcs
+- Flour | 2 cups | cup
+- Salt | 1 tbsp | tbsp
+- Oil | 500 ml | ml
+Instructions:
+1. Mix flour and salt.
+2. Coat chicken.
+3. Fry until golden.
+YouTube: https://youtu.be/example
+Access: Private
+=== RECIPE END ===''';
+
+  final _parser = const RecipeImportParser();
+  late final TextEditingController _pasteController;
+  late final TextEditingController _nameController;
+  late final TextEditingController _servingsController;
+  late final TextEditingController _timeTagsController;
+  late final TextEditingController _recipeTagsController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _ingredientNameController;
+  late final TextEditingController _ingredientQuantityController;
+  late final TextEditingController _ingredientNoteController;
+  late final TextEditingController _instructionsController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _youtubeController;
+  Unit _ingredientUnit = Unit.g;
+  RecipeVisibility _visibility = RecipeVisibility.private;
+  bool _pasteMode = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _pasteController = TextEditingController(text: _template.trim());
+    _nameController = TextEditingController();
+    _servingsController = TextEditingController(text: '4');
+    _timeTagsController = TextEditingController(text: 'Dinner');
+    _recipeTagsController = TextEditingController();
+    _descriptionController = TextEditingController();
+    _ingredientNameController = TextEditingController();
+    _ingredientQuantityController = TextEditingController(text: '1');
+    _ingredientNoteController = TextEditingController();
+    _instructionsController = TextEditingController();
+    _priceController = TextEditingController();
+    _youtubeController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _pasteController.dispose();
+    _nameController.dispose();
+    _servingsController.dispose();
+    _timeTagsController.dispose();
+    _recipeTagsController.dispose();
+    _descriptionController.dispose();
+    _ingredientNameController.dispose();
+    _ingredientQuantityController.dispose();
+    _ingredientNoteController.dispose();
+    _instructionsController.dispose();
+    _priceController.dispose();
+    _youtubeController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_pasteMode) {
+      _saveManual();
+      return;
+    }
+    final result = _parser.parse(_pasteController.text);
+    if (result.drafts.isEmpty) {
+      setState(() => _error = result.errors.join('\n'));
+      return;
+    }
+    Navigator.of(context).pop(result.drafts);
+  }
+
+  void _saveManual() {
+    final name = _nameController.text.trim();
+    final servings = int.tryParse(_servingsController.text.trim());
+    final ingredientName = _ingredientNameController.text.trim();
+    final ingredientQuantity = double.tryParse(
+      _ingredientQuantityController.text.trim(),
+    );
+    final instructions = _splitLines(_instructionsController.text);
+    final price = _priceController.text.trim().isEmpty
+        ? null
+        : double.tryParse(_priceController.text.trim());
+    final youtube = _youtubeController.text.trim();
+
+    if (name.isEmpty) {
+      setState(() => _error = 'Name is required.');
+      return;
+    }
+    if (servings == null || servings <= 0) {
+      setState(
+        () => _error = 'Default serving size must be a positive number.',
+      );
+      return;
+    }
+    if (ingredientName.isEmpty) {
+      setState(() => _error = 'At least one ingredient name is required.');
+      return;
+    }
+    if (ingredientQuantity == null || ingredientQuantity <= 0) {
+      setState(() => _error = 'Ingredient quantity must be a positive number.');
+      return;
+    }
+    if (instructions.isEmpty) {
+      setState(() => _error = 'At least one instruction is required.');
+      return;
+    }
+    if (_priceController.text.trim().isNotEmpty && price == null) {
+      setState(() => _error = 'Price estimate must be numeric.');
+      return;
+    }
+
+    final draft = RecipeDraft(
+      name: name,
+      defaultServingSize: servings,
+      timeTags: _splitCsv(_timeTagsController.text),
+      recipeTags: _splitCsv(_recipeTagsController.text),
+      description: _descriptionController.text.trim(),
+      ingredients: [
+        RecipeIngredientDraft(
+          name: ingredientName,
+          quantity: ingredientQuantity,
+          unit: _ingredientUnit,
+          preparationNote: _ingredientNoteController.text.trim().isEmpty
+              ? null
+              : _ingredientNoteController.text.trim(),
+        ),
+      ],
+      instructions: instructions,
+      visibility: _visibility,
+      priceEstimate: price,
+      youtubeUrl: youtube.isEmpty ? null : Uri.tryParse(youtube),
+    );
+    Navigator.of(context).pop([draft]);
+  }
+
+  List<String> _splitCsv(String value) => value
+      .split(',')
+      .map((tag) => tag.trim())
+      .where((tag) => tag.isNotEmpty)
+      .toList(growable: false);
+
+  List<String> _splitLines(String value) => value
+      .split('\n')
+      .map((line) => line.trim().replaceFirst(RegExp(r'^\d+\.\s*'), ''))
+      .where((line) => line.isNotEmpty)
+      .toList(growable: false);
+
+  @override
   Widget build(BuildContext context) {
-    return Center(
-      child: KsEmptyState(
-        icon: Icons.menu_book_outlined,
-        title: 'Your shelf of recipes is bare',
-        subtitle: 'Save one from Discover, or paste a recipe you already love.',
-        action: FilledButton(
-          onPressed: onAdd,
-          child: const Text('Add a recipe'),
+    final ks = context.ksColors;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          KsTokens.space20,
+          KsTokens.space12,
+          KsTokens.space20,
+          KsTokens.space20 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: ks.borderStrong,
+                  borderRadius: BorderRadius.circular(KsTokens.radiusFull),
+                ),
+              ),
+            ),
+            const SizedBox(height: KsTokens.space16),
+            Text(
+              'Add a recipe',
+              style: KsTokens.displaySmall.copyWith(
+                color: ks.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 22,
+              ),
+            ),
+            const SizedBox(height: KsTokens.space12),
+            _ImportModeRow(
+              icon: Icons.edit_note_rounded,
+              title: 'Manual recipe',
+              subtitle: 'Name, servings, tags, ingredients and instructions',
+              selected: !_pasteMode,
+              onTap: () => setState(() {
+                _pasteMode = false;
+                _error = null;
+              }),
+            ),
+            const SizedBox(height: KsTokens.space8),
+            _ImportModeRow(
+              icon: Icons.auto_awesome_rounded,
+              title: 'Paste & Parse',
+              subtitle: 'Bulk import one or more marked recipe blocks',
+              selected: _pasteMode,
+              onTap: () => setState(() {
+                _pasteMode = true;
+                _error = null;
+              }),
+            ),
+            const SizedBox(height: KsTokens.space12),
+            if (_pasteMode)
+              TextField(
+                controller: _pasteController,
+                minLines: 10,
+                maxLines: 14,
+                style: KsTokens.bodySmall.copyWith(
+                  color: ks.textPrimary,
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+                decoration: _inputDecoration(context),
+              )
+            else
+              _ManualRecipeFields(
+                nameController: _nameController,
+                servingsController: _servingsController,
+                timeTagsController: _timeTagsController,
+                recipeTagsController: _recipeTagsController,
+                descriptionController: _descriptionController,
+                ingredientNameController: _ingredientNameController,
+                ingredientQuantityController: _ingredientQuantityController,
+                ingredientNoteController: _ingredientNoteController,
+                instructionsController: _instructionsController,
+                priceController: _priceController,
+                youtubeController: _youtubeController,
+                ingredientUnit: _ingredientUnit,
+                visibility: _visibility,
+                onUnitChanged: (unit) => setState(() => _ingredientUnit = unit),
+                onVisibilityChanged: (visibility) =>
+                    setState(() => _visibility = visibility),
+              ),
+            if (_error != null) ...[
+              const SizedBox(height: KsTokens.space10),
+              KsErrorAlert(message: _error!),
+            ],
+            const SizedBox(height: KsTokens.space12),
+            FilledButton(
+              onPressed: _save,
+              child: Text(_pasteMode ? 'Import recipes' : 'Save recipe'),
+            ),
+          ],
         ),
       ),
     );
   }
+
+  InputDecoration _inputDecoration(BuildContext context) {
+    final ks = context.ksColors;
+    return InputDecoration(
+      filled: true,
+      fillColor: ks.surfaceBase,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(KsTokens.radius12),
+      ),
+    );
+  }
+}
+
+class _ImportModeRow extends StatelessWidget {
+  const _ImportModeRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return InkWell(
+      borderRadius: BorderRadius.circular(KsTokens.radius12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(KsTokens.space12),
+        decoration: BoxDecoration(
+          color: selected
+              ? ks.brandPrimary.withValues(alpha: 0.08)
+              : ks.surfaceSunken,
+          borderRadius: BorderRadius.circular(KsTokens.radius12),
+          border: Border.all(color: selected ? ks.brandPrimary : ks.hairline),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: ks.brandPrimary),
+            const SizedBox(width: KsTokens.space10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: KsTokens.labelMedium.copyWith(
+                      color: ks.textPrimary,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: KsTokens.bodySmall.copyWith(
+                      color: ks.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              Icon(
+                Icons.check_circle_rounded,
+                color: ks.brandPrimary,
+                size: 18,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ManualRecipeFields extends StatelessWidget {
+  const _ManualRecipeFields({
+    required this.nameController,
+    required this.servingsController,
+    required this.timeTagsController,
+    required this.recipeTagsController,
+    required this.descriptionController,
+    required this.ingredientNameController,
+    required this.ingredientQuantityController,
+    required this.ingredientNoteController,
+    required this.instructionsController,
+    required this.priceController,
+    required this.youtubeController,
+    required this.ingredientUnit,
+    required this.visibility,
+    required this.onUnitChanged,
+    required this.onVisibilityChanged,
+  });
+
+  final TextEditingController nameController;
+  final TextEditingController servingsController;
+  final TextEditingController timeTagsController;
+  final TextEditingController recipeTagsController;
+  final TextEditingController descriptionController;
+  final TextEditingController ingredientNameController;
+  final TextEditingController ingredientQuantityController;
+  final TextEditingController ingredientNoteController;
+  final TextEditingController instructionsController;
+  final TextEditingController priceController;
+  final TextEditingController youtubeController;
+  final Unit ingredientUnit;
+  final RecipeVisibility visibility;
+  final ValueChanged<Unit> onUnitChanged;
+  final ValueChanged<RecipeVisibility> onVisibilityChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _ManualTextField(controller: nameController, label: 'Name'),
+        const SizedBox(height: KsTokens.space8),
+        Row(
+          children: [
+            Expanded(
+              child: _ManualTextField(
+                controller: servingsController,
+                label: 'Default serving size',
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: KsTokens.space8),
+            Expanded(
+              child: _ManualTextField(
+                controller: priceController,
+                label: 'Price estimate',
+                keyboardType: TextInputType.number,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: KsTokens.space8),
+        _ManualTextField(
+          controller: timeTagsController,
+          label: 'Time tags',
+          hintText: 'Breakfast, Lunch, Dinner',
+        ),
+        const SizedBox(height: KsTokens.space8),
+        _ManualTextField(
+          controller: recipeTagsController,
+          label: 'Recipe tags',
+          hintText: 'Cuisine, diet, category',
+        ),
+        const SizedBox(height: KsTokens.space8),
+        _ManualTextField(
+          controller: descriptionController,
+          label: 'Description',
+          minLines: 2,
+          maxLines: 3,
+        ),
+        const SizedBox(height: KsTokens.space8),
+        _ManualTextField(
+          controller: ingredientNameController,
+          label: 'Ingredient name',
+        ),
+        const SizedBox(height: KsTokens.space8),
+        Row(
+          children: [
+            Expanded(
+              child: _ManualTextField(
+                controller: ingredientQuantityController,
+                label: 'Quantity',
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: KsTokens.space8),
+            Expanded(
+              child: DropdownButtonFormField<Unit>(
+                initialValue: ingredientUnit,
+                decoration: _manualDecoration(context, 'Unit'),
+                items: [
+                  for (final unit in Unit.values)
+                    DropdownMenuItem(value: unit, child: Text(unit.name)),
+                ],
+                onChanged: (unit) {
+                  if (unit != null) {
+                    onUnitChanged(unit);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: KsTokens.space8),
+        _ManualTextField(
+          controller: ingredientNoteController,
+          label: 'Preparation note',
+        ),
+        const SizedBox(height: KsTokens.space8),
+        _ManualTextField(
+          controller: instructionsController,
+          label: 'Instructions',
+          hintText: 'One step per line',
+          minLines: 3,
+          maxLines: 5,
+        ),
+        const SizedBox(height: KsTokens.space8),
+        _ManualTextField(
+          controller: youtubeController,
+          label: 'YouTube embed',
+          keyboardType: TextInputType.url,
+        ),
+        const SizedBox(height: KsTokens.space8),
+        SegmentedButton<RecipeVisibility>(
+          segments: const [
+            ButtonSegment(
+              value: RecipeVisibility.private,
+              label: Text('Private'),
+              icon: Icon(Icons.lock_outline_rounded),
+            ),
+            ButtonSegment(
+              value: RecipeVisibility.public,
+              label: Text('Public'),
+              icon: Icon(Icons.public_rounded),
+            ),
+          ],
+          selected: {visibility},
+          onSelectionChanged: (selection) =>
+              onVisibilityChanged(selection.single),
+        ),
+      ],
+    );
+  }
+}
+
+class _ManualTextField extends StatelessWidget {
+  const _ManualTextField({
+    required this.controller,
+    required this.label,
+    this.hintText,
+    this.keyboardType,
+    this.minLines = 1,
+    this.maxLines = 1,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? hintText;
+  final TextInputType? keyboardType;
+  final int minLines;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      minLines: minLines,
+      maxLines: maxLines,
+      decoration: _manualDecoration(context, label, hintText: hintText),
+    );
+  }
+}
+
+InputDecoration _manualDecoration(
+  BuildContext context,
+  String label, {
+  String? hintText,
+}) {
+  final ks = context.ksColors;
+  return InputDecoration(
+    labelText: label,
+    hintText: hintText,
+    filled: true,
+    fillColor: ks.surfaceBase,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(KsTokens.radius12),
+    ),
+  );
 }

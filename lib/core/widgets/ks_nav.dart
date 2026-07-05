@@ -138,12 +138,12 @@ class KsHeaderAction extends StatelessWidget {
   }
 }
 
-/// The five stable core tabs — the plan → shop → track spine that is identical
-/// across every role and tier.
+/// The stable dashboard tabs — the plan → shop → track spine plus the premium
+/// and account surfaces called out by the feature design.
 ///
 /// Selected destinations take the brand green with their filled glyph;
 /// the rest sit in tertiary. From "Components II (Modules)", Navigation &
-/// chrome. The fixed five live in [coreTabs].
+/// chrome. The fixed set lives in [coreTabs].
 class KsBottomNav extends StatelessWidget {
   const KsBottomNav({
     required this.destinations,
@@ -152,12 +152,17 @@ class KsBottomNav extends StatelessWidget {
     super.key,
   });
 
-  /// The five stable core tabs shared across roles and tiers.
+  /// The stable dashboard tabs shared across roles and tiers.
   static const List<KsNavDestination> coreTabs = [
     KsNavDestination(
       icon: Icons.home_outlined,
       activeIcon: Icons.home_rounded,
       label: 'Today',
+    ),
+    KsNavDestination(
+      icon: Icons.menu_book_outlined,
+      activeIcon: Icons.menu_book,
+      label: 'Recipes',
     ),
     KsNavDestination(
       icon: Icons.calendar_today_outlined,
@@ -167,7 +172,7 @@ class KsBottomNav extends StatelessWidget {
     KsNavDestination(
       icon: Icons.shopping_bag_outlined,
       activeIcon: Icons.shopping_bag,
-      label: 'Shop',
+      label: 'Shopping List',
     ),
     KsNavDestination(
       icon: Icons.inventory_2_outlined,
@@ -175,9 +180,14 @@ class KsBottomNav extends StatelessWidget {
       label: 'Pantry',
     ),
     KsNavDestination(
-      icon: Icons.menu_book_outlined,
-      activeIcon: Icons.menu_book,
-      label: 'Recipes',
+      icon: Icons.dashboard_customize_outlined,
+      activeIcon: Icons.dashboard_customize,
+      label: 'Menu Sets',
+    ),
+    KsNavDestination(
+      icon: Icons.settings_outlined,
+      activeIcon: Icons.settings,
+      label: 'Settings',
     ),
   ];
 
@@ -248,13 +258,16 @@ class _NavItem extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 22, color: color),
+                Icon(icon, size: 20, color: color),
                 const SizedBox(height: KsTokens.space4),
                 Text(
                   destination.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: KsTokens.labelSmall.copyWith(
                     color: color,
-                    fontSize: 10,
+                    fontSize: 9,
                     letterSpacing: 0,
                     height: 1,
                   ),

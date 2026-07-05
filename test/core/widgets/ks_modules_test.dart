@@ -44,7 +44,7 @@ void main() {
   });
 
   group('KsBottomNav', () {
-    testWidgets('renders the five stable core tabs', (tester) async {
+    testWidgets('renders the stable dashboard tabs', (tester) async {
       await _pump(
         tester,
         KsBottomNav(
@@ -53,7 +53,15 @@ void main() {
           onSelect: (_) {},
         ),
       );
-      for (final label in ['Today', 'Calendar', 'Shop', 'Pantry', 'Recipes']) {
+      for (final label in [
+        'Today',
+        'Recipes',
+        'Calendar',
+        'Shopping List',
+        'Pantry',
+        'Menu Sets',
+        'Settings',
+      ]) {
         expect(find.text(label), findsOneWidget);
       }
     });
@@ -68,8 +76,8 @@ void main() {
           onSelect: (i) => picked = i,
         ),
       );
-      await tester.tap(find.text('Shop'));
-      expect(picked, 2);
+      await tester.tap(find.text('Shopping List'));
+      expect(picked, 3);
     });
 
     testWidgets('the selected tab swaps to its filled glyph', (tester) async {

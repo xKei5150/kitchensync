@@ -1,25 +1,67 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
 /// Screen 13 (step 2) · Onboarding — set up your kitchen.
 ///
-/// Solo, joint (premium), or join with a code. Presentational P2; choosing a
-/// kitchen lands in the app at Today.
-class HouseholdSetupScreen extends StatefulWidget {
+/// Solo, joint (premium), or join with a code. Creating a kitchen persists the
+/// active household session so app-wide role and premium gates use real data.
+class HouseholdSetupScreen extends ConsumerStatefulWidget {
   const HouseholdSetupScreen({super.key});
 
   @override
-  State<HouseholdSetupScreen> createState() => _HouseholdSetupScreenState();
+  ConsumerState<HouseholdSetupScreen> createState() =>
+      _HouseholdSetupScreenState();
 }
 
 enum _KitchenKind { solo, joint }
 
-class _HouseholdSetupScreenState extends State<HouseholdSetupScreen> {
+class _HouseholdSetupScreenState extends ConsumerState<HouseholdSetupScreen> {
   _KitchenKind _kind = _KitchenKind.solo;
+  bool _saving = false;
 
-  void _finish() => context.go('/today');
+  Future<void> _finish() async {
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(_householdOnboardingControllerProvider)
+          .createHousehold(kind: _kind);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create household: $error')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    context.go('/today');
+  }
+
+  Future<void> _skipForNow() async {
+    await ref
+        .read(sharedPreferencesProvider)
+        .setBool(skipHouseholdSetupPrefKey, true);
+    ref.invalidate(activeHouseholdContextProvider);
+    if (!mounted) return;
+    final router = GoRouter.maybeOf(context);
+    if (router != null) {
+      router.go('/today');
+    } else {
+      await Navigator.of(context).maybePop();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,14 +132,203 @@ class _HouseholdSetupScreenState extends State<HouseholdSetupScreen> {
             const _JoinWithCode(),
             const SizedBox(height: KsTokens.space24),
             FilledButton(
-              onPressed: _finish,
-              child: const Text('Enter the kitchen'),
+              onPressed: _saving ? null : _finish,
+              child: Text(_saving ? 'Setting up...' : 'Enter the kitchen'),
             ),
+            if (kDebugMode) ...[
+              const SizedBox(height: KsTokens.space8),
+              TextButton(
+                onPressed: _saving ? null : _skipForNow,
+                child: const Text('Skip for now'),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+final _householdOnboardingControllerProvider =
+    Provider<_HouseholdOnboardingController>((ref) {
+      final auth = ref.watch(firebaseAuthProvider);
+      return _HouseholdOnboardingController(
+        db: auth == null ? null : ref.watch(firestoreProvider),
+        auth: auth,
+      );
+    });
+
+class _HouseholdOnboardingController {
+  const _HouseholdOnboardingController({required this.db, required this.auth});
+
+  final FirebaseFirestore? db;
+  final FirebaseAuth? auth;
+  static const _policy = HouseholdPolicy();
+
+  Future<void> createHousehold({required _KitchenKind kind}) async {
+    final auth = this.auth;
+    final db = this.db;
+    if (auth == null || db == null) return;
+    final user = await _activeOrAnonymousUser(auth);
+    final userDoc = db.collection('users').doc(user.uid);
+    final userSnap = await userDoc.get();
+    final storedPremium = userSnap.data()?['isPremium'] as bool? ?? false;
+    final userData = userSnap.data() ?? const <String, dynamic>{};
+    final requestJoint = kind == _KitchenKind.joint;
+    final userIsPremium = storedPremium || requestJoint;
+    final hasCreatedJoint =
+        (userData['createdJointHouseholdId'] as String?)?.isNotEmpty ?? false;
+    final hasCreatedSolo =
+        (userData['createdSoloHouseholdId'] as String?)?.isNotEmpty ?? false;
+    final specResult = _policy.creationSpec(
+      HouseholdCreationRequest(
+        userIsPremium: userIsPremium,
+        requestJointHousehold: requestJoint,
+        existingSoloHouseholds: hasCreatedSolo ? 1 : 0,
+        existingCreatedJointHouseholds: hasCreatedJoint ? 1 : 0,
+      ),
+    );
+    final spec = switch (specResult) {
+      Success(value: final value) => value,
+      ResultFailure(failure: final failure) => throw StateError(
+        failure.toString(),
+      ),
+    };
+
+    final now = FieldValue.serverTimestamp();
+    final households = db.collection('households');
+    final householdDoc = households.doc();
+    final householdId = householdDoc.id;
+    final memberDoc = householdDoc.collection('members').doc(user.uid);
+    final isJoint = spec.isJoint;
+    final inviteCode = _inviteCodeFor(householdId);
+    final inviteDoc = db.collection('householdInvites').doc(inviteCode);
+    final batch = db.batch()
+      ..set(userDoc, {
+        'activeHouseholdId': householdId,
+        'isPremium': userIsPremium,
+        if (isJoint) 'createdJointHouseholdId': householdId,
+        if (!isJoint) 'createdSoloHouseholdId': householdId,
+        'createdAt': now,
+        'updatedAt': now,
+      }, SetOptions(merge: true))
+      ..set(householdDoc, {
+        'name': isJoint ? 'Shared kitchen' : 'My kitchen',
+        'creatorUserId': user.uid,
+        'isJoint': isJoint,
+        'hasPremium': isJoint,
+        'maxMembers': spec.maxMembers,
+        'inviteCode': inviteCode,
+        'createdAt': now,
+        'updatedAt': now,
+      })
+      ..set(memberDoc, {
+        'role': spec.initialRole.name,
+        'joinedAt': now,
+        'updatedAt': now,
+      })
+      ..set(inviteDoc, {
+        'householdId': householdId,
+        'createdBy': user.uid,
+        'role': HouseholdRole.member.name,
+        'active': isJoint,
+        'createdAt': now,
+        'updatedAt': now,
+      });
+    await batch.commit();
+  }
+
+  Future<void> joinHousehold({required String code}) async {
+    final auth = this.auth;
+    final db = this.db;
+    if (auth == null || db == null) return;
+    final user = await _activeOrAnonymousUser(auth);
+    final normalizedCode = _normalizeInviteCode(code);
+    if (normalizedCode.isEmpty) {
+      throw StateError('Enter an invite code.');
+    }
+
+    final inviteDoc = db.collection('householdInvites').doc(normalizedCode);
+    final inviteSnap = await inviteDoc.get();
+    final invite = inviteSnap.data();
+    if (invite == null || invite['active'] != true) {
+      throw StateError('Invite code not found.');
+    }
+
+    final householdId = invite['householdId'] as String?;
+    if (householdId == null || householdId.isEmpty) {
+      throw StateError('Invite code is incomplete.');
+    }
+    final householdDoc = db.collection('households').doc(householdId);
+    final householdSnap = await householdDoc.get();
+    final household = householdSnap.data();
+    if (household == null) {
+      throw StateError('Household not found.');
+    }
+
+    final userDoc = db.collection('users').doc(user.uid);
+    final userSnap = await userDoc.get();
+    final userData = userSnap.data() ?? const <String, dynamic>{};
+    final memberSnap = await householdDoc.collection('members').get();
+    final joinedPremiumHouseholds =
+        (userData['joinedPremiumHouseholdIds'] as List<dynamic>?) ?? const [];
+    final approvalResult = _policy.joinApproval(
+      HouseholdJoinRequest(
+        userIsPremium: userData['isPremium'] as bool? ?? false,
+        householdIsJoint: household['isJoint'] as bool? ?? false,
+        householdHasPremium: household['hasPremium'] as bool? ?? false,
+        currentMemberCount: memberSnap.size,
+        maxMembers: household['maxMembers'] as int? ?? 1,
+        existingJoinedPremiumHouseholds: joinedPremiumHouseholds
+            .whereType<String>()
+            .where((id) => id != householdId)
+            .length,
+      ),
+    );
+    final approval = switch (approvalResult) {
+      Success(value: final value) => value,
+      ResultFailure(failure: final failure) => throw StateError(
+        failure.toString(),
+      ),
+    };
+
+    final now = FieldValue.serverTimestamp();
+    final memberDoc = householdDoc.collection('members').doc(user.uid);
+    final batch = db.batch()
+      ..set(memberDoc, {
+        'role': approval.defaultRole.name,
+        'inviteCode': normalizedCode,
+        'joinedAt': now,
+        'updatedAt': now,
+      })
+      ..set(userDoc, {
+        'activeHouseholdId': householdId,
+        if (household['hasPremium'] == true)
+          'joinedPremiumHouseholdIds': FieldValue.arrayUnion([householdId]),
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+    await batch.commit();
+  }
+
+  Future<User> _activeOrAnonymousUser(FirebaseAuth auth) async {
+    var user = auth.currentUser;
+    user ??= (await auth.signInAnonymously()).user;
+    if (user == null) {
+      throw StateError('No signed-in user.');
+    }
+    return user;
+  }
+
+  static String _inviteCodeFor(String householdId) {
+    final normalized = householdId
+        .replaceAll(RegExp('[^A-Za-z0-9]'), '')
+        .toUpperCase();
+    final suffix = normalized.padRight(6, '0').substring(0, 6);
+    return 'KS-$suffix';
+  }
+
+  static String _normalizeInviteCode(String code) =>
+      code.trim().replaceAll(RegExp(r'\s+'), '').toUpperCase();
 }
 
 class _KitchenOption extends StatelessWidget {
@@ -200,8 +431,40 @@ class _KitchenOption extends StatelessWidget {
 }
 
 /// The "Join with a code" card — an icon row over a code well + Join action.
-class _JoinWithCode extends StatelessWidget {
+class _JoinWithCode extends ConsumerStatefulWidget {
   const _JoinWithCode();
+
+  @override
+  ConsumerState<_JoinWithCode> createState() => _JoinWithCodeState();
+}
+
+class _JoinWithCodeState extends ConsumerState<_JoinWithCode> {
+  final _controller = TextEditingController();
+  bool _joining = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _join() async {
+    setState(() => _joining = true);
+    try {
+      await ref
+          .read(_householdOnboardingControllerProvider)
+          .joinHousehold(code: _controller.text);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _joining = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not join household: $error')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    context.go('/today');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -260,34 +523,42 @@ class _JoinWithCode extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(11),
-                  decoration: BoxDecoration(
-                    color: ks.surfaceBase,
-                    borderRadius: BorderRadius.circular(KsTokens.radius8),
-                    border: Border.all(color: ks.borderStrong),
-                  ),
-                  child: Text(
-                    'SAGE-417',
-                    style: KsTokens.headlineLarge.copyWith(
-                      color: ks.textTertiary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      letterSpacing: 3,
+                child: TextField(
+                  controller: _controller,
+                  textCapitalization: TextCapitalization.characters,
+                  autocorrect: false,
+                  decoration: InputDecoration(
+                    hintText: 'SAGE-417',
+                    filled: true,
+                    fillColor: ks.surfaceBase,
+                    contentPadding: const EdgeInsets.all(11),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(KsTokens.radius8),
+                      borderSide: BorderSide(color: ks.borderStrong),
                     ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(KsTokens.radius8),
+                      borderSide: BorderSide(color: ks.borderStrong),
+                    ),
+                  ),
+                  style: KsTokens.headlineLarge.copyWith(
+                    color: ks.textTertiary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    letterSpacing: 3,
                   ),
                 ),
               ),
               const SizedBox(width: KsTokens.space8),
               FilledButton(
-                onPressed: () {},
+                onPressed: _joining ? null : _join,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: KsTokens.space16,
                     vertical: 14,
                   ),
                 ),
-                child: const Text('Join'),
+                child: Text(_joining ? 'Joining...' : 'Join'),
               ),
             ],
           ),

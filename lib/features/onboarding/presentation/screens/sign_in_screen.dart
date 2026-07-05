@@ -1,16 +1,103 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 
 /// Screen 13 · Onboarding — a warm front door.
 ///
 /// A produce-tinted hero with the wordmark, then OAuth + email sign in. The
-/// front door is presentational P2: no auth backend is wired, so each path
-/// advances to household setup.
-class SignInScreen extends StatelessWidget {
+/// front door uses Firebase email/password for the email path, with anonymous
+/// Firebase Auth behind the visual OAuth choices until provider credentials are
+/// configured.
+class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
-  void _continue(BuildContext context) => context.push('/onboarding/household');
+  @override
+  ConsumerState<SignInScreen> createState() => _SignInScreenState();
+}
+
+class _SignInScreenState extends ConsumerState<SignInScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _continue(BuildContext context) async {
+    final auth = ref.read(firebaseAuthProvider);
+    try {
+      if (auth != null && auth.currentUser == null) {
+        await auth.signInAnonymously();
+      }
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not sign in: $error')));
+      return;
+    }
+    if (!context.mounted) return;
+    await context.push('/onboarding/household');
+  }
+
+  Future<void> _continueWithEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter email and password.')),
+      );
+      return;
+    }
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password must be at least 6 characters.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    final auth = ref.read(firebaseAuthProvider);
+    try {
+      if (auth != null && auth.currentUser == null) {
+        try {
+          await auth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+        } on FirebaseAuthException catch (error) {
+          if (error.code != 'user-not-found' &&
+              error.code != 'invalid-credential' &&
+              error.code != 'wrong-password') {
+            rethrow;
+          }
+          await auth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+        }
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not sign in: $error')));
+      return;
+    }
+    if (!mounted) return;
+    await context.push('/onboarding/household');
+    if (mounted) setState(() => _saving = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,11 +137,15 @@ class SignInScreen extends StatelessWidget {
                   const SizedBox(height: KsTokens.space16),
                   const _OrRule(),
                   const SizedBox(height: KsTokens.space16),
-                  const _EmailField(),
+                  _EmailField(controller: _emailController),
+                  const SizedBox(height: KsTokens.space10),
+                  _PasswordField(controller: _passwordController),
                   const SizedBox(height: KsTokens.space10),
                   FilledButton(
-                    onPressed: () => _continue(context),
-                    child: const Text('Continue with email'),
+                    onPressed: _saving ? null : _continueWithEmail,
+                    child: Text(
+                      _saving ? 'Continuing...' : 'Continue with email',
+                    ),
                   ),
                 ],
               ),
@@ -213,16 +304,54 @@ class _OrRule extends StatelessWidget {
 }
 
 class _EmailField extends StatelessWidget {
-  const _EmailField();
+  const _EmailField({required this.controller});
+
+  final TextEditingController controller;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
     return TextField(
+      controller: controller,
       keyboardType: TextInputType.emailAddress,
+      autofillHints: const [AutofillHints.email],
       style: KsTokens.bodyMedium.copyWith(color: ks.textPrimary),
       decoration: InputDecoration(
         hintText: 'you@email.com',
+        filled: true,
+        fillColor: ks.surfaceRaised,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(KsTokens.radius10),
+          borderSide: BorderSide(color: ks.borderStrong),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(KsTokens.radius10),
+          borderSide: BorderSide(color: ks.borderStrong),
+        ),
+      ),
+    );
+  }
+}
+
+class _PasswordField extends StatelessWidget {
+  const _PasswordField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return TextField(
+      controller: controller,
+      obscureText: true,
+      autofillHints: const [AutofillHints.password],
+      style: KsTokens.bodyMedium.copyWith(color: ks.textPrimary),
+      decoration: InputDecoration(
+        hintText: 'Password',
         filled: true,
         fillColor: ks.surfaceRaised,
         contentPadding: const EdgeInsets.symmetric(
