@@ -110,6 +110,48 @@ void main() {
     },
   );
 
+  test('upsert removes ingredient documents no longer on the recipe', () async {
+    await repo.upsert(privateRecipe);
+
+    await repo.upsert(
+      Recipe(
+        id: privateRecipe.id,
+        authorUserId: privateRecipe.authorUserId,
+        householdId: privateRecipe.householdId,
+        name: privateRecipe.name,
+        description: privateRecipe.description,
+        defaultServingSize: privateRecipe.defaultServingSize,
+        mealTimeTags: privateRecipe.mealTimeTags,
+        recipeTags: privateRecipe.recipeTags,
+        priceEstimate: privateRecipe.priceEstimate,
+        location: privateRecipe.location,
+        visibility: privateRecipe.visibility,
+        monetization: privateRecipe.monetization,
+        createdAt: privateRecipe.createdAt,
+        updatedAt: privateRecipe.updatedAt.add(const Duration(minutes: 1)),
+        instructions: privateRecipe.instructions,
+        ingredients: const [
+          RecipeIngredient(
+            id: 'ri-3',
+            recipeId: 'private-1',
+            ingredientId: 'garlic',
+            quantity: 2,
+            unit: Unit.piece,
+          ),
+        ],
+      ),
+    );
+
+    final ingredients = await db
+        .collection('recipes')
+        .doc(privateRecipe.id)
+        .collection('ingredients')
+        .get();
+    expect(ingredients.docs.map((doc) => doc.id), ['ri-3']);
+    final recipe = await repo.watchById(privateRecipe.id).first;
+    expect(recipe!.ingredients.single.ingredientId, 'garlic');
+  });
+
   test(
     'searchPublicRecipes applies budget and target serving normalization',
     () async {

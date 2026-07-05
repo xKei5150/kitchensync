@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
@@ -238,12 +240,21 @@ PantryItem _beanPantryItem() {
 }
 
 void main() {
+  const premiumAdmin = ActiveHouseholdContext(
+    id: 'solo-household',
+    name: 'Test kitchen',
+    role: HouseholdRole.admin,
+    isJoint: true,
+    hasPremium: true,
+  );
+
   CookingLifecycleController controller({
     required _FakeCalendarRepository calendar,
     required _FakePantryRepository pantry,
     required Recipe? recipe,
     List<String> leftoverIds = const ['leftover-1'],
     List<String> wasteIds = const ['waste-1'],
+    ActiveHouseholdContext? household = premiumAdmin,
   }) {
     final clock = FakeClock(DateTime(2026, 7, 6, 20));
     return CookingLifecycleController(
@@ -261,6 +272,7 @@ void main() {
         clock: clock,
       ),
       householdId: 'solo-household',
+      household: household,
     );
   }
 
@@ -524,6 +536,136 @@ void main() {
       ),
       throwsStateError,
     );
+  });
+
+  test('mergeMeals requires a premium household', () async {
+    final calendar = _FakeCalendarRepository();
+    final sut = controller(
+      calendar: calendar,
+      pantry: _FakePantryRepository([]),
+      recipe: _recipe(),
+      household: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Test kitchen',
+        role: HouseholdRole.admin,
+        isJoint: true,
+        hasPremium: false,
+      ),
+    );
+
+    expect(
+      () => sut.mergeMeals(
+        meal: MealScheduleEntry(
+          id: 'meal-1',
+          recipeId: 'braise',
+          date: DateTime(2026, 7, 6),
+          mealLabel: 'Dinner',
+          servingSize: 4,
+        ),
+        mealCount: 2,
+      ),
+      throwsStateError,
+    );
+    expect(calendar.upserted, isNull);
+  });
+
+  test('mergeMeals rejects read-only household members', () async {
+    final calendar = _FakeCalendarRepository();
+    final sut = controller(
+      calendar: calendar,
+      pantry: _FakePantryRepository([]),
+      recipe: _recipe(),
+      household: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Test kitchen',
+        role: HouseholdRole.member,
+        isJoint: true,
+        hasPremium: true,
+      ),
+    );
+
+    expect(
+      () => sut.mergeMeals(
+        meal: MealScheduleEntry(
+          id: 'meal-1',
+          recipeId: 'braise',
+          date: DateTime(2026, 7, 6),
+          mealLabel: 'Dinner',
+          servingSize: 4,
+        ),
+        mealCount: 2,
+      ),
+      throwsStateError,
+    );
+    expect(calendar.upserted, isNull);
+  });
+
+  test('member role cannot run persisted cooking lifecycle actions', () async {
+    final calendar = _FakeCalendarRepository();
+    final pantry = _FakePantryRepository([_pantryItem(), _beanPantryItem()]);
+    final sut = controller(
+      calendar: calendar,
+      pantry: pantry,
+      recipe: _recipe(),
+      household: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Test kitchen',
+        role: HouseholdRole.member,
+        isJoint: true,
+        hasPremium: true,
+      ),
+    );
+    final meal = MealScheduleEntry(
+      id: 'meal-1',
+      recipeId: 'braise',
+      date: DateTime(2026, 7, 6),
+      mealLabel: 'Dinner',
+      servingSize: 4,
+    );
+    final leftover = PantryItem(
+      id: 'leftover-1',
+      householdId: 'solo-household',
+      ingredientId: 'leftover-braise',
+      quantity: 3,
+      unit: Unit.piece,
+      section: PantrySection.leftover,
+      relatedRecipeId: 'braise',
+      leftoverServings: 3,
+      createdAt: DateTime(2026, 7, 6),
+      updatedAt: DateTime(2026, 7, 6),
+    );
+    final leftoverMeal = meal.copyWith(
+      state: ScheduledMealState.leftover,
+      linkedLeftoverId: leftover.id,
+    );
+
+    await expectLater(sut.markCooked(meal), throwsStateError);
+    await expectLater(
+      sut.saveLeftovers(meal: meal, servings: 2),
+      throwsStateError,
+    );
+    expect(() => sut.changeServingSize(meal, 6), throwsStateError);
+    expect(
+      () => sut.swapRecipe(meal: meal, recipeId: 'pad-thai', servingSize: 3),
+      throwsStateError,
+    );
+    expect(() => sut.cancelMeal(meal), throwsStateError);
+    expect(() => sut.rescheduleCookNext(meal), throwsStateError);
+    expect(
+      () => sut.scheduleLeftoverMeal(
+        leftover: leftover,
+        date: DateTime(2026, 7, 8),
+        mealLabel: 'Lunch',
+      ),
+      throwsStateError,
+    );
+    await expectLater(sut.consumeLeftoverMeal(leftoverMeal), throwsStateError);
+    await expectLater(sut.markLeftoverSpoiled(leftover), throwsStateError);
+
+    expect(calendar.upserted, isNull);
+    expect(pantry.quantities, isEmpty);
+    expect(pantry.addedItems, isEmpty);
+    expect(pantry.wasteEvent, isNull);
   });
 
   test('swapRecipe replaces only the scheduled instance recipe', () async {

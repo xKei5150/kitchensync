@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
-import 'package:kitchensync/features/calendar/presentation/providers/planning_providers.dart';
+import 'package:kitchensync/features/menu_sets/domain/entities/menu_set.dart';
 import 'package:kitchensync/features/menu_sets/domain/services/menu_set_application_engine.dart';
 import 'package:kitchensync/features/menu_sets/presentation/providers/menu_set_repository_providers.dart';
+import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
+import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 
 /// Screen 12 · Menu Set editor + Apply — build a week, then cast it across the
 /// calendar.
@@ -16,46 +18,26 @@ import 'package:kitchensync/features/menu_sets/presentation/providers/menu_set_r
 class MenuSetEditorScreen extends ConsumerWidget {
   const MenuSetEditorScreen({super.key});
 
-  static const _slots = [
-    KsMenuSlot(
-      weekday: 'Mon',
-      entries: [KsMenuSlotEntry(label: 'Lentil dal', color: KsTokens.catGrain)],
-    ),
-    KsMenuSlot(
-      weekday: 'Tue',
-      entries: [
-        KsMenuSlotEntry(label: 'Roast chicken', color: KsTokens.catMeat),
-      ],
-    ),
-    KsMenuSlot(weekday: 'Wed', isDropTarget: true),
-    KsMenuSlot(
-      weekday: 'Thu',
-      entries: [
-        KsMenuSlotEntry(label: 'Salmon traybake', color: KsTokens.catSeafood),
-      ],
-    ),
-    KsMenuSlot(
-      weekday: 'Fri',
-      entries: [
-        KsMenuSlotEntry(label: 'Chilli pasta', color: KsTokens.catSpice),
-      ],
-    ),
-  ];
-
-  void _openApplySheet(BuildContext context) {
+  void _openApplySheet(BuildContext context, MenuSet menuSet) {
     final ks = context.ksColors;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: ks.scrim,
-      builder: (_) => const _ApplySheet(),
+      builder: (_) => _ApplySheet(menuSet: menuSet),
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
+    final menuSets = ref.watch(activeHouseholdMenuSetsProvider).valueOrNull;
+    final recipes = ref.watch(activeHouseholdRecipesProvider).valueOrNull;
+    final draft = menuSets == null || menuSets.isEmpty ? null : menuSets.first;
+    final recipeNames = {
+      for (final recipe in recipes ?? const <Recipe>[]) recipe.id: recipe.name,
+    };
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -70,7 +52,7 @@ class MenuSetEditorScreen extends ConsumerWidget {
           children: [
             KsFolioHeader(
               eyebrow: 'Menu Set · editing',
-              title: 'Cosy autumn week',
+              title: draft?.name ?? 'New menu set',
               actions: [
                 KsHeaderAction(
                   icon: Icons.arrow_back_rounded,
@@ -80,34 +62,61 @@ class MenuSetEditorScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: KsTokens.space16),
-            const KsMenuSlotEditor(slots: _slots),
+            KsMenuSlotEditor(slots: _slotsFromDraft(draft, recipeNames)),
             const SizedBox(height: KsTokens.space20),
             _RecipeTray(
-              onAddOrzo: () async {
+              recipes: recipes ?? const [],
+              onAddFirstRecipe: () async {
+                final recipe = recipes == null || recipes.isEmpty
+                    ? null
+                    : recipes.first;
+                if (draft == null || recipe == null) {
+                  _showMessage(
+                    context,
+                    draft == null
+                        ? 'Save a menu set draft first.'
+                        : 'Add a recipe before editing this menu set.',
+                  );
+                  return;
+                }
                 await _runEditorAction(
                   context,
                   () => ref
                       .read(menuSetEditorControllerProvider)
-                      .addRecipeToDraft(recipeId: 'orzo', mealSlot: 'Dinner'),
-                  successMessage: 'Added Orzo to Wednesday.',
+                      .addRecipeToDraft(
+                        draft: draft,
+                        recipeId: recipe.id,
+                        mealSlot: 'Dinner',
+                      ),
+                  successMessage: 'Added ${recipe.name} to Wednesday.',
                   failureMessage: 'Could not update menu set',
                 );
+                ref.invalidate(activeHouseholdMenuSetsProvider);
               },
             ),
             const SizedBox(height: KsTokens.space12),
             OutlinedButton.icon(
               onPressed: () async {
+                final firstEntry = _firstEntry(draft);
+                if (draft == null || firstEntry == null) {
+                  _showMessage(context, 'There is no recipe to remove.');
+                  return;
+                }
                 await _runEditorAction(
                   context,
                   () => ref
                       .read(menuSetEditorControllerProvider)
-                      .removeEntryFromDraft(entryId: 'menu-entry-0'),
-                  successMessage: 'Removed Lentil dal.',
+                      .removeEntryFromDraft(
+                        draft: draft,
+                        entryId: firstEntry.id,
+                      ),
+                  successMessage: 'Removed recipe from menu set.',
                   failureMessage: 'Could not remove recipe',
                 );
+                ref.invalidate(activeHouseholdMenuSetsProvider);
               },
               icon: const Icon(Icons.remove_circle_outline_rounded, size: 16),
-              label: const Text('Remove Lentil dal'),
+              label: const Text('Remove first recipe'),
             ),
             const SizedBox(height: KsTokens.space20),
             OutlinedButton.icon(
@@ -118,19 +127,71 @@ class MenuSetEditorScreen extends ConsumerWidget {
                   successMessage: 'Menu set saved.',
                   failureMessage: 'Could not save menu set',
                 );
+                ref.invalidate(activeHouseholdMenuSetsProvider);
               },
               icon: const Icon(Icons.save_outlined, size: 16),
               label: const Text('Save draft'),
             ),
             const SizedBox(height: KsTokens.space8),
             FilledButton(
-              onPressed: () => _openApplySheet(context),
+              onPressed: draft == null || _firstEntry(draft) == null
+                  ? null
+                  : () => _openApplySheet(context, draft),
               child: const Text('Apply to calendar'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  List<KsMenuSlot> _slotsFromDraft(
+    MenuSet? draft,
+    Map<String, String> recipeNames,
+  ) {
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    if (draft == null || draft.days.isEmpty) {
+      return [for (final weekday in weekdays) KsMenuSlot(weekday: weekday)];
+    }
+    return [
+      for (final day in draft.days)
+        KsMenuSlot(
+          weekday: weekdays[day.dayIndex % weekdays.length],
+          isDropTarget: day.entries.isEmpty,
+          entries: [
+            for (final entry in day.entries)
+              KsMenuSlotEntry(
+                label: recipeNames[entry.recipeId] ?? entry.recipeId,
+                color: _entryColor(entry.orderInSlot),
+              ),
+          ],
+        ),
+    ];
+  }
+
+  Color _entryColor(int index) {
+    const colors = [
+      KsTokens.catGrain,
+      KsTokens.catProduce,
+      KsTokens.catMeat,
+      KsTokens.catSeafood,
+      KsTokens.catSpice,
+    ];
+    return colors[index % colors.length];
+  }
+
+  MenuSetEntry? _firstEntry(MenuSet? draft) {
+    if (draft == null) return null;
+    for (final day in draft.days) {
+      if (day.entries.isNotEmpty) return day.entries.first;
+    }
+    return null;
+  }
+
+  void _showMessage(BuildContext context, String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _runEditorAction(
@@ -158,15 +219,10 @@ class MenuSetEditorScreen extends ConsumerWidget {
 /// The "drag from your recipes" tray — colour-coded recipe chips to drop into
 /// the week above.
 class _RecipeTray extends StatelessWidget {
-  const _RecipeTray({required this.onAddOrzo});
+  const _RecipeTray({required this.recipes, required this.onAddFirstRecipe});
 
-  final VoidCallback onAddOrzo;
-
-  static const _chips = [
-    KsMenuSlotEntry(label: 'Orzo', color: KsTokens.catProduce),
-    KsMenuSlotEntry(label: 'Risotto', color: KsTokens.catGrain),
-    KsMenuSlotEntry(label: 'Tacos', color: KsTokens.catMeat),
-  ];
+  final List<Recipe> recipes;
+  final VoidCallback onAddFirstRecipe;
 
   @override
   Widget build(BuildContext context) {
@@ -195,30 +251,36 @@ class _RecipeTray extends StatelessWidget {
             spacing: KsTokens.space8,
             runSpacing: KsTokens.space8,
             children: [
-              for (final chip in _chips)
-                InkWell(
-                  onTap: chip.label == 'Orzo' ? onAddOrzo : null,
-                  borderRadius: BorderRadius.circular(KsTokens.radius8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: KsTokens.space8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: chip.color.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(KsTokens.radius8),
-                    ),
-                    child: Text(
-                      chip.label,
-                      style: KsTokens.labelMedium.copyWith(
-                        color: chip.color,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0,
-                        height: 1,
+              if (recipes.isEmpty)
+                Text(
+                  'No recipes yet',
+                  style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
+                )
+              else
+                for (final recipe in recipes.take(6))
+                  InkWell(
+                    onTap: recipe == recipes.first ? onAddFirstRecipe : null,
+                    borderRadius: BorderRadius.circular(KsTokens.radius8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: KsTokens.space8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: KsTokens.catProduce.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(KsTokens.radius8),
+                      ),
+                      child: Text(
+                        recipe.name,
+                        style: KsTokens.labelMedium.copyWith(
+                          color: KsTokens.catProduce,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0,
+                          height: 1,
+                        ),
                       ),
                     ),
                   ),
-                ),
             ],
           ),
         ],
@@ -230,7 +292,9 @@ class _RecipeTray extends StatelessWidget {
 /// The "Apply to the calendar" bottom sheet — a date range, a modulo-cycling
 /// note, and a Fill-empty / Replace mode toggle.
 class _ApplySheet extends ConsumerStatefulWidget {
-  const _ApplySheet();
+  const _ApplySheet({required this.menuSet});
+
+  final MenuSet menuSet;
 
   @override
   ConsumerState<_ApplySheet> createState() => _ApplySheetState();
@@ -249,6 +313,8 @@ extension on _ApplyMode {
 
 class _ApplySheetState extends ConsumerState<_ApplySheet> {
   _ApplyMode _mode = _ApplyMode.fillEmpty;
+  late final DateTime _startDate = _nextMonday(DateTime.now());
+  late final DateTime _endDate = _startDate.add(const Duration(days: 27));
 
   @override
   Widget build(BuildContext context) {
@@ -295,7 +361,7 @@ class _ApplySheetState extends ConsumerState<_ApplySheet> {
           const SizedBox(height: KsTokens.space8),
           Row(
             children: [
-              const Expanded(child: _DateField('30 Jun')),
+              Expanded(child: _DateField(_shortDate(_startDate))),
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: KsTokens.space10,
@@ -305,7 +371,7 @@ class _ApplySheetState extends ConsumerState<_ApplySheet> {
                   style: KsTokens.bodySmall.copyWith(color: ks.textTertiary),
                 ),
               ),
-              const Expanded(child: _DateField('27 Jul')),
+              Expanded(child: _DateField(_shortDate(_endDate))),
             ],
           ),
           const SizedBox(height: KsTokens.space8),
@@ -346,18 +412,14 @@ class _ApplySheetState extends ConsumerState<_ApplySheet> {
           const SizedBox(height: KsTokens.space16),
           FilledButton(
             onPressed: () async {
-              final result = ref
-                  .read(planningControllerProvider.notifier)
-                  .applyFeaturedMenuSet(_mode.domainMode);
-              final shoppingList = ref
-                  .read(planningControllerProvider)
-                  .activeShoppingList;
               try {
                 await ref
                     .read(menuSetApplyPersistenceControllerProvider)
-                    .persistApplication(
-                      result: result,
-                      shoppingList: shoppingList,
+                    .applyPersistedMenuSet(
+                      menuSet: widget.menuSet,
+                      startDate: _startDate,
+                      endDate: _endDate,
+                      mode: _mode.domainMode,
                     );
               } catch (error) {
                 if (!context.mounted) return;
@@ -374,6 +436,30 @@ class _ApplySheetState extends ConsumerState<_ApplySheet> {
         ],
       ),
     );
+  }
+
+  DateTime _nextMonday(DateTime date) {
+    final today = DateTime(date.year, date.month, date.day);
+    final daysUntilMonday = (DateTime.monday - today.weekday) % 7;
+    return today.add(Duration(days: daysUntilMonday));
+  }
+
+  String _shortDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${date.day} ${months[date.month - 1]}';
   }
 }
 

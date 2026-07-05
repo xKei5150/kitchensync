@@ -7,10 +7,9 @@ import 'package:kitchensync/core/session/active_household_id_provider.dart';
 
 /// Screen 13 · Onboarding — a warm front door.
 ///
-/// A produce-tinted hero with the wordmark, then OAuth + email sign in. The
-/// front door uses Firebase email/password for the email path, with anonymous
-/// Firebase Auth behind the visual OAuth choices until provider credentials are
-/// configured.
+/// A produce-tinted hero with the wordmark, then provider + email sign in.
+/// Email/password is live; OAuth buttons stay disabled until provider
+/// credentials are explicitly enabled for the build.
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
@@ -19,6 +18,9 @@ class SignInScreen extends ConsumerStatefulWidget {
 }
 
 class _SignInScreenState extends ConsumerState<SignInScreen> {
+  static const _appleAuthEnabled = bool.fromEnvironment('ENABLE_APPLE_AUTH');
+  static const _googleAuthEnabled = bool.fromEnvironment('ENABLE_GOOGLE_AUTH');
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _saving = false;
@@ -30,21 +32,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.dispose();
   }
 
-  Future<void> _continue(BuildContext context) async {
-    final auth = ref.read(firebaseAuthProvider);
-    try {
-      if (auth != null && auth.currentUser == null) {
-        await auth.signInAnonymously();
-      }
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not sign in: $error')));
-      return;
-    }
-    if (!context.mounted) return;
-    await context.push('/onboarding/household');
+  Future<void> _continueWithProvider(String provider) async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$provider sign-in is not configured yet.')),
+    );
   }
 
   Future<void> _continueWithEmail() async {
@@ -123,7 +115,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     icon: Icons.apple,
                     background: ks.textPrimary,
                     foreground: ks.surfaceBase,
-                    onTap: () => _continue(context),
+                    onTap: _appleAuthEnabled
+                        ? () => _continueWithProvider('Apple')
+                        : null,
                   ),
                   const SizedBox(height: KsTokens.space10),
                   _ProviderButton(
@@ -132,7 +126,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     background: ks.surfaceRaised,
                     foreground: ks.textPrimary,
                     border: ks.borderStrong,
-                    onTap: () => _continue(context),
+                    onTap: _googleAuthEnabled
+                        ? () => _continueWithProvider('Google')
+                        : null,
                   ),
                   const SizedBox(height: KsTokens.space16),
                   const _OrRule(),
@@ -241,12 +237,21 @@ class _ProviderButton extends StatelessWidget {
   final Color background;
   final Color foreground;
   final Color? border;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final ks = context.ksColors;
+    final effectiveBackground = enabled
+        ? background
+        : Color.alphaBlend(
+            Theme.of(context).disabledColor.withValues(alpha: 0.08),
+            ks.surfaceRaised,
+          );
+    final effectiveForeground = enabled ? foreground : ks.textTertiary;
     return Material(
-      color: background,
+      color: effectiveBackground,
       borderRadius: BorderRadius.circular(KsTokens.radius12),
       child: InkWell(
         onTap: onTap,
@@ -260,15 +265,26 @@ class _ProviderButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: foreground),
+              Icon(icon, size: 18, color: effectiveForeground),
               const SizedBox(width: KsTokens.space8),
               Text(
                 label,
                 style: KsTokens.labelLarge.copyWith(
-                  color: foreground,
+                  color: effectiveForeground,
                   letterSpacing: 0,
                 ),
               ),
+              if (!enabled) ...[
+                const SizedBox(width: KsTokens.space8),
+                Text(
+                  'Not configured',
+                  style: KsTokens.labelSmall.copyWith(
+                    color: effectiveForeground,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

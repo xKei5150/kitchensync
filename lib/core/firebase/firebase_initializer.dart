@@ -15,10 +15,8 @@ class FirebaseInitializer {
   const FirebaseInitializer();
 
   Future<void> initialize(AppEnv env) async {
-    final options = switch (env) {
-      AppEnv.dev => dev.DefaultFirebaseOptions.currentPlatform,
-      AppEnv.prod => prod.DefaultFirebaseOptions.currentPlatform,
-    };
+    const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+    final options = _firebaseOptions(env: env, useEmulator: useEmulator);
 
     try {
       await Firebase.initializeApp(options: options);
@@ -34,7 +32,6 @@ class FirebaseInitializer {
       rethrow;
     }
 
-    const useEmulator = bool.fromEnvironment('USE_EMULATOR');
     if (useEmulator) {
       // Emulator / integration-test path. Wire the local emulators and STOP.
       // Crashlytics, App Check, and Analytics have no emulators and must not
@@ -48,12 +45,58 @@ class FirebaseInitializer {
       // machine via 10.0.2.2, while iOS simulators / desktop use the loopback
       // address. Use 127.0.0.1 rather than 'localhost' so iOS doesn't resolve
       // to ::1 (IPv6) and stall on a connection the emulator never accepts.
-      final emulatorHost = defaultTargetPlatform == TargetPlatform.android
+      const firestoreEmulatorPort = int.fromEnvironment(
+        'FIRESTORE_EMULATOR_PORT',
+        defaultValue: 8080,
+      );
+      const authEmulatorPort = int.fromEnvironment(
+        'AUTH_EMULATOR_PORT',
+        defaultValue: 9099,
+      );
+      const storageEmulatorPort = int.fromEnvironment(
+        'STORAGE_EMULATOR_PORT',
+        defaultValue: 9199,
+      );
+      const configuredEmulatorHost = String.fromEnvironment(
+        'FIREBASE_EMULATOR_HOST',
+      );
+      const configuredFirestoreEmulatorHost = String.fromEnvironment(
+        'FIRESTORE_EMULATOR_HOST',
+      );
+      const configuredAuthEmulatorHost = String.fromEnvironment(
+        'AUTH_EMULATOR_HOST',
+      );
+      const configuredStorageEmulatorHost = String.fromEnvironment(
+        'STORAGE_EMULATOR_HOST',
+      );
+      final defaultEmulatorHost =
+          defaultTargetPlatform == TargetPlatform.android
           ? '10.0.2.2'
           : '127.0.0.1';
-      FirebaseFirestore.instance.useFirestoreEmulator(emulatorHost, 8080);
-      await FirebaseAuth.instance.useAuthEmulator(emulatorHost, 9099);
-      await FirebaseStorage.instance.useStorageEmulator(emulatorHost, 9199);
+      final emulatorHost = configuredEmulatorHost.isNotEmpty
+          ? configuredEmulatorHost
+          : defaultEmulatorHost;
+      final firestoreEmulatorHost = configuredFirestoreEmulatorHost.isNotEmpty
+          ? configuredFirestoreEmulatorHost
+          : emulatorHost;
+      final authEmulatorHost = configuredAuthEmulatorHost.isNotEmpty
+          ? configuredAuthEmulatorHost
+          : emulatorHost;
+      final storageEmulatorHost = configuredStorageEmulatorHost.isNotEmpty
+          ? configuredStorageEmulatorHost
+          : emulatorHost;
+      FirebaseFirestore.instance.useFirestoreEmulator(
+        firestoreEmulatorHost,
+        firestoreEmulatorPort,
+      );
+      await FirebaseAuth.instance.useAuthEmulator(
+        authEmulatorHost,
+        authEmulatorPort,
+      );
+      await FirebaseStorage.instance.useStorageEmulator(
+        storageEmulatorHost,
+        storageEmulatorPort,
+      );
     } else {
       await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
         !kDebugMode,
@@ -102,5 +145,26 @@ class FirebaseInitializer {
   static AppEnv envFromDartDefine() {
     const raw = String.fromEnvironment('ENV', defaultValue: 'dev');
     return raw == 'prod' ? AppEnv.prod : AppEnv.dev;
+  }
+
+  FirebaseOptions _firebaseOptions({
+    required AppEnv env,
+    required bool useEmulator,
+  }) {
+    if (!useEmulator ||
+        defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS) {
+      return switch (env) {
+        AppEnv.dev => dev.DefaultFirebaseOptions.currentPlatform,
+        AppEnv.prod => prod.DefaultFirebaseOptions.currentPlatform,
+      };
+    }
+    return const FirebaseOptions(
+      apiKey: 'emulator-api-key',
+      appId: '1:000000000000:desktop:emulator',
+      messagingSenderId: '000000000000',
+      projectId: 'kitchensync-dev-da503',
+      storageBucket: 'kitchensync-dev-da503.appspot.com',
+    );
   }
 }

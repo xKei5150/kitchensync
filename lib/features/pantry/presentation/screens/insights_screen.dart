@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/freshness_helper.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
@@ -9,6 +10,7 @@ import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
+import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
 /// Screen 30 · Reading the pantry back — the premium Insights surface.
 ///
@@ -45,10 +47,23 @@ class InsightsScreen extends ConsumerWidget {
     final itemsAsync = ref.watch(pantryAllItemsStreamProvider);
     final wasteAsync = ref.watch(wasteHistoryStreamProvider);
     final bulkStatuses = ref.watch(bulkPantryStatusesProvider);
+    final hasPremium =
+        ref.watch(activeHouseholdContextProvider)?.hasPremium ?? false;
 
     final items = itemsAsync.asData?.value ?? const <PantryItem>[];
     final events = wasteAsync.asData?.value ?? const <WasteEvent>[];
     final month = _monthNames[DateTime.now().month - 1];
+    final insightContent = Column(
+      children: [
+        _FreshnessCard(items: items),
+        const SizedBox(height: KsTokens.space12),
+        _SectionBalanceCard(items: items),
+        const SizedBox(height: KsTokens.space12),
+        _WasteTrendCard(events: events),
+        const SizedBox(height: KsTokens.space12),
+        _BulkPredictionCard(statuses: bulkStatuses),
+      ],
+    );
 
     return Scaffold(
       backgroundColor: ks.surfaceBase,
@@ -97,22 +112,16 @@ class InsightsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: KsTokens.space20),
-            KsPremiumLock(
-              title: 'See your pantry, measured',
-              body: 'Freshness, balance, and waste — at a glance, every month.',
-              onUnlock: () => context.pushNamed('premium'),
-              child: Column(
-                children: [
-                  _FreshnessCard(items: items),
-                  const SizedBox(height: KsTokens.space12),
-                  _SectionBalanceCard(items: items),
-                  const SizedBox(height: KsTokens.space12),
-                  _WasteTrendCard(events: events),
-                  const SizedBox(height: KsTokens.space12),
-                  _BulkPredictionCard(statuses: bulkStatuses),
-                ],
+            if (hasPremium)
+              insightContent
+            else
+              KsPremiumLock(
+                title: 'See your pantry, measured',
+                body:
+                    'Freshness, balance, and waste — at a glance, every month.',
+                onUnlock: () => context.pushNamed('premium'),
+                child: insightContent,
               ),
-            ),
           ],
         ),
       ),
@@ -120,13 +129,13 @@ class InsightsScreen extends ConsumerWidget {
   }
 }
 
-class _BulkPredictionCard extends StatelessWidget {
+class _BulkPredictionCard extends ConsumerWidget {
   const _BulkPredictionCard({required this.statuses});
 
   final List<BulkPantryStatus> statuses;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
     final visible = statuses.take(3).toList(growable: false);
     final dueCount = statuses
@@ -154,18 +163,54 @@ class _BulkPredictionCard extends StatelessWidget {
           else
             for (var i = 0; i < visible.length; i++) ...[
               if (i > 0) const SizedBox(height: KsTokens.space10),
-              _BulkPredictionRow(status: visible[i]),
+              _BulkPredictionRow(
+                status: visible[i],
+                onAdd: visible[i].needsPurchaseSoon
+                    ? () => _addToShopping(context, ref, visible[i])
+                    : null,
+              ),
             ],
         ],
       ),
     );
   }
+
+  Future<void> _addToShopping(
+    BuildContext context,
+    WidgetRef ref,
+    BulkPantryStatus status,
+  ) async {
+    try {
+      final record = await ref
+          .read(shoppingPlanningControllerProvider)
+          .createSuggestedListFromBulkStatus(status);
+      ref.invalidate(activeShoppingListsProvider);
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${record.items.single.ingredientId} added to shopping',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not add bulk item: $error')),
+      );
+    }
+  }
 }
 
 class _BulkPredictionRow extends StatelessWidget {
-  const _BulkPredictionRow({required this.status});
+  const _BulkPredictionRow({required this.status, required this.onAdd});
 
   final BulkPantryStatus status;
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -224,6 +269,12 @@ class _BulkPredictionRow extends StatelessWidget {
                 : ks.textPrimary,
             fontSize: 20,
           ),
+        ),
+        const SizedBox(width: KsTokens.space6),
+        IconButton.filledTonal(
+          tooltip: 'Add to shopping',
+          onPressed: onAdd,
+          icon: const Icon(Icons.add_shopping_cart_rounded, size: 17),
         ),
       ],
     );

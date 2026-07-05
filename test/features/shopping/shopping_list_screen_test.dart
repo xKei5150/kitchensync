@@ -11,7 +11,6 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
-import 'package:kitchensync/features/calendar/presentation/providers/planning_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
@@ -38,6 +37,9 @@ class _FakeShoppingRepository implements ShoppingRepository {
   String? updatedListId;
   String? updatedItemId;
   ShoppingListItemStatus? updatedStatus;
+  String? updatedSubstituteIngredientId;
+  double? updatedSubstituteQuantity;
+  Unit? updatedSubstituteUnit;
   ShoppingListStatus? completedStatus;
   ShoppingListRecord? adjustedShopNowList;
 
@@ -85,6 +87,9 @@ class _FakeShoppingRepository implements ShoppingRepository {
     updatedListId = listId;
     updatedItemId = itemId;
     updatedStatus = status;
+    updatedSubstituteIngredientId = substituteIngredientId;
+    updatedSubstituteQuantity = substituteQuantity;
+    updatedSubstituteUnit = substituteUnit;
 
     final index = lists.indexWhere(
       (list) => list.householdId == householdId && list.id == listId,
@@ -460,7 +465,7 @@ ShoppingListRecord _substitutedRecord() {
 }
 
 void main() {
-  testWidgets('ShoppingListScreen renders the checklist, progress and payoff', (
+  testWidgets('ShoppingListScreen without a list id shows an empty state', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(400, 1600);
@@ -477,11 +482,8 @@ void main() {
       ),
     );
 
-    expect(find.text('Weekly shop'), findsOneWidget);
-    expect(find.text('7 / 11'), findsOneWidget);
-    expect(find.text('Tomatoes'), findsOneWidget);
-    expect(find.text('Done shopping'), findsOneWidget);
-    expect(find.byType(KsChecklistRow), findsNWidgets(4));
+    expect(find.text('No shopping list selected'), findsOneWidget);
+    expect(find.byType(KsChecklistRow), findsNothing);
   });
 
   testWidgets('ShoppingListScreen renders in dark theme without error', (
@@ -497,35 +499,6 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('ShoppingListScreen renders generated shopping plans', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(400, 1600);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    container
-        .read(planningControllerProvider.notifier)
-        .buildShopNowList(weeksAhead: 0);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: AppTheme.light(),
-          home: const ShoppingListScreen(),
-        ),
-      ),
-    );
-
-    expect(find.text('White beans'), findsOneWidget);
-    expect(find.text('Tomatoes'), findsOneWidget);
-    expect(find.byType(KsChecklistRow), findsNWidgets(2));
   });
 
   testWidgets('ShoppingListScreen renders persisted shopping records by id', (
@@ -612,6 +585,63 @@ void main() {
     expect(repo.updatedStatus, ShoppingListItemStatus.bought);
     expect(find.text('2 / 2'), findsOneWidget);
   });
+
+  testWidgets(
+    'ShoppingListScreen records substitution status from row actions',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final repo = _FakeShoppingRepository([_record()]);
+      addTearDown(repo.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
+            recipeRepositoryProvider.overrideWithValue(_FakeRecipeRepository()),
+            shoppingRepositoryProvider.overrideWithValue(repo),
+            pantryRepositoryProvider.overrideWithValue(
+              _FakePantryRepository([]),
+            ),
+            purchaseHistoryRepositoryProvider.overrideWithValue(
+              _FakePurchaseHistoryRepository(),
+            ),
+            wasteRepositoryProvider.overrideWithValue(_FakeWasteRepository()),
+            calendarRepositoryProvider.overrideWithValue(
+              _FakeCalendarRepository([]),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const ShoppingListScreen(listId: 'persisted-shop'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.byType(KsChecklistRow).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Record substitution'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Substitute ingredient ID'),
+        'pepper',
+      );
+      await tester.enterText(find.widgetWithText(TextField, 'Quantity'), '3');
+      await tester.tap(find.text('Save substitution'));
+      await tester.pumpAndSettle();
+
+      expect(repo.updatedItemId, 'item-beans');
+      expect(repo.updatedStatus, ShoppingListItemStatus.substituted);
+      expect(repo.updatedSubstituteIngredientId, 'pepper');
+      expect(repo.updatedSubstituteQuantity, 3);
+      expect(repo.updatedSubstituteUnit, Unit.piece);
+      expect(find.textContaining('Pepper'), findsOneWidget);
+    },
+  );
 
   testWidgets('ShoppingListScreen completes persisted lists into pantry', (
     tester,

@@ -60,19 +60,23 @@ class ShoppingEngine {
         if (needed <= 0) {
           continue;
         }
-        final key = (ingredient.ingredientId, ingredient.unit);
+        final normalized = _normalizeQuantity(
+          quantity: needed,
+          unit: ingredient.unit,
+        );
+        final key = (ingredient.ingredientId, normalized.unit);
         required
             .putIfAbsent(
               key,
               () =>
-                  _RequirementBucket(ingredient.ingredientId, ingredient.unit),
+                  _RequirementBucket(ingredient.ingredientId, normalized.unit),
             )
             .add(
               MealSourceLink(
                 mealEntryId: meal.id,
                 recipeId: recipe.id,
                 date: mealDate,
-                quantity: needed,
+                quantity: normalized.quantity,
               ),
             );
       }
@@ -154,10 +158,25 @@ class ShoppingEngine {
   ) {
     final result = <(String, Unit), double>{};
     for (final item in pantryItems) {
-      final key = (item.ingredientId, item.unit);
-      result[key] = (result[key] ?? 0) + item.quantity;
+      final normalized = _normalizeQuantity(
+        quantity: item.quantity,
+        unit: item.unit,
+      );
+      final key = (item.ingredientId, normalized.unit);
+      result[key] = (result[key] ?? 0) + normalized.quantity;
     }
     return result;
+  }
+
+  ({double quantity, Unit unit}) _normalizeQuantity({
+    required double quantity,
+    required Unit unit,
+  }) {
+    return switch (unit) {
+      Unit.kg => (quantity: quantity * 1000, unit: Unit.g),
+      Unit.l => (quantity: quantity * 1000, unit: Unit.ml),
+      _ => (quantity: quantity, unit: unit),
+    };
   }
 
   DateTime _dateOnly(DateTime value) {

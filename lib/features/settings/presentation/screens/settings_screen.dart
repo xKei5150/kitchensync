@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,7 +7,10 @@ import 'package:kitchensync/app/theme_mode_controller.dart';
 import 'package:kitchensync/core/locale/app_currency.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/locale/unit_system.dart';
+import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Screen 15 · Settings — the quiet, useful corners.
 ///
@@ -15,6 +19,20 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 /// onboarding flow stays reachable.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(settingsSignOutControllerProvider).signOut();
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not sign out: $error')));
+      return;
+    }
+    ref.invalidate(activeHouseholdContextProvider);
+    if (context.mounted) context.go('/onboarding');
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -89,7 +107,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: KsTokens.space20),
             OutlinedButton(
-              onPressed: () => context.go('/onboarding'),
+              onPressed: () => _signOut(context, ref),
               style: OutlinedButton.styleFrom(
                 foregroundColor: ks.danger,
                 side: BorderSide(color: ks.borderStrong),
@@ -104,6 +122,30 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+final settingsSignOutControllerProvider = Provider<SettingsSignOutController>((
+  ref,
+) {
+  return SettingsSignOutController(
+    auth: ref.watch(firebaseAuthProvider),
+    preferences: ref.watch(sharedPreferencesProvider),
+  );
+});
+
+class SettingsSignOutController {
+  const SettingsSignOutController({
+    required this.auth,
+    required this.preferences,
+  });
+
+  final FirebaseAuth? auth;
+  final SharedPreferences preferences;
+
+  Future<void> signOut() async {
+    await preferences.remove(skipHouseholdSetupPrefKey);
+    await auth?.signOut();
   }
 }
 

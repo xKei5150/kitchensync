@@ -5,6 +5,7 @@ import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/services/recipe_import_parser.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
@@ -510,7 +511,7 @@ class _MyRecipeGrid extends ConsumerWidget {
                 title: recipe.title,
                 meta: recipe.meta,
                 coverColors: recipe.colors,
-                onEdit: () {},
+                onEdit: () => _editRecipe(context, ref, recipe.record),
                 onDelete: () => _deleteRecipe(context, ref, recipe.record),
               ),
             );
@@ -518,6 +519,40 @@ class _MyRecipeGrid extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _editRecipe(
+    BuildContext context,
+    WidgetRef ref,
+    Recipe recipe,
+  ) async {
+    final drafts = await showModalBottomSheet<List<RecipeDraft>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _RecipeImportSheet(existingRecipe: recipe),
+    );
+    if (drafts == null || drafts.isEmpty) {
+      return;
+    }
+    try {
+      final updated = await ref
+          .read(recipeLibraryControllerProvider)
+          .updateLocalRecipe(recipe: recipe, draft: drafts.single);
+      ref.invalidate(activeHouseholdRecipesProvider);
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${updated.name} updated')));
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update recipe: $error')),
+      );
+    }
   }
 
   Future<void> _deleteRecipe(
@@ -546,7 +581,9 @@ class _MyRecipeGrid extends ConsumerWidget {
 }
 
 class _RecipeImportSheet extends StatefulWidget {
-  const _RecipeImportSheet();
+  const _RecipeImportSheet({this.existingRecipe});
+
+  final Recipe? existingRecipe;
 
   @override
   State<_RecipeImportSheet> createState() => _RecipeImportSheetState();
@@ -580,13 +617,11 @@ Access: Private
   late final TextEditingController _timeTagsController;
   late final TextEditingController _recipeTagsController;
   late final TextEditingController _descriptionController;
-  late final TextEditingController _ingredientNameController;
-  late final TextEditingController _ingredientQuantityController;
-  late final TextEditingController _ingredientNoteController;
   late final TextEditingController _instructionsController;
   late final TextEditingController _priceController;
   late final TextEditingController _youtubeController;
-  Unit _ingredientUnit = Unit.g;
+  final List<_ManualIngredientInput> _ingredientRows = [];
+  int _nextIngredientRowId = 0;
   RecipeVisibility _visibility = RecipeVisibility.private;
   bool _pasteMode = false;
   String? _error;
@@ -594,18 +629,38 @@ Access: Private
   @override
   void initState() {
     super.initState();
+    final recipe = widget.existingRecipe;
     _pasteController = TextEditingController(text: _template.trim());
-    _nameController = TextEditingController();
-    _servingsController = TextEditingController(text: '4');
-    _timeTagsController = TextEditingController(text: 'Dinner');
-    _recipeTagsController = TextEditingController();
-    _descriptionController = TextEditingController();
-    _ingredientNameController = TextEditingController();
-    _ingredientQuantityController = TextEditingController(text: '1');
-    _ingredientNoteController = TextEditingController();
-    _instructionsController = TextEditingController();
-    _priceController = TextEditingController();
-    _youtubeController = TextEditingController();
+    _nameController = TextEditingController(text: recipe?.name ?? '');
+    _servingsController = TextEditingController(
+      text: '${recipe?.defaultServingSize ?? 4}',
+    );
+    _timeTagsController = TextEditingController(
+      text: recipe?.mealTimeTags.join(', ') ?? 'Dinner',
+    );
+    _recipeTagsController = TextEditingController(
+      text: recipe?.recipeTags.join(', ') ?? '',
+    );
+    _descriptionController = TextEditingController(
+      text: recipe?.description ?? '',
+    );
+    _instructionsController = TextEditingController(
+      text: recipe?.instructions.join('\n') ?? '',
+    );
+    _priceController = TextEditingController(
+      text: recipe?.priceEstimate?.toString() ?? '',
+    );
+    _youtubeController = TextEditingController(
+      text: recipe?.youtubeEmbedUrl?.toString() ?? '',
+    );
+    _visibility = recipe?.visibility ?? RecipeVisibility.private;
+    if (recipe == null || recipe.ingredients.isEmpty) {
+      _ingredientRows.add(_createIngredientRow());
+    } else {
+      for (final ingredient in recipe.ingredients) {
+        _ingredientRows.add(_createIngredientRow(ingredient: ingredient));
+      }
+    }
   }
 
   @override
@@ -616,9 +671,9 @@ Access: Private
     _timeTagsController.dispose();
     _recipeTagsController.dispose();
     _descriptionController.dispose();
-    _ingredientNameController.dispose();
-    _ingredientQuantityController.dispose();
-    _ingredientNoteController.dispose();
+    for (final row in _ingredientRows) {
+      row.dispose();
+    }
     _instructionsController.dispose();
     _priceController.dispose();
     _youtubeController.dispose();
@@ -626,7 +681,7 @@ Access: Private
   }
 
   void _save() {
-    if (!_pasteMode) {
+    if (!_pasteMode || widget.existingRecipe != null) {
       _saveManual();
       return;
     }
@@ -641,10 +696,44 @@ Access: Private
   void _saveManual() {
     final name = _nameController.text.trim();
     final servings = int.tryParse(_servingsController.text.trim());
-    final ingredientName = _ingredientNameController.text.trim();
-    final ingredientQuantity = double.tryParse(
-      _ingredientQuantityController.text.trim(),
-    );
+    final ingredientDrafts = <RecipeIngredientDraft>[];
+    var ingredientError = false;
+    for (final row in _ingredientRows) {
+      final ingredientName = row.nameController.text.trim();
+      final quantityText = row.quantityController.text.trim();
+      final ingredientQuantity = double.tryParse(quantityText);
+      final hasAnyInput =
+          ingredientName.isNotEmpty ||
+          quantityText.isNotEmpty ||
+          row.noteController.text.trim().isNotEmpty ||
+          row.ingredientId != null;
+      if (!hasAnyInput) {
+        continue;
+      }
+      if (ingredientName.isEmpty) {
+        ingredientError = true;
+        setState(() => _error = 'Every ingredient needs a name.');
+        break;
+      }
+      if (ingredientQuantity == null || ingredientQuantity <= 0) {
+        ingredientError = true;
+        setState(
+          () => _error = 'Every ingredient quantity must be a positive number.',
+        );
+        break;
+      }
+      ingredientDrafts.add(
+        RecipeIngredientDraft(
+          ingredientId: row.linkedIngredientIdFor(ingredientName),
+          name: ingredientName,
+          quantity: ingredientQuantity,
+          unit: row.unit,
+          preparationNote: row.noteController.text.trim().isEmpty
+              ? null
+              : row.noteController.text.trim(),
+        ),
+      );
+    }
     final instructions = _splitLines(_instructionsController.text);
     final price = _priceController.text.trim().isEmpty
         ? null
@@ -661,12 +750,11 @@ Access: Private
       );
       return;
     }
-    if (ingredientName.isEmpty) {
-      setState(() => _error = 'At least one ingredient name is required.');
+    if (ingredientError) {
       return;
     }
-    if (ingredientQuantity == null || ingredientQuantity <= 0) {
-      setState(() => _error = 'Ingredient quantity must be a positive number.');
+    if (ingredientDrafts.isEmpty) {
+      setState(() => _error = 'At least one ingredient name is required.');
       return;
     }
     if (instructions.isEmpty) {
@@ -677,6 +765,10 @@ Access: Private
       setState(() => _error = 'Price estimate must be numeric.');
       return;
     }
+    if (_visibility == RecipeVisibility.public && price == null) {
+      setState(() => _error = 'Public recipes require a price estimate.');
+      return;
+    }
 
     final draft = RecipeDraft(
       name: name,
@@ -684,22 +776,64 @@ Access: Private
       timeTags: _splitCsv(_timeTagsController.text),
       recipeTags: _splitCsv(_recipeTagsController.text),
       description: _descriptionController.text.trim(),
-      ingredients: [
-        RecipeIngredientDraft(
-          name: ingredientName,
-          quantity: ingredientQuantity,
-          unit: _ingredientUnit,
-          preparationNote: _ingredientNoteController.text.trim().isEmpty
-              ? null
-              : _ingredientNoteController.text.trim(),
-        ),
-      ],
+      ingredients: List.unmodifiable(ingredientDrafts),
       instructions: instructions,
       visibility: _visibility,
       priceEstimate: price,
       youtubeUrl: youtube.isEmpty ? null : Uri.tryParse(youtube),
     );
     Navigator.of(context).pop([draft]);
+  }
+
+  _ManualIngredientInput _createIngredientRow({RecipeIngredient? ingredient}) {
+    return _ManualIngredientInput(
+      id: _nextIngredientRowId++,
+      ingredientId: ingredient?.ingredientId,
+      linkedName: ingredient?.description,
+      nameController: TextEditingController(
+        text: ingredient?.description ?? '',
+      ),
+      quantityController: TextEditingController(
+        text: ingredient == null ? '1' : '${ingredient.quantity}',
+      ),
+      noteController: TextEditingController(
+        text: ingredient?.preparationNote ?? '',
+      ),
+      unit: ingredient?.unit ?? Unit.g,
+    );
+  }
+
+  void _addIngredientRow() {
+    setState(() {
+      _ingredientRows.add(_createIngredientRow());
+      _error = null;
+    });
+  }
+
+  void _removeIngredientRow(_ManualIngredientInput row) {
+    if (_ingredientRows.length == 1) {
+      return;
+    }
+    setState(() {
+      _ingredientRows.remove(row);
+      row.dispose();
+      _error = null;
+    });
+  }
+
+  Future<void> _pickIngredient(_ManualIngredientInput row) async {
+    final ingredient = await context.push<Ingredient>('/ingredient/pick');
+    if (!mounted || ingredient == null) {
+      return;
+    }
+    setState(() {
+      row.ingredientId = ingredient.id;
+      final displayName = ingredient.displayNames['en'] ?? ingredient.name;
+      row.nameController.text = displayName;
+      row.linkedName = displayName;
+      row.unit = ingredient.defaultUnit;
+      _error = null;
+    });
   }
 
   List<String> _splitCsv(String value) => value
@@ -740,7 +874,7 @@ Access: Private
             ),
             const SizedBox(height: KsTokens.space16),
             Text(
-              'Add a recipe',
+              widget.existingRecipe == null ? 'Add a recipe' : 'Edit recipe',
               style: KsTokens.displaySmall.copyWith(
                 color: ks.textPrimary,
                 fontWeight: FontWeight.w600,
@@ -748,28 +882,30 @@ Access: Private
               ),
             ),
             const SizedBox(height: KsTokens.space12),
-            _ImportModeRow(
-              icon: Icons.edit_note_rounded,
-              title: 'Manual recipe',
-              subtitle: 'Name, servings, tags, ingredients and instructions',
-              selected: !_pasteMode,
-              onTap: () => setState(() {
-                _pasteMode = false;
-                _error = null;
-              }),
-            ),
-            const SizedBox(height: KsTokens.space8),
-            _ImportModeRow(
-              icon: Icons.auto_awesome_rounded,
-              title: 'Paste & Parse',
-              subtitle: 'Bulk import one or more marked recipe blocks',
-              selected: _pasteMode,
-              onTap: () => setState(() {
-                _pasteMode = true;
-                _error = null;
-              }),
-            ),
-            const SizedBox(height: KsTokens.space12),
+            if (widget.existingRecipe == null) ...[
+              _ImportModeRow(
+                icon: Icons.edit_note_rounded,
+                title: 'Manual recipe',
+                subtitle: 'Name, servings, tags, ingredients and instructions',
+                selected: !_pasteMode,
+                onTap: () => setState(() {
+                  _pasteMode = false;
+                  _error = null;
+                }),
+              ),
+              const SizedBox(height: KsTokens.space8),
+              _ImportModeRow(
+                icon: Icons.auto_awesome_rounded,
+                title: 'Paste & Parse',
+                subtitle: 'Bulk import one or more marked recipe blocks',
+                selected: _pasteMode,
+                onTap: () => setState(() {
+                  _pasteMode = true;
+                  _error = null;
+                }),
+              ),
+              const SizedBox(height: KsTokens.space12),
+            ],
             if (_pasteMode)
               TextField(
                 controller: _pasteController,
@@ -789,15 +925,15 @@ Access: Private
                 timeTagsController: _timeTagsController,
                 recipeTagsController: _recipeTagsController,
                 descriptionController: _descriptionController,
-                ingredientNameController: _ingredientNameController,
-                ingredientQuantityController: _ingredientQuantityController,
-                ingredientNoteController: _ingredientNoteController,
+                ingredientRows: _ingredientRows,
                 instructionsController: _instructionsController,
                 priceController: _priceController,
                 youtubeController: _youtubeController,
-                ingredientUnit: _ingredientUnit,
                 visibility: _visibility,
-                onUnitChanged: (unit) => setState(() => _ingredientUnit = unit),
+                onAddIngredient: _addIngredientRow,
+                onRemoveIngredient: _removeIngredientRow,
+                onPickIngredient: _pickIngredient,
+                onUnitChanged: (row, unit) => setState(() => row.unit = unit),
                 onVisibilityChanged: (visibility) =>
                     setState(() => _visibility = visibility),
               ),
@@ -808,7 +944,13 @@ Access: Private
             const SizedBox(height: KsTokens.space12),
             FilledButton(
               onPressed: _save,
-              child: Text(_pasteMode ? 'Import recipes' : 'Save recipe'),
+              child: Text(
+                _pasteMode && widget.existingRecipe == null
+                    ? 'Import recipes'
+                    : widget.existingRecipe == null
+                    ? 'Save recipe'
+                    : 'Update recipe',
+              ),
             ),
           ],
         ),
@@ -825,6 +967,45 @@ Access: Private
         borderRadius: BorderRadius.circular(KsTokens.radius12),
       ),
     );
+  }
+}
+
+class _ManualIngredientInput {
+  _ManualIngredientInput({
+    required this.id,
+    TextEditingController? nameController,
+    TextEditingController? quantityController,
+    TextEditingController? noteController,
+    this.unit = Unit.g,
+    this.ingredientId,
+    this.linkedName,
+  }) : nameController = nameController ?? TextEditingController(),
+       quantityController = quantityController ?? TextEditingController(),
+       noteController = noteController ?? TextEditingController();
+
+  final int id;
+  final TextEditingController nameController;
+  final TextEditingController quantityController;
+  final TextEditingController noteController;
+  Unit unit;
+  String? ingredientId;
+  String? linkedName;
+
+  String? linkedIngredientIdFor(String currentName) {
+    final id = ingredientId;
+    final name = linkedName;
+    if (id == null || name == null) {
+      return null;
+    }
+    return currentName.trim().toLowerCase() == name.trim().toLowerCase()
+        ? id
+        : null;
+  }
+
+  void dispose() {
+    nameController.dispose();
+    quantityController.dispose();
+    noteController.dispose();
   }
 }
 
@@ -904,14 +1085,14 @@ class _ManualRecipeFields extends StatelessWidget {
     required this.timeTagsController,
     required this.recipeTagsController,
     required this.descriptionController,
-    required this.ingredientNameController,
-    required this.ingredientQuantityController,
-    required this.ingredientNoteController,
+    required this.ingredientRows,
     required this.instructionsController,
     required this.priceController,
     required this.youtubeController,
-    required this.ingredientUnit,
     required this.visibility,
+    required this.onAddIngredient,
+    required this.onRemoveIngredient,
+    required this.onPickIngredient,
     required this.onUnitChanged,
     required this.onVisibilityChanged,
   });
@@ -921,15 +1102,15 @@ class _ManualRecipeFields extends StatelessWidget {
   final TextEditingController timeTagsController;
   final TextEditingController recipeTagsController;
   final TextEditingController descriptionController;
-  final TextEditingController ingredientNameController;
-  final TextEditingController ingredientQuantityController;
-  final TextEditingController ingredientNoteController;
+  final List<_ManualIngredientInput> ingredientRows;
   final TextEditingController instructionsController;
   final TextEditingController priceController;
   final TextEditingController youtubeController;
-  final Unit ingredientUnit;
   final RecipeVisibility visibility;
-  final ValueChanged<Unit> onUnitChanged;
+  final VoidCallback onAddIngredient;
+  final ValueChanged<_ManualIngredientInput> onRemoveIngredient;
+  final ValueChanged<_ManualIngredientInput> onPickIngredient;
+  final void Function(_ManualIngredientInput row, Unit unit) onUnitChanged;
   final ValueChanged<RecipeVisibility> onVisibilityChanged;
 
   @override
@@ -977,43 +1158,34 @@ class _ManualRecipeFields extends StatelessWidget {
           maxLines: 3,
         ),
         const SizedBox(height: KsTokens.space8),
-        _ManualTextField(
-          controller: ingredientNameController,
-          label: 'Ingredient name',
-        ),
-        const SizedBox(height: KsTokens.space8),
         Row(
           children: [
             Expanded(
-              child: _ManualTextField(
-                controller: ingredientQuantityController,
-                label: 'Quantity',
-                keyboardType: TextInputType.number,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Ingredients',
+                  style: KsTokens.labelMedium.copyWith(letterSpacing: 0),
+                ),
               ),
             ),
-            const SizedBox(width: KsTokens.space8),
-            Expanded(
-              child: DropdownButtonFormField<Unit>(
-                initialValue: ingredientUnit,
-                decoration: _manualDecoration(context, 'Unit'),
-                items: [
-                  for (final unit in Unit.values)
-                    DropdownMenuItem(value: unit, child: Text(unit.name)),
-                ],
-                onChanged: (unit) {
-                  if (unit != null) {
-                    onUnitChanged(unit);
-                  }
-                },
-              ),
+            TextButton.icon(
+              onPressed: onAddIngredient,
+              icon: const Icon(Icons.add_rounded, size: 17),
+              label: const Text('Add ingredient'),
             ),
           ],
         ),
-        const SizedBox(height: KsTokens.space8),
-        _ManualTextField(
-          controller: ingredientNoteController,
-          label: 'Preparation note',
-        ),
+        for (final row in ingredientRows) ...[
+          _ManualIngredientFields(
+            row: row,
+            canRemove: ingredientRows.length > 1,
+            onRemove: () => onRemoveIngredient(row),
+            onPick: () => onPickIngredient(row),
+            onUnitChanged: (unit) => onUnitChanged(row, unit),
+          ),
+          const SizedBox(height: KsTokens.space8),
+        ],
         const SizedBox(height: KsTokens.space8),
         _ManualTextField(
           controller: instructionsController,
@@ -1045,6 +1217,89 @@ class _ManualRecipeFields extends StatelessWidget {
           selected: {visibility},
           onSelectionChanged: (selection) =>
               onVisibilityChanged(selection.single),
+        ),
+      ],
+    );
+  }
+}
+
+class _ManualIngredientFields extends StatelessWidget {
+  const _ManualIngredientFields({
+    required this.row,
+    required this.canRemove,
+    required this.onRemove,
+    required this.onPick,
+    required this.onUnitChanged,
+  });
+
+  final _ManualIngredientInput row;
+  final bool canRemove;
+  final VoidCallback onRemove;
+  final VoidCallback onPick;
+  final ValueChanged<Unit> onUnitChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _ManualTextField(
+                controller: row.nameController,
+                label: 'Ingredient name',
+              ),
+            ),
+            const SizedBox(width: KsTokens.space8),
+            IconButton.filledTonal(
+              tooltip: 'Pick ingredient',
+              onPressed: onPick,
+              icon: const Icon(Icons.search_rounded, size: 18),
+            ),
+            if (canRemove) ...[
+              const SizedBox(width: KsTokens.space4),
+              IconButton(
+                tooltip: 'Remove ingredient',
+                onPressed: onRemove,
+                icon: const Icon(Icons.close_rounded, size: 18),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: KsTokens.space8),
+        Row(
+          children: [
+            Expanded(
+              child: _ManualTextField(
+                controller: row.quantityController,
+                label: 'Quantity',
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: KsTokens.space8),
+            Expanded(
+              child: DropdownButtonFormField<Unit>(
+                key: ValueKey('ingredient-unit-${row.id}-${row.unit.name}'),
+                initialValue: row.unit,
+                decoration: _manualDecoration(context, 'Unit'),
+                items: [
+                  for (final unit in Unit.values)
+                    DropdownMenuItem(value: unit, child: Text(unit.name)),
+                ],
+                onChanged: (unit) {
+                  if (unit != null) {
+                    onUnitChanged(unit);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: KsTokens.space8),
+        _ManualTextField(
+          controller: row.noteController,
+          label: 'Preparation note',
         ),
       ],
     );

@@ -22,7 +22,10 @@ class UpdatePantryItem extends UseCase<PantryItem, PantryItem> {
     }
 
     try {
-      final ing = await _ingredients.getById(item.ingredientId);
+      final ing = await _ingredients.getById(
+        item.ingredientId,
+        householdId: item.householdId,
+      );
       if (ing == null) {
         return Result.failure(
           Failure.notFound(entity: 'ingredient', id: item.ingredientId),

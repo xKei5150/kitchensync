@@ -53,7 +53,10 @@ class AddPantryItem extends UseCase<PantryItem, AddPantryItemParams> {
     }
 
     try {
-      final ing = await _ingredients.getById(params.ingredientId);
+      final ing = await _ingredients.getById(
+        params.ingredientId,
+        householdId: params.householdId,
+      );
       if (ing == null) {
         return Result.failure(
           Failure.notFound(entity: 'ingredient', id: params.ingredientId),

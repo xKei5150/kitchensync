@@ -169,7 +169,7 @@ class _HouseholdOnboardingController {
     final auth = this.auth;
     final db = this.db;
     if (auth == null || db == null) return;
-    final user = await _activeOrAnonymousUser(auth);
+    final user = _requireSignedInUser(auth);
     final userDoc = db.collection('users').doc(user.uid);
     final userSnap = await userDoc.get();
     final storedPremium = userSnap.data()?['isPremium'] as bool? ?? false;
@@ -242,7 +242,7 @@ class _HouseholdOnboardingController {
     final auth = this.auth;
     final db = this.db;
     if (auth == null || db == null) return;
-    final user = await _activeOrAnonymousUser(auth);
+    final user = _requireSignedInUser(auth);
     final normalizedCode = _normalizeInviteCode(code);
     if (normalizedCode.isEmpty) {
       throw StateError('Enter an invite code.');
@@ -310,11 +310,10 @@ class _HouseholdOnboardingController {
     await batch.commit();
   }
 
-  Future<User> _activeOrAnonymousUser(FirebaseAuth auth) async {
-    var user = auth.currentUser;
-    user ??= (await auth.signInAnonymously()).user;
+  User _requireSignedInUser(FirebaseAuth auth) {
+    final user = auth.currentUser;
     if (user == null) {
-      throw StateError('No signed-in user.');
+      throw StateError('Sign in before setting up a household.');
     }
     return user;
   }

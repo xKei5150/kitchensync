@@ -1,14 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:io';
+
 import 'package:kitchensync/app/theme.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/core/utils/clock.dart';
+import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/insights_screen.dart';
+import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
+import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
+import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
+import 'package:kitchensync/features/shopping/domain/repositories/shopping_repository.dart';
+import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
 PantryItem _item({
   required String id,
@@ -38,6 +55,15 @@ Future<void> _pump(WidgetTester tester, List<PantryItem> items) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        activeHouseholdContextProvider.overrideWithValue(
+          const ActiveHouseholdContext(
+            id: 'solo-household',
+            name: 'Test kitchen',
+            role: HouseholdRole.admin,
+            isJoint: true,
+            hasPremium: true,
+          ),
+        ),
         pantryAllItemsStreamProvider.overrideWith((ref) => Stream.value(items)),
         wasteHistoryStreamProvider.overrideWith(
           (ref) => Stream.value(<WasteEvent>[]),
@@ -47,6 +73,215 @@ Future<void> _pump(WidgetTester tester, List<PantryItem> items) async {
     ),
   );
   await tester.pump();
+}
+
+class _FakeShoppingRepository implements ShoppingRepository {
+  ShoppingListRecord? upserted;
+
+  @override
+  Stream<List<ShoppingListRecord>> watchLists(String householdId) =>
+      Stream.value(upserted == null ? const [] : [upserted!]);
+
+  @override
+  Stream<ShoppingListRecord?> watchList({
+    required String householdId,
+    required String listId,
+  }) => Stream.value(upserted?.id == listId ? upserted : null);
+
+  @override
+  Future<void> upsertList(ShoppingListRecord list) async {
+    upserted = list;
+  }
+
+  @override
+  Future<void> updateItemStatus({
+    required String householdId,
+    required String listId,
+    required String itemId,
+    required ShoppingListItemStatus status,
+    String? substituteIngredientId,
+    double? substituteQuantity,
+    Unit? substituteUnit,
+  }) async {}
+
+  @override
+  Future<void> updateListStatus({
+    required String householdId,
+    required String listId,
+    required ShoppingListStatus status,
+  }) async {}
+
+  @override
+  Future<void> applyShopNowPurchasesToScheduledLists({
+    required String householdId,
+    required ShoppingListRecord shopNowList,
+  }) async {}
+
+  @override
+  Future<void> deleteList({
+    required String householdId,
+    required String listId,
+  }) async {}
+}
+
+class _EmptyCalendarRepository implements CalendarRepository {
+  @override
+  Stream<List<MealScheduleEntry>> watchMealsInRange({
+    required String householdId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) => Stream.value(const []);
+
+  @override
+  Future<void> upsertMeal({
+    required String householdId,
+    required MealScheduleEntry entry,
+  }) async {}
+
+  @override
+  Future<void> deleteMeal({
+    required String householdId,
+    required String entryId,
+  }) async {}
+
+  @override
+  Stream<List<CalendarDaySettings>> watchActiveDaySettings(
+    String householdId,
+  ) => Stream.value(const []);
+
+  @override
+  Future<void> upsertDaySettings(CalendarDaySettings settings) async {}
+}
+
+class _FakePantryRepository implements PantryRepository {
+  const _FakePantryRepository(this.items);
+
+  final List<PantryItem> items;
+
+  @override
+  Stream<List<PantryItem>> watchBySection(
+    String householdId,
+    PantrySection section,
+  ) => Stream.value(
+    items.where((item) => item.section == section).toList(growable: false),
+  );
+
+  @override
+  Stream<PantryItem?> watchById(String householdId, String itemId) =>
+      Stream.value(null);
+
+  @override
+  Future<PantryItem?> findByIngredient(
+    String householdId,
+    String ingredientId,
+  ) async => null;
+
+  @override
+  Future<void> add(PantryItem item) async {}
+
+  @override
+  Future<void> update(PantryItem item) async {}
+
+  @override
+  Future<void> setQuantity(
+    String householdId,
+    String itemId,
+    double newQty,
+  ) async {}
+
+  @override
+  Future<void> delete(String householdId, String itemId) async {}
+
+  @override
+  Future<String> uploadPhoto(
+    String householdId,
+    String itemId,
+    File file,
+  ) async => '';
+
+  @override
+  Future<void> markAsWasteAtomic({
+    required String householdId,
+    required String pantryItemId,
+    required double newPantryQuantity,
+    required WasteEvent wasteEvent,
+  }) async {}
+
+  @override
+  Future<PantryItem?> findByIngredientUnit({
+    required String householdId,
+    required String ingredientId,
+    required Unit unit,
+    required PantrySection section,
+  }) async => null;
+}
+
+class _FakePurchaseHistoryRepository implements PurchaseHistoryRepository {
+  const _FakePurchaseHistoryRepository(this.records);
+
+  final List<PurchaseRecord> records;
+
+  @override
+  Stream<List<PurchaseRecord>> watchByHousehold(String householdId) =>
+      Stream.value(records);
+
+  @override
+  Stream<List<PurchaseRecord>> watchByIngredient(
+    String householdId,
+    String ingredientId,
+  ) => Stream.value(
+    records
+        .where((record) => record.ingredientId == ingredientId)
+        .toList(growable: false),
+  );
+
+  @override
+  Future<void> record(PurchaseRecord record) async {}
+}
+
+class _EmptyWasteRepository implements WasteRepository {
+  @override
+  Stream<List<WasteEvent>> watchByHousehold(
+    String householdId, {
+    int limit = 50,
+  }) => Stream.value(const []);
+
+  @override
+  Future<void> log(WasteEvent event) async {}
+}
+
+class _EmptyRecipeRepository implements RecipeRepository {
+  @override
+  Stream<List<Recipe>> watchHouseholdRecipes(String householdId) =>
+      Stream.value(const []);
+
+  @override
+  Stream<Recipe?> watchById(String recipeId) => Stream.value(null);
+
+  @override
+  Future<void> upsert(Recipe recipe) async {}
+
+  @override
+  Future<void> delete(String recipeId) async {}
+
+  @override
+  Future<List<Recipe>> searchPublicRecipes({
+    double? budget,
+    int? targetServings,
+    int limit = 30,
+  }) async => const [];
+
+  @override
+  Future<SavedRecipe> savePublicRecipeAsLocalCopy({
+    required String sourceRecipeId,
+    required String userId,
+    required String householdId,
+    required String localRecipeId,
+    required String savedRecipeId,
+    required DateTime now,
+  }) {
+    throw UnimplementedError();
+  }
 }
 
 void main() {
@@ -102,10 +337,143 @@ void main() {
   testWidgets('Insights keeps the premium veil over the working charts', (
     tester,
   ) async {
-    await _pump(tester, [_item(id: '1', section: PantrySection.food)]);
+    tester.view.physicalSize = const Size(400, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activeHouseholdContextProvider.overrideWithValue(
+            const ActiveHouseholdContext(
+              id: 'solo-household',
+              name: 'Test kitchen',
+              role: HouseholdRole.admin,
+              isJoint: true,
+              hasPremium: false,
+            ),
+          ),
+          pantryAllItemsStreamProvider.overrideWith(
+            (ref) =>
+                Stream.value([_item(id: '1', section: PantrySection.food)]),
+          ),
+          wasteHistoryStreamProvider.overrideWith(
+            (ref) => Stream.value(<WasteEvent>[]),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const InsightsScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
 
     expect(find.byType(KsPremiumLock), findsOneWidget);
     expect(find.text('See your pantry, measured'), findsOneWidget);
+  });
+
+  testWidgets('Insights can add due bulk recommendation to shopping', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final shopping = _FakeShoppingRepository();
+    final bulkItem = PantryItem(
+      id: 'rice-stock',
+      householdId: 'solo-household',
+      ingredientId: 'rice',
+      quantity: 0,
+      unit: Unit.g,
+      section: PantrySection.bulk,
+      lastPurchaseDate: DateTime(2026, 6),
+      createdAt: DateTime(2026, 7, 5),
+      updatedAt: DateTime(2026, 7, 5),
+    );
+    final purchases = [
+      PurchaseRecord(
+        id: 'rice-june',
+        householdId: 'solo-household',
+        ingredientId: 'rice',
+        quantity: 2000,
+        unit: Unit.g,
+        purchaseDate: DateTime(2026, 6),
+        isBulk: true,
+      ),
+      PurchaseRecord(
+        id: 'rice-july',
+        householdId: 'solo-household',
+        ingredientId: 'rice',
+        quantity: 3000,
+        unit: Unit.g,
+        purchaseDate: DateTime(2026, 7),
+        isBulk: true,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activeHouseholdContextProvider.overrideWithValue(
+            const ActiveHouseholdContext(
+              id: 'solo-household',
+              name: 'Test kitchen',
+              role: HouseholdRole.admin,
+              isJoint: true,
+              hasPremium: true,
+            ),
+          ),
+          pantryAllItemsStreamProvider.overrideWith(
+            (ref) => Stream.value([bulkItem]),
+          ),
+          wasteHistoryStreamProvider.overrideWith(
+            (ref) => Stream.value(<WasteEvent>[]),
+          ),
+          purchaseHistoryStreamProvider.overrideWith(
+            (ref) => Stream.value(purchases),
+          ),
+          shoppingPlanningControllerProvider.overrideWithValue(
+            ShoppingPlanningController(
+              repository: shopping,
+              calendarRepository: _EmptyCalendarRepository(),
+              pantryRepository: _FakePantryRepository([bulkItem]),
+              purchaseHistoryRepository: _FakePurchaseHistoryRepository(
+                purchases,
+              ),
+              wasteRepository: _EmptyWasteRepository(),
+              recipeRepository: _EmptyRecipeRepository(),
+              householdId: 'solo-household',
+              household: const ActiveHouseholdContext(
+                id: 'solo-household',
+                name: 'Test kitchen',
+                role: HouseholdRole.admin,
+                isJoint: true,
+                hasPremium: true,
+              ),
+              idGenerator: FakeIdGenerator(['bulk-list', 'rice-line']),
+              clock: FakeClock(DateTime(2026, 7, 6, 9)),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const InsightsScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Add to shopping'));
+    await tester.pumpAndSettle();
+
+    expect(shopping.upserted, isNotNull);
+    expect(shopping.upserted!.type, ShoppingListType.suggested);
+    expect(shopping.upserted!.items.single.ingredientId, 'rice');
+    expect(shopping.upserted!.items.single.quantityNeeded, 2500);
+    expect(find.text('rice added to shopping'), findsOneWidget);
   });
 
   testWidgets('Insights renders in dark theme without error', (tester) async {
@@ -117,6 +485,15 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          activeHouseholdContextProvider.overrideWithValue(
+            const ActiveHouseholdContext(
+              id: 'solo-household',
+              name: 'Test kitchen',
+              role: HouseholdRole.admin,
+              isJoint: true,
+              hasPremium: true,
+            ),
+          ),
           pantryAllItemsStreamProvider.overrideWith(
             (ref) =>
                 Stream.value([_item(id: '1', section: PantrySection.food)]),

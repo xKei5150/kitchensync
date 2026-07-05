@@ -2,7 +2,7 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingre
 
 abstract class IngredientRepository {
   Stream<List<Ingredient>> watchByIds(List<String> ids);
-  Future<Ingredient?> getById(String id);
+  Future<Ingredient?> getById(String id, {String? householdId});
   Future<List<Ingredient>> search({
     required String query,
     String? householdId,

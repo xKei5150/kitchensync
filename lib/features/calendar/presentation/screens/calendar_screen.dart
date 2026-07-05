@@ -5,7 +5,8 @@ import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
-import 'package:kitchensync/features/calendar/presentation/providers/planning_providers.dart';
+import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
+import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 
@@ -49,25 +50,23 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final planning = ref.watch(planningControllerProvider);
     final visibleStart = DateTime(_visibleMonth.year, _visibleMonth.month);
     final visibleEnd = DateTime(_visibleMonth.year, _visibleMonth.month + 1, 0);
     final persistedMeals = ref.watch(
       activeCalendarMealsProvider((start: visibleStart, end: visibleEnd)),
     );
+    final activeSettings = ref.watch(activeCalendarDaySettingsProvider);
     final persistedRecipes = ref.watch(activeHouseholdRecipesProvider);
-    final schedule = persistedMeals.valueOrNull?.isNotEmpty ?? false
-        ? persistedMeals.valueOrNull!
-        : planning.schedule;
-    final recipesById = _recipesById(
-      persistedRecipes.valueOrNull,
-      planning.recipesById,
-    );
+    final wasteEvents = ref.watch(wasteHistoryStreamProvider);
+    final schedule = persistedMeals.valueOrNull ?? const <MealScheduleEntry>[];
+    final recipesById = _recipesById(persistedRecipes.valueOrNull);
     final mealsByDay = _mealsByDay(schedule);
+    final wasteDays = _wasteDays(wasteEvents.valueOrNull ?? const []);
     final days = _monthDays(
       month: _visibleMonth,
       mealsByDay: mealsByDay,
-      shoppingDate: planning.activeShoppingList?.endDate,
+      wasteDays: wasteDays,
+      shoppingDate: null,
     );
     final selectedMeals = mealsByDay[_dateKey(_selectedDate)] ?? const [];
     final selectedMeal = selectedMeals.isEmpty ? null : selectedMeals.first;
@@ -88,6 +87,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             eyebrow: 'The Calendar',
             title: _monthTitle(_visibleMonth),
             actions: [
+              KsHeaderAction(
+                icon: Icons.tune_rounded,
+                tooltip: 'Calendar defaults',
+                onTap: () => _openDefaultsSheet(
+                  activeSettings.valueOrNull,
+                  visibleStart,
+                  visibleEnd,
+                ),
+              ),
               KsHeaderAction(
                 icon: Icons.dashboard_customize_outlined,
                 tooltip: 'Menu Sets',
@@ -129,6 +137,57 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
+  Future<void> _openDefaultsSheet(
+    List<CalendarDaySettings>? settings,
+    DateTime visibleStart,
+    DateTime visibleEnd,
+  ) async {
+    final existing = _settingsForDate(_selectedDate, settings ?? const []);
+    final input = await showModalBottomSheet<_CalendarDefaultsInput>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _CalendarDefaultsSheet(
+        existing: existing,
+        initialStart: existing?.dateRangeStart ?? visibleStart,
+        initialEnd: existing?.dateRangeEnd ?? visibleEnd,
+      ),
+    );
+    if (input == null || !mounted) {
+      return;
+    }
+    try {
+      await ref
+          .read(calendarSettingsControllerProvider)
+          .saveDefaults(
+            existing: existing,
+            dateRangeStart: input.dateRangeStart,
+            dateRangeEnd: input.dateRangeEnd,
+            defaultServingSize: input.defaultServingSize,
+            mealsPerDay: input.mealsPerDay,
+            dishesPerMeal: input.dishesPerMeal,
+            mealModeName: input.mealModeName,
+          );
+      ref.invalidate(activeCalendarDaySettingsProvider);
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Calendar defaults saved');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Could not save defaults: $error');
+    }
+  }
+
+  void _showSnackBar(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      return;
+    }
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Map<DateTime, List<MealScheduleEntry>> _mealsByDay(
     List<MealScheduleEntry> schedule,
   ) {
@@ -140,15 +199,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     return result;
   }
 
-  Map<String, PlannedRecipe> _recipesById(
-    List<Recipe>? recipes,
-    Map<String, PlannedRecipe> fallback,
-  ) {
-    if (recipes == null || recipes.isEmpty) {
-      return fallback;
-    }
+  Map<String, PlannedRecipe> _recipesById(List<Recipe>? recipes) {
     return {
-      for (final recipe in recipes)
+      for (final recipe in recipes ?? const <Recipe>[])
         recipe.id: PlannedRecipe(
           id: recipe.id,
           title: recipe.name,
@@ -165,9 +218,34 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     };
   }
 
+  CalendarDaySettings? _settingsForDate(
+    DateTime date,
+    List<CalendarDaySettings> settings,
+  ) {
+    final key = _dateKey(date);
+    for (final setting in settings) {
+      if (!setting.isActive) continue;
+      if (!key.isBefore(_dateKey(setting.dateRangeStart)) &&
+          !key.isAfter(_dateKey(setting.dateRangeEnd))) {
+        return setting;
+      }
+    }
+    for (final setting in settings) {
+      if (setting.isActive) {
+        return setting;
+      }
+    }
+    return null;
+  }
+
+  Set<DateTime> _wasteDays(Iterable<WasteEvent> wasteEvents) {
+    return {for (final event in wasteEvents) _dateKey(event.date)};
+  }
+
   List<KsAlmanacDay> _monthDays({
     required DateTime month,
     required Map<DateTime, List<MealScheduleEntry>> mealsByDay,
+    required Set<DateTime> wasteDays,
     required DateTime? shoppingDate,
   }) {
     final first = DateTime(month.year, month.month);
@@ -180,6 +258,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           _statusForDay(
             DateTime(month.year, month.month, day),
             mealsByDay,
+            wasteDays,
             shoppingDate,
           ),
           isToday:
@@ -192,17 +271,21 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   CalendarDayStatus _statusForDay(
     DateTime date,
     Map<DateTime, List<MealScheduleEntry>> mealsByDay,
+    Set<DateTime> wasteDays,
     DateTime? shoppingDate,
   ) {
     if (shoppingDate != null && _dateKey(shoppingDate) == _dateKey(date)) {
       return CalendarDayStatus.shopping;
     }
     final meals = mealsByDay[_dateKey(date)] ?? const [];
-    if (meals.isEmpty) {
-      return CalendarDayStatus.empty;
-    }
     if (meals.any((meal) => meal.state == ScheduledMealState.cancelled)) {
       return CalendarDayStatus.problem;
+    }
+    if (wasteDays.contains(_dateKey(date))) {
+      return CalendarDayStatus.problem;
+    }
+    if (meals.isEmpty) {
+      return CalendarDayStatus.empty;
     }
     if (meals.any((meal) => meal.state == ScheduledMealState.leftover)) {
       return CalendarDayStatus.leftover;
@@ -295,6 +378,254 @@ class _SelectedDayPeek extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarDefaultsInput {
+  const _CalendarDefaultsInput({
+    required this.dateRangeStart,
+    required this.dateRangeEnd,
+    required this.defaultServingSize,
+    required this.mealsPerDay,
+    required this.dishesPerMeal,
+    required this.mealModeName,
+  });
+
+  final DateTime dateRangeStart;
+  final DateTime dateRangeEnd;
+  final int defaultServingSize;
+  final int mealsPerDay;
+  final int dishesPerMeal;
+  final String mealModeName;
+}
+
+class _CalendarDefaultsSheet extends StatefulWidget {
+  const _CalendarDefaultsSheet({
+    required this.existing,
+    required this.initialStart,
+    required this.initialEnd,
+  });
+
+  final CalendarDaySettings? existing;
+  final DateTime initialStart;
+  final DateTime initialEnd;
+
+  @override
+  State<_CalendarDefaultsSheet> createState() => _CalendarDefaultsSheetState();
+}
+
+class _CalendarDefaultsSheetState extends State<_CalendarDefaultsSheet> {
+  late final TextEditingController _servingsController;
+  late final TextEditingController _mealsController;
+  late final TextEditingController _dishesController;
+  late final TextEditingController _modeController;
+  late final TextEditingController _startController;
+  late final TextEditingController _endController;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _servingsController = TextEditingController(
+      text: '${existing?.defaultServingSize ?? 4}',
+    );
+    _mealsController = TextEditingController(
+      text: '${existing?.mealsPerDay ?? 3}',
+    );
+    _dishesController = TextEditingController(
+      text: '${existing?.dishesPerMeal ?? 1}',
+    );
+    _modeController = TextEditingController(
+      text: existing?.mealModeName ?? 'Standard',
+    );
+    _startController = TextEditingController(
+      text: _datePath(existing?.dateRangeStart ?? widget.initialStart),
+    );
+    _endController = TextEditingController(
+      text: _datePath(existing?.dateRangeEnd ?? widget.initialEnd),
+    );
+  }
+
+  @override
+  void dispose() {
+    _servingsController.dispose();
+    _mealsController.dispose();
+    _dishesController.dispose();
+    _modeController.dispose();
+    _startController.dispose();
+    _endController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final servings = int.tryParse(_servingsController.text.trim());
+    final meals = int.tryParse(_mealsController.text.trim());
+    final dishes = int.tryParse(_dishesController.text.trim());
+    final start = _parseDate(_startController.text.trim());
+    final end = _parseDate(_endController.text.trim());
+    if (servings == null || servings <= 0) {
+      setState(() => _error = 'Default serving size must be positive.');
+      return;
+    }
+    if (meals == null || meals <= 0) {
+      setState(() => _error = 'Meals per day must be positive.');
+      return;
+    }
+    if (dishes == null || dishes <= 0) {
+      setState(() => _error = 'Dishes per meal must be positive.');
+      return;
+    }
+    if (start == null || end == null || end.isBefore(start)) {
+      setState(() => _error = 'Use a valid date range.');
+      return;
+    }
+    Navigator.of(context).pop(
+      _CalendarDefaultsInput(
+        dateRangeStart: start,
+        dateRangeEnd: end,
+        defaultServingSize: servings,
+        mealsPerDay: meals,
+        dishesPerMeal: dishes,
+        mealModeName: _modeController.text.trim(),
+      ),
+    );
+  }
+
+  DateTime? _parseDate(String value) {
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
+      return null;
+    }
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      return null;
+    }
+    return _datePath(parsed) == value
+        ? DateTime(parsed.year, parsed.month, parsed.day)
+        : null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          KsTokens.space20,
+          KsTokens.space12,
+          KsTokens.space20,
+          KsTokens.space20 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: ks.borderStrong,
+                  borderRadius: BorderRadius.circular(KsTokens.radiusFull),
+                ),
+              ),
+            ),
+            const SizedBox(height: KsTokens.space16),
+            Text(
+              'Calendar defaults',
+              style: KsTokens.displaySmall.copyWith(
+                color: ks.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 22,
+              ),
+            ),
+            const SizedBox(height: KsTokens.space12),
+            _CalendarDefaultsTextField(
+              controller: _startController,
+              label: 'Start date',
+            ),
+            const SizedBox(height: KsTokens.space8),
+            _CalendarDefaultsTextField(
+              controller: _endController,
+              label: 'End date',
+            ),
+            const SizedBox(height: KsTokens.space8),
+            Row(
+              children: [
+                Expanded(
+                  child: _CalendarDefaultsTextField(
+                    controller: _servingsController,
+                    label: 'Default serving size',
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: KsTokens.space8),
+                Expanded(
+                  child: _CalendarDefaultsTextField(
+                    controller: _mealsController,
+                    label: 'Meals per day',
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: KsTokens.space8),
+            Row(
+              children: [
+                Expanded(
+                  child: _CalendarDefaultsTextField(
+                    controller: _dishesController,
+                    label: 'Dishes per meal',
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: KsTokens.space8),
+                Expanded(
+                  child: _CalendarDefaultsTextField(
+                    controller: _modeController,
+                    label: 'Meal mode',
+                  ),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: KsTokens.space10),
+              KsErrorAlert(message: _error!),
+            ],
+            const SizedBox(height: KsTokens.space12),
+            FilledButton(onPressed: _save, child: const Text('Save defaults')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarDefaultsTextField extends StatelessWidget {
+  const _CalendarDefaultsTextField({
+    required this.controller,
+    required this.label,
+    this.keyboardType,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: ks.surfaceBase,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(KsTokens.radius12),
         ),
       ),
     );

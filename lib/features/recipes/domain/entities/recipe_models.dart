@@ -101,10 +101,12 @@ class RecipeIngredientDraft {
     required this.name,
     required this.quantity,
     required this.unit,
+    this.ingredientId,
     this.preparationNote,
     this.shelfLifeDays,
   });
 
+  final String? ingredientId;
   final String name;
   final double quantity;
   final Unit unit;

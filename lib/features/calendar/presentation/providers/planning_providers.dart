@@ -88,10 +88,24 @@ class PlanningController extends StateNotifier<KitchenPlanningState> {
   int _pantryId = 0;
 
   MenuSetApplicationResult applyFeaturedMenuSet(MenuSetApplyMode mode) {
-    final result = _menuSets.apply(
+    return applyMenuSet(
       menuSet: state.featuredMenuSet,
+      mode: mode,
       startDate: DateTime(2026, 7, 6),
       endDate: DateTime(2026, 8, 2),
+    );
+  }
+
+  MenuSetApplicationResult applyMenuSet({
+    required MenuSet menuSet,
+    required MenuSetApplyMode mode,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) {
+    final result = _menuSets.apply(
+      menuSet: menuSet,
+      startDate: startDate,
+      endDate: endDate,
       mode: mode,
       existingSchedule: state.schedule,
       recipesById: state.recipesById,
@@ -103,8 +117,8 @@ class PlanningController extends StateNotifier<KitchenPlanningState> {
       activeShoppingList: _generateList(
         id: 'scheduled-${_shopId++}',
         type: ShoppingListType.scheduled,
-        startDate: DateTime(2026, 7, 6),
-        endDate: DateTime(2026, 7, 12),
+        startDate: startDate,
+        endDate: startDate.add(const Duration(days: 6)),
         schedule: result.schedule,
       ),
       lastMenuSetApplication: result,

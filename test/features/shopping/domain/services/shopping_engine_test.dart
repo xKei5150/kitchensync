@@ -96,6 +96,87 @@ void main() {
     },
   );
 
+  test('shopping list normalizes compatible mass units before subtracting', () {
+    const recipe = PlannedRecipe(
+      id: 'granola',
+      title: 'Granola',
+      defaultServingSize: 2,
+      ingredients: [
+        RecipeIngredientRequirement(
+          ingredientId: 'oats',
+          quantity: 1.5,
+          unit: Unit.kg,
+        ),
+      ],
+    );
+    final meal = MealScheduleEntry(
+      id: 'm1',
+      recipeId: 'granola',
+      date: DateTime.utc(2026, 7, 6),
+      mealLabel: 'Breakfast',
+      servingSize: 2,
+    );
+
+    final list = engine.generateList(
+      id: 's1',
+      type: ShoppingListType.scheduled,
+      startDate: DateTime.utc(2026, 7, 6),
+      endDate: DateTime.utc(2026, 7, 6),
+      meals: [meal],
+      recipesById: {recipe.id: recipe},
+      pantryItems: [_pantry(ingredientId: 'oats', quantity: 500, unit: Unit.g)],
+    );
+
+    expect(list.items, hasLength(1));
+    expect(list.items.single.ingredientId, 'oats');
+    expect(list.items.single.quantity, 1000);
+    expect(list.items.single.unit, Unit.g);
+    expect(list.items.single.sourceMealLinks.single.quantity, 1500);
+  });
+
+  test(
+    'shopping list normalizes compatible volume units before subtracting',
+    () {
+      const recipe = PlannedRecipe(
+        id: 'soup',
+        title: 'Soup',
+        defaultServingSize: 4,
+        ingredients: [
+          RecipeIngredientRequirement(
+            ingredientId: 'stock',
+            quantity: 750,
+            unit: Unit.ml,
+          ),
+        ],
+      );
+      final meal = MealScheduleEntry(
+        id: 'm1',
+        recipeId: 'soup',
+        date: DateTime.utc(2026, 7, 6),
+        mealLabel: 'Dinner',
+        servingSize: 8,
+      );
+
+      final list = engine.generateList(
+        id: 's1',
+        type: ShoppingListType.scheduled,
+        startDate: DateTime.utc(2026, 7, 6),
+        endDate: DateTime.utc(2026, 7, 6),
+        meals: [meal],
+        recipesById: {recipe.id: recipe},
+        pantryItems: [
+          _pantry(ingredientId: 'stock', quantity: 1, unit: Unit.l),
+        ],
+      );
+
+      expect(list.items, hasLength(1));
+      expect(list.items.single.ingredientId, 'stock');
+      expect(list.items.single.quantity, 500);
+      expect(list.items.single.unit, Unit.ml);
+      expect(list.items.single.sourceMealLinks.single.quantity, 1500);
+    },
+  );
+
   test('fully stocked ingredients are excluded from the generated list', () {
     final recipe = _recipe();
     final meal = calendar.scheduleRecipe(

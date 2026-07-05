@@ -24,6 +24,7 @@ class KsChecklistRow extends StatelessWidget {
     this.memberInitial,
     this.memberSeat,
     this.onToggle,
+    this.onLongPress,
     super.key,
   });
 
@@ -45,6 +46,9 @@ class KsChecklistRow extends StatelessWidget {
   /// Tap handler for the checkbox.
   final VoidCallback? onToggle;
 
+  /// Optional row action handler, used for secondary checklist states.
+  final VoidCallback? onLongPress;
+
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
@@ -52,15 +56,19 @@ class KsChecklistRow extends StatelessWidget {
 
     return Opacity(
       opacity: opacity,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-        child: Row(
-          children: [
-            _Checkbox(state: state, onTap: onToggle),
-            const SizedBox(width: 13),
-            Expanded(child: _label(context)),
-            ..._trailing(context, ks),
-          ],
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+          child: Row(
+            children: [
+              _Checkbox(state: state, onTap: onToggle),
+              const SizedBox(width: 13),
+              Expanded(child: _label(context)),
+              ..._trailing(context, ks),
+            ],
+          ),
         ),
       ),
     );

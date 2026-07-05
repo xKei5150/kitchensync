@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
@@ -14,6 +16,7 @@ import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
+import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
@@ -355,6 +358,7 @@ ShoppingPlanningController _controller({
   List<PurchaseRecord> purchaseHistory = const [],
   List<WasteEvent> wasteHistory = const [],
   List<String> ids = const ['list-1', 'item-1', 'item-2'],
+  ActiveHouseholdContext? household,
 }) {
   final purchases =
       purchaseHistoryRepository ??
@@ -367,6 +371,7 @@ ShoppingPlanningController _controller({
     wasteRepository: _FakeWasteRepository(wasteHistory),
     recipeRepository: _FakeRecipeRepository({'braise': _recipe()}),
     householdId: 'solo-household',
+    household: household,
     idGenerator: FakeIdGenerator(ids),
     clock: FakeClock(DateTime(2026, 7, 6, 9)),
   );
@@ -539,6 +544,109 @@ void main() {
     expect(record.items.single.sourceMealLinks, isEmpty);
   });
 
+  test(
+    'createSuggestedListFromBulkStatus persists one due bulk line',
+    () async {
+      final shopping = _FakeShoppingRepository();
+      final status = BulkPantryStatus(
+        item: _pantryItem(
+          id: 'rice-stock',
+          ingredientId: 'rice',
+          quantity: 100,
+          unit: Unit.g,
+          section: PantrySection.bulk,
+          lastPurchaseDate: DateTime(2026, 6),
+        ),
+        estimatedConsumptionRatePerDay: 25,
+        estimatedEmptyDate: DateTime(2026, 7, 8),
+        recommendedPurchaseIntervalDays: 30,
+        needsPurchaseSoon: true,
+      );
+      final sut = _controller(
+        shopping: shopping,
+        meals: const [],
+        pantryRepository: _FakePantryRepository([]),
+        purchaseHistory: [
+          PurchaseRecord(
+            id: 'rice-june',
+            householdId: 'solo-household',
+            ingredientId: 'rice',
+            quantity: 2000,
+            unit: Unit.g,
+            purchaseDate: DateTime(2026, 6),
+            isBulk: true,
+          ),
+          PurchaseRecord(
+            id: 'rice-july',
+            householdId: 'solo-household',
+            ingredientId: 'rice',
+            quantity: 3000,
+            unit: Unit.g,
+            purchaseDate: DateTime(2026, 7),
+            isBulk: true,
+          ),
+        ],
+        ids: const ['suggested-rice', 'rice-line'],
+        household: const ActiveHouseholdContext(
+          id: 'solo-household',
+          name: 'Test kitchen',
+          role: HouseholdRole.admin,
+          isJoint: true,
+          hasPremium: true,
+        ),
+      );
+
+      final record = await sut.createSuggestedListFromBulkStatus(status);
+
+      expect(record, same(shopping.upserted));
+      expect(record.id, 'suggested-rice');
+      expect(record.type, ShoppingListType.suggested);
+      expect(record.generatedForRangeStart, DateTime(2026, 7, 6));
+      expect(record.generatedForRangeEnd, DateTime(2026, 7, 6));
+      expect(record.items.single.id, 'rice-line');
+      expect(record.items.single.ingredientId, 'rice');
+      expect(record.items.single.quantityNeeded, 2500);
+      expect(record.items.single.unit, Unit.g);
+    },
+  );
+
+  test(
+    'createSuggestedListFromBulkStatus requires premium household',
+    () async {
+      final sut = _controller(
+        shopping: _FakeShoppingRepository(),
+        meals: const [],
+        pantryRepository: _FakePantryRepository([]),
+        household: const ActiveHouseholdContext(
+          id: 'solo-household',
+          name: 'Test kitchen',
+          role: HouseholdRole.admin,
+          isJoint: true,
+          hasPremium: false,
+        ),
+      );
+
+      expect(
+        () => sut.createSuggestedListFromBulkStatus(
+          BulkPantryStatus(
+            item: _pantryItem(
+              id: 'rice-stock',
+              ingredientId: 'rice',
+              quantity: 0,
+              unit: Unit.g,
+              section: PantrySection.bulk,
+            ),
+            estimatedConsumptionRatePerDay: 1,
+            estimatedEmptyDate: DateTime(2026, 7, 6),
+            recommendedPurchaseIntervalDays: null,
+            needsPurchaseSoon: true,
+          ),
+        ),
+        throwsStateError,
+      );
+    },
+  );
+
   test('completeList updates existing bulk pantry stock', () async {
     final shopping = _FakeShoppingRepository();
     final pantry = _FakePantryRepository([
@@ -608,5 +716,57 @@ void main() {
       ),
       throwsArgumentError,
     );
+  });
+
+  test('completeList rejects member role at controller boundary', () async {
+    final sut = _controller(
+      shopping: _FakeShoppingRepository(),
+      meals: const [],
+      pantryRepository: _FakePantryRepository([]),
+      household: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Test kitchen',
+        role: HouseholdRole.member,
+        isJoint: true,
+        hasPremium: true,
+      ),
+    );
+
+    expect(
+      () => sut.completeList(
+        ShoppingListRecord(
+          id: 'list-1',
+          householdId: 'solo-household',
+          type: ShoppingListType.shopNow,
+          shoppingDate: DateTime(2026, 7, 6),
+          generatedForRangeStart: DateTime(2026, 7, 6),
+          generatedForRangeEnd: DateTime(2026, 7, 6),
+          status: ShoppingListStatus.pending,
+          createdAt: DateTime(2026, 7, 6),
+          updatedAt: DateTime(2026, 7, 6),
+          items: const [],
+        ),
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('deleteList rejects member role at controller boundary', () async {
+    final shopping = _FakeShoppingRepository();
+    final sut = _controller(
+      shopping: shopping,
+      meals: const [],
+      pantryRepository: _FakePantryRepository([]),
+      household: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Test kitchen',
+        role: HouseholdRole.member,
+        isJoint: true,
+        hasPremium: true,
+      ),
+    );
+
+    expect(() => sut.deleteList('suggested-1'), throwsStateError);
+    expect(shopping.upserted, isNull);
   });
 }

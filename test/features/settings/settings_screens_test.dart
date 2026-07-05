@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/app/theme_mode_controller.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/features/settings/presentation/screens/premium_screen.dart';
 import 'package:kitchensync/features/settings/presentation/screens/settings_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -34,6 +36,19 @@ class _FakePremiumUpgradeController extends PremiumUpgradeController {
   }
 }
 
+class _FakeSignOutController extends SettingsSignOutController {
+  _FakeSignOutController(this.prefs) : super(auth: null, preferences: prefs);
+
+  final SharedPreferences prefs;
+  bool called = false;
+
+  @override
+  Future<void> signOut() async {
+    called = true;
+    await prefs.remove(skipHouseholdSetupPrefKey);
+  }
+}
+
 void main() {
   testWidgets('SettingsScreen shows the profile, premium banner and list', (
     tester,
@@ -50,6 +65,49 @@ void main() {
     expect(find.text('Household & roles'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
+  });
+
+  testWidgets('Sign out clears debug household skip and routes to onboarding', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({skipHouseholdSetupPrefKey: true});
+    final prefs = await SharedPreferences.getInstance();
+    final signOut = _FakeSignOutController(prefs);
+    final router = GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (_, _) => const SettingsScreen()),
+        GoRoute(
+          path: '/onboarding',
+          builder: (_, _) => const Scaffold(body: Text('Onboarding')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          settingsSignOutControllerProvider.overrideWithValue(signOut),
+        ],
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          routerConfig: router,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(signOut.called, isTrue);
+    expect(prefs.getBool(skipHouseholdSetupPrefKey), isNull);
+    expect(find.text('Onboarding'), findsOneWidget);
   });
 
   testWidgets('Appearance row reflects the stored choice', (tester) async {

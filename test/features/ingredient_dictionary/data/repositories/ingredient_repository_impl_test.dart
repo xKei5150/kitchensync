@@ -103,6 +103,20 @@ void main() {
     expect(onionCount, 1);
   });
 
+  test('getById falls back to household custom ingredients', () async {
+    final r = await repo.getById('mangosteen', householdId: 'h1');
+
+    expect(r, isNotNull);
+    expect(r!.scope, IngredientScope.householdCustom);
+    expect(r.householdId, 'h1');
+  });
+
+  test('getById does not leak another household custom ingredient', () async {
+    final r = await repo.getById('mangosteen', householdId: 'other');
+
+    expect(r, isNull);
+  });
+
   test('listVariantsOf returns only children', () async {
     final r = await repo.listVariantsOf('onion');
     expect(r.map((e) => e.id), ['red-onion']);

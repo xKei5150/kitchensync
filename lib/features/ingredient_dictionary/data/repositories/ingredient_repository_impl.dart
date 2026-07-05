@@ -7,11 +7,12 @@ class IngredientRepositoryImpl implements IngredientRepository {
   IngredientRepositoryImpl(this._remote);
   final IngredientRemoteDataSource _remote;
 
-  // NOTE(plan-2): resolves global /ingredients only. Household-custom
-  // ingredients are not fetchable by id here. Plan 3 (pantry) will plumb
-  // householdId through and fall back to the custom subcollection.
   @override
-  Future<Ingredient?> getById(String id) => _remote.getGlobal(id);
+  Future<Ingredient?> getById(String id, {String? householdId}) async {
+    final global = await _remote.getGlobal(id);
+    if (global != null || householdId == null) return global;
+    return _remote.getCustom(householdId, id);
+  }
 
   @override
   Future<List<Ingredient>> search({

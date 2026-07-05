@@ -21,7 +21,7 @@ Widget _wrap(
 }
 
 void main() {
-  testWidgets('SignInScreen shows the wordmark and OAuth + email paths', (
+  testWidgets('SignInScreen shows disabled OAuth and email paths', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(400, 1400);
@@ -34,9 +34,29 @@ void main() {
     expect(find.text('KitchenSync'), findsOneWidget);
     expect(find.text('Continue with Apple'), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Not configured'), findsNWidgets(2));
     expect(find.text('Continue with email'), findsOneWidget);
     expect(find.widgetWithText(TextField, 'you@email.com'), findsOneWidget);
     expect(find.widgetWithText(TextField, 'Password'), findsOneWidget);
+  });
+
+  testWidgets('SignInScreen does not use anonymous OAuth placeholders', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(_wrap(const SignInScreen()));
+
+    await tester.tap(find.text('Continue with Apple'));
+    await tester.pump();
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Set up your kitchen'), findsNothing);
   });
 
   testWidgets('SignInScreen validates the email password path', (tester) async {

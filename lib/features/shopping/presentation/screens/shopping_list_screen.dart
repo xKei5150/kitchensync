@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
-import 'package:kitchensync/features/calendar/presentation/providers/planning_providers.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
@@ -22,74 +24,6 @@ class ShoppingListScreen extends ConsumerStatefulWidget {
 }
 
 class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
-  // The four visible lines; the wider list is 11 items, 7 already done.
-  late final List<_ShopLine> _lines = [
-    const _ShopLine(
-      key: 'sample-tomatoes',
-      name: 'Tomatoes',
-      state: ChecklistItemState.toBuy,
-      quantity: '1 kg',
-    ),
-    const _ShopLine(
-      key: 'sample-beans',
-      name: 'White beans · 2 tins',
-      state: ChecklistItemState.bought,
-      memberInitial: 'B',
-      memberSeat: 1,
-    ),
-    const _ShopLine(
-      key: 'sample-orzo',
-      name: 'Orzo',
-      state: ChecklistItemState.substituted,
-      note: 'risoni',
-      memberInitial: 'A',
-      memberSeat: 0,
-    ),
-    const _ShopLine(
-      key: 'sample-dill',
-      name: 'Fresh dill',
-      state: ChecklistItemState.unavailable,
-      note: 'none left',
-    ),
-  ];
-
-  final Map<String, ChecklistItemState> _generatedStates = {};
-
-  static const int _sampleTotal = 11;
-
-  // Five of the eleven are done off-screen; the two visible done lines (a
-  // bought tin, a substitution) lift the live count to the design's 7 / 11,
-  // and local toggles move it from there.
-  int get _sampleDone =>
-      5 +
-      _lines
-          .where(
-            (l) =>
-                l.state == ChecklistItemState.bought ||
-                l.state == ChecklistItemState.substituted,
-          )
-          .length;
-
-  void _toggleSample(int index) {
-    setState(() {
-      final line = _lines[index];
-      _lines[index] = line.copyWith(
-        state: line.state == ChecklistItemState.bought
-            ? ChecklistItemState.toBuy
-            : ChecklistItemState.bought,
-      );
-    });
-  }
-
-  void _toggleGenerated(String key) {
-    setState(() {
-      final state = _generatedStates[key] ?? ChecklistItemState.toBuy;
-      _generatedStates[key] = state == ChecklistItemState.bought
-          ? ChecklistItemState.toBuy
-          : ChecklistItemState.bought;
-    });
-  }
-
   Future<void> _togglePersisted(ShoppingListRecord list, String itemId) async {
     ShoppingListItemRecord? item;
     for (final current in list.items) {
@@ -114,6 +48,52 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     }
   }
 
+  Future<void> _setPersistedStatus(
+    ShoppingListRecord list,
+    String itemId,
+    ShoppingListItemStatus status,
+  ) async {
+    try {
+      await ref
+          .read(shoppingPlanningControllerProvider)
+          .updateItemStatus(listId: list.id, itemId: itemId, status: status);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update item: $error')));
+    }
+  }
+
+  Future<void> _substitutePersisted(
+    ShoppingListRecord list,
+    ShoppingListItemRecord item,
+  ) async {
+    final substitution = await showModalBottomSheet<_SubstitutionDraft>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _SubstitutionSheet(item: item),
+    );
+    if (substitution == null) return;
+    try {
+      await ref
+          .read(shoppingPlanningControllerProvider)
+          .updateItemStatus(
+            listId: list.id,
+            itemId: item.id,
+            status: ShoppingListItemStatus.substituted,
+            substituteIngredientId: substitution.ingredientId,
+            substituteQuantity: substitution.quantity,
+            substituteUnit: substitution.unit,
+          );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save substitution: $error')),
+      );
+    }
+  }
+
   Future<void> _finishPersistedShopping(ShoppingListRecord list) async {
     try {
       await ref.read(shoppingPlanningControllerProvider).completeList(list);
@@ -127,107 +107,72 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     }
   }
 
-  void _finishShopping(ShoppingListPlan? activeList, List<_ShopLine> lines) {
-    if (activeList != null) {
-      final purchases = lines
-          .where(
-            (line) =>
-                line.ingredientId != null &&
-                line.quantityValue != null &&
-                line.unit != null &&
-                (line.state == ChecklistItemState.bought ||
-                    line.state == ChecklistItemState.substituted),
-          )
-          .map(
-            (line) => ShoppingPurchaseLine(
-              ingredientId: line.ingredientId!,
-              quantity: line.quantityValue!,
-              unit: line.unit!,
-            ),
-          );
-      ref
-          .read(planningControllerProvider.notifier)
-          .completeActiveShopping(lines: purchases);
-    }
-    context.pop();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final persistedList = widget.listId == null
-        ? null
-        : ref.watch(activeShoppingListRecordProvider(widget.listId!));
-    if (persistedList != null) {
-      return persistedList.when(
-        data: (list) {
-          if (list == null) {
-            return const Scaffold(
-              body: Center(
-                child: KsEmptyState(
-                  icon: Icons.shopping_bag_outlined,
-                  title: 'Shopping list not found',
-                  subtitle: 'It may have been completed or deleted.',
-                ),
-              ),
-            );
-          }
-          return _ShoppingListBody(
-            lines: list.items.map(_ShopLine.fromRecord).toList(growable: false),
-            totalFallback: list.items.length,
-            onToggle: (itemId) => _togglePersisted(list, itemId),
-            onDone: () => _finishPersistedShopping(list),
-          );
-        },
-        loading: () =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
-        error: (error, _) => Scaffold(
-          body: Padding(
-            padding: const EdgeInsets.all(KsTokens.space16),
-            child: Center(
-              child: KsErrorAlert(message: 'Could not load list: $error'),
-            ),
+    final listId = widget.listId;
+    if (listId == null) {
+      return const Scaffold(
+        body: Center(
+          child: KsEmptyState(
+            icon: Icons.shopping_bag_outlined,
+            title: 'No shopping list selected',
+            subtitle: 'Open a persisted list from the shopping tab.',
           ),
         ),
       );
     }
 
-    final activeList = ref.watch(
-      planningControllerProvider.select((state) => state.activeShoppingList),
-    );
-    final generatedLines = activeList?.items
-        .map(
-          (item) => _ShopLine.fromPlan(
-            item,
-            state:
-                _generatedStates[_ShopLine.planKey(item)] ??
-                ChecklistItemState.toBuy,
-          ),
-        )
-        .toList(growable: false);
-    final lines = generatedLines ?? _lines;
-    final done = generatedLines == null
-        ? _sampleDone
-        : lines
-              .where(
-                (line) =>
-                    line.state == ChecklistItemState.bought ||
-                    line.state == ChecklistItemState.substituted,
-              )
-              .length;
-    final total = generatedLines == null ? _sampleTotal : lines.length;
-    return _ShoppingListBody(
-      lines: lines,
-      totalFallback: total,
-      doneOverride: done,
-      onToggle: (key) {
-        if (generatedLines == null) {
-          final index = lines.indexWhere((line) => line.key == key);
-          _toggleSample(index);
-        } else {
-          _toggleGenerated(key);
+    final persistedList = ref.watch(activeShoppingListRecordProvider(listId));
+    return persistedList.when(
+      data: (list) {
+        if (list == null) {
+          return const Scaffold(
+            body: Center(
+              child: KsEmptyState(
+                icon: Icons.shopping_bag_outlined,
+                title: 'Shopping list not found',
+                subtitle: 'It may have been completed or deleted.',
+              ),
+            ),
+          );
         }
+        return _ShoppingListBody(
+          lines: list.items.map(_ShopLine.fromRecord).toList(growable: false),
+          totalFallback: list.items.length,
+          canEdit: _can(HouseholdCapability.editShoppingLists),
+          canComplete: _can(HouseholdCapability.completeShopping),
+          onToggle: (itemId) => _togglePersisted(list, itemId),
+          onStatus: (itemId, status) =>
+              _setPersistedStatus(list, itemId, status),
+          onSubstitute: (itemId) {
+            final item = list.items.firstWhere(
+              (current) => current.id == itemId,
+            );
+            return _substitutePersisted(list, item);
+          },
+          onDone: () => _finishPersistedShopping(list),
+        );
       },
-      onDone: () => _finishShopping(activeList, lines),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, _) => Scaffold(
+        body: Padding(
+          padding: const EdgeInsets.all(KsTokens.space16),
+          child: Center(
+            child: KsErrorAlert(message: 'Could not load list: $error'),
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _can(HouseholdCapability capability) {
+    final household = ref.watch(activeHouseholdContextProvider);
+    if (household == null) return false;
+    return const HouseholdPolicy().roleCan(
+      household.role,
+      capability,
+      isSoloHousehold: household.isSolo,
     );
   }
 }
@@ -238,27 +183,31 @@ class _ShoppingListBody extends StatelessWidget {
     required this.totalFallback,
     required this.onToggle,
     required this.onDone,
-    this.doneOverride,
+    required this.canEdit,
+    required this.canComplete,
+    this.onStatus,
+    this.onSubstitute,
   });
 
   final List<_ShopLine> lines;
   final int totalFallback;
   final ValueChanged<String> onToggle;
   final VoidCallback onDone;
-  final int? doneOverride;
+  final bool canEdit;
+  final bool canComplete;
+  final void Function(String itemId, ShoppingListItemStatus status)? onStatus;
+  final Future<void> Function(String itemId)? onSubstitute;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
-    final done =
-        doneOverride ??
-        lines
-            .where(
-              (line) =>
-                  line.state == ChecklistItemState.bought ||
-                  line.state == ChecklistItemState.substituted,
-            )
-            .length;
+    final done = lines
+        .where(
+          (line) =>
+              line.state == ChecklistItemState.bought ||
+              line.state == ChecklistItemState.substituted,
+        )
+        .length;
     final total = totalFallback;
     return Scaffold(
       backgroundColor: ks.surfaceBase,
@@ -307,9 +256,10 @@ class _ShoppingListBody extends StatelessWidget {
                       state: lines[i].state,
                       quantity: lines[i].quantity,
                       note: lines[i].note,
-                      memberInitial: lines[i].memberInitial,
-                      memberSeat: lines[i].memberSeat,
-                      onToggle: () => onToggle(lines[i].key),
+                      onToggle: canEdit ? () => onToggle(lines[i].key) : null,
+                      onLongPress: canEdit
+                          ? () => _openItemActions(context, lines[i])
+                          : null,
                     ),
                   ],
                 ],
@@ -319,7 +269,7 @@ class _ShoppingListBody extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: onDone,
+                onPressed: canComplete ? onDone : null,
                 child: const Text('Done shopping'),
               ),
             ),
@@ -328,9 +278,29 @@ class _ShoppingListBody extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _openItemActions(BuildContext context, _ShopLine line) async {
+    final action = await showModalBottomSheet<_ShoppingItemAction>(
+      context: context,
+      builder: (_) => _ShoppingItemActionSheet(line: line),
+    );
+    if (action == null) return;
+    switch (action) {
+      case _ShoppingItemAction.bought:
+        onStatus?.call(line.key, ShoppingListItemStatus.bought);
+      case _ShoppingItemAction.toBuy:
+        onStatus?.call(line.key, ShoppingListItemStatus.unchecked);
+      case _ShoppingItemAction.unavailable:
+        onStatus?.call(line.key, ShoppingListItemStatus.unavailable);
+      case _ShoppingItemAction.skipped:
+        onStatus?.call(line.key, ShoppingListItemStatus.skipped);
+      case _ShoppingItemAction.substitute:
+        await onSubstitute?.call(line.key);
+    }
+  }
 }
 
-/// Immutable shopping-line view model for the local toggle state.
+/// Immutable shopping-line view model for the persisted checklist state.
 @immutable
 class _ShopLine {
   const _ShopLine({
@@ -339,27 +309,10 @@ class _ShopLine {
     this.key = '',
     this.quantity,
     this.note,
-    this.memberInitial,
-    this.memberSeat,
     this.ingredientId,
     this.quantityValue,
     this.unit,
   });
-
-  factory _ShopLine.fromPlan(
-    ShoppingListItemPlan item, {
-    required ChecklistItemState state,
-  }) {
-    return _ShopLine(
-      key: planKey(item),
-      name: _ingredientLabel(item.ingredientId),
-      state: state,
-      quantity: _quantityLabel(item.quantity, item.unit),
-      ingredientId: item.ingredientId,
-      quantityValue: item.quantity,
-      unit: item.unit,
-    );
-  }
 
   factory _ShopLine.fromRecord(
     ShoppingListItemRecord item, {
@@ -371,6 +324,9 @@ class _ShopLine {
       name: _ingredientLabel(item.ingredientId),
       state: state,
       quantity: _quantityLabel(item.quantityNeeded, item.unit),
+      note: item.status == ShoppingListItemStatus.substituted
+          ? _substitutionNote(item)
+          : null,
       ingredientId: item.substituteIngredientId ?? item.ingredientId,
       quantityValue: item.substituteQuantity ?? item.quantityNeeded,
       unit: item.substituteUnit ?? item.unit,
@@ -382,27 +338,203 @@ class _ShopLine {
   final ChecklistItemState state;
   final String? quantity;
   final String? note;
-  final String? memberInitial;
-  final int? memberSeat;
   final String? ingredientId;
   final double? quantityValue;
   final Unit? unit;
+}
 
-  _ShopLine copyWith({ChecklistItemState? state}) => _ShopLine(
-    key: key,
-    name: name,
-    state: state ?? this.state,
-    quantity: quantity,
-    note: note,
-    memberInitial: memberInitial,
-    memberSeat: memberSeat,
-    ingredientId: ingredientId,
-    quantityValue: quantityValue,
-    unit: unit,
+enum _ShoppingItemAction { bought, toBuy, substitute, unavailable, skipped }
+
+class _ShoppingItemActionSheet extends StatelessWidget {
+  const _ShoppingItemActionSheet({required this.line});
+
+  final _ShopLine line;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          KsTokens.space16,
+          KsTokens.space12,
+          KsTokens.space16,
+          KsTokens.space16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(line.name),
+              subtitle: line.quantity == null ? null : Text(line.quantity!),
+            ),
+            const _ActionTile(
+              icon: Icons.check_rounded,
+              label: 'Mark bought',
+              action: _ShoppingItemAction.bought,
+            ),
+            const _ActionTile(
+              icon: Icons.swap_horiz_rounded,
+              label: 'Record substitution',
+              action: _ShoppingItemAction.substitute,
+            ),
+            const _ActionTile(
+              icon: Icons.block_rounded,
+              label: 'Unavailable',
+              action: _ShoppingItemAction.unavailable,
+            ),
+            const _ActionTile(
+              icon: Icons.skip_next_rounded,
+              label: 'Skip',
+              action: _ShoppingItemAction.skipped,
+            ),
+            const _ActionTile(
+              icon: Icons.undo_rounded,
+              label: 'Back to list',
+              action: _ShoppingItemAction.toBuy,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.action,
+  });
+
+  final IconData icon;
+  final String label;
+  final _ShoppingItemAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(label),
+      onTap: () => Navigator.of(context).pop(action),
+    );
+  }
+}
+
+class _SubstitutionDraft {
+  const _SubstitutionDraft({
+    required this.ingredientId,
+    required this.quantity,
+    required this.unit,
+  });
+
+  final String ingredientId;
+  final double quantity;
+  final Unit unit;
+}
+
+class _SubstitutionSheet extends StatefulWidget {
+  const _SubstitutionSheet({required this.item});
+
+  final ShoppingListItemRecord item;
+
+  @override
+  State<_SubstitutionSheet> createState() => _SubstitutionSheetState();
+}
+
+class _SubstitutionSheetState extends State<_SubstitutionSheet> {
+  late final TextEditingController _ingredientController =
+      TextEditingController(
+        text: widget.item.substituteIngredientId ?? widget.item.ingredientId,
+      );
+  late final TextEditingController _quantityController = TextEditingController(
+    text: (widget.item.substituteQuantity ?? widget.item.quantityNeeded)
+        .toString(),
   );
+  late Unit _unit = widget.item.substituteUnit ?? widget.item.unit;
 
-  static String planKey(ShoppingListItemPlan item) {
-    return '${item.ingredientId}:${item.unit.name}';
+  @override
+  void dispose() {
+    _ingredientController.dispose();
+    _quantityController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          KsTokens.space20,
+          KsTokens.space12,
+          KsTokens.space20,
+          MediaQuery.viewInsetsOf(context).bottom + KsTokens.space20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Record substitution',
+              style: KsTokens.titleMedium.copyWith(
+                color: context.ksColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: KsTokens.space12),
+            TextField(
+              controller: _ingredientController,
+              decoration: const InputDecoration(
+                labelText: 'Substitute ingredient ID',
+              ),
+            ),
+            const SizedBox(height: KsTokens.space12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _quantityController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Quantity'),
+                  ),
+                ),
+                const SizedBox(width: KsTokens.space12),
+                DropdownButton<Unit>(
+                  value: _unit,
+                  items: [
+                    for (final unit in Unit.values)
+                      DropdownMenuItem(value: unit, child: Text(unit.name)),
+                  ],
+                  onChanged: (unit) {
+                    if (unit != null) setState(() => _unit = unit);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: KsTokens.space16),
+            FilledButton(
+              onPressed: () {
+                final ingredientId = _ingredientController.text.trim();
+                final quantity = double.tryParse(
+                  _quantityController.text.trim(),
+                );
+                if (ingredientId.isEmpty || quantity == null || quantity <= 0) {
+                  return;
+                }
+                Navigator.of(context).pop(
+                  _SubstitutionDraft(
+                    ingredientId: ingredientId,
+                    quantity: quantity,
+                    unit: _unit,
+                  ),
+                );
+              },
+              child: const Text('Save substitution'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -413,6 +545,16 @@ ChecklistItemState _stateFromRecord(ShoppingListItemStatus status) {
     ShoppingListItemStatus.unavailable => ChecklistItemState.unavailable,
     _ => ChecklistItemState.toBuy,
   };
+}
+
+String _substitutionNote(ShoppingListItemRecord item) {
+  final ingredient = item.substituteIngredientId;
+  final quantity = item.substituteQuantity;
+  final unit = item.substituteUnit;
+  if (ingredient == null || quantity == null || unit == null) {
+    return 'substituted';
+  }
+  return '${_ingredientLabel(ingredient)} · ${_quantityLabel(quantity, unit)}';
 }
 
 class _ProgressBar extends StatelessWidget {

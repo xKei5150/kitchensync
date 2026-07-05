@@ -3,14 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
+import 'package:kitchensync/features/menu_sets/domain/entities/menu_set.dart';
+import 'package:kitchensync/features/menu_sets/domain/services/menu_set_application_engine.dart';
 import 'package:kitchensync/features/menu_sets/presentation/providers/menu_set_repository_providers.dart';
 
 /// Screen 11 · Menu Sets home — a deck of weeks you can re-live.
 ///
 /// A horizontal carousel, deliberately unlike every vertical list in the app:
 /// each [KsMenuSetCard] previews its seven days. Premium P2 backed by the menu
-/// set repository, with a design-canvas fallback when no saved sets exist.
+/// set repository.
 class MenuSetsScreen extends ConsumerStatefulWidget {
   const MenuSetsScreen({super.key});
 
@@ -23,60 +28,14 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
   final _controller = PageController(viewportFraction: 0.86);
   int _page = 0;
 
-  static final List<_MenuSetSample> _sets = [
-    _MenuSetSample(
-      title: 'Cosy autumn week',
-      metaPrefix: '7 days · 14 meals',
-      priceValue: 61,
-      days: const [
-        KsMenuDay(weekday: 'M', dishColors: [KsTokens.catGrain]),
-        KsMenuDay(weekday: 'T', dishColors: [KsTokens.catMeat]),
-        KsMenuDay(weekday: 'W', dishColors: [KsTokens.catProduce]),
-        KsMenuDay(weekday: 'T', dishColors: [KsTokens.catSeafood]),
-        KsMenuDay(weekday: 'F', dishColors: [KsTokens.catSpice]),
-        KsMenuDay(weekday: 'S', dishColors: [KsTokens.catProduce]),
-        KsMenuDay(weekday: 'S', dishColors: [KsTokens.catBakery]),
-      ],
-    ),
-    _MenuSetSample(
-      title: 'Quick weeknights',
-      metaPrefix: '5 days · 10 meals',
-      priceValue: 38,
-      days: const [
-        KsMenuDay(weekday: 'M', dishColors: [KsTokens.catSeafood]),
-        KsMenuDay(weekday: 'T', dishColors: [KsTokens.catProduce]),
-        KsMenuDay(weekday: 'W', dishColors: [KsTokens.catMeat]),
-        KsMenuDay(weekday: 'T', dishColors: [KsTokens.catGrain]),
-        KsMenuDay(weekday: 'F', dishColors: [KsTokens.catSpice]),
-        KsMenuDay(weekday: 'S', dishColors: []),
-        KsMenuDay(weekday: 'S', dishColors: []),
-      ],
-    ),
-    _MenuSetSample(
-      title: 'Batch-cook Sunday',
-      metaPrefix: '6 days · 12 meals',
-      priceValue: 47,
-      days: const [
-        KsMenuDay(weekday: 'M', dishColors: [KsTokens.catGrain]),
-        KsMenuDay(weekday: 'T', dishColors: [KsTokens.catGrain]),
-        KsMenuDay(weekday: 'W', dishColors: [KsTokens.catProduce]),
-        KsMenuDay(weekday: 'T', dishColors: [KsTokens.catMeat]),
-        KsMenuDay(weekday: 'F', dishColors: [KsTokens.catSeafood]),
-        KsMenuDay(weekday: 'S', dishColors: [KsTokens.catBakery]),
-        KsMenuDay(weekday: 'S', dishColors: []),
-      ],
-    ),
-  ];
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
-  void _openEditor() => context.push('/menu-sets/edit');
-
-  Future<void> _createFromPastCalendar() async {
+  Future<void> _createFromPastCalendar(bool allowed) async {
+    if (!allowed) return _showAccessRequired();
     final today = DateTime.now();
     final end = DateTime(
       today.year,
@@ -105,10 +64,80 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
     );
   }
 
+  Future<void> _apply(MenuSet set, bool allowed) async {
+    if (!allowed) return _showAccessRequired();
+    final start = DateTime(2026, 7, 6);
+    final end = DateTime(2026, 8, 2);
+    try {
+      await ref
+          .read(menuSetApplyPersistenceControllerProvider)
+          .applyPersistedMenuSet(
+            menuSet: set,
+            startDate: start,
+            endDate: end,
+            mode: MenuSetApplyMode.fillEmpty,
+          );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not apply menu set: $error')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Applied ${set.name} to the calendar.')),
+    );
+  }
+
+  Future<void> _duplicate(MenuSet set, bool allowed) async {
+    if (!allowed) return _showAccessRequired();
+    final now = DateTime.now();
+    final duplicateId = '${set.id}-copy-${now.microsecondsSinceEpoch}';
+    final duplicate = MenuSet(
+      id: duplicateId,
+      householdId: set.householdId,
+      name: '${set.name} copy',
+      description: set.description,
+      lengthInDays: set.lengthInDays,
+      createdByUserId: set.createdByUserId,
+      createdAt: now,
+      updatedAt: now,
+      isPublicTemplate: set.isPublicTemplate,
+      days: [
+        for (final day in set.days)
+          _duplicateDay(day, duplicateId, now.microsecondsSinceEpoch),
+      ],
+    );
+    await ref.read(menuSetRepositoryProvider).upsert(duplicate);
+  }
+
+  Future<void> _delete(MenuSet set, bool allowed) async {
+    if (!allowed) return _showAccessRequired();
+    await ref
+        .read(menuSetRepositoryProvider)
+        .delete(householdId: set.householdId, menuSetId: set.id);
+  }
+
+  void _showAccessRequired() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Menu set access requires a cook role.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
     final currency = ref.watch(localeFormattersProvider).currency;
+    final sets = ref.watch(activeHouseholdMenuSetsProvider);
+    final household = ref.watch(activeHouseholdContextProvider);
+    final canCreate = _can(
+      household,
+      HouseholdCapability.createMenuSetsFromPastCalendar,
+    );
+    final canApply = _can(household, HouseholdCapability.applyMenuSets);
+    final canEdit = _can(household, HouseholdCapability.editMenuSets);
+    final canDelete = _can(household, HouseholdCapability.deleteMenuSets);
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -147,32 +176,87 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
             ),
             const SizedBox(height: KsTokens.space16),
             Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                onPageChanged: (i) => setState(() => _page = i),
-                itemCount: _sets.length,
-                itemBuilder: (context, i) {
-                  final set = _sets[i];
-                  final meta =
-                      '${set.metaPrefix} · '
-                      '${currency.format(set.priceValue, decimals: false)}';
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: KsMenuSetCard(
-                        title: set.title,
-                        meta: meta,
-                        days: set.days,
-                        onApply: _openEditor,
-                        onDuplicate: _openEditor,
+              child: sets.when(
+                data: (menuSets) {
+                  if (menuSets.isEmpty) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(KsTokens.space16),
+                        child: KsEmptyState(
+                          icon: Icons.style_outlined,
+                          title: 'No saved menu sets',
+                          subtitle: 'Save a calendar week to reuse it later.',
+                        ),
                       ),
-                    ),
+                    );
+                  }
+                  final activePage = _page.clamp(0, menuSets.length - 1);
+                  if (activePage != _page) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => _page = activePage);
+                    });
+                  }
+                  return PageView.builder(
+                    controller: _controller,
+                    onPageChanged: (i) => setState(() => _page = i),
+                    itemCount: menuSets.length,
+                    itemBuilder: (context, i) {
+                      final set = menuSets[i];
+                      final mealCount = set.days.fold<int>(
+                        0,
+                        (sum, day) => sum + day.entries.length,
+                      );
+                      final meta =
+                          '${set.lengthInDays} days · $mealCount meals · '
+                          '${currency.format(mealCount * 4, decimals: false)}';
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: KsMenuSetCard(
+                            title: set.name,
+                            meta: meta,
+                            days: _previewDays(set),
+                            onApply: canApply ? () => _apply(set, true) : null,
+                            onDuplicate: canEdit
+                                ? () => _duplicate(set, true)
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Padding(
+                  padding: const EdgeInsets.all(KsTokens.space16),
+                  child: Center(
+                    child: KsErrorAlert(
+                      message: 'Could not load menu sets: $error',
+                    ),
+                  ),
+                ),
               ),
             ),
-            _PageDots(count: _sets.length, active: _page),
+            sets.maybeWhen(
+              data: (menuSets) => menuSets.isEmpty
+                  ? const SizedBox.shrink()
+                  : _PageDots(count: menuSets.length, active: _page),
+              orElse: () => const SizedBox.shrink(),
+            ),
+            sets.maybeWhen(
+              data: (menuSets) => menuSets.isEmpty
+                  ? const SizedBox.shrink()
+                  : _DeleteButton(
+                      enabled: canDelete,
+                      onTap: () {
+                        final set =
+                            menuSets[_page.clamp(0, menuSets.length - 1)];
+                        _delete(set, true);
+                      },
+                    ),
+              orElse: () => const SizedBox.shrink(),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 KsTokens.space16,
@@ -180,31 +264,50 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
                 KsTokens.space16,
                 KsTokens.space20,
               ),
-              child: _SaveAsSetButton(onTap: _createFromPastCalendar),
+              child: _SaveAsSetButton(
+                enabled: canCreate,
+                onTap: () => _createFromPastCalendar(canCreate),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  bool _can(ActiveHouseholdContext? household, HouseholdCapability capability) {
+    if (household == null) return false;
+    const policy = HouseholdPolicy();
+    return policy.canUsePremiumCapability(
+          householdHasPremium: household.hasPremium,
+          capability: capability,
+        ) &&
+        policy.roleCan(
+          household.role,
+          capability,
+          isSoloHousehold: household.isSolo,
+        );
+  }
 }
 
-class _MenuSetSample {
-  _MenuSetSample({
-    required this.title,
-    required this.metaPrefix,
-    required this.priceValue,
-    required this.days,
-  });
-
-  final String title;
-
-  /// Everything in the summary line before the cost, e.g. `7 days · 14 meals`.
-  final String metaPrefix;
-
-  /// Estimated set cost; formatted in the active currency at build time.
-  final double priceValue;
-  final List<KsMenuDay> days;
+MenuSetDay _duplicateDay(MenuSetDay day, String menuSetId, int suffix) {
+  final dayId = '${day.id}-copy-$suffix';
+  return MenuSetDay(
+    id: dayId,
+    menuSetId: menuSetId,
+    dayIndex: day.dayIndex,
+    label: day.label,
+    entries: [
+      for (final entry in day.entries)
+        MenuSetEntry(
+          id: '${entry.id}-copy-$suffix',
+          menuSetDayId: dayId,
+          mealSlot: entry.mealSlot,
+          recipeId: entry.recipeId,
+          orderInSlot: entry.orderInSlot,
+        ),
+    ],
+  );
 }
 
 class _Subhead extends StatelessWidget {
@@ -258,9 +361,10 @@ class _PageDots extends StatelessWidget {
 
 /// The dashed "Save this week as a set" call to action.
 class _SaveAsSetButton extends StatelessWidget {
-  const _SaveAsSetButton({required this.onTap});
+  const _SaveAsSetButton({required this.onTap, required this.enabled});
 
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +374,7 @@ class _SaveAsSetButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: enabled ? onTap : null,
           borderRadius: BorderRadius.circular(KsTokens.radius12),
           child: Padding(
             padding: const EdgeInsets.all(13),
@@ -280,7 +384,7 @@ class _SaveAsSetButton extends StatelessWidget {
                 Icon(Icons.add_rounded, size: 16, color: ks.textSecondary),
                 const SizedBox(width: KsTokens.space8),
                 Text(
-                  'Save this week as a set',
+                  enabled ? 'Save this week as a set' : 'Premium cook required',
                   style: KsTokens.labelLarge.copyWith(
                     color: ks.textSecondary,
                     letterSpacing: 0,
@@ -293,4 +397,50 @@ class _SaveAsSetButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DeleteButton extends StatelessWidget {
+  const _DeleteButton({required this.enabled, required this.onTap});
+
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space16,
+        KsTokens.space8,
+        KsTokens.space16,
+        0,
+      ),
+      child: TextButton.icon(
+        onPressed: enabled ? onTap : null,
+        icon: const Icon(Icons.delete_outline_rounded, size: 16),
+        label: const Text('Delete selected set'),
+      ),
+    );
+  }
+}
+
+List<KsMenuDay> _previewDays(MenuSet set) {
+  const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const palette = [
+    KsTokens.catGrain,
+    KsTokens.catMeat,
+    KsTokens.catProduce,
+    KsTokens.catSeafood,
+    KsTokens.catSpice,
+    KsTokens.catBakery,
+  ];
+  return [
+    for (var i = 0; i < set.lengthInDays.clamp(1, 7); i++)
+      KsMenuDay(
+        weekday: weekdays[i % weekdays.length],
+        dishColors: [
+          for (var j = 0; j < (set.dayAt(i)?.entries.length ?? 0); j++)
+            palette[(i + j) % palette.length],
+        ],
+      ),
+  ];
 }

@@ -134,7 +134,7 @@ service cloud.firestore {
           isHouseholdMember(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId)
         );
         allow create, update: if isSignedIn()
-          && isHouseholdCook(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId)
+          && isHouseholdCook(getAfter(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId)
           && request.resource.data.recipeId == recipeId;
         allow delete: if isSignedIn()
           && isHouseholdCook(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId);

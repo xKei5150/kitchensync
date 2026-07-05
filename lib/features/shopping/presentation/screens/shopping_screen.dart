@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
-import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
-import 'package:kitchensync/features/calendar/presentation/providers/planning_providers.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
+import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
 /// Screen 09 · Shopping home + Shop Now.
@@ -17,14 +19,6 @@ import 'package:kitchensync/features/shopping/presentation/providers/shopping_re
 class ShoppingScreen extends ConsumerWidget {
   const ShoppingScreen({super.key});
 
-  static const _upcoming = [
-    _UpcomingShop(title: 'Weekly shop', when: 'Fri 27 · 11 items'),
-    _UpcomingShop(title: 'Next week', when: 'Fri 4 Jul · 9 items'),
-  ];
-
-  /// Sample total for the most recent completed shop, formatted on build.
-  static const _lastShopTotal = 58.0;
-
   Future<void> _openShopNow(BuildContext context, WidgetRef ref) async {
     final weeksAhead = await showModalBottomSheet<int>(
       context: context,
@@ -32,12 +26,9 @@ class ShoppingScreen extends ConsumerWidget {
       builder: (_) => const _ShopNowSheet(),
     );
     if (weeksAhead != null && context.mounted) {
-      final plan = ref
-          .read(planningControllerProvider.notifier)
-          .buildShopNowList(weeksAhead: weeksAhead);
       final record = await ref
           .read(shoppingPlanningControllerProvider)
-          .persistGeneratedList(plan);
+          .generateShopNowList(weeksAhead: weeksAhead);
       if (context.mounted) {
         unawaited(context.push('/shop/list/${record.id}'));
       }
@@ -46,49 +37,159 @@ class ShoppingScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currency = ref.watch(localeFormattersProvider).currency;
-    final activeShoppingList = ref.watch(
-      planningControllerProvider.select((state) => state.activeShoppingList),
-    );
-    final lastShopTotal = currency.format(_lastShopTotal, decimals: false);
-    final lastShopLabel = 'Fri 20 Jun · 13 items · $lastShopTotal';
+    final lists = ref.watch(activeShoppingListsProvider);
+    final household = ref.watch(activeHouseholdContextProvider);
+    final canShopNow = _can(household, HouseholdCapability.initiateShopNow);
     return SafeArea(
       bottom: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          KsTokens.space16,
-          KsTokens.space8,
-          KsTokens.space16,
-          KsTokens.space24,
+      child: lists.when(
+        data: (records) {
+          final pending = records
+              .where((list) => list.status == ShoppingListStatus.pending)
+              .toList(growable: false);
+          final suggestions = pending
+              .where(
+                (list) =>
+                    list.type == ShoppingListType.suggested ||
+                    list.type == ShoppingListType.emergency,
+              )
+              .toList(growable: false);
+          final upcoming = pending
+              .where(
+                (list) =>
+                    list.type == ShoppingListType.scheduled ||
+                    list.type == ShoppingListType.shopNow,
+              )
+              .toList(growable: false);
+          final history =
+              records
+                  .where((list) => list.status == ShoppingListStatus.completed)
+                  .toList(growable: false)
+                ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          return _ShoppingHomeBody(
+            upcoming: upcoming,
+            suggestions: suggestions,
+            history: history,
+            canShopNow: canShopNow,
+            onShopNow: () => _openShopNow(context, ref),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Padding(
+          padding: const EdgeInsets.all(KsTokens.space16),
+          child: Center(
+            child: KsErrorAlert(message: 'Could not load shopping: $error'),
+          ),
         ),
-        children: [
-          const KsFolioHeader(eyebrow: 'The Shop', title: 'Shopping'),
-          const SizedBox(height: KsTokens.space16),
-          _ShopNowCard(onStart: () => _openShopNow(context, ref)),
-          const SizedBox(height: KsTokens.space20),
-          const _SectionLabel('Upcoming'),
+      ),
+    );
+  }
+
+  bool _can(ActiveHouseholdContext? household, HouseholdCapability capability) {
+    if (household == null) return false;
+    return const HouseholdPolicy().roleCan(
+      household.role,
+      capability,
+      isSoloHousehold: household.isSolo,
+    );
+  }
+}
+
+class _ShoppingHomeBody extends ConsumerWidget {
+  const _ShoppingHomeBody({
+    required this.upcoming,
+    required this.suggestions,
+    required this.history,
+    required this.canShopNow,
+    required this.onShopNow,
+  });
+
+  final List<ShoppingListRecord> upcoming;
+  final List<ShoppingListRecord> suggestions;
+  final List<ShoppingListRecord> history;
+  final bool canShopNow;
+  final VoidCallback onShopNow;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space16,
+        KsTokens.space8,
+        KsTokens.space16,
+        KsTokens.space24,
+      ),
+      children: [
+        const KsFolioHeader(eyebrow: 'The Shop', title: 'Shopping'),
+        const SizedBox(height: KsTokens.space16),
+        _ShopNowCard(
+          onStart: canShopNow ? onShopNow : null,
+          locked: !canShopNow,
+        ),
+        const SizedBox(height: KsTokens.space20),
+        if (suggestions.isNotEmpty) ...[
+          const _SectionLabel('Suggestions'),
           const SizedBox(height: KsTokens.space10),
-          if (activeShoppingList != null) ...[
-            _UpcomingTile(
-              shop: _UpcomingShop(
-                title: 'Ready list',
-                when: '${activeShoppingList.items.length} items',
-              ),
-              onTap: () => context.push('/shop/list'),
+          for (final list in suggestions) ...[
+            _SuggestionTile(
+              list: list,
+              onAccept: () => context.push('/shop/list/${list.id}'),
+              onIgnore: () => _ignoreSuggestion(context, ref, list),
             ),
             const SizedBox(height: KsTokens.space8),
           ],
-          for (final shop in _upcoming) ...[
-            _UpcomingTile(shop: shop, onTap: () => context.push('/shop/list')),
+          const SizedBox(height: KsTokens.space12),
+        ],
+        const _SectionLabel('Upcoming'),
+        const SizedBox(height: KsTokens.space10),
+        if (upcoming.isEmpty)
+          const KsEmptyState(
+            icon: Icons.shopping_bag_outlined,
+            title: 'No shopping lists yet',
+            subtitle: 'Schedule meals or start a Shop Now list to build one.',
+          )
+        else
+          for (final list in upcoming) ...[
+            _UpcomingTile(
+              shop: _UpcomingShop.fromRecord(list),
+              onTap: () => context.push('/shop/list/${list.id}'),
+            ),
             const SizedBox(height: KsTokens.space8),
           ],
-          const SizedBox(height: KsTokens.space12),
-          const _SectionLabel('History'),
-          const SizedBox(height: KsTokens.space10),
-          _HistoryRow(label: lastShopLabel),
-        ],
-      ),
+        const SizedBox(height: KsTokens.space12),
+        const _SectionLabel('History'),
+        const SizedBox(height: KsTokens.space10),
+        if (history.isEmpty)
+          const _HistoryRow(label: 'No completed shops yet.')
+        else
+          for (final list in history.take(3))
+            _HistoryRow(label: _historyLabel(list)),
+      ],
     );
+  }
+
+  Future<void> _ignoreSuggestion(
+    BuildContext context,
+    WidgetRef ref,
+    ShoppingListRecord list,
+  ) async {
+    try {
+      await ref.read(shoppingPlanningControllerProvider).deleteList(list.id);
+      ref.invalidate(activeShoppingListsProvider);
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${_typeLabel(list.type)} ignored')),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not ignore list: $error')));
+    }
   }
 }
 
@@ -114,9 +215,10 @@ class _SectionLabel extends StatelessWidget {
 /// The prominent Shop Now banner — a brand-green gradient card inviting the
 /// household to buy ahead and shrink future lists.
 class _ShopNowCard extends StatelessWidget {
-  const _ShopNowCard({required this.onStart});
+  const _ShopNowCard({required this.onStart, this.locked = false});
 
-  final VoidCallback onStart;
+  final VoidCallback? onStart;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +262,10 @@ class _ShopNowCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 13),
-          _OnBrandButton(label: 'Start a shop', onTap: onStart),
+          _OnBrandButton(
+            label: locked ? 'Shopper access required' : 'Start a shop',
+            onTap: onStart,
+          ),
         ],
       ),
     );
@@ -172,7 +277,7 @@ class _OnBrandButton extends StatelessWidget {
   const _OnBrandButton({required this.label, required this.onTap});
 
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -199,10 +304,25 @@ class _OnBrandButton extends StatelessWidget {
 }
 
 class _UpcomingShop {
-  const _UpcomingShop({required this.title, required this.when});
+  const _UpcomingShop({
+    required this.title,
+    required this.when,
+    required this.type,
+  });
+
+  factory _UpcomingShop.fromRecord(ShoppingListRecord list) {
+    return _UpcomingShop(
+      title: _typeLabel(list.type),
+      when:
+          '${_shortDate(list.shoppingDate)} · ${list.items.length} '
+          '${list.items.length == 1 ? 'item' : 'items'}',
+      type: list.type,
+    );
+  }
 
   final String title;
   final String when;
+  final ShoppingListType type;
 }
 
 class _UpcomingTile extends StatelessWidget {
@@ -235,13 +355,13 @@ class _UpcomingTile extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: ks.calShopping.withValues(alpha: 0.14),
+                  color: _typeColor(ks, shop.type).withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(KsTokens.radius10),
                 ),
                 child: Icon(
                   Icons.shopping_bag_outlined,
                   size: 18,
-                  color: ks.calShopping,
+                  color: _typeColor(ks, shop.type),
                 ),
               ),
               const SizedBox(width: KsTokens.space12),
@@ -279,6 +399,126 @@ class _UpcomingTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SuggestionTile extends StatelessWidget {
+  const _SuggestionTile({
+    required this.list,
+    required this.onAccept,
+    required this.onIgnore,
+  });
+
+  final ShoppingListRecord list;
+  final VoidCallback onAccept;
+  final VoidCallback onIgnore;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final accent = _typeColor(ks, list.type);
+    return Container(
+      padding: const EdgeInsets.all(KsTokens.space12),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          accent.withValues(alpha: 0.08),
+          ks.surfaceRaised,
+        ),
+        borderRadius: BorderRadius.circular(KsTokens.radius12),
+        border: Border.all(color: accent.withValues(alpha: 0.32)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(KsTokens.radius10),
+            ),
+            child: Icon(
+              list.type == ShoppingListType.emergency
+                  ? Icons.warning_amber_rounded
+                  : Icons.auto_awesome_rounded,
+              size: 18,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: KsTokens.space12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _typeLabel(list.type),
+                  style: KsTokens.titleSmall.copyWith(
+                    color: ks.textPrimary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: KsTokens.space2),
+                Text(
+                  '${list.items.length} '
+                  '${list.items.length == 1 ? 'item' : 'items'} · '
+                  '${_shortDate(list.shoppingDate)}',
+                  style: KsTokens.labelSmall.copyWith(
+                    color: ks.textTertiary,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton.filledTonal(
+            tooltip: 'Accept suggestion',
+            onPressed: onAccept,
+            icon: const Icon(Icons.check_rounded, size: 18),
+          ),
+          const SizedBox(width: KsTokens.space4),
+          IconButton(
+            tooltip: 'Ignore suggestion',
+            onPressed: onIgnore,
+            icon: const Icon(Icons.close_rounded, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _typeLabel(ShoppingListType type) => switch (type) {
+  ShoppingListType.scheduled => 'Scheduled list',
+  ShoppingListType.shopNow => 'Shop Now',
+  ShoppingListType.suggested => 'Suggested list',
+  ShoppingListType.emergency => 'Emergency list',
+};
+
+Color _typeColor(KsColors ks, ShoppingListType type) => switch (type) {
+  ShoppingListType.emergency => ks.danger,
+  ShoppingListType.suggested => ks.warning,
+  _ => ks.calShopping,
+};
+
+String _historyLabel(ShoppingListRecord list) =>
+    '${_shortDate(list.updatedAt)} · ${list.items.length} '
+    '${list.items.length == 1 ? 'item' : 'items'} · ${_typeLabel(list.type)}';
+
+String _shortDate(DateTime date) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${date.day} ${months[date.month - 1]}';
 }
 
 class _HistoryRow extends StatelessWidget {

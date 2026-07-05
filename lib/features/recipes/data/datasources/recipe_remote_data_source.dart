@@ -27,9 +27,23 @@ class RecipeRemoteDataSource {
   }
 
   Future<void> upsert(Recipe recipe) async {
+    final recipeRef = _refs.recipe(recipe.id);
+    final isCreate = recipe.createdAt.isAtSameMomentAs(recipe.updatedAt);
+    final existingIngredients = isCreate
+        ? null
+        : await _refs.recipeIngredients(recipe.id).get();
+    final nextIngredientIds = {
+      for (final ingredient in recipe.ingredients) ingredient.id,
+    };
     final db = _refs.recipes().firestore;
-    final batch = db.batch()
-      ..set(_refs.recipe(recipe.id), RecipeMapper.toMap(recipe));
+    final batch = db.batch()..set(recipeRef, RecipeMapper.toMap(recipe));
+    if (existingIngredients != null) {
+      for (final existing in existingIngredients.docs) {
+        if (!nextIngredientIds.contains(existing.id)) {
+          batch.delete(existing.reference);
+        }
+      }
+    }
     for (final ingredient in recipe.ingredients) {
       batch.set(
         _refs.recipeIngredients(recipe.id).doc(ingredient.id),

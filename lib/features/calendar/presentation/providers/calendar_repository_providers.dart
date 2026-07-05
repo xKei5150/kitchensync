@@ -1,10 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/core/utils/clock.dart';
+import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/calendar/data/datasources/calendar_remote_data_source.dart';
 import 'package:kitchensync/features/calendar/data/repositories/calendar_repository_impl.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
@@ -48,6 +52,18 @@ final activeCalendarDaySettingsProvider =
           .watchActiveDaySettings(householdId);
     });
 
+final calendarSettingsControllerProvider = Provider<CalendarSettingsController>(
+  (ref) {
+    return CalendarSettingsController(
+      repository: ref.watch(calendarRepositoryProvider),
+      householdId: ref.watch(activeHouseholdIdProvider),
+      household: ref.watch(activeHouseholdContextProvider),
+      idGenerator: ref.watch(idGeneratorProvider),
+      clock: ref.watch(clockProvider),
+    );
+  },
+);
+
 final cookingLifecycleControllerProvider = Provider<CookingLifecycleController>(
   (ref) {
     return CookingLifecycleController(
@@ -57,9 +73,98 @@ final cookingLifecycleControllerProvider = Provider<CookingLifecycleController>(
       recordLeftover: ref.watch(recordLeftoverProvider),
       markAsWaste: ref.watch(markAsWasteProvider),
       householdId: ref.watch(activeHouseholdIdProvider),
+      household: ref.watch(activeHouseholdContextProvider),
     );
   },
 );
+
+class CalendarSettingsController {
+  const CalendarSettingsController({
+    required this.repository,
+    required this.householdId,
+    this.household,
+    required this.idGenerator,
+    required this.clock,
+  });
+
+  final CalendarRepository repository;
+  final String householdId;
+  final ActiveHouseholdContext? household;
+  final IdGenerator idGenerator;
+  final Clock clock;
+  static const _policy = HouseholdPolicy();
+
+  Future<CalendarDaySettings> saveDefaults({
+    CalendarDaySettings? existing,
+    required DateTime dateRangeStart,
+    required DateTime dateRangeEnd,
+    required int defaultServingSize,
+    required int mealsPerDay,
+    required int dishesPerMeal,
+    required String mealModeName,
+  }) async {
+    _require(HouseholdCapability.configureCalendarDefaults);
+    if (defaultServingSize <= 0) {
+      throw ArgumentError.value(
+        defaultServingSize,
+        'defaultServingSize',
+        'Default serving size must be greater than zero.',
+      );
+    }
+    if (mealsPerDay <= 0) {
+      throw ArgumentError.value(
+        mealsPerDay,
+        'mealsPerDay',
+        'Meals per day must be greater than zero.',
+      );
+    }
+    if (dishesPerMeal <= 0) {
+      throw ArgumentError.value(
+        dishesPerMeal,
+        'dishesPerMeal',
+        'Dishes per meal must be greater than zero.',
+      );
+    }
+    final start = _dateKey(dateRangeStart);
+    final end = _dateKey(dateRangeEnd);
+    if (end.isBefore(start)) {
+      throw ArgumentError.value(
+        dateRangeEnd,
+        'dateRangeEnd',
+        'Date range end must be on or after start.',
+      );
+    }
+    final settings = CalendarDaySettings(
+      id: existing?.id ?? idGenerator.newId(),
+      householdId: householdId,
+      dateRangeStart: start,
+      dateRangeEnd: end,
+      defaultServingSize: defaultServingSize,
+      mealsPerDay: mealsPerDay,
+      dishesPerMeal: dishesPerMeal,
+      mealModeName: mealModeName.trim().isEmpty
+          ? 'Standard'
+          : mealModeName.trim(),
+      isActive: true,
+    );
+    await repository.upsertDaySettings(settings);
+    return settings;
+  }
+
+  void _require(HouseholdCapability capability) {
+    final household = this.household;
+    if (household == null) return;
+    if (!_policy.roleCan(
+      household.role,
+      capability,
+      isSoloHousehold: household.isSolo,
+    )) {
+      throw StateError('${household.role.label} cannot ${capability.name}.');
+    }
+  }
+
+  DateTime _dateKey(DateTime date) => DateTime(date.year, date.month, date.day);
+}
 
 class CookingLifecycleController {
   const CookingLifecycleController({
@@ -69,6 +174,7 @@ class CookingLifecycleController {
     required this.recordLeftover,
     required this.markAsWaste,
     required this.householdId,
+    this.household,
   });
 
   final CalendarRepository calendarRepository;
@@ -77,8 +183,12 @@ class CookingLifecycleController {
   final RecordLeftover recordLeftover;
   final MarkAsWaste markAsWaste;
   final String householdId;
+  final ActiveHouseholdContext? household;
+  static const _policy = HouseholdPolicy();
 
   Future<void> markCooked(MealScheduleEntry meal) async {
+    _require(HouseholdCapability.markMealsCooked);
+    _require(HouseholdCapability.markIngredientsConsumed);
     final recipe = await recipeRepository.watchById(meal.recipeId).first;
     if (recipe == null) {
       throw StateError('Cannot cook missing recipe ${meal.recipeId}.');
@@ -140,6 +250,8 @@ class CookingLifecycleController {
     required MealScheduleEntry meal,
     required int servings,
   }) async {
+    _require(HouseholdCapability.manageLeftovers);
+    _require(HouseholdCapability.recordLeftovers);
     final recipe = await recipeRepository.watchById(meal.recipeId).first;
     if (recipe == null) {
       throw StateError(
@@ -175,6 +287,7 @@ class CookingLifecycleController {
   }
 
   Future<void> changeServingSize(MealScheduleEntry meal, int servingSize) {
+    _require(HouseholdCapability.adjustMealServings);
     if (servingSize <= 0) {
       throw ArgumentError.value(
         servingSize,
@@ -192,6 +305,8 @@ class CookingLifecycleController {
     required MealScheduleEntry meal,
     required int mealCount,
   }) async {
+    _require(HouseholdCapability.adjustMealServings);
+    _requirePremium(HouseholdCapability.adjustMealServings);
     if (mealCount <= 1) {
       throw ArgumentError.value(
         mealCount,
@@ -219,11 +334,32 @@ class CookingLifecycleController {
     );
   }
 
+  void _require(HouseholdCapability capability) {
+    final household = this.household;
+    if (household == null) return;
+    if (!_policy.roleCan(
+      household.role,
+      capability,
+      isSoloHousehold: household.isSolo,
+    )) {
+      throw StateError('${household.role.label} cannot ${capability.name}.');
+    }
+  }
+
+  void _requirePremium(HouseholdCapability capability) {
+    final household = this.household;
+    if (household == null) return;
+    if (!household.hasPremium) {
+      throw StateError('Premium is required to ${capability.name}.');
+    }
+  }
+
   Future<void> swapRecipe({
     required MealScheduleEntry meal,
     required String recipeId,
     required int servingSize,
   }) {
+    _require(HouseholdCapability.scheduleMeals);
     if (recipeId.isEmpty) {
       throw ArgumentError.value(recipeId, 'recipeId', 'Recipe id is required.');
     }
@@ -246,6 +382,7 @@ class CookingLifecycleController {
   }
 
   Future<void> cancelMeal(MealScheduleEntry meal) {
+    _require(HouseholdCapability.removeScheduledMeals);
     return calendarRepository.upsertMeal(
       householdId: householdId,
       entry: meal.copyWith(state: ScheduledMealState.cancelled),
@@ -253,6 +390,7 @@ class CookingLifecycleController {
   }
 
   Future<void> rescheduleCookNext(MealScheduleEntry meal) {
+    _require(HouseholdCapability.scheduleMeals);
     return calendarRepository.upsertMeal(
       householdId: householdId,
       entry: meal.copyWith(
@@ -268,6 +406,8 @@ class CookingLifecycleController {
     required DateTime date,
     required String mealLabel,
   }) {
+    _require(HouseholdCapability.manageLeftovers);
+    _require(HouseholdCapability.scheduleMeals);
     if (leftover.section != PantrySection.leftover ||
         leftover.relatedRecipeId == null) {
       throw ArgumentError.value(
@@ -300,6 +440,8 @@ class CookingLifecycleController {
   }
 
   Future<void> consumeLeftoverMeal(MealScheduleEntry meal) async {
+    _require(HouseholdCapability.manageLeftovers);
+    _require(HouseholdCapability.markMealsCooked);
     final leftoverId = meal.linkedLeftoverId;
     if (leftoverId == null) {
       throw ArgumentError.value(
@@ -327,6 +469,8 @@ class CookingLifecycleController {
   }
 
   Future<void> markLeftoverSpoiled(PantryItem leftover) async {
+    _require(HouseholdCapability.manageLeftovers);
+    _require(HouseholdCapability.markCalendarWaste);
     if (leftover.section != PantrySection.leftover) {
       throw ArgumentError.value(
         leftover.id,

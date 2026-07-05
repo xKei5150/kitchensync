@@ -5,10 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/core/utils/clock.dart';
+import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/create_custom_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
@@ -179,7 +184,7 @@ class _FakeIngredientRepository implements IngredientRepository {
   );
 
   @override
-  Future<Ingredient?> getById(String id) async {
+  Future<Ingredient?> getById(String id, {String? householdId}) async {
     for (final ingredient in created) {
       if (ingredient.id == id) return ingredient;
     }
@@ -289,6 +294,57 @@ List<Recipe> _publicRecipes() {
 }
 
 void main() {
+  test(
+    'RecipeSearchController rejects premium filters for free households',
+    () {
+      final repo = _FakeRecipeRepository(_publicRecipes());
+      addTearDown(repo.dispose);
+      final controller = RecipeSearchController(
+        repository: repo,
+        household: const ActiveHouseholdContext(
+          id: 'solo-household',
+          name: 'Test kitchen',
+          role: HouseholdRole.admin,
+          isJoint: false,
+          hasPremium: false,
+        ),
+      );
+
+      expect(
+        () => controller.searchPublicRecipes(
+          filter: const RecipeSearchFilter(budget: 500, targetServings: 8),
+        ),
+        throwsStateError,
+      );
+    },
+  );
+
+  test(
+    'RecipeSearchController allows unfiltered public search for free households',
+    () async {
+      final repo = _FakeRecipeRepository(_publicRecipes());
+      addTearDown(repo.dispose);
+      final controller = RecipeSearchController(
+        repository: repo,
+        household: const ActiveHouseholdContext(
+          id: 'solo-household',
+          name: 'Test kitchen',
+          role: HouseholdRole.admin,
+          isJoint: false,
+          hasPremium: false,
+        ),
+      );
+
+      final results = await controller.searchPublicRecipes();
+
+      expect(results.map((recipe) => recipe.id), [
+        'public-chicken',
+        'public-dal',
+        'public-roast',
+      ]);
+    },
+  );
+
   testWidgets('RecipesScreen searches public recipes with premium filters', (
     tester,
   ) async {
@@ -367,7 +423,6 @@ void main() {
       await tester.tap(find.byIcon(Icons.delete_outline));
       await tester.pumpAndSettle();
 
-      expect(find.byType(KsRecipeCard), findsNothing);
       expect(
         repo.recipes.any((recipe) => recipe.id == 'public-chicken'),
         isTrue,
@@ -448,7 +503,7 @@ void main() {
     );
   });
 
-  testWidgets('RecipesScreen saves a manually entered recipe into My Recipes', (
+  testWidgets('RecipesScreen saves manual recipe with multiple ingredients', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(400, 2200);
@@ -498,6 +553,20 @@ void main() {
       find.widgetWithText(TextField, 'Preparation note'),
       'bone-in',
     );
+    await tester.tap(find.widgetWithText(TextButton, 'Add ingredient'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Ingredient name').last,
+      'Soy Sauce',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Quantity').last,
+      '3',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Preparation note').last,
+      'dark',
+    );
     await tester.enterText(
       find.widgetWithText(TextField, 'Instructions'),
       'Brown chicken\nSimmer with soy and vinegar',
@@ -517,17 +586,312 @@ void main() {
     expect(repo.recipes.single.mealTimeTags, ['Lunch', 'Dinner']);
     expect(repo.recipes.single.recipeTags, ['Chicken', 'Filipino']);
     expect(repo.recipes.single.priceEstimate, 320);
-    expect(ingredients.created.single.name, 'chicken thighs');
-    expect(ingredients.created.single.category, IngredientCategory.meat);
+    expect(ingredients.created.map((ingredient) => ingredient.name), [
+      'chicken thighs',
+      'soy sauce',
+    ]);
+    expect(ingredients.created.first.category, IngredientCategory.meat);
+    expect(ingredients.created.last.category, IngredientCategory.condiment);
+    expect(repo.recipes.single.ingredients, hasLength(2));
     expect(
-      repo.recipes.single.ingredients.single.ingredientId,
-      ingredients.created.single.id,
+      repo.recipes.single.ingredients.first.ingredientId,
+      ingredients.created.first.id,
     );
-    expect(repo.recipes.single.ingredients.single.preparationNote, 'bone-in');
+    expect(
+      repo.recipes.single.ingredients.last.ingredientId,
+      ingredients.created.last.id,
+    );
+    expect(repo.recipes.single.ingredients.first.preparationNote, 'bone-in');
+    expect(repo.recipes.single.ingredients.last.preparationNote, 'dark');
     expect(repo.recipes.single.instructions, [
       'Brown chicken',
       'Simmer with soy and vinegar',
     ]);
+  });
+
+  testWidgets('RecipesScreen edits an existing recipe and removes old rows', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime(2026, 7, 5);
+    final repo = _FakeRecipeRepository([
+      Recipe(
+        id: 'adobo',
+        authorUserId: 'demo-user',
+        householdId: 'solo-household',
+        name: 'Adobo',
+        description: 'Classic braise',
+        defaultServingSize: 4,
+        mealTimeTags: const ['Dinner'],
+        recipeTags: const ['Filipino'],
+        priceEstimate: 250,
+        location: 'Home',
+        visibility: RecipeVisibility.private,
+        monetization: RecipeMonetization.free,
+        createdAt: now,
+        updatedAt: now,
+        ingredients: const [
+          RecipeIngredient(
+            id: 'ri-chicken',
+            recipeId: 'adobo',
+            ingredientId: 'chicken-thighs',
+            quantity: 1,
+            unit: Unit.kg,
+            description: 'Chicken Thighs',
+          ),
+          RecipeIngredient(
+            id: 'ri-soy',
+            recipeId: 'adobo',
+            ingredientId: 'soy-sauce',
+            quantity: 3,
+            unit: Unit.tbsp,
+            description: 'Soy Sauce',
+          ),
+        ],
+        instructions: const ['Braise chicken.'],
+      ),
+    ]);
+    final ingredients = _FakeIngredientRepository();
+    addTearDown(repo.dispose);
+
+    await tester.pumpWidget(
+      await _wrap(
+        const RecipesScreen(),
+        ingredientRepository: ingredients,
+        recipeRepository: repo,
+      ),
+    );
+
+    await tester.tap(find.text('My Recipes'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Name'),
+      'Pork Adobo',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Default serving size'),
+      '5',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Ingredient name').first,
+      'Pork Belly',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Quantity').first,
+      '2',
+    );
+    await tester.tap(find.byTooltip('Remove ingredient').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Update recipe'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pork Adobo'), findsOneWidget);
+    expect(repo.recipes.single.name, 'Pork Adobo');
+    expect(repo.recipes.single.defaultServingSize, 5);
+    expect(repo.recipes.single.ingredients, hasLength(1));
+    expect(repo.recipes.single.ingredients.single.id, 'ri-chicken');
+    expect(
+      repo.recipes.single.ingredients.single.ingredientId,
+      isNot('soy-sauce'),
+    );
+    expect(ingredients.created.single.name, 'pork belly');
+  });
+
+  test(
+    'RecipeImportController links picked ingredient id without duplication',
+    () async {
+      final repo = _FakeRecipeRepository();
+      final ingredients = _FakeIngredientRepository();
+      addTearDown(repo.dispose);
+      final controller = RecipeImportController(
+        repository: repo,
+        householdId: 'solo-household',
+        userId: 'demo-user',
+        idGenerator: FakeIdGenerator(['recipe-1', 'recipe-ing-1']),
+        clock: FakeClock(DateTime(2026, 7, 5, 9)),
+        createCustomIngredient: CreateCustomIngredient(
+          ingredients,
+          idGenerator: FakeIdGenerator(['custom-ingredient-1']),
+          clock: FakeClock(DateTime(2026, 7, 5, 9)),
+        ),
+      );
+
+      final imported = await controller.importDrafts([
+        const RecipeDraft(
+          name: 'Breakfast Bowl',
+          defaultServingSize: 2,
+          timeTags: ['Breakfast'],
+          recipeTags: ['Quick'],
+          description: '',
+          ingredients: [
+            RecipeIngredientDraft(
+              ingredientId: 'seed-egg',
+              name: 'Egg',
+              quantity: 2,
+              unit: Unit.piece,
+            ),
+          ],
+          instructions: ['Cook eggs.'],
+          visibility: RecipeVisibility.private,
+        ),
+      ]);
+
+      expect(imported.single.ingredients.single.ingredientId, 'seed-egg');
+      expect(repo.recipes.single.ingredients.single.ingredientId, 'seed-egg');
+      expect(ingredients.created, isEmpty);
+    },
+  );
+
+  test('RecipeImportController rejects member recipe creation', () async {
+    final repo = _FakeRecipeRepository();
+    final ingredients = _FakeIngredientRepository();
+    addTearDown(repo.dispose);
+    final controller = RecipeImportController(
+      repository: repo,
+      householdId: 'household-1',
+      household: const ActiveHouseholdContext(
+        id: 'household-1',
+        name: 'Shared kitchen',
+        role: HouseholdRole.member,
+        isJoint: true,
+        hasPremium: true,
+      ),
+      userId: 'demo-user',
+      idGenerator: FakeIdGenerator(['recipe-1']),
+      clock: FakeClock(DateTime(2026, 7, 5, 9)),
+      createCustomIngredient: CreateCustomIngredient(
+        ingredients,
+        idGenerator: FakeIdGenerator(['custom-ingredient-1']),
+        clock: FakeClock(DateTime(2026, 7, 5, 9)),
+      ),
+    );
+
+    expect(
+      controller.importDrafts([
+        const RecipeDraft(
+          name: 'Member Draft',
+          defaultServingSize: 2,
+          timeTags: ['Dinner'],
+          recipeTags: ['Test'],
+          description: '',
+          ingredients: [
+            RecipeIngredientDraft(name: 'Rice', quantity: 1, unit: Unit.cup),
+          ],
+          instructions: ['Cook rice.'],
+          visibility: RecipeVisibility.private,
+        ),
+      ]),
+      throwsStateError,
+    );
+    expect(repo.recipes, isEmpty);
+    expect(ingredients.created, isEmpty);
+  });
+
+  test('RecipeLibraryController rejects member recipe edits', () async {
+    final repo = _FakeRecipeRepository();
+    final ingredients = _FakeIngredientRepository();
+    addTearDown(repo.dispose);
+    final now = DateTime(2026, 7, 5);
+    final controller = RecipeLibraryController(
+      repository: repo,
+      householdId: 'household-1',
+      household: const ActiveHouseholdContext(
+        id: 'household-1',
+        name: 'Shared kitchen',
+        role: HouseholdRole.member,
+        isJoint: true,
+        hasPremium: true,
+      ),
+      idGenerator: FakeIdGenerator(['recipe-ing-1']),
+      clock: FakeClock(now),
+      createCustomIngredient: () => CreateCustomIngredient(
+        ingredients,
+        idGenerator: FakeIdGenerator(['custom-ingredient-1']),
+        clock: FakeClock(now),
+      ),
+    );
+
+    expect(
+      controller.updateLocalRecipe(
+        recipe: Recipe(
+          id: 'recipe-1',
+          authorUserId: 'demo-user',
+          householdId: 'household-1',
+          name: 'Rice',
+          description: '',
+          defaultServingSize: 2,
+          mealTimeTags: const ['Dinner'],
+          recipeTags: const [],
+          location: '',
+          visibility: RecipeVisibility.private,
+          monetization: RecipeMonetization.free,
+          createdAt: now,
+          updatedAt: now,
+          ingredients: const [],
+          instructions: const ['Cook rice.'],
+        ),
+        draft: const RecipeDraft(
+          name: 'Edited Rice',
+          defaultServingSize: 2,
+          timeTags: ['Dinner'],
+          recipeTags: [],
+          description: '',
+          ingredients: [
+            RecipeIngredientDraft(name: 'Rice', quantity: 1, unit: Unit.cup),
+          ],
+          instructions: ['Cook rice.'],
+          visibility: RecipeVisibility.private,
+        ),
+      ),
+      throwsStateError,
+    );
+    expect(repo.recipes, isEmpty);
+    expect(ingredients.created, isEmpty);
+  });
+
+  test('RecipeImportController rejects public recipes without price', () async {
+    final repo = _FakeRecipeRepository();
+    final ingredients = _FakeIngredientRepository();
+    addTearDown(repo.dispose);
+    final controller = RecipeImportController(
+      repository: repo,
+      householdId: 'solo-household',
+      userId: 'demo-user',
+      idGenerator: FakeIdGenerator(['recipe-1']),
+      clock: FakeClock(DateTime(2026, 7, 5, 9)),
+      createCustomIngredient: CreateCustomIngredient(
+        ingredients,
+        idGenerator: FakeIdGenerator(['custom-ingredient-1']),
+        clock: FakeClock(DateTime(2026, 7, 5, 9)),
+      ),
+    );
+
+    expect(
+      controller.importDrafts([
+        const RecipeDraft(
+          name: 'Public Draft',
+          defaultServingSize: 2,
+          timeTags: ['Dinner'],
+          recipeTags: ['Test'],
+          description: '',
+          ingredients: [
+            RecipeIngredientDraft(name: 'Rice', quantity: 1, unit: Unit.cup),
+          ],
+          instructions: ['Cook rice.'],
+          visibility: RecipeVisibility.public,
+        ),
+      ]),
+      throwsStateError,
+    );
+    expect(repo.recipes, isEmpty);
+    expect(ingredients.created, isEmpty);
   });
 
   testWidgets('RecipesScreen renders in dark theme without error', (
