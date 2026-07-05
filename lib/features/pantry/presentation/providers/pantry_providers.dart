@@ -15,10 +15,12 @@ import 'package:kitchensync/features/pantry/data/repositories/purchase_history_r
 import 'package:kitchensync/features/pantry/data/repositories/waste_repository_impl.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
+import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item_photo.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/adjust_pantry_quantity.dart';
@@ -147,6 +149,12 @@ Stream<List<WasteEvent>> wasteHistoryStream(Ref ref) {
   return ref.watch(watchWasteHistoryProvider).watch(hid);
 }
 
+@riverpod
+Stream<List<PurchaseRecord>> purchaseHistoryStream(Ref ref) {
+  final hid = ref.watch(activeHouseholdIdProvider);
+  return ref.watch(purchaseHistoryRepositoryProvider).watchByHousehold(hid);
+}
+
 /// Every pantry item across all four sections, combined into one live list.
 ///
 /// The repository only exposes a per-section watch, so this fans out across
@@ -190,6 +198,25 @@ Stream<List<PantryItem>> pantryAllItemsStream(Ref ref) {
   });
 
   return controller.stream;
+}
+
+@riverpod
+List<BulkPantryStatus> bulkPantryStatuses(Ref ref) {
+  final items =
+      ref.watch(pantryAllItemsStreamProvider).asData?.value ??
+      const <PantryItem>[];
+  final waste =
+      ref.watch(wasteHistoryStreamProvider).asData?.value ??
+      const <WasteEvent>[];
+  final purchases =
+      ref.watch(purchaseHistoryStreamProvider).asData?.value ??
+      const <PurchaseRecord>[];
+  return const BulkPredictionEngine().predict(
+    pantryItems: items,
+    usageEvents: waste,
+    purchaseHistory: purchases,
+    now: DateTime.now(),
+  );
 }
 
 @riverpod

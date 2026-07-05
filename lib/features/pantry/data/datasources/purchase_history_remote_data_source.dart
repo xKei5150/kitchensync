@@ -6,6 +6,16 @@ class PurchaseHistoryRemoteDataSource {
   PurchaseHistoryRemoteDataSource(this._refs);
   final FirestoreRefs _refs;
 
+  Stream<List<PurchaseRecord>> watchByHousehold(String householdId) => _refs
+      .purchases(householdId)
+      .orderBy('purchaseDate', descending: true)
+      .snapshots()
+      .map(
+        (s) => s.docs
+            .map((d) => PurchaseRecordMapper.fromMap(d.id, d.data()))
+            .toList(),
+      );
+
   Stream<List<PurchaseRecord>> watchByIngredient(
     String householdId,
     String ingredientId,

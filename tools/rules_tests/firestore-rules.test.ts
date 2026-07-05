@@ -6,19 +6,57 @@ import {
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { setDoc, doc, getDoc } from "firebase/firestore";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { deleteDoc, setDoc, doc, getDoc } from "firebase/firestore";
 
 let env: RulesTestEnvironment;
+const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
+const [firestoreHostname, firestorePort] = firestoreHost.split(":");
+const projectId = process.env.GCLOUD_PROJECT ?? "kitchensync-rules-test";
+const rulesPath = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../firestore.rules",
+);
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({
-    projectId: "kitchensync-dev",
+    projectId,
     firestore: {
-      rules: readFileSync(resolve("../../firestore.rules"), "utf-8"),
-      host: "localhost",
-      port: 8080,
+      rules: readFileSync(rulesPath, "utf-8"),
+      host: firestoreHostname,
+      port: Number(firestorePort),
     },
+  });
+  await env.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, "households/solo-household"), {
+      name: "Solo kitchen",
+      creatorUserId: "u1",
+      isJoint: false,
+      hasPremium: false,
+      maxMembers: 1,
+    });
+    await setDoc(doc(db, "households/solo-household/members/u1"), {
+      role: "admin",
+    });
+    await setDoc(doc(db, "households/joinable-household"), {
+      name: "Joinable kitchen",
+      creatorUserId: "admin",
+      isJoint: true,
+      hasPremium: true,
+      maxMembers: 6,
+      inviteCode: "KS-JOIN1",
+    });
+    await setDoc(doc(db, "households/joinable-household/members/admin"), {
+      role: "admin",
+    });
+    await setDoc(doc(db, "householdInvites/KS-JOIN1"), {
+      householdId: "joinable-household",
+      createdBy: "admin",
+      role: "member",
+      active: true,
+    });
   });
 });
 
@@ -42,6 +80,151 @@ describe("/ingredients global dictionary", () => {
   test("unsigned users cannot read", async () => {
     const db = env.unauthenticatedContext().firestore();
     await assertFails(getDoc(doc(db, "ingredients/onion")));
+  });
+});
+
+describe("/users session documents", () => {
+  test("users can read and update only their own active household", async () => {
+    const db = env.authenticatedContext("u1").firestore();
+    const outsiderDb = env.authenticatedContext("outsider").firestore();
+
+    await assertSucceeds(
+      setDoc(doc(db, "users/u1"), {
+        activeHouseholdId: "solo-household",
+        isPremium: false,
+      }),
+    );
+    await assertSucceeds(getDoc(doc(db, "users/u1")));
+    await assertFails(getDoc(doc(outsiderDb, "users/u1")));
+  });
+});
+
+describe("/households and memberships", () => {
+  test("members can read household docs and outsiders cannot", async () => {
+    const memberDb = env.authenticatedContext("u1").firestore();
+    const outsiderDb = env.authenticatedContext("outsider").firestore();
+
+    await assertSucceeds(getDoc(doc(memberDb, "households/solo-household")));
+    await assertSucceeds(
+      getDoc(doc(memberDb, "households/solo-household/members/u1")),
+    );
+    await assertFails(getDoc(doc(outsiderDb, "households/solo-household")));
+  });
+
+  test("signed-in users can create their own household and first admin member", async () => {
+    const db = env.authenticatedContext("new-user").firestore();
+    const outsiderDb = env.authenticatedContext("outsider").firestore();
+
+    await assertSucceeds(
+      setDoc(doc(db, "households/new-household"), {
+        name: "New kitchen",
+        creatorUserId: "new-user",
+        isJoint: false,
+        hasPremium: false,
+        maxMembers: 1,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(db, "households/new-household/members/new-user"), {
+        role: "admin",
+      }),
+    );
+    await assertFails(
+      setDoc(doc(outsiderDb, "households/new-household/members/outsider"), {
+        role: "member",
+      }),
+    );
+  });
+
+  test("onboarding batch can create a solo household and active context", async () => {
+    const db = env.authenticatedContext("fresh-user").firestore();
+
+    await assertSucceeds(
+      setDoc(doc(db, "users/fresh-user"), {
+        activeHouseholdId: "fresh-household",
+        isPremium: false,
+        createdSoloHouseholdId: "fresh-household",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(db, "households/fresh-household"), {
+        name: "My kitchen",
+        creatorUserId: "fresh-user",
+        isJoint: false,
+        hasPremium: false,
+        maxMembers: 1,
+        inviteCode: "KS-FRESH",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(db, "households/fresh-household/members/fresh-user"), {
+        role: "admin",
+        joinedAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(db, "householdInvites/KS-FRESH"), {
+        householdId: "fresh-household",
+        createdBy: "fresh-user",
+        role: "member",
+        active: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
+  test("invite codes allow self-joining the invited household role only", async () => {
+    const inviteeDb = env.authenticatedContext("invitee").firestore();
+    const outsiderDb = env.authenticatedContext("outsider").firestore();
+
+    await assertSucceeds(
+      getDoc(doc(inviteeDb, "householdInvites/KS-JOIN1")),
+    );
+    await assertSucceeds(
+      setDoc(doc(inviteeDb, "households/joinable-household/members/invitee"), {
+        role: "member",
+        inviteCode: "KS-JOIN1",
+      }),
+    );
+    await assertFails(
+      setDoc(doc(outsiderDb, "households/joinable-household/members/other"), {
+        role: "admin",
+        inviteCode: "KS-JOIN1",
+      }),
+    );
+  });
+
+  test("household premium subscription records are admin-owned", async () => {
+    const adminDb = env.authenticatedContext("admin").firestore();
+    const inviteeDb = env.authenticatedContext("invitee").firestore();
+    const payload = {
+      status: "trialing",
+      plan: "annual",
+      ownerUserId: "admin",
+      provider: "in_app_trial",
+      startedAt: new Date(),
+      trialEndsAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await assertSucceeds(
+      setDoc(
+        doc(adminDb, "households/joinable-household/subscriptions/premium"),
+        payload,
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(inviteeDb, "households/joinable-household/subscriptions/premium"),
+        { ...payload, ownerUserId: "invitee" },
+      ),
+    );
   });
 });
 
@@ -131,6 +314,240 @@ describe("/households/{hid}/customIngredients", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }),
+    );
+  });
+});
+
+describe("household role-gated feature collections", () => {
+  beforeAll(async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, "households/joint-household/members/admin"), {
+        role: "admin",
+      });
+      await setDoc(doc(db, "households/joint-household/members/cook"), {
+        role: "cook",
+      });
+      await setDoc(doc(db, "households/joint-household/members/shopper"), {
+        role: "shopper",
+      });
+      await setDoc(doc(db, "households/joint-household/members/member"), {
+        role: "member",
+      });
+      await setDoc(doc(db, "recipes/public-recipe"), {
+        authorUserId: "admin",
+        householdId: "joint-household",
+        name: "Public Stew",
+        defaultServingSize: 4,
+        visibility: "public",
+        monetization: "free",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await setDoc(doc(db, "recipes/private-recipe"), {
+        authorUserId: "admin",
+        householdId: "joint-household",
+        name: "Private Stew",
+        defaultServingSize: 4,
+        visibility: "private",
+        monetization: "free",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await setDoc(doc(db, "households/joint-household/menuSets/set-1"), {
+        householdId: "joint-household",
+        name: "Week",
+        lengthInDays: 7,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await setDoc(
+        doc(db, "households/joint-household/menuSets/set-1/days/day-1"),
+        {
+          menuSetId: "set-1",
+          dayIndex: 0,
+        },
+      );
+    });
+  });
+
+  test("public recipes are readable but private recipes require membership", async () => {
+    const outsider = env.authenticatedContext("outsider").firestore();
+    const member = env.authenticatedContext("member").firestore();
+
+    await assertSucceeds(getDoc(doc(outsider, "recipes/public-recipe")));
+    await assertFails(getDoc(doc(outsider, "recipes/private-recipe")));
+    await assertSucceeds(getDoc(doc(member, "recipes/private-recipe")));
+  });
+
+  test("cook can write recipes and member cannot", async () => {
+    const cookDb = env.authenticatedContext("cook").firestore();
+    const memberDb = env.authenticatedContext("member").firestore();
+    const payload = {
+      authorUserId: "cook",
+      householdId: "joint-household",
+      name: "Adobo",
+      defaultServingSize: 4,
+      visibility: "private",
+      monetization: "free",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await assertSucceeds(setDoc(doc(cookDb, "recipes/adobo"), payload));
+    await assertFails(setDoc(doc(memberDb, "recipes/member-adobo"), payload));
+  });
+
+  test("calendar entries are cook-writable and reject household mismatch", async () => {
+    const cookDb = env.authenticatedContext("cook").firestore();
+    const memberDb = env.authenticatedContext("member").firestore();
+
+    await assertSucceeds(
+      setDoc(
+        doc(cookDb, "households/joint-household/mealScheduleEntries/meal-1"),
+        {
+          householdId: "joint-household",
+          date: "2026-07-06",
+          mealSlot: "Dinner",
+          recipeId: "adobo",
+          servingSize: 4,
+          state: "scheduled",
+          marking: "none",
+        },
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(memberDb, "households/joint-household/mealScheduleEntries/meal-2"),
+        {
+          householdId: "joint-household",
+          date: "2026-07-06",
+          mealSlot: "Dinner",
+          recipeId: "adobo",
+          servingSize: 4,
+          state: "scheduled",
+          marking: "none",
+        },
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(cookDb, "households/joint-household/mealScheduleEntries/meal-3"),
+        {
+          householdId: "other-household",
+          date: "2026-07-06",
+          mealSlot: "Dinner",
+          recipeId: "adobo",
+          servingSize: 4,
+          state: "scheduled",
+          marking: "none",
+        },
+      ),
+    );
+  });
+
+  test("shopping lists are shopper-writable and cook is denied", async () => {
+    const shopperDb = env.authenticatedContext("shopper").firestore();
+    const cookDb = env.authenticatedContext("cook").firestore();
+    const payload = {
+      householdId: "joint-household",
+      type: "scheduled",
+      shoppingDate: "2026-07-12",
+      generatedForRangeStart: "2026-07-06",
+      generatedForRangeEnd: "2026-07-12",
+      status: "pending",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await assertSucceeds(
+      setDoc(doc(shopperDb, "households/joint-household/shoppingLists/list-1"), payload),
+    );
+    await assertFails(
+      setDoc(doc(cookDb, "households/joint-household/shoppingLists/list-2"), payload),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(shopperDb, "households/joint-household/shoppingLists/list-1/items/i1"),
+        {
+          shoppingListId: "list-1",
+          ingredientId: "onion",
+          quantityNeeded: 1,
+          unit: "piece",
+          status: "unchecked",
+        },
+      ),
+    );
+  });
+
+  test("menu sets and day settings are admin-only", async () => {
+    const adminDb = env.authenticatedContext("admin").firestore();
+    const cookDb = env.authenticatedContext("cook").firestore();
+
+    await assertSucceeds(
+      setDoc(doc(adminDb, "households/joint-household/daySettings/ds-1"), {
+        householdId: "joint-household",
+        dateRangeStart: "2026-07-01",
+        dateRangeEnd: "2026-07-31",
+        mealsPerDay: 3,
+        dishesPerMeal: 1,
+        mealModeName: "Standard",
+        isActive: true,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(cookDb, "households/joint-household/daySettings/ds-2"), {
+        householdId: "joint-household",
+        dateRangeStart: "2026-07-01",
+        dateRangeEnd: "2026-07-31",
+        mealsPerDay: 3,
+        dishesPerMeal: 1,
+        mealModeName: "Standard",
+        isActive: true,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(adminDb, "households/joint-household/menuSets/set-2"), {
+        householdId: "joint-household",
+        name: "Week",
+        lengthInDays: 7,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+    await assertFails(
+      setDoc(doc(cookDb, "households/joint-household/menuSets/set-3"), {
+        householdId: "joint-household",
+        name: "Week",
+        lengthInDays: 7,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(adminDb, "households/joint-household/menuSets/set-1/days/day-1/entries/e1"),
+        {
+          menuSetDayId: "day-1",
+          mealSlot: "Dinner",
+          recipeId: "adobo",
+          orderInSlot: 0,
+        },
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(cookDb, "households/joint-household/menuSets/set-1/days/day-1/entries/e2"),
+        {
+          menuSetDayId: "day-1",
+          mealSlot: "Dinner",
+          recipeId: "adobo",
+          orderInSlot: 0,
+        },
+      ),
+    );
+    await assertSucceeds(
+      deleteDoc(doc(adminDb, "households/joint-household/menuSets/set-1/days/day-1")),
     );
   });
 });

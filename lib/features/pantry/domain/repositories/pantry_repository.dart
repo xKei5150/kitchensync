@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
@@ -11,6 +12,12 @@ abstract class PantryRepository {
   );
   Stream<PantryItem?> watchById(String householdId, String itemId);
   Future<PantryItem?> findByIngredient(String householdId, String ingredientId);
+  Future<PantryItem?> findByIngredientUnit({
+    required String householdId,
+    required String ingredientId,
+    required Unit unit,
+    required PantrySection section,
+  });
   Future<void> add(PantryItem item);
   Future<void> update(PantryItem item);
   Future<void> setQuantity(String householdId, String itemId, double newQty);

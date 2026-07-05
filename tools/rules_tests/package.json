@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore --project=kitchensync-dev \"vitest run\""
+    "test": "bash ./run-firestore-rules-tests.sh"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

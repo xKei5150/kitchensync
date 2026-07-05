@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/data/datasources/pantry_image_storage.dart';
 import 'package:kitchensync/features/pantry/data/datasources/pantry_remote_data_source.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
@@ -27,6 +28,19 @@ class PantryRepositoryImpl implements PantryRepository {
     String householdId,
     String ingredientId,
   ) => _remote.findByIngredient(householdId, ingredientId);
+
+  @override
+  Future<PantryItem?> findByIngredientUnit({
+    required String householdId,
+    required String ingredientId,
+    required Unit unit,
+    required PantrySection section,
+  }) => _remote.findByIngredientUnit(
+    householdId: householdId,
+    ingredientId: ingredientId,
+    unit: unit,
+    section: section,
+  );
 
   @override
   Future<void> add(PantryItem item) => _remote.add(item);

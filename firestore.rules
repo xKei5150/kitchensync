@@ -5,25 +5,140 @@ service cloud.firestore {
       return request.auth != null;
     }
     function isHouseholdMember(hid) {
-      return isSignedIn() && (
-        hid == 'solo-household' ||
-        exists(/databases/$(database)/documents/households/$(hid)/members/$(request.auth.uid))
-      );
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/households/$(hid)/members/$(request.auth.uid));
     }
     function householdRole(hid) {
       return get(/databases/$(database)/documents/households/$(hid)/members/$(request.auth.uid)).data.role;
     }
     function isHouseholdAdmin(hid) {
-      return hid == 'solo-household' || householdRole(hid) == 'admin';
+      return isHouseholdMember(hid) && householdRole(hid) == 'admin';
     }
     function isHouseholdMutator(hid) {
-      let role = hid == 'solo-household' ? 'admin' : householdRole(hid);
-      return role in ['admin', 'cook', 'shopper'];
+      return isHouseholdMember(hid)
+        && (
+          householdRole(hid) == 'admin' ||
+          householdRole(hid) == 'cook' ||
+          householdRole(hid) == 'shopper'
+        );
+    }
+    function isHouseholdCook(hid) {
+      return isHouseholdMember(hid)
+        && (
+          householdRole(hid) == 'admin' ||
+          householdRole(hid) == 'cook'
+        );
+    }
+    function isHouseholdShopper(hid) {
+      return isHouseholdMember(hid)
+        && (
+          householdRole(hid) == 'admin' ||
+          householdRole(hid) == 'shopper'
+        );
+    }
+    function hasHouseholdId(hid) {
+      return request.resource.data.householdId == hid;
+    }
+    function recipeHouseholdId() {
+      return request.resource.data.householdId;
+    }
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function inviteDoc(code) {
+      return get(/databases/$(database)/documents/householdInvites/$(code));
+    }
+
+    match /users/{uid} {
+      allow read, create, update: if isSelf(uid);
+      allow delete: if false;
     }
 
     match /ingredients/{ingredientId} {
       allow read: if isSignedIn();
       allow write: if false;
+    }
+
+    match /householdInvites/{code} {
+      allow read: if isSignedIn() && resource.data.active == true;
+      allow create, update: if isSignedIn()
+        && request.resource.data.householdId is string
+        && request.resource.data.active is bool
+        && request.resource.data.role in ['member', 'shopper', 'cook']
+        && (
+          (
+            request.resource.data.createdBy == request.auth.uid &&
+            getAfter(/databases/$(database)/documents/households/$(request.resource.data.householdId)).data.creatorUserId == request.auth.uid
+          ) ||
+          isHouseholdAdmin(request.resource.data.householdId)
+        );
+      allow delete: if false;
+    }
+
+    match /households/{hid} {
+      allow read: if isHouseholdMember(hid);
+      allow create: if isSignedIn()
+        && request.resource.data.creatorUserId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.isJoint is bool
+        && request.resource.data.hasPremium is bool
+        && request.resource.data.maxMembers in [1, 6];
+      allow update, delete: if isHouseholdAdmin(hid);
+
+      match /members/{uid} {
+        allow read: if isHouseholdMember(hid);
+        allow create: if isSignedIn()
+          && (
+            isHouseholdAdmin(hid) ||
+            (
+              request.auth.uid == uid &&
+              getAfter(/databases/$(database)/documents/households/$(hid)).data.creatorUserId == request.auth.uid &&
+              request.resource.data.role == 'admin'
+            ) ||
+            (
+              request.auth.uid == uid &&
+              request.resource.data.inviteCode is string &&
+              inviteDoc(request.resource.data.inviteCode).data.active == true &&
+              inviteDoc(request.resource.data.inviteCode).data.householdId == hid &&
+              inviteDoc(request.resource.data.inviteCode).data.role == request.resource.data.role
+            )
+          );
+        allow update, delete: if isHouseholdAdmin(hid);
+      }
+
+      match /subscriptions/{subscriptionId} {
+        allow read: if isHouseholdMember(hid);
+        allow create, update: if isHouseholdAdmin(hid)
+          && request.resource.data.ownerUserId == request.auth.uid
+          && request.resource.data.status in ['trialing', 'active', 'cancelled', 'expired']
+          && request.resource.data.plan in ['annual', 'monthly'];
+        allow delete: if false;
+      }
+    }
+
+    match /recipes/{recipeId} {
+      allow read: if isSignedIn() && (
+        resource.data.visibility == 'public' ||
+        isHouseholdMember(resource.data.householdId)
+      );
+      allow create, update: if isSignedIn()
+        && isHouseholdCook(recipeHouseholdId())
+        && request.resource.data.visibility in ['private', 'public']
+        && request.resource.data.householdId is string;
+      allow delete: if isSignedIn()
+        && isHouseholdCook(resource.data.householdId);
+
+      match /ingredients/{ingredientLineId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public' ||
+          isHouseholdMember(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId)
+        );
+        allow create, update: if isSignedIn()
+          && isHouseholdCook(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId)
+          && request.resource.data.recipeId == recipeId;
+        allow delete: if isSignedIn()
+          && isHouseholdCook(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId);
+      }
     }
 
     match /households/{hid}/customIngredients/{id} {
@@ -53,6 +168,62 @@ service cloud.firestore {
       allow create: if isHouseholdMutator(hid)
         && request.resource.data.householdId == hid;
       allow update, delete: if false;
+    }
+
+    match /households/{hid}/savedRecipes/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create, update: if isHouseholdCook(hid)
+        && hasHouseholdId(hid);
+      allow delete: if isHouseholdCook(hid);
+    }
+
+    match /households/{hid}/mealScheduleEntries/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create, update: if isHouseholdCook(hid)
+        && hasHouseholdId(hid);
+      allow delete: if isHouseholdCook(hid);
+    }
+
+    match /households/{hid}/daySettings/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create, update: if isHouseholdAdmin(hid)
+        && hasHouseholdId(hid);
+      allow delete: if isHouseholdAdmin(hid);
+    }
+
+    match /households/{hid}/shoppingLists/{listId} {
+      allow read: if isHouseholdMember(hid);
+      allow create, update: if isHouseholdShopper(hid)
+        && hasHouseholdId(hid);
+      allow delete: if isHouseholdShopper(hid);
+
+      match /items/{itemId} {
+        allow read: if isHouseholdMember(hid);
+        allow create, update: if isHouseholdShopper(hid)
+          && request.resource.data.shoppingListId == listId;
+        allow delete: if isHouseholdShopper(hid);
+      }
+    }
+
+    match /households/{hid}/menuSets/{menuSetId} {
+      allow read: if isHouseholdMember(hid);
+      allow create, update: if isHouseholdAdmin(hid)
+        && hasHouseholdId(hid);
+      allow delete: if isHouseholdAdmin(hid);
+
+      match /days/{dayId} {
+        allow read: if isHouseholdMember(hid);
+        allow create, update: if isHouseholdAdmin(hid)
+          && request.resource.data.menuSetId == menuSetId;
+        allow delete: if isHouseholdAdmin(hid);
+
+        match /entries/{entryId} {
+          allow read: if isHouseholdMember(hid);
+          allow create, update: if isHouseholdAdmin(hid)
+            && request.resource.data.menuSetDayId == dayId;
+          allow delete: if isHouseholdAdmin(hid);
+        }
+      }
     }
   }
 }

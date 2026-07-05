@@ -7,6 +7,10 @@ class PurchaseHistoryRepositoryImpl implements PurchaseHistoryRepository {
   final PurchaseHistoryRemoteDataSource _remote;
 
   @override
+  Stream<List<PurchaseRecord>> watchByHousehold(String householdId) =>
+      _remote.watchByHousehold(householdId);
+
+  @override
   Stream<List<PurchaseRecord>> watchByIngredient(
     String householdId,
     String ingredientId,

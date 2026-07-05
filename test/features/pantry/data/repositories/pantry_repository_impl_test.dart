@@ -140,6 +140,39 @@ void main() {
       final found = await repo.findByIngredient('h1', 'missing');
       expect(found, isNull);
     });
+
+    test(
+      'findByIngredientUnit scopes by ingredient, unit, and section',
+      () async {
+        await db
+            .collection('households')
+            .doc('h1')
+            .collection('pantryItems')
+            .doc('pieces')
+            .set(PantryItemMapper.toMap(testItem));
+        await db
+            .collection('households')
+            .doc('h1')
+            .collection('pantryItems')
+            .doc('grams')
+            .set(
+              PantryItemMapper.toMap(
+                testItem.copyWith(id: 'grams', unit: Unit.g),
+              ),
+            );
+
+        final found = await repo.findByIngredientUnit(
+          householdId: 'h1',
+          ingredientId: 'ing1',
+          unit: Unit.g,
+          section: PantrySection.food,
+        );
+
+        expect(found, isNotNull);
+        expect(found!.id, 'grams');
+        expect(found.unit, Unit.g);
+      },
+    );
   });
 
   group('setQuantity', () {

@@ -31,6 +31,70 @@
         {"fieldPath": "scope", "order": "ASCENDING"},
         {"fieldPath": "name", "order": "ASCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "recipes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "visibility", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "savedRecipes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "householdId", "order": "ASCENDING"},
+        {"fieldPath": "userId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "mealScheduleEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "date", "order": "ASCENDING"},
+        {"fieldPath": "mealSlot", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "daySettings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "isActive", "order": "ASCENDING"},
+        {"fieldPath": "dateRangeStart", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "shoppingLists",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "shoppingDate", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "menuSets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "householdId", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "days",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "menuSetId", "order": "ASCENDING"},
+        {"fieldPath": "dayIndex", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "entries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "menuSetDayId", "order": "ASCENDING"},
+        {"fieldPath": "orderInSlot", "order": "ASCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []

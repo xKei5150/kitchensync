@@ -1,0 +1,138 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
+import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
+import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
+
+PantryItem _item({
+  required String id,
+  required String ingredientId,
+  required double quantity,
+  PantrySection section = PantrySection.bulk,
+  DateTime? lastPurchaseDate,
+}) {
+  final now = DateTime(2026, 7);
+  return PantryItem(
+    id: id,
+    householdId: 'h1',
+    ingredientId: ingredientId,
+    quantity: quantity,
+    unit: Unit.g,
+    section: section,
+    lastPurchaseDate: lastPurchaseDate,
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
+WasteEvent _usage({
+  required String ingredientId,
+  required double quantity,
+  required DateTime date,
+}) {
+  return WasteEvent(
+    id: 'w-$ingredientId-${date.day}',
+    householdId: 'h1',
+    pantryItemId: 'p-$ingredientId',
+    ingredientId: ingredientId,
+    quantity: quantity,
+    unit: Unit.g,
+    reason: WasteReason.other,
+    date: date,
+  );
+}
+
+PurchaseRecord _purchase({
+  required String ingredientId,
+  required DateTime date,
+}) {
+  return PurchaseRecord(
+    id: 'p-$ingredientId-${date.day}',
+    householdId: 'h1',
+    ingredientId: ingredientId,
+    quantity: 1000,
+    unit: Unit.g,
+    purchaseDate: date,
+    isBulk: true,
+  );
+}
+
+void main() {
+  test('predict computes rate, empty date and purchase interval', () {
+    final now = DateTime(2026, 7, 31);
+
+    final statuses = const BulkPredictionEngine().predict(
+      pantryItems: [
+        _item(
+          id: 'rice-stock',
+          ingredientId: 'rice',
+          quantity: 500,
+          lastPurchaseDate: DateTime(2026, 7),
+        ),
+      ],
+      usageEvents: [
+        _usage(ingredientId: 'rice', quantity: 600, date: DateTime(2026, 7)),
+      ],
+      purchaseHistory: [
+        _purchase(ingredientId: 'rice', date: DateTime(2026, 6)),
+        _purchase(ingredientId: 'rice', date: DateTime(2026, 7)),
+      ],
+      now: now,
+    );
+
+    expect(statuses, hasLength(1));
+    expect(statuses.single.estimatedConsumptionRatePerDay, 20);
+    expect(statuses.single.estimatedEmptyDate, DateTime(2026, 8, 25));
+    expect(statuses.single.recommendedPurchaseIntervalDays, 30);
+    expect(statuses.single.needsPurchaseSoon, isTrue);
+  });
+
+  test('predict sorts urgent bulk items before unknown rhythm items', () {
+    final now = DateTime(2026, 7, 31);
+
+    final statuses = const BulkPredictionEngine().predict(
+      pantryItems: [
+        _item(id: 'flour-stock', ingredientId: 'flour', quantity: 1000),
+        _item(id: 'oil-stock', ingredientId: 'oil', quantity: 10),
+      ],
+      usageEvents: [
+        _usage(ingredientId: 'oil', quantity: 100, date: DateTime(2026, 7, 21)),
+      ],
+      purchaseHistory: const [],
+      now: now,
+    );
+
+    expect(statuses.map((status) => status.item.ingredientId), [
+      'oil',
+      'flour',
+    ]);
+    expect(statuses.first.needsPurchaseSoon, isTrue);
+    expect(statuses.last.estimatedEmptyDate, isNull);
+  });
+
+  test('predict ignores regular food and leftovers', () {
+    final statuses = const BulkPredictionEngine().predict(
+      pantryItems: [
+        _item(
+          id: 'tomato-stock',
+          ingredientId: 'tomato',
+          quantity: 300,
+          section: PantrySection.food,
+        ),
+        _item(
+          id: 'leftover-stock',
+          ingredientId: 'leftover-stew',
+          quantity: 1,
+          section: PantrySection.leftover,
+        ),
+      ],
+      usageEvents: const [],
+      purchaseHistory: const [],
+      now: DateTime(2026, 7, 31),
+    );
+
+    expect(statuses, isEmpty);
+  });
+}

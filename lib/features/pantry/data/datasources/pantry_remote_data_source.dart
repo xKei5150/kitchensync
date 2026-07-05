@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/data/dtos/pantry_item_dto.dart';
 import 'package:kitchensync/features/pantry/data/dtos/waste_event_dto.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
@@ -37,6 +38,24 @@ class PantryRemoteDataSource {
     final snap = await _refs
         .pantryItems(householdId)
         .where('ingredientId', isEqualTo: ingredientId)
+        .limit(1)
+        .get();
+    if (snap.docs.isEmpty) return null;
+    final doc = snap.docs.first;
+    return PantryItemMapper.fromMap(doc.id, doc.data());
+  }
+
+  Future<PantryItem?> findByIngredientUnit({
+    required String householdId,
+    required String ingredientId,
+    required Unit unit,
+    required PantrySection section,
+  }) async {
+    final snap = await _refs
+        .pantryItems(householdId)
+        .where('ingredientId', isEqualTo: ingredientId)
+        .where('unit', isEqualTo: unit.name)
+        .where('section', isEqualTo: section.name)
         .limit(1)
         .get();
     if (snap.docs.isEmpty) return null;

@@ -15,4 +15,4 @@ npm install
 npm test
 ```
 
-This boots the Firestore emulator, runs the rules under `../../firestore.rules`, and shuts the emulator down. Make sure no other emulator instance is running on port 8080.
+This boots the Firestore emulator, runs the rules under `../../firestore.rules`, and shuts the emulator down. The runner defaults to `127.0.0.1:18080`; set `FIRESTORE_EMULATOR_HOST=127.0.0.1:<port>` if that port is busy.
