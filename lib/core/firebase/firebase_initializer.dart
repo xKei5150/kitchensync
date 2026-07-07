@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -6,6 +8,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:kitchensync/core/session/debug_household_session.dart';
 import 'package:kitchensync/firebase_options_dev.dart' as dev;
 import 'package:kitchensync/firebase_options_prod.dart' as prod;
 
@@ -140,6 +143,10 @@ class FirebaseInitializer {
         );
       }
     }
+
+    if (kDebugMode && env == AppEnv.dev) {
+      unawaited(_ensureDebugHousehold());
+    }
   }
 
   static AppEnv envFromDartDefine() {
@@ -160,11 +167,62 @@ class FirebaseInitializer {
       };
     }
     return const FirebaseOptions(
-      apiKey: 'emulator-api-key',
-      appId: '1:000000000000:desktop:emulator',
+      apiKey: 'AIzaSyB3dy6MmSDH-DCmIUiYAv5w5MVOh4KBpNA',
+      appId: '1:000000000000:ios:0000000000000000000000',
       messagingSenderId: '000000000000',
       projectId: 'kitchensync-dev-da503',
       storageBucket: 'kitchensync-dev-da503.appspot.com',
+      iosBundleId: 'com.example.kitchensync',
     );
+  }
+
+  Future<void> _ensureDebugHousehold() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final db = FirebaseFirestore.instance;
+    final now = FieldValue.serverTimestamp();
+    final userDoc = db.collection('users').doc(user.uid);
+    final householdDoc = db.collection('households').doc(debugHouseholdId);
+    final memberDoc = householdDoc.collection('members').doc(user.uid);
+    final inviteDoc = db
+        .collection('householdInvites')
+        .doc(debugHouseholdInviteCode);
+
+    final batch = db.batch()
+      ..set(userDoc, {
+        'activeHouseholdId': debugHouseholdId,
+        'isPremium': true,
+        'createdJointHouseholdId': debugHouseholdId,
+        'updatedAt': now,
+      }, SetOptions(merge: true))
+      ..set(householdDoc, {
+        'name': debugHouseholdName,
+        'creatorUserId': user.uid,
+        'isJoint': true,
+        'hasPremium': true,
+        'maxMembers': 6,
+        'inviteCode': debugHouseholdInviteCode,
+        'updatedAt': now,
+      }, SetOptions(merge: true))
+      ..set(memberDoc, {
+        'role': 'admin',
+        'updatedAt': now,
+      }, SetOptions(merge: true))
+      ..set(inviteDoc, {
+        'householdId': debugHouseholdId,
+        'createdBy': user.uid,
+        'role': 'member',
+        'active': true,
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+    try {
+      await batch.commit();
+    } on FirebaseException catch (e) {
+      debugPrint(
+        'Debug household seed failed (code=${e.code}). '
+        'The app will use the local debug household fallback.',
+      );
+    }
   }
 }

@@ -1,7 +1,7 @@
 {
   "projects": {
-    "default": "kitchensync-dev",
-    "dev": "kitchensync-dev",
-    "prod": "kitchensync-prod"
+    "default": "kitchensync-dev-da503",
+    "dev": "kitchensync-dev-da503",
+    "prod": "kitchensync-prod-8d6fd"
   }
 }

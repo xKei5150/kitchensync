@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:kitchensync/core/session/debug_household_session.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -32,8 +33,8 @@ class ActiveHouseholdContext {
 }
 
 const previewHouseholdContext = ActiveHouseholdContext(
-  id: 'solo-household',
-  name: 'Holloway kitchen',
+  id: debugHouseholdId,
+  name: debugHouseholdName,
   role: HouseholdRole.admin,
   isJoint: true,
   hasPremium: true,
@@ -58,9 +59,10 @@ final activeFirebaseUserProvider = StreamProvider<User?>((ref) {
 
 final activeUserIdProvider = Provider<String>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
-  if (auth == null) return 'demo-user';
+  if (auth == null) return debugUserId;
   final user = ref.watch(activeFirebaseUserProvider).valueOrNull;
   if (user == null) {
+    if (kDebugMode) return debugUserId;
     throw StateError('No signed-in user.');
   }
   return user.uid;
@@ -77,7 +79,9 @@ final activeHouseholdContextProvider = Provider<ActiveHouseholdContext?>((ref) {
 
   final auth = ref.watch(firebaseAuthProvider);
   if (auth == null) return previewHouseholdContext;
-  return ref.watch(activeHouseholdContextStreamProvider).valueOrNull;
+  final household = ref.watch(activeHouseholdContextStreamProvider).valueOrNull;
+  if (kDebugMode) return household ?? previewHouseholdContext;
+  return household;
 });
 
 final activeHouseholdContextStreamProvider =
@@ -86,12 +90,14 @@ final activeHouseholdContextStreamProvider =
       if (auth == null) return Stream.value(previewHouseholdContext);
       final refs = ref.watch(firestoreRefsProvider);
       return auth.authStateChanges().asyncExpand((user) {
-        if (user == null) return Stream.value(null);
+        if (user == null) {
+          return Stream.value(kDebugMode ? previewHouseholdContext : null);
+        }
         return refs.user(user.uid).snapshots().asyncExpand((userDoc) {
           final activeHouseholdId =
               userDoc.data()?['activeHouseholdId'] as String?;
           if (activeHouseholdId == null || activeHouseholdId.isEmpty) {
-            return Stream.value(null);
+            return Stream.value(kDebugMode ? previewHouseholdContext : null);
           }
           return _watchHouseholdContext(
             refs: refs,
@@ -108,9 +114,13 @@ Stream<ActiveHouseholdContext?> _watchHouseholdContext({
   required String householdId,
 }) {
   return refs.household(householdId).snapshots().asyncExpand((householdDoc) {
-    if (!householdDoc.exists) return Stream.value(null);
+    if (!householdDoc.exists) {
+      return Stream.value(kDebugMode ? previewHouseholdContext : null);
+    }
     return refs.householdMember(householdId, uid).snapshots().map((memberDoc) {
-      if (!memberDoc.exists) return null;
+      if (!memberDoc.exists) {
+        return kDebugMode ? previewHouseholdContext : null;
+      }
       return _contextFromDocs(
         householdId: householdId,
         household: householdDoc,
