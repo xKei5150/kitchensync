@@ -6,7 +6,19 @@ import { resolve } from "node:path";
 
 interface SeedDoc {
   version: number;
-  ingredients: Array<Record<string, unknown> & { id: string }>;
+  ingredients: readonly SeedIngredient[];
+}
+
+interface SeedIngredient {
+  readonly id: string;
+  readonly displayNames: Readonly<Record<string, string>>;
+  readonly aliases?: readonly string[];
+  readonly parentTokens?: readonly string[];
+  readonly taxonomyTags?: readonly string[];
+  readonly formTags?: readonly string[];
+  readonly allergens?: readonly string[];
+  readonly dietaryTags?: readonly string[];
+  readonly [key: string]: unknown;
 }
 
 // Project ids per env — required when authenticating via Application Default
@@ -20,6 +32,57 @@ function arg(name: string): string | undefined {
   const flag = `--${name}=`;
   const found = process.argv.find((a) => a.startsWith(flag));
   return found?.substring(flag.length);
+}
+
+function tokenize(input: string): readonly string[] {
+  const normalized = input
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+  if (normalized.length === 0) return [];
+  return [
+    ...new Set(
+      normalized.split(/\s+/u).filter((part) => part.length > 0),
+    ),
+  ];
+}
+
+function buildSearchTokens(ingredient: SeedIngredient): readonly string[] {
+  const tokens = new Set<string>();
+  const addTokenized = (values: readonly string[] | undefined): void => {
+    for (const value of values ?? []) {
+      for (const token of tokenize(value)) {
+        tokens.add(token);
+      }
+    }
+  };
+
+  addTokenized(Object.values(ingredient.displayNames));
+  addTokenized(ingredient.aliases);
+  addTokenized(ingredient.parentTokens);
+  addTokenized(ingredient.taxonomyTags);
+  addTokenized(ingredient.formTags);
+  return [...tokens];
+}
+
+function toFirestoreIngredient(
+  ingredient: SeedIngredient,
+): Record<string, unknown> {
+  const { id: _id, parentTokens: _parentTokens, ...rest } = ingredient;
+  const name = ingredient.displayNames.en?.toLowerCase();
+  if (!name) {
+    throw new Error(`Ingredient "${ingredient.id}" is missing displayNames.en.`);
+  }
+  return {
+    ...rest,
+    name,
+    searchTokens: buildSearchTokens(ingredient),
+    scope: "global",
+    schemaVersion: 1,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
 }
 
 async function main() {
@@ -58,17 +121,10 @@ async function main() {
     const chunk = seed.ingredients.slice(i, i + 400);
     const batch = db.batch();
     for (const ing of chunk) {
-      const { id, ...rest } = ing;
-      const doc = db.collection("ingredients").doc(id);
+      const doc = db.collection("ingredients").doc(ing.id);
       batch.set(
         doc,
-        {
-          ...rest,
-          scope: "global",
-          schemaVersion: 1,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
+        toFirestoreIngredient(ing),
         { merge: true },
       );
     }
