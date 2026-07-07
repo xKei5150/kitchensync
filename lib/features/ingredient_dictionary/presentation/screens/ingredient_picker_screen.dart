@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/errors/failure.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
@@ -22,9 +23,15 @@ class IngredientPickerScreen extends ConsumerStatefulWidget {
 
 class _IngredientPickerScreenState
     extends ConsumerState<IngredientPickerScreen> {
+  static const _permissionSearchError =
+      'Could not search ingredients. Check your sign-in and try again.';
+  static const _networkSearchError =
+      'Could not search ingredients. Check your connection and try again.';
+
   Timer? _debounce;
   String _query = '';
   bool _loading = false;
+  String? _error;
   List<Ingredient> _results = const [];
 
   @override
@@ -45,6 +52,7 @@ class _IngredientPickerScreenState
     setState(() {
       _query = query;
       _loading = true;
+      _error = null;
     });
     final useCase = ref.read(searchIngredientsProvider);
     final hid = ref.read(activeHouseholdIdProvider);
@@ -54,7 +62,19 @@ class _IngredientPickerScreenState
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _results = r is Success<List<Ingredient>> ? r.value : const [];
+      switch (r) {
+        case Success<List<Ingredient>>(:final value):
+          _results = value;
+        case ResultFailure<List<Ingredient>>(:final failure):
+          _results = const [];
+          _error = switch (failure) {
+            PermissionFailure() => _permissionSearchError,
+            NetworkFailure() => _networkSearchError,
+            UnknownFailure(:final cause) =>
+              'Could not search ingredients: $cause',
+            _ => 'Could not search ingredients.',
+          };
+      }
     });
   }
 
@@ -80,7 +100,9 @@ class _IngredientPickerScreenState
           if (_loading)
             const LinearProgressIndicator(backgroundColor: Colors.transparent),
           Expanded(
-            child: _results.isEmpty && _query.isNotEmpty && !_loading
+            child: _error != null && !_loading
+                ? _errorState()
+                : _results.isEmpty && _query.isNotEmpty && !_loading
                 ? _emptyState(context)
                 : ListView.separated(
                     padding: const EdgeInsets.only(
@@ -102,6 +124,18 @@ class _IngredientPickerScreenState
           ),
         ],
       ),
+    );
+  }
+
+  Widget _errorState() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        KsTokens.space16,
+        KsTokens.space4,
+        KsTokens.space16,
+        KsTokens.space32,
+      ),
+      children: [KsErrorAlert(message: _error!)],
     );
   }
 
