@@ -41,7 +41,7 @@ void main() {
         ingredientId: 'onion',
         servings: 2,
         quantity: 1.5,
-        unit: Unit.cup,
+        unit: UnitId.cup,
       ),
     );
     expect(result, isA<Success<PantryItem>>());
@@ -60,7 +60,7 @@ void main() {
         ingredientId: 'onion',
         servings: 0,
         quantity: 1,
-        unit: Unit.cup,
+        unit: UnitId.cup,
       ),
     );
     expect(result, isA<ResultFailure<PantryItem>>());
@@ -76,7 +76,7 @@ void main() {
         ingredientId: 'onion',
         servings: 2,
         quantity: 0,
-        unit: Unit.cup,
+        unit: UnitId.cup,
       ),
     );
     expect(result, isA<ResultFailure<PantryItem>>());

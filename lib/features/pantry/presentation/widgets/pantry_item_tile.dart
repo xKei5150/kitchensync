@@ -21,23 +21,18 @@ class PantryItemTile extends ConsumerWidget {
       pantryIngredientProvider(item.ingredientId),
     );
 
-    final name = ingredientAsync.when(
+    final ingredient = ingredientAsync.when(
       data: (result) => switch (result) {
-        Success(:final value) => value.displayNames['en'] ?? item.ingredientId,
-        ResultFailure() => item.ingredientId,
-      },
-      loading: () => item.ingredientId,
-      error: (_, __) => item.ingredientId,
-    );
-
-    final category = ingredientAsync.when(
-      data: (result) => switch (result) {
-        Success(:final value) => value.category,
+        Success(:final value) => value,
         ResultFailure() => null,
       },
       loading: () => null,
       error: (_, __) => null,
     );
+
+    final category = ingredient?.category;
+
+    final name = ingredient?.displayNames['en'] ?? item.ingredientId;
 
     final freshness = FreshnessHelper.fromExpiry(item.expiryDate);
     final expiryLabel = FreshnessHelper.relativeLabel(item.expiryDate);
@@ -45,7 +40,12 @@ class PantryItemTile extends ConsumerWidget {
         ? freshness.label
         : '${freshness.label} · $expiryLabel';
     final measurement = ref.watch(localeFormattersProvider).measurement;
-    final quantityLabel = measurement.format(item.quantity, item.unit.name);
+    final quantityLabel = measurement.formatUnit(
+      item.quantity,
+      item.unit,
+      localUnitDefinitions:
+          ingredient?.localUnitDefinitions ?? const <UnitDefinition>[],
+    );
     final isLowStock = item.quantity <= 1;
     final ks = context.ksColors;
 

@@ -1,3 +1,4 @@
+// SIZE_OK: custom ingredient screen intentionally owns one full form surface.
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/create_custom_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/widgets/unit_picker.dart';
 
 /// Screen 21 · Create ingredient — defining a new kind of thing.
 ///
@@ -39,8 +41,9 @@ class _CreateCustomIngredientScreenState
   final TextEditingController _aliasInput = TextEditingController();
   final List<String> _aliases = [];
   IngredientCategory _category = IngredientCategory.produce;
-  Unit _defaultUnit = Unit.piece;
-  final Set<Unit> _allowedUnits = {Unit.piece};
+  UnitId _defaultUnit = UnitId.piece;
+  final Set<UnitId> _allowedUnits = {UnitId.piece};
+  final List<UnitDefinition> _localUnitDefinitions = [];
   final Set<Allergen> _allergens = {};
   final Set<DietaryTag> _diet = {};
   int _shelfLifeDays = 7;
@@ -96,10 +99,31 @@ class _CreateCustomIngredientScreenState
     setState(() => _category = category);
   }
 
-  void _selectDefaultUnit(Unit unit) {
+  void _selectDefaultUnit(UnitId unit) {
     setState(() {
       _defaultUnit = unit;
       _allowedUnits.add(unit);
+    });
+  }
+
+  void _toggleAllowedUnit(UnitId unit) {
+    setState(() {
+      if (_allowedUnits.contains(unit)) {
+        // The default unit must stay allowed.
+        if (unit == _defaultUnit) return;
+        _allowedUnits.remove(unit);
+      } else {
+        _allowedUnits.add(unit);
+      }
+    });
+  }
+
+  void _addLocalUnit(UnitDefinition unit) {
+    setState(() {
+      final exists = _localUnitDefinitions.any((local) => local.id == unit.id);
+      if (!exists) _localUnitDefinitions.add(unit);
+      _allowedUnits.add(unit.id);
+      _defaultUnit = unit.id;
     });
   }
 
@@ -130,6 +154,7 @@ class _CreateCustomIngredientScreenState
         category: _category,
         defaultUnit: _defaultUnit,
         allowedUnits: _allowedUnits.toList(),
+        localUnitDefinitions: List.unmodifiable(_localUnitDefinitions),
         aliases: List.unmodifiable(_aliases),
         allergens: _allergens.toList(),
         dietaryTags: _diet.toList(),
@@ -215,43 +240,21 @@ class _CreateCustomIngredientScreenState
                   ),
                   const SizedBox(height: KsTokens.space16),
                   const KsFieldLabel('Default unit'),
-                  Wrap(
-                    spacing: KsTokens.space8,
-                    runSpacing: KsTokens.space8,
-                    children: [
-                      for (final unit in Unit.values)
-                        KsSelectChip(
-                          label: unit.name,
-                          selected: unit == _defaultUnit,
-                          onTap: _submitting
-                              ? null
-                              : () => _selectDefaultUnit(unit),
-                        ),
-                    ],
+                  UnitPicker(
+                    selectedUnit: _defaultUnit,
+                    localUnitDefinitions: _localUnitDefinitions,
+                    allowCreate: !_submitting,
+                    onSelected: _submitting ? (_) {} : _selectDefaultUnit,
+                    onLocalUnitAdded: _submitting ? null : _addLocalUnit,
                   ),
                   const SizedBox(height: KsTokens.space16),
                   const KsFieldLabel('Allowed units'),
-                  Wrap(
-                    spacing: KsTokens.space8,
-                    runSpacing: KsTokens.space8,
-                    children: [
-                      for (final unit in Unit.values)
-                        KsSelectChip(
-                          label: unit.name,
-                          selected: _allowedUnits.contains(unit),
-                          onTap: _submitting
-                              ? null
-                              : () => setState(() {
-                                  if (_allowedUnits.contains(unit)) {
-                                    // The default unit must stay allowed.
-                                    if (unit == _defaultUnit) return;
-                                    _allowedUnits.remove(unit);
-                                  } else {
-                                    _allowedUnits.add(unit);
-                                  }
-                                }),
-                        ),
-                    ],
+                  UnitPicker(
+                    selectedUnit: _defaultUnit,
+                    localUnitDefinitions: _localUnitDefinitions,
+                    allowCreate: false,
+                    selectedUnits: _allowedUnits,
+                    onSelected: _submitting ? (_) {} : _toggleAllowedUnit,
                   ),
                   const SizedBox(height: KsTokens.space16),
                   const KsFieldLabel('Also known as'),

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 
 class RecipeMapper {
@@ -69,7 +70,7 @@ class RecipeIngredientMapper {
     'recipeId': ingredient.recipeId,
     'ingredientId': ingredient.ingredientId,
     'quantity': ingredient.quantity,
-    'unit': ingredient.unit.name,
+    'unit': ingredient.unit.value,
     'description': ingredient.description,
     'preparationNote': ingredient.preparationNote,
     'shelfLifeDays': ingredient.shelfLifeDays,
@@ -81,7 +82,7 @@ class RecipeIngredientMapper {
       recipeId: map['recipeId'] as String,
       ingredientId: map['ingredientId'] as String,
       quantity: (map['quantity'] as num).toDouble(),
-      unit: _enumFromName(Unit.values, map['unit'] as String),
+      unit: UnitId(map['unit'] as String),
       description: map['description'] as String?,
       preparationNote: map['preparationNote'] as String?,
       shelfLifeDays: map['shelfLifeDays'] as int?,

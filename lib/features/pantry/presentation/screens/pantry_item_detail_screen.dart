@@ -1,3 +1,4 @@
+// SIZE_OK: pantry detail screen owns the existing item lifecycle surface.
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -140,8 +141,6 @@ class _BodyState extends ConsumerState<_Body> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
-    final qty = QuantityFormatter.format(item.quantity);
-    final unit = _unitLabel(item.unit);
     final freshness = FreshnessHelper.fromExpiry(item.expiryDate);
     final expiryLabel = FreshnessHelper.relativeLabel(item.expiryDate);
 
@@ -158,6 +157,12 @@ class _BodyState extends ConsumerState<_Body> {
     );
 
     final name = ingredient?.displayNames['en'] ?? item.ingredientId;
+    final qty = QuantityFormatter.format(item.quantity);
+    final unit = _unitLabel(
+      item.unit,
+      item.quantity,
+      ingredient?.localUnitDefinitions ?? const <UnitDefinition>[],
+    );
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -212,7 +217,7 @@ class _BodyState extends ConsumerState<_Body> {
                 ),
               ),
               const SizedBox(height: KsTokens.space16),
-              _QuantitySummaryCard(item: item),
+              _QuantitySummaryCard(item: item, ingredient: ingredient),
               const SizedBox(height: KsTokens.space12),
               KsQuantityStepper(
                 qty: qty,
@@ -273,26 +278,43 @@ String _formatDate(DateTime date) =>
     '${date.month.toString().padLeft(2, '0')}-'
     '${date.day.toString().padLeft(2, '0')}';
 
-String _unitLabel(Unit unit) => switch (unit) {
-  Unit.g => 'g',
-  Unit.kg => 'kg',
-  Unit.ml => 'ml',
-  Unit.l => 'l',
-  Unit.piece => 'pc',
-  Unit.tsp => 'tsp',
-  Unit.tbsp => 'tbsp',
-  Unit.cup => 'cup',
-};
+String _unitLabel(
+  UnitId unit,
+  double amount,
+  List<UnitDefinition> localUnitDefinitions,
+) {
+  final definition =
+      UnitRegistry.find(unit) ??
+      _localUnitDefinition(unit, localUnitDefinitions);
+  if (definition == null) return unit.value;
+  return amount == 1 ? definition.label : definition.pluralLabel;
+}
+
+UnitDefinition? _localUnitDefinition(
+  UnitId unit,
+  List<UnitDefinition> localUnitDefinitions,
+) {
+  for (final definition in localUnitDefinitions) {
+    if (definition.id == unit) return definition;
+  }
+  return null;
+}
 
 class _QuantitySummaryCard extends ConsumerWidget {
-  const _QuantitySummaryCard({required this.item});
+  const _QuantitySummaryCard({required this.item, required this.ingredient});
 
   final PantryItem item;
+  final Ingredient? ingredient;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final measurement = ref.watch(localeFormattersProvider).measurement;
-    final value = measurement.format(item.quantity, item.unit.name);
+    final value = measurement.formatUnit(
+      item.quantity,
+      item.unit,
+      localUnitDefinitions:
+          ingredient?.localUnitDefinitions ?? const <UnitDefinition>[],
+    );
     return KsCard(
       child: KsMetadataRow(
         icon: Icons.scale_outlined,

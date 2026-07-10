@@ -13,7 +13,7 @@ PlannedRecipe _recipe(String id, {int defaultServingSize = 2}) {
       RecipeIngredientRequirement(
         ingredientId: 'tomato',
         quantity: 100,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
     ],
   );

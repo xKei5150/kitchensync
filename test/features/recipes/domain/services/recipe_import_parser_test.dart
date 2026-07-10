@@ -58,7 +58,7 @@ Access: Public
     expect(result.drafts.first.visibility, RecipeVisibility.private);
     expect(result.drafts.first.ingredients.first.name, 'Chicken Thighs');
     expect(result.drafts.first.ingredients.first.quantity, 1);
-    expect(result.drafts.first.ingredients.first.unit, Unit.piece);
+    expect(result.drafts.first.ingredients.first.unit, UnitId.piece);
     expect(result.drafts.last.visibility, RecipeVisibility.public);
   });
 
@@ -95,6 +95,81 @@ Access: Private
     expect(
       result.errors.single,
       contains('Servings must be a positive number'),
+    );
+  });
+
+  test('parses common informal unit aliases', () {
+    final result = parser.parse('''
+=== RECIPE START ===
+Name: Market Salad
+Servings: 4
+Ingredients:
+- Tomatoes | 2 | tins
+- Herbs | 1 | bunches
+- Cheese | 3 | slices
+- Seeds | 1 | packs
+Instructions:
+1. Toss together.
+Access: Private
+=== RECIPE END ===
+''');
+
+    expect(result.errors, isEmpty);
+    expect(result.drafts.single.ingredients.map((item) => item.unit), [
+      UnitId.tin,
+      UnitId.bunch,
+      UnitId.slice,
+      UnitId.pack,
+    ]);
+  });
+
+  test('parses formal imperial unit aliases', () {
+    final result = parser.parse('''
+=== RECIPE START ===
+Name: Pantry Sauce
+Servings: 2
+Ingredients:
+- Oil | 8 oz | oz
+- Beans | 1 pound | pound
+- Stock | 6 fluid ounce | fluid ounce
+- Milk | 1 pint | pint
+- Broth | 1 quart | quart
+- Water | 1 gallon | gallon
+Instructions:
+1. Simmer gently.
+Access: Private
+=== RECIPE END ===
+''');
+
+    expect(result.errors, isEmpty);
+    expect(result.drafts.single.ingredients.map((item) => item.unit), [
+      UnitId.oz,
+      UnitId.lb,
+      UnitId.flOz,
+      UnitId.pt,
+      UnitId.qt,
+      UnitId.gal,
+    ]);
+  });
+
+  test('rejects unknown unit without local creation context', () {
+    final result = parser.parse('''
+=== RECIPE START ===
+Name: Local Tray Bake
+Servings: 4
+Ingredients:
+- Eggs | 1 tray | tray
+Instructions:
+1. Bake.
+Access: Private
+=== RECIPE END ===
+''');
+
+    expect(result.drafts, isEmpty);
+    expect(result.errors.single, contains('Unit "tray" is not supported'));
+    expect(
+      result.errors.single,
+      contains('Add this unit through ingredient authoring first'),
     );
   });
 }

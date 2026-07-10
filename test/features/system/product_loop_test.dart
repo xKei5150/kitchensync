@@ -1,3 +1,4 @@
+// SIZE_OK: product loop test intentionally drives the app workflow surface.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -55,7 +56,7 @@ void main() {
         id: 'tomato-stock',
         ingredientId: 'tomato',
         quantity: 100,
-        unit: Unit.g,
+        unit: UnitId.g,
         section: PantrySection.food,
         now: now,
       ),
@@ -117,7 +118,7 @@ void main() {
       status: ShoppingListItemStatus.substituted,
       substituteIngredientId: 'pepper',
       substituteQuantity: 300,
-      substituteUnit: Unit.g,
+      substituteUnit: UnitId.g,
     );
 
     final readyList = await shoppingRepository
@@ -129,9 +130,9 @@ void main() {
       shoppingRepository.lists[shoppingList.id]?.status,
       ShoppingListStatus.completed,
     );
-    expect(pantryRepository.findQuantity('beans', Unit.piece), 2);
-    expect(pantryRepository.findQuantity('pepper', Unit.g), 300);
-    expect(pantryRepository.findQuantity('tomato', Unit.g), 100);
+    expect(pantryRepository.findQuantity('beans', UnitId.piece), 2);
+    expect(pantryRepository.findQuantity('pepper', UnitId.g), 300);
+    expect(pantryRepository.findQuantity('tomato', UnitId.g), 100);
     expect(purchaseRepository.records.map((record) => record.ingredientId), [
       'beans',
       'pepper',
@@ -169,9 +170,9 @@ void main() {
     );
 
     await cookingController.markCooked(overriddenMeal);
-    expect(pantryRepository.findQuantity('beans', Unit.piece), 0);
-    expect(pantryRepository.findQuantity('pepper', Unit.g), 0);
-    expect(pantryRepository.findQuantity('tomato', Unit.g), 100);
+    expect(pantryRepository.findQuantity('beans', UnitId.piece), 0);
+    expect(pantryRepository.findQuantity('pepper', UnitId.g), 0);
+    expect(pantryRepository.findQuantity('tomato', UnitId.g), 100);
     expect(
       calendarRepository.meals[scheduledMeal.id]?.state,
       ScheduledMealState.cooked,
@@ -220,6 +221,67 @@ void main() {
         );
     expect(wasteVisibleToCalendar, isNotEmpty);
   });
+
+  test('product loop supports custom informal pantry unit', () async {
+    final now = DateTime(2026, 7, 6, 9);
+    final household = _premiumAdmin();
+    final calendarRepository = _MemoryCalendarRepository();
+    final pantryRepository = _MemoryPantryRepository();
+    final purchaseRepository = _MemoryPurchaseHistoryRepository();
+    final wasteRepository = _MemoryWasteRepository(pantryRepository);
+    final recipeRepository = _MemoryRecipeRepository();
+    final shoppingRepository = _MemoryShoppingRepository();
+    final tray = UnitId('tray');
+    final list = ShoppingListRecord(
+      id: 'shop-now',
+      householdId: 'solo-household',
+      type: ShoppingListType.shopNow,
+      shoppingDate: DateTime(2026, 7, 6),
+      generatedForRangeStart: DateTime(2026, 7, 6),
+      generatedForRangeEnd: DateTime(2026, 7, 6),
+      status: ShoppingListStatus.pending,
+      createdAt: DateTime(2026, 7, 6, 9),
+      updatedAt: DateTime(2026, 7, 6, 9),
+      items: [
+        ShoppingListItemRecord(
+          id: 'platter-line',
+          shoppingListId: 'shop-now',
+          ingredientId: 'party-platter',
+          quantityNeeded: 3,
+          unit: tray,
+          status: ShoppingListItemStatus.bought,
+          sourceMealLinks: [],
+        ),
+      ],
+    );
+    await shoppingRepository.upsertList(list);
+
+    final shoppingController = ShoppingPlanningController(
+      repository: shoppingRepository,
+      calendarRepository: calendarRepository,
+      pantryRepository: pantryRepository,
+      purchaseHistoryRepository: purchaseRepository,
+      wasteRepository: wasteRepository,
+      recipeRepository: recipeRepository,
+      householdId: household.id,
+      household: household,
+      idGenerator: FakeIdGenerator(const [
+        'platter-pantry',
+        'platter-purchase',
+      ]),
+      clock: FakeClock(now),
+    );
+
+    await shoppingController.completeList(list);
+
+    expect(
+      shoppingRepository.lists[list.id]?.status,
+      ShoppingListStatus.completed,
+    );
+    expect(pantryRepository.findQuantity('party-platter', tray), 3);
+    expect(purchaseRepository.records.single.ingredientId, 'party-platter');
+    expect(purchaseRepository.records.single.unit, tray);
+  });
 }
 
 ActiveHouseholdContext _premiumAdmin() {
@@ -253,14 +315,14 @@ Recipe _recipe(DateTime now) {
         recipeId: 'braise',
         ingredientId: 'tomato',
         quantity: 400,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
       RecipeIngredient(
         id: 'beans-line',
         recipeId: 'braise',
         ingredientId: 'beans',
         quantity: 2,
-        unit: Unit.piece,
+        unit: UnitId.piece,
       ),
     ],
     instructions: const ['Simmer until saucy.'],
@@ -271,7 +333,7 @@ PantryItem _pantryItem({
   required String id,
   required String ingredientId,
   required double quantity,
-  required Unit unit,
+  required UnitId unit,
   required PantrySection section,
   required DateTime now,
 }) {
@@ -389,7 +451,7 @@ class _MemoryPantryRepository implements PantryRepository {
   final items = <String, PantryItem>{};
   final wasteEvents = <WasteEvent>[];
 
-  double? findQuantity(String ingredientId, Unit unit) {
+  double? findQuantity(String ingredientId, UnitId unit) {
     for (final item in items.values) {
       if (item.ingredientId == ingredientId && item.unit == unit) {
         return item.quantity;
@@ -434,7 +496,7 @@ class _MemoryPantryRepository implements PantryRepository {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   }) async {
     for (final item in items.values) {
@@ -580,7 +642,7 @@ class _MemoryShoppingRepository implements ShoppingRepository {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) async {
     final list = lists[listId];
     if (list == null || list.householdId != householdId) return;

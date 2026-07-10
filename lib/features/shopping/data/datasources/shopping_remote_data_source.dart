@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/shopping/data/dtos/shopping_dto.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 
@@ -58,13 +59,13 @@ class ShoppingRemoteDataSource {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) {
     return _refs.shoppingListItems(householdId, listId).doc(itemId).update({
       'status': status.name,
       'substituteIngredientId': substituteIngredientId,
       'substituteQuantity': substituteQuantity,
-      'substituteUnit': substituteUnit?.name,
+      'substituteUnit': substituteUnit?.value,
     });
   }
 
@@ -185,7 +186,7 @@ class _ScheduledAdjustment {
   }) : _remaining = quantity;
 
   final String ingredientId;
-  final Unit unit;
+  final UnitId unit;
   final String mealEntryId;
   double _remaining;
 

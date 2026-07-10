@@ -1,11 +1,14 @@
+// SIZE_OK: recipes screen is pre-existing broad CRUD/search UI surface.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/services/recipe_import_parser.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
@@ -31,7 +34,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     final drafts = await showModalBottomSheet<List<RecipeDraft>>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const _RecipeImportSheet(),
+      builder: (sheetContext) => _RecipeImportSheet(routeContext: context),
     );
     if (drafts == null || drafts.isEmpty || !mounted) {
       return;
@@ -529,7 +532,8 @@ class _MyRecipeGrid extends ConsumerWidget {
     final drafts = await showModalBottomSheet<List<RecipeDraft>>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _RecipeImportSheet(existingRecipe: recipe),
+      builder: (sheetContext) =>
+          _RecipeImportSheet(existingRecipe: recipe, routeContext: context),
     );
     if (drafts == null || drafts.isEmpty) {
       return;
@@ -580,16 +584,17 @@ class _MyRecipeGrid extends ConsumerWidget {
   }
 }
 
-class _RecipeImportSheet extends StatefulWidget {
-  const _RecipeImportSheet({this.existingRecipe});
+class _RecipeImportSheet extends ConsumerStatefulWidget {
+  const _RecipeImportSheet({this.existingRecipe, required this.routeContext});
 
   final Recipe? existingRecipe;
+  final BuildContext routeContext;
 
   @override
-  State<_RecipeImportSheet> createState() => _RecipeImportSheetState();
+  ConsumerState<_RecipeImportSheet> createState() => _RecipeImportSheetState();
 }
 
-class _RecipeImportSheetState extends State<_RecipeImportSheet> {
+class _RecipeImportSheetState extends ConsumerState<_RecipeImportSheet> {
   static const _template = '''
 === RECIPE START ===
 Name: Fried Chicken
@@ -660,6 +665,7 @@ Access: Private
       for (final ingredient in recipe.ingredients) {
         _ingredientRows.add(_createIngredientRow(ingredient: ingredient));
       }
+      _hydrateExistingIngredientUnits();
     }
   }
 
@@ -799,7 +805,8 @@ Access: Private
       noteController: TextEditingController(
         text: ingredient?.preparationNote ?? '',
       ),
-      unit: ingredient?.unit ?? Unit.g,
+      unit: ingredient?.unit ?? UnitId.g,
+      localUnits: _unitDefinitionsForIngredient(ingredient),
     );
   }
 
@@ -822,18 +829,85 @@ Access: Private
   }
 
   Future<void> _pickIngredient(_ManualIngredientInput row) async {
-    final ingredient = await context.push<Ingredient>('/ingredient/pick');
+    final ingredient = await widget.routeContext.push<Ingredient>(
+      '/ingredient/pick',
+    );
     if (!mounted || ingredient == null) {
       return;
     }
     setState(() {
-      row.ingredientId = ingredient.id;
       final displayName = ingredient.displayNames['en'] ?? ingredient.name;
-      row.nameController.text = displayName;
-      row.linkedName = displayName;
-      row.unit = ingredient.defaultUnit;
+      row
+        ..ingredientId = ingredient.id
+        ..nameController.text = displayName
+        ..linkedName = displayName
+        ..unit = ingredient.defaultUnit
+        ..localUnits = _unitDefinitionsFor(ingredient);
       _error = null;
     });
+  }
+
+  Future<void> _hydrateExistingIngredientUnits() async {
+    final rows = _ingredientRows
+        .where(
+          (row) => row.ingredientId != null && row.ingredientId!.isNotEmpty,
+        )
+        .toList(growable: false);
+    if (rows.isEmpty) {
+      return;
+    }
+    final repository = ref.read(ingredientRepositoryProvider);
+    final householdId = ref.read(activeHouseholdIdProvider);
+    for (final row in rows) {
+      final ingredient = await repository.getById(
+        row.ingredientId!,
+        householdId: householdId,
+      );
+      if (!mounted || ingredient == null) {
+        continue;
+      }
+      setState(() {
+        row.localUnits = _unitDefinitionsFor(ingredient);
+      });
+    }
+  }
+
+  List<UnitDefinition> _unitDefinitionsForIngredient(
+    RecipeIngredient? ingredient,
+  ) {
+    final ingredientId = ingredient?.ingredientId;
+    if (ingredientId == null || ingredientId.isEmpty) {
+      return const [];
+    }
+    final unit = ingredient!.unit;
+    final fallback =
+        UnitRegistry.find(unit) ??
+        UnitDefinition(
+          id: unit,
+          label: unit.value,
+          pluralLabel: unit.value,
+          dimension: UnitDimension.informal,
+          family: UnitSystemFamily.local,
+        );
+    return [fallback];
+  }
+
+  List<UnitDefinition> _unitDefinitionsFor(Ingredient ingredient) {
+    final byId = <UnitId, UnitDefinition>{
+      for (final unit in ingredient.localUnitDefinitions) unit.id: unit,
+    };
+    return [
+      for (final unit in ingredient.allowedUnits)
+        byId[unit] ??
+            UnitRegistry.find(unit) ??
+            UnitDefinition(
+              id: unit,
+              label: unit.value,
+              pluralLabel: unit.value,
+              dimension: UnitDimension.informal,
+              family: UnitSystemFamily.local,
+            ),
+    ];
   }
 
   List<String> _splitCsv(String value) => value
@@ -976,18 +1050,21 @@ class _ManualIngredientInput {
     TextEditingController? nameController,
     TextEditingController? quantityController,
     TextEditingController? noteController,
-    this.unit = Unit.g,
+    this.unit = UnitId.g,
+    List<UnitDefinition> localUnits = const [],
     this.ingredientId,
     this.linkedName,
   }) : nameController = nameController ?? TextEditingController(),
        quantityController = quantityController ?? TextEditingController(),
-       noteController = noteController ?? TextEditingController();
+       noteController = noteController ?? TextEditingController(),
+       localUnits = List<UnitDefinition>.unmodifiable(localUnits);
 
   final int id;
   final TextEditingController nameController;
   final TextEditingController quantityController;
   final TextEditingController noteController;
-  Unit unit;
+  UnitId unit;
+  List<UnitDefinition> localUnits;
   String? ingredientId;
   String? linkedName;
 
@@ -1110,7 +1187,7 @@ class _ManualRecipeFields extends StatelessWidget {
   final VoidCallback onAddIngredient;
   final ValueChanged<_ManualIngredientInput> onRemoveIngredient;
   final ValueChanged<_ManualIngredientInput> onPickIngredient;
-  final void Function(_ManualIngredientInput row, Unit unit) onUnitChanged;
+  final void Function(_ManualIngredientInput row, UnitId unit) onUnitChanged;
   final ValueChanged<RecipeVisibility> onVisibilityChanged;
 
   @override
@@ -1236,7 +1313,7 @@ class _ManualIngredientFields extends StatelessWidget {
   final bool canRemove;
   final VoidCallback onRemove;
   final VoidCallback onPick;
-  final ValueChanged<Unit> onUnitChanged;
+  final ValueChanged<UnitId> onUnitChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1279,13 +1356,13 @@ class _ManualIngredientFields extends StatelessWidget {
             ),
             const SizedBox(width: KsTokens.space8),
             Expanded(
-              child: DropdownButtonFormField<Unit>(
-                key: ValueKey('ingredient-unit-${row.id}-${row.unit.name}'),
+              child: DropdownButtonFormField<UnitId>(
+                key: ValueKey('ingredient-unit-${row.id}-${row.unit.value}'),
                 initialValue: row.unit,
                 decoration: _manualDecoration(context, 'Unit'),
                 items: [
-                  for (final unit in Unit.values)
-                    DropdownMenuItem(value: unit, child: Text(unit.name)),
+                  for (final unit in _unitOptions(row))
+                    DropdownMenuItem(value: unit.id, child: Text(unit.label)),
                 ],
                 onChanged: (unit) {
                   if (unit != null) {
@@ -1304,6 +1381,27 @@ class _ManualIngredientFields extends StatelessWidget {
       ],
     );
   }
+}
+
+List<UnitDefinition> _unitOptions(_ManualIngredientInput row) {
+  final selectedUnit = row.unit;
+  final byId =
+      <UnitId, UnitDefinition>{
+        for (final unit in UnitRegistry.builtIns) unit.id: unit,
+        for (final unit in row.localUnits) unit.id: unit,
+      }..putIfAbsent(
+        selectedUnit,
+        () =>
+            UnitRegistry.find(selectedUnit) ??
+            UnitDefinition(
+              id: selectedUnit,
+              label: selectedUnit.value,
+              pluralLabel: selectedUnit.value,
+              dimension: UnitDimension.informal,
+              family: UnitSystemFamily.local,
+            ),
+      );
+  return List<UnitDefinition>.unmodifiable(byId.values);
 }
 
 class _ManualTextField extends StatelessWidget {

@@ -12,8 +12,11 @@ class IngredientMapper {
     'displayNames': i.displayNames,
     'parentIngredientId': i.parentIngredientId,
     'category': i.category.name,
-    'defaultUnit': i.defaultUnit.name,
-    'allowedUnits': i.allowedUnits.map((u) => u.name).toList(),
+    'defaultUnit': i.defaultUnit.value,
+    'allowedUnits': i.allowedUnits.map((u) => u.value).toList(),
+    'localUnitDefinitions': i.localUnitDefinitions
+        .map((unit) => unit.toJson())
+        .toList(),
     'defaultShelfLifeDays': i.defaultShelfLifeDays,
     'isBulkCandidate': i.isBulkCandidate,
     'isNonFood': i.isNonFood,
@@ -41,9 +44,12 @@ class IngredientMapper {
     displayNames: Map<String, String>.from(m['displayNames'] as Map),
     parentIngredientId: m['parentIngredientId'] as String?,
     category: _enumFromName(IngredientCategory.values, m['category'] as String),
-    defaultUnit: _enumFromName(Unit.values, m['defaultUnit'] as String),
+    defaultUnit: UnitId(m['defaultUnit'] as String),
     allowedUnits: (m['allowedUnits'] as List)
-        .map((e) => _enumFromName(Unit.values, e as String))
+        .map((e) => UnitId(e as String))
+        .toList(),
+    localUnitDefinitions: ((m['localUnitDefinitions'] as List?) ?? const [])
+        .map((e) => _unitDefinitionFromMap(Map<String, dynamic>.from(e as Map)))
         .toList(),
     defaultShelfLifeDays: m['defaultShelfLifeDays'] as int?,
     isBulkCandidate: (m['isBulkCandidate'] as bool?) ?? false,
@@ -85,6 +91,23 @@ class IngredientMapper {
       orElse: () => throw FormatException(
         'Unknown ${values.first.runtimeType} value in Firestore doc: "$name"',
       ),
+    );
+  }
+
+  static UnitDefinition _unitDefinitionFromMap(Map<String, dynamic> map) {
+    final id = UnitId(map['id'] as String);
+    final label = map['label'] as String;
+    final familyValue = map['systemFamily'] ?? map['family'] ?? 'local';
+    return UnitDefinition(
+      id: id,
+      label: label,
+      pluralLabel: (map['pluralLabel'] as String?) ?? label,
+      dimension: UnitDimension.values.byName(
+        (map['dimension'] as String?) ?? UnitDimension.informal.name,
+      ),
+      family: UnitSystemFamily.values.byName(familyValue as String),
+      gramsPerUnit: (map['gramsPerUnit'] as num?)?.toDouble(),
+      millilitersPerUnit: (map['millilitersPerUnit'] as num?)?.toDouble(),
     );
   }
 }

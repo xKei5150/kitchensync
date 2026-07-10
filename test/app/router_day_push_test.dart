@@ -86,7 +86,7 @@ class _FakeRecipeRepository implements RecipeRepository {
             recipeId: 'braise',
             ingredientId: 'tomato',
             quantity: 400,
-            unit: Unit.g,
+            unit: UnitId.g,
           ),
         ],
         instructions: const [],

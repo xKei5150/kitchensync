@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 
 class ShoppingListMapper {
@@ -50,11 +51,11 @@ class ShoppingListItemMapper {
     'shoppingListId': item.shoppingListId,
     'ingredientId': item.ingredientId,
     'quantityNeeded': item.quantityNeeded,
-    'unit': item.unit.name,
+    'unit': item.unit.value,
     'status': item.status.name,
     'substituteIngredientId': item.substituteIngredientId,
     'substituteQuantity': item.substituteQuantity,
-    'substituteUnit': item.substituteUnit?.name,
+    'substituteUnit': item.substituteUnit?.value,
     'sourceMealLinks': item.sourceMealLinks.map(_sourceLinkToMap).toList(),
   };
 
@@ -68,7 +69,7 @@ class ShoppingListItemMapper {
       shoppingListId: map['shoppingListId'] as String,
       ingredientId: map['ingredientId'] as String,
       quantityNeeded: (map['quantityNeeded'] as num).toDouble(),
-      unit: _enumFromName(Unit.values, map['unit'] as String),
+      unit: UnitId(map['unit'] as String),
       status: _enumFromName(
         ShoppingListItemStatus.values,
         map['status'] as String? ?? ShoppingListItemStatus.unchecked.name,
@@ -77,7 +78,7 @@ class ShoppingListItemMapper {
       substituteQuantity: (map['substituteQuantity'] as num?)?.toDouble(),
       substituteUnit: map['substituteUnit'] == null
           ? null
-          : _enumFromName(Unit.values, map['substituteUnit'] as String),
+          : UnitId(map['substituteUnit'] as String),
       sourceMealLinks: List.unmodifiable(sourceMealLinks),
     );
   }

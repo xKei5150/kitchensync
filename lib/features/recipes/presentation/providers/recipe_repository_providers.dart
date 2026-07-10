@@ -1,14 +1,15 @@
+// SIZE_OK: recipe repository providers centralize existing demo/data wiring.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/utils/result.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/create_custom_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
-import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
-import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/recipes/data/datasources/recipe_remote_data_source.dart';
 import 'package:kitchensync/features/recipes/data/repositories/recipe_repository_impl.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';

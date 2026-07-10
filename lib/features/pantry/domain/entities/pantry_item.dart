@@ -1,5 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 
 part 'pantry_item.freezed.dart';
@@ -12,7 +12,7 @@ class PantryItem with _$PantryItem {
     required String householdId,
     required String ingredientId,
     required double quantity,
-    required Unit unit,
+    @UnitIdJsonConverter() required UnitId unit,
     required PantrySection section,
     String? imageUrl,
     String? note,

@@ -14,8 +14,11 @@ class Ingredient with _$Ingredient {
     required Map<String, String> displayNames,
     String? parentIngredientId,
     required IngredientCategory category,
-    required Unit defaultUnit,
-    required List<Unit> allowedUnits,
+    @UnitIdJsonConverter() required UnitId defaultUnit,
+    @UnitIdListJsonConverter() required List<UnitId> allowedUnits,
+    @Default(<UnitDefinition>[])
+    @UnitDefinitionListJsonConverter()
+    List<UnitDefinition> localUnitDefinitions,
     int? defaultShelfLifeDays,
     @Default(false) bool isBulkCandidate,
     @Default(false) bool isNonFood,

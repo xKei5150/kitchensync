@@ -1,4 +1,4 @@
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 
 abstract class ShoppingRepository {
@@ -18,7 +18,7 @@ abstract class ShoppingRepository {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   });
 
   Future<void> updateListStatus({

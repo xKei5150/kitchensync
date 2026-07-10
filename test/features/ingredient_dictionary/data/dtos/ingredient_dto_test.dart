@@ -12,8 +12,8 @@ void main() {
       displayNames: const {'en': 'Red onion', 'tl': 'Pulang sibuyas'},
       parentIngredientId: 'onion',
       category: IngredientCategory.produce,
-      defaultUnit: Unit.piece,
-      allowedUnits: const [Unit.piece, Unit.g],
+      defaultUnit: UnitId.piece,
+      allowedUnits: const [UnitId.piece, UnitId.g],
       defaultShelfLifeDays: 30,
       allergens: const [Allergen.gluten],
       dietaryTags: const [DietaryTag.vegan],
@@ -41,8 +41,8 @@ void main() {
       name: 'onion',
       displayNames: const {'en': 'Onion'},
       category: IngredientCategory.produce,
-      defaultUnit: Unit.piece,
-      allowedUnits: const [Unit.piece],
+      defaultUnit: UnitId.piece,
+      allowedUnits: const [UnitId.piece],
       scope: IngredientScope.global,
       createdAt: DateTime.utc(2026),
       updatedAt: DateTime.utc(2026),
@@ -62,8 +62,8 @@ void main() {
         name: 'onion',
         displayNames: const {'en': 'Onion'},
         category: IngredientCategory.produce,
-        defaultUnit: Unit.piece,
-        allowedUnits: const [Unit.piece],
+        defaultUnit: UnitId.piece,
+        allowedUnits: const [UnitId.piece],
         scope: IngredientScope.global,
         createdAt: DateTime.utc(2026),
         updatedAt: DateTime.utc(2026),
@@ -80,4 +80,98 @@ void main() {
       expect(back.curation, isNull);
     },
   );
+
+  test('round trips local informal unit strings', () {
+    final ing = Ingredient(
+      id: 'custom-tomatoes',
+      name: 'custom tomatoes',
+      displayNames: const {'en': 'Custom tomatoes'},
+      category: IngredientCategory.produce,
+      defaultUnit: UnitId('tin'),
+      allowedUnits: [UnitId.piece, UnitId('tin')],
+      localUnitDefinitions: [
+        UnitDefinition(
+          id: UnitId('tin'),
+          label: 'Tin',
+          pluralLabel: 'Tins',
+          dimension: UnitDimension.informal,
+          family: UnitSystemFamily.local,
+        ),
+      ],
+      scope: IngredientScope.householdCustom,
+      householdId: 'household-1',
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+
+    final map = IngredientMapper.toMap(ing);
+
+    expect(map['defaultUnit'], 'tin');
+    expect(map['allowedUnits'], ['piece', 'tin']);
+    expect(map['localUnitDefinitions'], [
+      {
+        'id': 'tin',
+        'label': 'Tin',
+        'pluralLabel': 'Tins',
+        'dimension': 'informal',
+        'systemFamily': 'local',
+      },
+    ]);
+    expect(IngredientMapper.fromMap(ing.id, map), ing);
+  });
+
+  test('fromMap accepts minimal localUnitDefinitions from Firestore', () {
+    final ing = Ingredient(
+      id: 'custom-tomatoes',
+      name: 'custom tomatoes',
+      displayNames: const {'en': 'Custom tomatoes'},
+      category: IngredientCategory.produce,
+      defaultUnit: UnitId.piece,
+      allowedUnits: const [UnitId.piece],
+      scope: IngredientScope.householdCustom,
+      householdId: 'household-1',
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final map = IngredientMapper.toMap(ing)
+      ..['defaultUnit'] = 'tin'
+      ..['allowedUnits'] = ['piece', 'tin']
+      ..['localUnitDefinitions'] = [
+        {'id': 'tin', 'label': 'Tin'},
+      ];
+
+    final back = IngredientMapper.fromMap(ing.id, map);
+
+    expect(back.defaultUnit, UnitId('tin'));
+    expect(back.allowedUnits, [UnitId.piece, UnitId('tin')]);
+    expect(back.localUnitDefinitions, [
+      UnitDefinition(
+        id: UnitId('tin'),
+        label: 'Tin',
+        pluralLabel: 'Tin',
+        dimension: UnitDimension.informal,
+        family: UnitSystemFamily.local,
+      ),
+    ]);
+  });
+
+  test('rejects malformed empty unit id', () {
+    final ing = Ingredient(
+      id: 'x',
+      name: 'onion',
+      displayNames: const {'en': 'Onion'},
+      category: IngredientCategory.produce,
+      defaultUnit: UnitId.piece,
+      allowedUnits: const [UnitId.piece],
+      scope: IngredientScope.global,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final map = IngredientMapper.toMap(ing)..['defaultUnit'] = '';
+
+    expect(
+      () => IngredientMapper.fromMap('x', map),
+      throwsA(isA<FormatException>()),
+    );
+  });
 }

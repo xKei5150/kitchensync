@@ -1,3 +1,4 @@
+// SIZE_OK: planning providers aggregate existing calendar/menu coordination.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
@@ -72,7 +73,7 @@ class PlanningController extends StateNotifier<KitchenPlanningState> {
             id: 'pantry-tomato',
             ingredientId: 'tomato',
             quantity: 300,
-            unit: Unit.g,
+            unit: UnitId.g,
           ),
         ],
         featuredMenuSet: _sampleMenuSet,
@@ -179,12 +180,12 @@ Map<String, PlannedRecipe> get _sampleRecipes => {
       RecipeIngredientRequirement(
         ingredientId: 'tomato',
         quantity: 400,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
       RecipeIngredientRequirement(
         ingredientId: 'beans',
         quantity: 2,
-        unit: Unit.piece,
+        unit: UnitId.piece,
       ),
     ],
   ),
@@ -196,12 +197,12 @@ Map<String, PlannedRecipe> get _sampleRecipes => {
       RecipeIngredientRequirement(
         ingredientId: 'lentils',
         quantity: 300,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
       RecipeIngredientRequirement(
         ingredientId: 'spinach',
         quantity: 150,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
     ],
   ),
@@ -213,12 +214,12 @@ Map<String, PlannedRecipe> get _sampleRecipes => {
       RecipeIngredientRequirement(
         ingredientId: 'chicken',
         quantity: 1,
-        unit: Unit.piece,
+        unit: UnitId.piece,
       ),
       RecipeIngredientRequirement(
         ingredientId: 'potato',
         quantity: 700,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
     ],
   ),
@@ -319,7 +320,7 @@ PantryItem _pantryItem({
   required String id,
   required String ingredientId,
   required double quantity,
-  required Unit unit,
+  required UnitId unit,
 }) {
   return PantryItem(
     id: id,

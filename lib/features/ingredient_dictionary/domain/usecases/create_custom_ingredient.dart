@@ -8,14 +8,16 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/services/search_tokenizer.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/custom_ingredient_local_units.dart';
 
 class CreateCustomIngredientParams {
-  const CreateCustomIngredientParams({
+  CreateCustomIngredientParams({
     required this.householdId,
     required this.displayNames,
     required this.category,
     required this.defaultUnit,
     required this.allowedUnits,
+    List<UnitDefinition> localUnitDefinitions = const [],
     this.parentIngredientId,
     this.aliases = const [],
     this.allergens = const [],
@@ -25,13 +27,16 @@ class CreateCustomIngredientParams {
     this.defaultShelfLifeDays,
     this.isBulkCandidate = false,
     this.isNonFood = false,
-  });
+  }) : localUnitDefinitions = List<UnitDefinition>.unmodifiable(
+         localUnitDefinitions,
+       );
 
   final String householdId;
   final Map<String, String> displayNames;
   final IngredientCategory category;
-  final Unit defaultUnit;
-  final List<Unit> allowedUnits;
+  final UnitId defaultUnit;
+  final List<UnitId> allowedUnits;
+  final List<UnitDefinition> localUnitDefinitions;
   final String? parentIngredientId;
   final List<String> aliases;
   final List<Allergen> allergens;
@@ -66,6 +71,25 @@ class CreateCustomIngredient
         ),
       );
     }
+    if (p.allowedUnits.isEmpty) {
+      return const Result.failure(
+        Failure.validation(
+          field: 'allowedUnits',
+          message: 'At least one allowed unit is required.',
+        ),
+      );
+    }
+    final allowedUnitIds = <UnitId>{};
+    for (final unit in p.allowedUnits) {
+      if (!allowedUnitIds.add(unit)) {
+        return const Result.failure(
+          Failure.validation(
+            field: 'allowedUnits',
+            message: 'Allowed units must not contain duplicate unit IDs.',
+          ),
+        );
+      }
+    }
     if (!p.allowedUnits.contains(p.defaultUnit)) {
       return const Result.failure(
         Failure.validation(
@@ -74,13 +98,15 @@ class CreateCustomIngredient
         ),
       );
     }
-    if (p.allowedUnits.isEmpty) {
-      return const Result.failure(
-        Failure.validation(
-          field: 'allowedUnits',
-          message: 'At least one allowed unit is required.',
-        ),
-      );
+    final localUnitDefinitions = normalizeLocalUnitDefinitions(
+      p.localUnitDefinitions,
+    );
+    final localUnitFailure = validateLocalUnitDefinitions(
+      allowedUnits: p.allowedUnits,
+      localUnitDefinitions: localUnitDefinitions,
+    );
+    if (localUnitFailure != null) {
+      return Result.failure(localUnitFailure);
     }
 
     final normalizedName = enName.toLowerCase();
@@ -148,6 +174,7 @@ class CreateCustomIngredient
       category: p.category,
       defaultUnit: p.defaultUnit,
       allowedUnits: p.allowedUnits,
+      localUnitDefinitions: localUnitDefinitions,
       defaultShelfLifeDays: p.defaultShelfLifeDays,
       isBulkCandidate: p.isBulkCandidate,
       isNonFood: p.isNonFood,

@@ -36,7 +36,7 @@ void main() {
         householdId: hid,
         ingredientId: 'salt',
         quantity: 100,
-        unit: Unit.g,
+        unit: UnitId.g,
         section: PantrySection.food,
       ),
     );

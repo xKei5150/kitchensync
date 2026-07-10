@@ -1,5 +1,5 @@
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
@@ -26,7 +26,7 @@ class ShoppingEngine {
       );
     }
 
-    final required = <(String, Unit), _RequirementBucket>{};
+    final required = <(String, UnitId), _RequirementBucket>{};
     final pantry = _pantryByIngredientUnit(pantryItems);
 
     for (final meal in meals) {
@@ -60,7 +60,7 @@ class ShoppingEngine {
         if (needed <= 0) {
           continue;
         }
-        final normalized = _normalizeQuantity(
+        final normalized = UnitRegistry.normalizeFormalQuantity(
           quantity: needed,
           unit: ingredient.unit,
         );
@@ -153,12 +153,12 @@ class ShoppingEngine {
     return List.unmodifiable(updated);
   }
 
-  Map<(String, Unit), double> _pantryByIngredientUnit(
+  Map<(String, UnitId), double> _pantryByIngredientUnit(
     Iterable<PantryItem> pantryItems,
   ) {
-    final result = <(String, Unit), double>{};
+    final result = <(String, UnitId), double>{};
     for (final item in pantryItems) {
-      final normalized = _normalizeQuantity(
+      final normalized = UnitRegistry.normalizeFormalQuantity(
         quantity: item.quantity,
         unit: item.unit,
       );
@@ -166,17 +166,6 @@ class ShoppingEngine {
       result[key] = (result[key] ?? 0) + normalized.quantity;
     }
     return result;
-  }
-
-  ({double quantity, Unit unit}) _normalizeQuantity({
-    required double quantity,
-    required Unit unit,
-  }) {
-    return switch (unit) {
-      Unit.kg => (quantity: quantity * 1000, unit: Unit.g),
-      Unit.l => (quantity: quantity * 1000, unit: Unit.ml),
-      _ => (quantity: quantity, unit: unit),
-    };
   }
 
   DateTime _dateOnly(DateTime value) {
@@ -192,7 +181,7 @@ class _RequirementBucket {
   _RequirementBucket(this.ingredientId, this.unit);
 
   final String ingredientId;
-  final Unit unit;
+  final UnitId unit;
   double quantity = 0;
   final List<MealSourceLink> sourceMealLinks = [];
 

@@ -1,3 +1,4 @@
+// SIZE_OK: shopping screen tests cover existing navigation and list states.
 import 'dart:async';
 import 'dart:io';
 
@@ -8,11 +9,13 @@ import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
@@ -83,7 +86,7 @@ class _FakePantryRepository implements PantryRepository {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   }) async => null;
 
@@ -259,7 +262,7 @@ Recipe _recipe(String id) {
         recipeId: 'braise',
         ingredientId: 'tomato',
         quantity: 500,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
     ],
     instructions: const ['Cook.'],
@@ -328,7 +331,7 @@ class _FakeShoppingRepository implements ShoppingRepository {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) async {}
 
   @override
@@ -381,7 +384,7 @@ ShoppingListRecord _shoppingRecord({
           shoppingListId: id,
           ingredientId: i.isEven ? 'beans' : 'tomato',
           quantityNeeded: i + 1,
-          unit: Unit.piece,
+          unit: UnitId.piece,
           status: ShoppingListItemStatus.unchecked,
           sourceMealLinks: const [],
         ),
@@ -613,6 +616,7 @@ void main() {
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
+        clockProvider.overrideWithValue(FakeClock(DateTime(2026, 7, 6, 9))),
         recipeRepositoryProvider.overrideWithValue(
           _FakeRecipeRepository(recipes: {'braise': _recipe('braise')}),
         ),

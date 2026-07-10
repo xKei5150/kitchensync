@@ -26,8 +26,8 @@ Ingredient _ingredient(
     name: name.toLowerCase(),
     displayNames: {'en': name},
     category: category,
-    defaultUnit: Unit.g,
-    allowedUnits: const [Unit.g],
+    defaultUnit: UnitId.g,
+    allowedUnits: const [UnitId.g],
     scope: IngredientScope.global,
     createdAt: now,
     updatedAt: now,
@@ -39,6 +39,7 @@ PantryItem _item(
   String ingredientId, {
   PantrySection section = PantrySection.food,
   double quantity = 2,
+  UnitId unit = UnitId.g,
   DateTime? lastPurchaseDate,
   DateTime? expiryDate,
 }) {
@@ -48,7 +49,7 @@ PantryItem _item(
     householdId: 'solo-household',
     ingredientId: ingredientId,
     quantity: quantity,
-    unit: Unit.g,
+    unit: unit,
     section: section,
     lastPurchaseDate: lastPurchaseDate,
     expiryDate: expiryDate,
@@ -167,7 +168,7 @@ void main() {
                 'rice-item',
                 'rice',
                 lastPurchaseDate: DateTime(2026, 7),
-                expiryDate: DateTime(2026, 7, 9),
+                expiryDate: DateTime(2026, 7, 20),
               ),
               _item('bleach-item', 'bleach', section: PantrySection.nonFood),
             ]),
@@ -193,6 +194,31 @@ void main() {
 
     expect(find.text('Jasmine Rice'), findsOneWidget);
     expect(find.text('Bleach'), findsNothing);
+  });
+
+  testWidgets('PantryHomeScreen uses registry plural labels for quantities', (
+    tester,
+  ) async {
+    final lemon = _ingredient('lemon', 'Lemon');
+
+    await tester.pumpWidget(
+      await _wrap(
+        overrides: [
+          pantryAllItemsStreamProvider.overrideWith(
+            (ref) => Stream.value([
+              _item('lemon-item', 'lemon', unit: UnitId.piece),
+            ]),
+          ),
+          pantryIngredientProvider(
+            'lemon',
+          ).overrideWith((ref) async => Result.success(lemon)),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lemon'), findsOneWidget);
+    expect(find.text('2 pieces'), findsOneWidget);
   });
 
   testWidgets('PantryHomeScreen keeps Leftovers behind the filter control', (

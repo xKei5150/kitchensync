@@ -24,7 +24,7 @@ void main() {
     householdId: 'h1',
     ingredientId: 'ing1',
     quantity: 3,
-    unit: Unit.piece,
+    unit: UnitId.piece,
     section: PantrySection.food,
     createdAt: now,
     updatedAt: now,
@@ -36,7 +36,7 @@ void main() {
     pantryItemId: 'p1',
     ingredientId: 'ing1',
     quantity: 2,
-    unit: Unit.piece,
+    unit: UnitId.piece,
     reason: WasteReason.spoiled,
     date: now,
   );
@@ -157,20 +157,20 @@ void main() {
             .doc('grams')
             .set(
               PantryItemMapper.toMap(
-                testItem.copyWith(id: 'grams', unit: Unit.g),
+                testItem.copyWith(id: 'grams', unit: UnitId.g),
               ),
             );
 
         final found = await repo.findByIngredientUnit(
           householdId: 'h1',
           ingredientId: 'ing1',
-          unit: Unit.g,
+          unit: UnitId.g,
           section: PantrySection.food,
         );
 
         expect(found, isNotNull);
         expect(found!.id, 'grams');
-        expect(found.unit, Unit.g);
+        expect(found.unit, UnitId.g);
       },
     );
   });

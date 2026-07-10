@@ -1,5 +1,6 @@
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 
 class MealScheduleEntryMapper {
   const MealScheduleEntryMapper._();
@@ -21,10 +22,10 @@ class MealScheduleEntryMapper {
       for (final override in entry.ingredientOverrides)
         {
           'originalIngredientId': override.originalIngredientId,
-          'originalUnit': override.originalUnit.name,
+          'originalUnit': override.originalUnit.value,
           'substituteIngredientId': override.substituteIngredientId,
           'substituteQuantity': override.substituteQuantity,
-          'substituteUnit': override.substituteUnit.name,
+          'substituteUnit': override.substituteUnit.value,
         },
     ],
   };
@@ -123,16 +124,10 @@ List<MealIngredientOverride> _ingredientOverridesFromMap(Object? raw) {
       if (item is Map)
         MealIngredientOverride(
           originalIngredientId: item['originalIngredientId'] as String,
-          originalUnit: _enumFromName(
-            Unit.values,
-            item['originalUnit'] as String,
-          ),
+          originalUnit: UnitId(item['originalUnit'] as String),
           substituteIngredientId: item['substituteIngredientId'] as String,
           substituteQuantity: (item['substituteQuantity'] as num).toDouble(),
-          substituteUnit: _enumFromName(
-            Unit.values,
-            item['substituteUnit'] as String,
-          ),
+          substituteUnit: UnitId(item['substituteUnit'] as String),
         ),
   ];
 }

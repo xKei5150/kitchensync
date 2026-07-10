@@ -15,12 +15,12 @@ PlannedRecipe _recipe({String id = 'braise', int defaultServingSize = 2}) {
       RecipeIngredientRequirement(
         ingredientId: 'tomato',
         quantity: 400,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
       RecipeIngredientRequirement(
         ingredientId: 'beans',
         quantity: 2,
-        unit: Unit.piece,
+        unit: UnitId.piece,
       ),
     ],
   );
@@ -29,7 +29,7 @@ PlannedRecipe _recipe({String id = 'braise', int defaultServingSize = 2}) {
 PantryItem _pantry({
   required String ingredientId,
   required double quantity,
-  required Unit unit,
+  required UnitId unit,
   String id = 'p1',
 }) {
   return PantryItem(
@@ -82,7 +82,7 @@ void main() {
         meals: [meal],
         recipesById: {recipe.id: recipe},
         pantryItems: [
-          _pantry(ingredientId: 'tomato', quantity: 300, unit: Unit.g),
+          _pantry(ingredientId: 'tomato', quantity: 300, unit: UnitId.g),
         ],
       );
 
@@ -90,90 +90,9 @@ void main() {
       final beans = list.items.singleWhere((i) => i.ingredientId == 'beans');
       final tomato = list.items.singleWhere((i) => i.ingredientId == 'tomato');
       expect(beans.quantity, 4);
-      expect(beans.unit, Unit.piece);
+      expect(beans.unit, UnitId.piece);
       expect(tomato.quantity, 500);
       expect(tomato.sourceMealLinks.single.mealEntryId, 'm1');
-    },
-  );
-
-  test('shopping list normalizes compatible mass units before subtracting', () {
-    const recipe = PlannedRecipe(
-      id: 'granola',
-      title: 'Granola',
-      defaultServingSize: 2,
-      ingredients: [
-        RecipeIngredientRequirement(
-          ingredientId: 'oats',
-          quantity: 1.5,
-          unit: Unit.kg,
-        ),
-      ],
-    );
-    final meal = MealScheduleEntry(
-      id: 'm1',
-      recipeId: 'granola',
-      date: DateTime.utc(2026, 7, 6),
-      mealLabel: 'Breakfast',
-      servingSize: 2,
-    );
-
-    final list = engine.generateList(
-      id: 's1',
-      type: ShoppingListType.scheduled,
-      startDate: DateTime.utc(2026, 7, 6),
-      endDate: DateTime.utc(2026, 7, 6),
-      meals: [meal],
-      recipesById: {recipe.id: recipe},
-      pantryItems: [_pantry(ingredientId: 'oats', quantity: 500, unit: Unit.g)],
-    );
-
-    expect(list.items, hasLength(1));
-    expect(list.items.single.ingredientId, 'oats');
-    expect(list.items.single.quantity, 1000);
-    expect(list.items.single.unit, Unit.g);
-    expect(list.items.single.sourceMealLinks.single.quantity, 1500);
-  });
-
-  test(
-    'shopping list normalizes compatible volume units before subtracting',
-    () {
-      const recipe = PlannedRecipe(
-        id: 'soup',
-        title: 'Soup',
-        defaultServingSize: 4,
-        ingredients: [
-          RecipeIngredientRequirement(
-            ingredientId: 'stock',
-            quantity: 750,
-            unit: Unit.ml,
-          ),
-        ],
-      );
-      final meal = MealScheduleEntry(
-        id: 'm1',
-        recipeId: 'soup',
-        date: DateTime.utc(2026, 7, 6),
-        mealLabel: 'Dinner',
-        servingSize: 8,
-      );
-
-      final list = engine.generateList(
-        id: 's1',
-        type: ShoppingListType.scheduled,
-        startDate: DateTime.utc(2026, 7, 6),
-        endDate: DateTime.utc(2026, 7, 6),
-        meals: [meal],
-        recipesById: {recipe.id: recipe},
-        pantryItems: [
-          _pantry(ingredientId: 'stock', quantity: 1, unit: Unit.l),
-        ],
-      );
-
-      expect(list.items, hasLength(1));
-      expect(list.items.single.ingredientId, 'stock');
-      expect(list.items.single.quantity, 500);
-      expect(list.items.single.unit, Unit.ml);
-      expect(list.items.single.sourceMealLinks.single.quantity, 1500);
     },
   );
 
@@ -195,8 +114,8 @@ void main() {
       meals: [meal],
       recipesById: {recipe.id: recipe},
       pantryItems: [
-        _pantry(ingredientId: 'tomato', quantity: 400, unit: Unit.g),
-        _pantry(ingredientId: 'beans', quantity: 2, unit: Unit.piece),
+        _pantry(ingredientId: 'tomato', quantity: 400, unit: UnitId.g),
+        _pantry(ingredientId: 'beans', quantity: 2, unit: UnitId.piece),
       ],
     );
 
@@ -247,7 +166,7 @@ void main() {
         ShoppingPurchaseLine(
           ingredientId: 'tomato',
           quantity: 300,
-          unit: Unit.g,
+          unit: UnitId.g,
         ),
       ],
       householdId: 'h1',

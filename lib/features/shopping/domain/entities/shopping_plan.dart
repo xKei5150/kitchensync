@@ -1,4 +1,4 @@
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 
 enum ShoppingListType { scheduled, shopNow, suggested, emergency }
 
@@ -36,7 +36,7 @@ class ShoppingListItemPlan {
 
   final String ingredientId;
   final double quantity;
-  final Unit unit;
+  final UnitId unit;
   final List<MealSourceLink> sourceMealLinks;
 }
 
@@ -104,11 +104,11 @@ class ShoppingListItemRecord {
   final String shoppingListId;
   final String ingredientId;
   final double quantityNeeded;
-  final Unit unit;
+  final UnitId unit;
   final ShoppingListItemStatus status;
   final String? substituteIngredientId;
   final double? substituteQuantity;
-  final Unit? substituteUnit;
+  final UnitId? substituteUnit;
   final List<MealSourceLink> sourceMealLinks;
 }
 
@@ -122,7 +122,7 @@ class ShoppingPurchaseLine {
 
   final String ingredientId;
   final double quantity;
-  final Unit unit;
+  final UnitId unit;
 
   /// The originally requested ingredient when the shopper bought a substitute.
   final String? substituteForIngredientId;

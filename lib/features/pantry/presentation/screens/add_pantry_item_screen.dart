@@ -1,3 +1,4 @@
+// SIZE_OK: add pantry item screen retains existing full entry workflow.
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/widgets/unit_picker.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
@@ -34,7 +36,7 @@ class AddPantryItemScreen extends ConsumerStatefulWidget {
 class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
   Ingredient? _selected;
   final TextEditingController _qty = TextEditingController(text: '1');
-  Unit _unit = Unit.piece;
+  UnitId _unit = UnitId.piece;
   PantrySection _section = PantrySection.food;
   bool _submitting = false;
 
@@ -73,15 +75,29 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
     return null;
   }
 
+  String? get _unitError {
+    final selected = _selected;
+    if (selected == null || selected.allowedUnits.isNotEmpty) return null;
+    return 'This ingredient has no units available for pantry items.';
+  }
+
   int get _errorCount =>
-      [_itemError, _quantityError].where((e) => e != null).length;
+      [_itemError, _quantityError, _unitError].where((e) => e != null).length;
 
   Future<void> _pickIngredient() async {
     final picked = await context.push<Ingredient>('/ingredient/pick');
     if (picked == null || !mounted) return;
+    final UnitId nextUnit;
+    if (picked.allowedUnits.isEmpty) {
+      nextUnit = UnitId.piece;
+    } else if (picked.allowedUnits.contains(picked.defaultUnit)) {
+      nextUnit = picked.defaultUnit;
+    } else {
+      nextUnit = picked.allowedUnits.first;
+    }
     setState(() {
       _selected = picked;
-      _unit = picked.defaultUnit;
+      _unit = nextUnit;
       _section = picked.isNonFood ? PantrySection.nonFood : PantrySection.food;
       _error = null;
     });
@@ -153,7 +169,9 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
   Widget build(BuildContext context) {
     final ks = context.ksColors;
     final selected = _selected;
-    final allowedUnits = selected?.allowedUnits ?? Unit.values;
+    final allowedUnits = selected?.allowedUnits.toSet();
+    final localUnitDefinitions =
+        selected?.localUnitDefinitions ?? const <UnitDefinition>[];
 
     return Scaffold(
       backgroundColor: ks.surfaceBase,
@@ -195,20 +213,17 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
                   ),
                   const SizedBox(height: KsTokens.space16),
                   const KsFieldLabel('Unit'),
-                  Wrap(
-                    spacing: KsTokens.space8,
-                    runSpacing: KsTokens.space8,
-                    children: [
-                      for (final unit in allowedUnits)
-                        KsSelectChip(
-                          label: unit.name,
-                          selected: unit == _unit,
-                          onTap: _submitting
-                              ? null
-                              : () => setState(() => _unit = unit),
-                        ),
-                    ],
+                  UnitPicker(
+                    selectedUnit: _unit,
+                    localUnitDefinitions: localUnitDefinitions,
+                    allowCreate: false,
+                    availableUnits: allowedUnits,
+                    onSelected: _submitting
+                        ? (_) {}
+                        : (unit) => setState(() => _unit = unit),
                   ),
+                  if (_validated && _unitError != null)
+                    KsFieldError(_unitError!),
                   const SizedBox(height: KsTokens.space16),
                   const KsFieldLabel('Section'),
                   Wrap(

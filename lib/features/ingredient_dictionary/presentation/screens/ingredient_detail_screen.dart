@@ -5,6 +5,7 @@ import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
 class IngredientDetailScreen extends ConsumerWidget {
@@ -40,6 +41,8 @@ class IngredientDetailScreen extends ConsumerWidget {
   Widget _detail(BuildContext context, Ingredient ing) {
     final name = ing.displayNames['en'] ?? ing.name;
     final categoryColor = ing.category.color;
+    final defaultUnitLabel =
+        UnitRegistry.find(ing.defaultUnit)?.label ?? ing.defaultUnit.value;
 
     return SingleChildScrollView(
       child: Column(
@@ -77,7 +80,7 @@ class IngredientDetailScreen extends ConsumerWidget {
                   runSpacing: KsTokens.space4,
                   children: [
                     KsTag(label: ing.category.name, color: categoryColor),
-                    KsTag(label: 'default ${ing.defaultUnit.name}'),
+                    KsTag(label: 'default $defaultUnitLabel'),
                     if (ing.isBulkCandidate)
                       const KsTag(label: 'bulk', color: KsTokens.sectionBulk),
                     if (ing.isNonFood)

@@ -27,7 +27,7 @@ void main() {
       householdId: 'h1',
       ingredientId: ingredientId,
       quantity: 1000,
-      unit: Unit.g,
+      unit: UnitId.g,
       purchaseDate: date,
       isBulk: true,
     );

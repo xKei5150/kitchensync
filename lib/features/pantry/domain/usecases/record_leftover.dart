@@ -24,7 +24,7 @@ class RecordLeftoverParams {
   final String ingredientId;
   final int servings;
   final double quantity;
-  final Unit unit;
+  final UnitId unit;
 }
 
 class RecordLeftover extends UseCase<PantryItem, RecordLeftoverParams> {

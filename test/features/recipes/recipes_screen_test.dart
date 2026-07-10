@@ -1,3 +1,4 @@
+// SIZE_OK: recipes screen tests cover existing CRUD/search UI workflows.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -9,7 +10,6 @@ import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
-import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
@@ -174,7 +174,10 @@ class _FakeRecipeRepository implements RecipeRepository {
 }
 
 class _FakeIngredientRepository implements IngredientRepository {
-  final created = <Ingredient>[];
+  _FakeIngredientRepository([List<Ingredient> initial = const []])
+    : created = List.of(initial);
+
+  final List<Ingredient> created;
 
   @override
   Stream<List<Ingredient>> watchByIds(List<String> ids) => Stream.value(
@@ -198,9 +201,18 @@ class _FakeIngredientRepository implements IngredientRepository {
     int limit = 30,
     String? startAfterId,
   }) async {
+    final normalized = query.trim().toLowerCase();
     return created
-        .where((ingredient) => ingredient.householdId == householdId)
-        .where((ingredient) => ingredient.name == query)
+        .where(
+          (ingredient) =>
+              ingredient.householdId == householdId ||
+              ingredient.scope == IngredientScope.global,
+        )
+        .where((ingredient) {
+          final displayName = ingredient.displayNames['en'] ?? ingredient.name;
+          return ingredient.name.toLowerCase().contains(normalized) ||
+              displayName.toLowerCase().contains(normalized);
+        })
         .take(limit)
         .toList(growable: false);
   }
@@ -248,7 +260,7 @@ List<Recipe> _publicRecipes() {
           recipeId: 'public-chicken',
           ingredientId: 'chicken-thighs',
           quantity: 1,
-          unit: Unit.kg,
+          unit: UnitId.kg,
           description: 'Chicken Thighs',
         ),
       ],
@@ -319,31 +331,29 @@ void main() {
     },
   );
 
-  test(
-    'RecipeSearchController allows unfiltered public search for free households',
-    () async {
-      final repo = _FakeRecipeRepository(_publicRecipes());
-      addTearDown(repo.dispose);
-      final controller = RecipeSearchController(
-        repository: repo,
-        household: const ActiveHouseholdContext(
-          id: 'solo-household',
-          name: 'Test kitchen',
-          role: HouseholdRole.admin,
-          isJoint: false,
-          hasPremium: false,
-        ),
-      );
+  test('RecipeSearchController allows unfiltered public search for '
+      'free households', () async {
+    final repo = _FakeRecipeRepository(_publicRecipes());
+    addTearDown(repo.dispose);
+    final controller = RecipeSearchController(
+      repository: repo,
+      household: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Test kitchen',
+        role: HouseholdRole.admin,
+        isJoint: false,
+        hasPremium: false,
+      ),
+    );
 
-      final results = await controller.searchPublicRecipes();
+    final results = await controller.searchPublicRecipes();
 
-      expect(results.map((recipe) => recipe.id), [
-        'public-chicken',
-        'public-dal',
-        'public-roast',
-      ]);
-    },
-  );
+    expect(results.map((recipe) => recipe.id), [
+      'public-chicken',
+      'public-dal',
+      'public-roast',
+    ]);
+  });
 
   testWidgets('RecipesScreen searches public recipes with premium filters', (
     tester,
@@ -639,7 +649,7 @@ void main() {
             recipeId: 'adobo',
             ingredientId: 'chicken-thighs',
             quantity: 1,
-            unit: Unit.kg,
+            unit: UnitId.kg,
             description: 'Chicken Thighs',
           ),
           RecipeIngredient(
@@ -647,7 +657,7 @@ void main() {
             recipeId: 'adobo',
             ingredientId: 'soy-sauce',
             quantity: 3,
-            unit: Unit.tbsp,
+            unit: UnitId.tbsp,
             description: 'Soy Sauce',
           ),
         ],
@@ -735,7 +745,7 @@ void main() {
               ingredientId: 'seed-egg',
               name: 'Egg',
               quantity: 2,
-              unit: Unit.piece,
+              unit: UnitId.piece,
             ),
           ],
           instructions: ['Cook eggs.'],
@@ -782,7 +792,7 @@ void main() {
           recipeTags: ['Test'],
           description: '',
           ingredients: [
-            RecipeIngredientDraft(name: 'Rice', quantity: 1, unit: Unit.cup),
+            RecipeIngredientDraft(name: 'Rice', quantity: 1, unit: UnitId.cup),
           ],
           instructions: ['Cook rice.'],
           visibility: RecipeVisibility.private,
@@ -844,7 +854,7 @@ void main() {
           recipeTags: [],
           description: '',
           ingredients: [
-            RecipeIngredientDraft(name: 'Rice', quantity: 1, unit: Unit.cup),
+            RecipeIngredientDraft(name: 'Rice', quantity: 1, unit: UnitId.cup),
           ],
           instructions: ['Cook rice.'],
           visibility: RecipeVisibility.private,
@@ -882,7 +892,7 @@ void main() {
           recipeTags: ['Test'],
           description: '',
           ingredients: [
-            RecipeIngredientDraft(name: 'Rice', quantity: 1, unit: Unit.cup),
+            RecipeIngredientDraft(name: 'Rice', quantity: 1, unit: UnitId.cup),
           ],
           instructions: ['Cook rice.'],
           visibility: RecipeVisibility.public,

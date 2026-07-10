@@ -10,6 +10,7 @@ PantryItem _item({
   required String id,
   required String ingredientId,
   required double quantity,
+  UnitId unit = UnitId.g,
   PantrySection section = PantrySection.bulk,
   DateTime? lastPurchaseDate,
 }) {
@@ -19,7 +20,7 @@ PantryItem _item({
     householdId: 'h1',
     ingredientId: ingredientId,
     quantity: quantity,
-    unit: Unit.g,
+    unit: unit,
     section: section,
     lastPurchaseDate: lastPurchaseDate,
     createdAt: now,
@@ -31,6 +32,7 @@ WasteEvent _usage({
   required String ingredientId,
   required double quantity,
   required DateTime date,
+  UnitId unit = UnitId.g,
 }) {
   return WasteEvent(
     id: 'w-$ingredientId-${date.day}',
@@ -38,7 +40,7 @@ WasteEvent _usage({
     pantryItemId: 'p-$ingredientId',
     ingredientId: ingredientId,
     quantity: quantity,
-    unit: Unit.g,
+    unit: unit,
     reason: WasteReason.other,
     date: date,
   );
@@ -47,13 +49,14 @@ WasteEvent _usage({
 PurchaseRecord _purchase({
   required String ingredientId,
   required DateTime date,
+  UnitId unit = UnitId.g,
 }) {
   return PurchaseRecord(
     id: 'p-$ingredientId-${date.day}',
     householdId: 'h1',
     ingredientId: ingredientId,
     quantity: 1000,
-    unit: Unit.g,
+    unit: unit,
     purchaseDate: date,
     isBulk: true,
   );
@@ -134,5 +137,52 @@ void main() {
     );
 
     expect(statuses, isEmpty);
+  });
+
+  test('predict matches usage and purchase history by exact unit id', () {
+    final now = DateTime(2026, 7, 31);
+    final tin = UnitId('tin');
+
+    final statuses = const BulkPredictionEngine().predict(
+      pantryItems: [
+        _item(
+          id: 'tomato-stock',
+          ingredientId: 'tomato',
+          quantity: 10,
+          unit: tin,
+          lastPurchaseDate: DateTime(2026, 7),
+        ),
+      ],
+      usageEvents: [
+        _usage(
+          ingredientId: 'tomato',
+          quantity: 4,
+          unit: UnitId.piece,
+          date: DateTime(2026, 7, 21),
+        ),
+        _usage(
+          ingredientId: 'tomato',
+          quantity: 2,
+          unit: tin,
+          date: DateTime(2026, 7, 21),
+        ),
+      ],
+      purchaseHistory: [
+        _purchase(
+          ingredientId: 'tomato',
+          unit: UnitId.piece,
+          date: DateTime(2026, 6),
+        ),
+        _purchase(
+          ingredientId: 'tomato',
+          unit: UnitId.piece,
+          date: DateTime(2026, 7),
+        ),
+      ],
+      now: now,
+    );
+
+    expect(statuses.single.estimatedConsumptionRatePerDay, 0.2);
+    expect(statuses.single.recommendedPurchaseIntervalDays, isNull);
   });
 }

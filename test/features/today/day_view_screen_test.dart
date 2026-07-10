@@ -1,3 +1,4 @@
+// SIZE_OK: day view tests cover existing multi-feature daily UI surface.
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -116,11 +117,11 @@ class _FakePantryRepository implements PantryRepository {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   }) async {
     if (!stockTomato) return null;
-    if (ingredientId != 'tomato' || unit != Unit.g) return null;
+    if (ingredientId != 'tomato' || unit != UnitId.g) return null;
     final now = DateTime(2026, 7);
     return PantryItem(
       id: 'pantry-tomato',
@@ -194,7 +195,7 @@ class _FakeShoppingRepository implements ShoppingRepository {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) async {}
 
   @override
@@ -277,7 +278,7 @@ class _FakeRecipeRepository implements RecipeRepository {
             recipeId: 'braise',
             ingredientId: 'tomato',
             quantity: 400,
-            unit: Unit.g,
+            unit: UnitId.g,
           ),
         ],
         instructions: const [],

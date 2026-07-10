@@ -1,3 +1,4 @@
+// SIZE_OK: recipe detail tests cover existing full detail UI states.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,8 @@ import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
@@ -62,6 +65,54 @@ class _FakeCalendarRepository implements CalendarRepository {
   Future<void> upsertDaySettings(CalendarDaySettings settings) async {}
 }
 
+class _FakeIngredientRepository implements IngredientRepository {
+  const _FakeIngredientRepository(this.ingredients);
+
+  final List<Ingredient> ingredients;
+
+  @override
+  Stream<List<Ingredient>> watchByIds(List<String> ids) => Stream.value(
+    ingredients
+        .where((ingredient) => ids.contains(ingredient.id))
+        .toList(growable: false),
+  );
+
+  @override
+  Future<Ingredient?> getById(String id, {String? householdId}) async {
+    for (final ingredient in ingredients) {
+      if (ingredient.id == id) return ingredient;
+    }
+    return null;
+  }
+
+  @override
+  Future<List<Ingredient>> search({
+    required String query,
+    String? householdId,
+    int limit = 30,
+    String? startAfterId,
+  }) async => ingredients
+      .where((ingredient) => ingredient.name.contains(query))
+      .take(limit)
+      .toList(growable: false);
+
+  @override
+  Future<List<Ingredient>> listVariantsOf(String parentId) async => const [];
+
+  @override
+  Future<void> createCustom(Ingredient ingredient) async {}
+
+  @override
+  Future<void> updateCustom(Ingredient ingredient) async {}
+
+  @override
+  Future<int> upsertSeed(List<Ingredient> seed) async => seed.length;
+
+  @override
+  Stream<List<Ingredient>> watchByBarcode(String barcode) =>
+      Stream.value(const []);
+}
+
 const _activeHousehold = ActiveHouseholdContext(
   id: 'solo-household',
   name: 'Test kitchen',
@@ -83,6 +134,31 @@ Future<Widget> _wrap(
       ...overrides,
     ],
     child: MaterialApp(theme: theme ?? AppTheme.light(), home: home),
+  );
+}
+
+Ingredient _pepperWithLocalBundleUnit() {
+  final now = DateTime(2026, 7, 5, 12);
+  return Ingredient(
+    id: 'pepper',
+    name: 'pepper',
+    displayNames: const {'en': 'Pepper'},
+    category: IngredientCategory.produce,
+    defaultUnit: UnitId('bundle'),
+    allowedUnits: [UnitId('bundle'), UnitId.g],
+    localUnitDefinitions: [
+      UnitDefinition(
+        id: UnitId('bundle'),
+        label: 'Bundle',
+        pluralLabel: 'Bundles',
+        dimension: UnitDimension.informal,
+        family: UnitSystemFamily.local,
+      ),
+    ],
+    scope: IngredientScope.householdCustom,
+    householdId: 'solo-household',
+    createdAt: now,
+    updatedAt: now,
   );
 }
 
@@ -133,7 +209,7 @@ void main() {
           recipeId: 'fried-chicken',
           ingredientId: 'chicken-thighs',
           quantity: 1,
-          unit: Unit.kg,
+          unit: UnitId.kg,
         ),
       ],
       instructions: const ['Fry until golden.'],
@@ -198,7 +274,7 @@ void main() {
           recipeId: 'fried-chicken',
           ingredientId: 'chicken-thighs',
           quantity: 1,
-          unit: Unit.kg,
+          unit: UnitId.kg,
           description: 'Chicken Thighs',
         ),
       ],
@@ -226,6 +302,58 @@ void main() {
     expect(find.text('Instructions'), findsOneWidget);
     expect(find.text('1. Coat chicken.'), findsOneWidget);
     expect(find.text('2. Fry until golden.'), findsOneWidget);
+  });
+
+  testWidgets('RecipeDetailScreen renders linked local unit label plurals', (
+    tester,
+  ) async {
+    final recipe = Recipe(
+      id: 'pepper-salsa',
+      authorUserId: 'user-1',
+      householdId: 'solo-household',
+      name: 'Pepper Salsa',
+      description: 'Fresh pepper salsa',
+      defaultServingSize: 4,
+      mealTimeTags: const ['Snack'],
+      recipeTags: const ['Produce'],
+      location: 'Home',
+      visibility: RecipeVisibility.private,
+      monetization: RecipeMonetization.free,
+      createdAt: DateTime(2026, 7, 5),
+      updatedAt: DateTime(2026, 7, 5),
+      ingredients: [
+        RecipeIngredient(
+          id: 'ri-1',
+          recipeId: 'pepper-salsa',
+          ingredientId: 'pepper',
+          quantity: 3,
+          unit: UnitId('bundle'),
+          description: 'Pepper',
+        ),
+      ],
+      instructions: const ['Chop peppers.'],
+    );
+
+    await tester.pumpWidget(
+      await _wrap(
+        const RecipeDetailScreen(recipeId: 'pepper-salsa'),
+        overrides: [
+          ingredientRepositoryProvider.overrideWithValue(
+            _FakeIngredientRepository([_pepperWithLocalBundleUnit()]),
+          ),
+          recipeRecordProvider(
+            'pepper-salsa',
+          ).overrideWith((ref) => Stream.value(recipe)),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 Bundles'), findsOneWidget);
+    expect(find.text('3 bundle'), findsNothing);
+    debugPrint(
+      'QA_RECIPE_DETAIL_LOCAL_UNIT rendered=3 Bundles raw_slug_absent=true',
+    );
   });
 
   testWidgets('RecipeDetailScreen renders in dark theme without error', (

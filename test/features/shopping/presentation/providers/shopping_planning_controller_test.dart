@@ -1,3 +1,4 @@
+// SIZE_OK: shopping planning tests cover existing controller state branches.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -49,7 +50,7 @@ class _FakeShoppingRepository implements ShoppingRepository {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) async {}
 
   @override
@@ -145,7 +146,7 @@ class _FakePantryRepository implements PantryRepository {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   }) async {
     final index = items.indexWhere(
@@ -314,14 +315,14 @@ Recipe _recipe() {
         recipeId: 'braise',
         ingredientId: 'tomato',
         quantity: 400,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
       RecipeIngredient(
         id: 'bean-line',
         recipeId: 'braise',
         ingredientId: 'beans',
         quantity: 2,
-        unit: Unit.piece,
+        unit: UnitId.piece,
       ),
     ],
     instructions: const [],
@@ -332,7 +333,7 @@ PantryItem _pantryItem({
   required String id,
   required String ingredientId,
   required double quantity,
-  required Unit unit,
+  required UnitId unit,
   required PantrySection section,
   DateTime? lastPurchaseDate,
 }) {
@@ -398,14 +399,14 @@ void main() {
             id: 'tomato-stock',
             ingredientId: 'tomato',
             quantity: 300,
-            unit: Unit.g,
+            unit: UnitId.g,
             section: PantrySection.food,
           ),
           _pantryItem(
             id: 'bean-bulk',
             ingredientId: 'beans',
             quantity: 1,
-            unit: Unit.piece,
+            unit: UnitId.piece,
             section: PantrySection.bulk,
           ),
         ]),
@@ -478,7 +479,7 @@ void main() {
           CookingIngredientRequirement(
             ingredientId: 'tomato',
             quantity: 300,
-            unit: Unit.g,
+            unit: UnitId.g,
           ),
         ],
       );
@@ -503,7 +504,7 @@ void main() {
           id: 'oil-stock',
           ingredientId: 'oil',
           quantity: 100,
-          unit: Unit.ml,
+          unit: UnitId.ml,
           section: PantrySection.bulk,
           lastPurchaseDate: DateTime(2026, 6),
         ),
@@ -514,7 +515,7 @@ void main() {
           householdId: 'solo-household',
           ingredientId: 'oil',
           quantity: 750,
-          unit: Unit.ml,
+          unit: UnitId.ml,
           purchaseDate: DateTime(2026, 6),
           isBulk: true,
         ),
@@ -523,7 +524,7 @@ void main() {
           householdId: 'solo-household',
           ingredientId: 'oil',
           quantity: 1000,
-          unit: Unit.ml,
+          unit: UnitId.ml,
           purchaseDate: DateTime(2026, 7),
           isBulk: true,
         ),
@@ -540,7 +541,7 @@ void main() {
     expect(record.items, hasLength(1));
     expect(record.items.single.ingredientId, 'oil');
     expect(record.items.single.quantityNeeded, 875);
-    expect(record.items.single.unit, Unit.ml);
+    expect(record.items.single.unit, UnitId.ml);
     expect(record.items.single.sourceMealLinks, isEmpty);
   });
 
@@ -553,7 +554,7 @@ void main() {
           id: 'rice-stock',
           ingredientId: 'rice',
           quantity: 100,
-          unit: Unit.g,
+          unit: UnitId.g,
           section: PantrySection.bulk,
           lastPurchaseDate: DateTime(2026, 6),
         ),
@@ -572,7 +573,7 @@ void main() {
             householdId: 'solo-household',
             ingredientId: 'rice',
             quantity: 2000,
-            unit: Unit.g,
+            unit: UnitId.g,
             purchaseDate: DateTime(2026, 6),
             isBulk: true,
           ),
@@ -581,7 +582,7 @@ void main() {
             householdId: 'solo-household',
             ingredientId: 'rice',
             quantity: 3000,
-            unit: Unit.g,
+            unit: UnitId.g,
             purchaseDate: DateTime(2026, 7),
             isBulk: true,
           ),
@@ -606,7 +607,7 @@ void main() {
       expect(record.items.single.id, 'rice-line');
       expect(record.items.single.ingredientId, 'rice');
       expect(record.items.single.quantityNeeded, 2500);
-      expect(record.items.single.unit, Unit.g);
+      expect(record.items.single.unit, UnitId.g);
     },
   );
 
@@ -633,7 +634,7 @@ void main() {
               id: 'rice-stock',
               ingredientId: 'rice',
               quantity: 0,
-              unit: Unit.g,
+              unit: UnitId.g,
               section: PantrySection.bulk,
             ),
             estimatedConsumptionRatePerDay: 1,
@@ -654,7 +655,7 @@ void main() {
         id: 'rice-stock',
         ingredientId: 'rice',
         quantity: 2000,
-        unit: Unit.g,
+        unit: UnitId.g,
         section: PantrySection.bulk,
       ),
     ]);
@@ -684,7 +685,7 @@ void main() {
             shoppingListId: 'list-1',
             ingredientId: 'rice',
             quantityNeeded: 1000,
-            unit: Unit.g,
+            unit: UnitId.g,
             status: ShoppingListItemStatus.bought,
             sourceMealLinks: [],
           ),

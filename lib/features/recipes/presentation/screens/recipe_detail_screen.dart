@@ -1,3 +1,4 @@
+// SIZE_OK: recipe detail screen keeps the existing full recipe view surface.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
@@ -54,20 +56,32 @@ class RecipeDetailScreen extends ConsumerWidget {
               ),
             );
           }
-          return _RecipeDetailBody(
-            recipeId: recipe.id,
-            title: recipe.name,
-            intro: recipe.description.isEmpty
-                ? recipe.name
-                : recipe.description,
-            baseServings: recipe.defaultServingSize,
-            ingredients: recipe.ingredients
-                .map(_scaledIngredient)
-                .toList(growable: false),
-            tags: [...recipe.mealTimeTags, ...recipe.recipeTags],
-            priceEstimate: recipe.priceEstimate,
-            instructions: recipe.instructions,
-            onBack: () => context.pop(),
+          return FutureBuilder<Map<String, Ingredient>>(
+            future: _ingredientsById(ref, recipe),
+            builder: (context, snapshot) {
+              final ingredientsById =
+                  snapshot.data ?? const <String, Ingredient>{};
+              return _RecipeDetailBody(
+                recipeId: recipe.id,
+                title: recipe.name,
+                intro: recipe.description.isEmpty
+                    ? recipe.name
+                    : recipe.description,
+                baseServings: recipe.defaultServingSize,
+                ingredients: recipe.ingredients
+                    .map(
+                      (ingredient) => _scaledIngredient(
+                        ingredient,
+                        ingredientsById[ingredient.ingredientId],
+                      ),
+                    )
+                    .toList(growable: false),
+                tags: [...recipe.mealTimeTags, ...recipe.recipeTags],
+                priceEstimate: recipe.priceEstimate,
+                instructions: recipe.instructions,
+                onBack: () => context.pop(),
+              );
+            },
           );
         },
         loading: () =>
@@ -94,24 +108,60 @@ class RecipeDetailScreen extends ConsumerWidget {
     );
   }
 
-  static KsScalableIngredient _scaledIngredient(RecipeIngredient ingredient) {
+  static Future<Map<String, Ingredient>> _ingredientsById(
+    WidgetRef ref,
+    Recipe recipe,
+  ) async {
+    final repository = ref.read(ingredientRepositoryProvider);
+    final byId = <String, Ingredient>{};
+    for (final ingredient in recipe.ingredients) {
+      final id = ingredient.ingredientId;
+      if (byId.containsKey(id)) continue;
+      final linked = await repository.getById(
+        id,
+        householdId: recipe.householdId,
+      );
+      if (linked != null) byId[id] = linked;
+    }
+    return byId;
+  }
+
+  static KsScalableIngredient _scaledIngredient(
+    RecipeIngredient ingredient,
+    Ingredient? linkedIngredient,
+  ) {
     return KsScalableIngredient(
       name: ingredient.description ?? ingredient.ingredientId,
       baseAmount: ingredient.quantity,
-      unit: _unitLabel(ingredient.unit),
+      unit: _unitLabel(
+        ingredient.unit,
+        ingredient.quantity,
+        linkedIngredient?.localUnitDefinitions ?? const [],
+      ),
     );
   }
 
-  static String _unitLabel(Unit unit) => switch (unit) {
-    Unit.g => 'g',
-    Unit.kg => 'kg',
-    Unit.ml => 'ml',
-    Unit.l => 'l',
-    Unit.piece => 'pc',
-    Unit.tsp => 'tsp',
-    Unit.tbsp => 'tbsp',
-    Unit.cup => 'cup',
-  };
+  static String _unitLabel(
+    UnitId unit,
+    double quantity,
+    List<UnitDefinition> localUnitDefinitions,
+  ) {
+    final definition =
+        UnitRegistry.find(unit) ??
+        _localUnitDefinition(unit, localUnitDefinitions);
+    if (definition == null) return unit.value;
+    return quantity == 1 ? definition.label : definition.pluralLabel;
+  }
+
+  static UnitDefinition? _localUnitDefinition(
+    UnitId unit,
+    List<UnitDefinition> localUnitDefinitions,
+  ) {
+    for (final definition in localUnitDefinitions) {
+      if (definition.id == unit) return definition;
+    }
+    return null;
+  }
 }
 
 class _RecipeDetailBody extends ConsumerWidget {

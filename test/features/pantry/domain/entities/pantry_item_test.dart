@@ -10,7 +10,7 @@ void main() {
       householdId: 'h1',
       ingredientId: 'onion',
       quantity: 2.5,
-      unit: Unit.kg,
+      unit: UnitId.kg,
       section: PantrySection.food,
       createdAt: DateTime.utc(2026),
       updatedAt: DateTime.utc(2026),

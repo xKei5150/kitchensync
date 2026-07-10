@@ -1,3 +1,4 @@
+// SIZE_OK: shopping list screen is pre-existing broad planning UI surface.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,8 +8,20 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
+
+final shoppingIngredientProvider = FutureProvider.family<Ingredient?, String>((
+  ref,
+  ingredientId,
+) {
+  final householdId = ref.watch(activeHouseholdIdProvider);
+  return ref
+      .watch(ingredientRepositoryProvider)
+      .getById(ingredientId, householdId: householdId);
+});
 
 /// In-store checklist — buying ahead pays down the future.
 ///
@@ -251,11 +264,8 @@ class _ShoppingListBody extends StatelessWidget {
                   for (var i = 0; i < lines.length; i++) ...[
                     if (i > 0)
                       Divider(height: 1, thickness: 1, color: ks.hairline),
-                    KsChecklistRow(
-                      name: lines[i].name,
-                      state: lines[i].state,
-                      quantity: lines[i].quantity,
-                      note: lines[i].note,
+                    _ShoppingChecklistRow(
+                      line: lines[i],
                       onToggle: canEdit ? () => onToggle(lines[i].key) : null,
                       onLongPress: canEdit
                           ? () => _openItemActions(context, lines[i])
@@ -300,6 +310,50 @@ class _ShoppingListBody extends StatelessWidget {
   }
 }
 
+class _ShoppingChecklistRow extends ConsumerWidget {
+  const _ShoppingChecklistRow({
+    required this.line,
+    required this.onToggle,
+    required this.onLongPress,
+  });
+
+  final _ShopLine line;
+  final VoidCallback? onToggle;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ingredient = line.ingredientId == null
+        ? null
+        : ref
+              .watch(shoppingIngredientProvider(line.ingredientId!))
+              .maybeWhen(data: (value) => value, orElse: () => null);
+    final substitutionIngredient = line.substitution == null
+        ? null
+        : ref
+              .watch(
+                shoppingIngredientProvider(line.substitution!.ingredientId),
+              )
+              .maybeWhen(data: (value) => value, orElse: () => null);
+    return KsChecklistRow(
+      name: line.name,
+      state: line.state,
+      quantity: _quantityLabel(
+        line.quantityValue,
+        line.unit,
+        ingredient?.localUnitDefinitions ?? const <UnitDefinition>[],
+      ),
+      note: _noteLabel(
+        line,
+        substitutionIngredient?.localUnitDefinitions ??
+            const <UnitDefinition>[],
+      ),
+      onToggle: onToggle,
+      onLongPress: onLongPress,
+    );
+  }
+}
+
 /// Immutable shopping-line view model for the persisted checklist state.
 @immutable
 class _ShopLine {
@@ -307,11 +361,11 @@ class _ShopLine {
     required this.name,
     required this.state,
     this.key = '',
-    this.quantity,
-    this.note,
     this.ingredientId,
     this.quantityValue,
     this.unit,
+    this.isSubstituted = false,
+    this.substitution,
   });
 
   factory _ShopLine.fromRecord(
@@ -323,27 +377,55 @@ class _ShopLine {
       key: item.id,
       name: _ingredientLabel(item.ingredientId),
       state: state,
-      quantity: _quantityLabel(item.quantityNeeded, item.unit),
-      note: item.status == ShoppingListItemStatus.substituted
-          ? _substitutionNote(item)
+      ingredientId: item.ingredientId,
+      quantityValue: item.quantityNeeded,
+      unit: item.unit,
+      isSubstituted: item.status == ShoppingListItemStatus.substituted,
+      substitution: item.status == ShoppingListItemStatus.substituted
+          ? _SubstitutionLine.fromRecord(item)
           : null,
-      ingredientId: item.substituteIngredientId ?? item.ingredientId,
-      quantityValue: item.substituteQuantity ?? item.quantityNeeded,
-      unit: item.substituteUnit ?? item.unit,
     );
   }
 
   final String key;
   final String name;
   final ChecklistItemState state;
-  final String? quantity;
-  final String? note;
   final String? ingredientId;
   final double? quantityValue;
-  final Unit? unit;
+  final UnitId? unit;
+  final bool isSubstituted;
+  final _SubstitutionLine? substitution;
+}
+
+@immutable
+class _SubstitutionLine {
+  const _SubstitutionLine({
+    required this.ingredientId,
+    required this.quantity,
+    required this.unit,
+  });
+
+  static _SubstitutionLine? fromRecord(ShoppingListItemRecord item) {
+    final ingredient = item.substituteIngredientId;
+    final quantity = item.substituteQuantity;
+    final unit = item.substituteUnit;
+    if (ingredient == null || quantity == null || unit == null) return null;
+    return _SubstitutionLine(
+      ingredientId: ingredient,
+      quantity: quantity,
+      unit: unit,
+    );
+  }
+
+  final String ingredientId;
+  final double quantity;
+  final UnitId unit;
 }
 
 enum _ShoppingItemAction { bought, toBuy, substitute, unavailable, skipped }
+
+const _invalidSubstitutionInputMessage =
+    'Substitution needs an ingredient and positive quantity.';
 
 class _ShoppingItemActionSheet extends StatelessWidget {
   const _ShoppingItemActionSheet({required this.line});
@@ -352,6 +434,7 @@ class _ShoppingItemActionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final quantity = _quantityLabel(line.quantityValue, line.unit);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
@@ -365,7 +448,7 @@ class _ShoppingItemActionSheet extends StatelessWidget {
           children: [
             ListTile(
               title: Text(line.name),
-              subtitle: line.quantity == null ? null : Text(line.quantity!),
+              subtitle: quantity == null ? null : Text(quantity),
             ),
             const _ActionTile(
               icon: Icons.check_rounded,
@@ -429,19 +512,19 @@ class _SubstitutionDraft {
 
   final String ingredientId;
   final double quantity;
-  final Unit unit;
+  final UnitId unit;
 }
 
-class _SubstitutionSheet extends StatefulWidget {
+class _SubstitutionSheet extends ConsumerStatefulWidget {
   const _SubstitutionSheet({required this.item});
 
   final ShoppingListItemRecord item;
 
   @override
-  State<_SubstitutionSheet> createState() => _SubstitutionSheetState();
+  ConsumerState<_SubstitutionSheet> createState() => _SubstitutionSheetState();
 }
 
-class _SubstitutionSheetState extends State<_SubstitutionSheet> {
+class _SubstitutionSheetState extends ConsumerState<_SubstitutionSheet> {
   late final TextEditingController _ingredientController =
       TextEditingController(
         text: widget.item.substituteIngredientId ?? widget.item.ingredientId,
@@ -450,13 +533,72 @@ class _SubstitutionSheetState extends State<_SubstitutionSheet> {
     text: (widget.item.substituteQuantity ?? widget.item.quantityNeeded)
         .toString(),
   );
-  late Unit _unit = widget.item.substituteUnit ?? widget.item.unit;
+  late UnitId _unit = widget.item.substituteUnit ?? widget.item.unit;
+  Ingredient? _selectedIngredient;
+  String? _selectedIngredientId;
+  String? _unitError;
+  String? _inputError;
+
+  @override
+  void initState() {
+    super.initState();
+    _ingredientController.addListener(_handleIngredientChanged);
+    _loadSelectedIngredient();
+  }
 
   @override
   void dispose() {
-    _ingredientController.dispose();
+    _ingredientController
+      ..removeListener(_handleIngredientChanged)
+      ..dispose();
     _quantityController.dispose();
     super.dispose();
+  }
+
+  void _handleIngredientChanged() {
+    final ingredientId = _ingredientController.text.trim();
+    if (ingredientId == _selectedIngredientId) {
+      return;
+    }
+    _selectedIngredientId = ingredientId;
+    _loadSelectedIngredient();
+  }
+
+  Future<void> _loadSelectedIngredient() async {
+    final ingredientId = _ingredientController.text.trim();
+    if (ingredientId.isEmpty) {
+      setState(() {
+        _selectedIngredient = null;
+        _unitError = null;
+      });
+      return;
+    }
+    final householdId = ref.read(activeHouseholdIdProvider);
+    final ingredient = await ref
+        .read(ingredientRepositoryProvider)
+        .getById(ingredientId, householdId: householdId);
+    if (!mounted || ingredientId != _ingredientController.text.trim()) {
+      return;
+    }
+    setState(() {
+      _selectedIngredient = ingredient;
+      if (ingredient == null) {
+        _unitError = 'Choose a known substitute ingredient before saving.';
+        _unit = widget.item.unit;
+        return;
+      }
+      _unitError = null;
+      if (!_isAllowedUnit(_unit, ingredient)) {
+        _unit = ingredient.defaultUnit;
+      }
+    });
+  }
+
+  bool _isAllowedUnit(UnitId unit, Ingredient ingredient) {
+    return ingredient.allowedUnits.contains(unit) ||
+        ingredient.localUnitDefinitions.any(
+          (definition) => definition.id == unit,
+        );
   }
 
   @override
@@ -499,18 +641,46 @@ class _SubstitutionSheetState extends State<_SubstitutionSheet> {
                   ),
                 ),
                 const SizedBox(width: KsTokens.space12),
-                DropdownButton<Unit>(
+                DropdownButton<UnitId>(
+                  key: const ValueKey('substitution-unit-dropdown'),
                   value: _unit,
                   items: [
-                    for (final unit in Unit.values)
-                      DropdownMenuItem(value: unit, child: Text(unit.name)),
+                    for (final unit in _substitutionUnitOptions(
+                      itemUnit: widget.item.unit,
+                      selectedUnit: _unit,
+                      ingredient: _selectedIngredient,
+                    ))
+                      DropdownMenuItem(value: unit.id, child: Text(unit.label)),
                   ],
                   onChanged: (unit) {
-                    if (unit != null) setState(() => _unit = unit);
+                    if (unit != null) {
+                      setState(() {
+                        _unit = unit;
+                        _unitError = null;
+                      });
+                    }
                   },
                 ),
               ],
             ),
+            if (_unitError != null) ...[
+              const SizedBox(height: KsTokens.space8),
+              Text(
+                _unitError!,
+                style: KsTokens.bodySmall.copyWith(
+                  color: context.ksColors.danger,
+                ),
+              ),
+            ],
+            if (_inputError != null) ...[
+              const SizedBox(height: KsTokens.space8),
+              Text(
+                _inputError!,
+                style: KsTokens.bodySmall.copyWith(
+                  color: context.ksColors.danger,
+                ),
+              ),
+            ],
             const SizedBox(height: KsTokens.space16),
             FilledButton(
               onPressed: () {
@@ -518,7 +688,19 @@ class _SubstitutionSheetState extends State<_SubstitutionSheet> {
                 final quantity = double.tryParse(
                   _quantityController.text.trim(),
                 );
-                if (ingredientId.isEmpty || quantity == null || quantity <= 0) {
+                final hasValidQuantity = quantity != null && quantity > 0;
+                if (ingredientId.isEmpty || !hasValidQuantity) {
+                  setState(
+                    () => _inputError = _invalidSubstitutionInputMessage,
+                  );
+                  return;
+                }
+                final ingredient = _selectedIngredient;
+                if (ingredient == null || !_isAllowedUnit(_unit, ingredient)) {
+                  setState(
+                    () => _unitError =
+                        'Choose a known substitute ingredient unit.',
+                  );
                   return;
                 }
                 Navigator.of(context).pop(
@@ -538,6 +720,57 @@ class _SubstitutionSheetState extends State<_SubstitutionSheet> {
   }
 }
 
+List<UnitDefinition> _substitutionUnitOptions({
+  required UnitId itemUnit,
+  required UnitId selectedUnit,
+  required Ingredient? ingredient,
+}) {
+  final localDefinitions = ingredient?.localUnitDefinitions ?? const [];
+  final allowedUnits = ingredient?.allowedUnits ?? const <UnitId>[];
+  final localById = <UnitId, UnitDefinition>{
+    for (final unit in localDefinitions) unit.id: unit,
+  };
+  final byId =
+      <UnitId, UnitDefinition>{
+          for (final unit in UnitRegistry.builtIns) unit.id: unit,
+          for (final unit in allowedUnits)
+            unit:
+                localById[unit] ??
+                UnitRegistry.find(unit) ??
+                UnitDefinition(
+                  id: unit,
+                  label: unit.value,
+                  pluralLabel: unit.value,
+                  dimension: UnitDimension.informal,
+                  family: UnitSystemFamily.local,
+                ),
+        }
+        ..putIfAbsent(
+          selectedUnit,
+          () => _fallbackUnitDefinition(selectedUnit, localById),
+        )
+        ..putIfAbsent(
+          itemUnit,
+          () => _fallbackUnitDefinition(itemUnit, localById),
+        );
+  return List<UnitDefinition>.unmodifiable(byId.values);
+}
+
+UnitDefinition _fallbackUnitDefinition(
+  UnitId unit,
+  Map<UnitId, UnitDefinition> localById,
+) {
+  return localById[unit] ??
+      UnitRegistry.find(unit) ??
+      UnitDefinition(
+        id: unit,
+        label: unit.value,
+        pluralLabel: unit.value,
+        dimension: UnitDimension.informal,
+        family: UnitSystemFamily.local,
+      );
+}
+
 ChecklistItemState _stateFromRecord(ShoppingListItemStatus status) {
   return switch (status) {
     ShoppingListItemStatus.bought => ChecklistItemState.bought,
@@ -547,14 +780,26 @@ ChecklistItemState _stateFromRecord(ShoppingListItemStatus status) {
   };
 }
 
-String _substitutionNote(ShoppingListItemRecord item) {
-  final ingredient = item.substituteIngredientId;
-  final quantity = item.substituteQuantity;
-  final unit = item.substituteUnit;
-  if (ingredient == null || quantity == null || unit == null) {
-    return 'substituted';
-  }
-  return '${_ingredientLabel(ingredient)} · ${_quantityLabel(quantity, unit)}';
+String _substitutionNote(
+  _SubstitutionLine substitution,
+  List<UnitDefinition> localUnitDefinitions,
+) {
+  final quantity = _quantityLabel(
+    substitution.quantity,
+    substitution.unit,
+    localUnitDefinitions,
+  );
+  return '${_ingredientLabel(substitution.ingredientId)} · '
+      '$quantity';
+}
+
+String? _noteLabel(
+  _ShopLine line,
+  List<UnitDefinition> substitutionLocalUnitDefinitions,
+) {
+  final substitution = line.substitution;
+  if (substitution == null) return line.isSubstituted ? 'substituted' : null;
+  return _substitutionNote(substitution, substitutionLocalUnitDefinitions);
 }
 
 class _ProgressBar extends StatelessWidget {
@@ -616,15 +861,34 @@ String _ingredientLabel(String ingredientId) {
   };
 }
 
-String _quantityLabel(double quantity, Unit unit) {
+String? _quantityLabel(
+  double? quantity,
+  UnitId? unit, [
+  List<UnitDefinition> localUnitDefinitions = const [],
+]) {
+  if (quantity == null || unit == null) return null;
   final amount = quantity == quantity.roundToDouble()
       ? quantity.toInt().toString()
       : quantity.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
-  final unitLabel = switch (unit) {
-    Unit.piece => quantity == 1 ? 'piece' : 'pieces',
-    _ => unit.name,
-  };
+  final definition =
+      UnitRegistry.find(unit) ??
+      _localUnitDefinition(unit, localUnitDefinitions);
+  final unitLabel = definition == null
+      ? unit.value
+      : quantity == 1
+      ? definition.label
+      : definition.pluralLabel;
   return '$amount $unitLabel';
+}
+
+UnitDefinition? _localUnitDefinition(
+  UnitId unit,
+  List<UnitDefinition> localUnitDefinitions,
+) {
+  for (final definition in localUnitDefinitions) {
+    if (definition.id == unit) return definition;
+  }
+  return null;
 }
 
 /// The "you paid down the future" ledger — ticking an item early strikes it

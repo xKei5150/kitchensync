@@ -1,3 +1,4 @@
+// SIZE_OK: add pantry item tests cover existing validation/unit branches.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/core/errors/failure.dart';
 import 'package:kitchensync/core/utils/clock.dart';
@@ -18,14 +19,14 @@ class _MockIngredients extends Mock implements IngredientRepository {}
 
 class _FakePantryItem extends Fake implements PantryItem {}
 
-Ingredient _ing({bool isNonFood = false, List<Unit>? allowed}) {
-  final units = allowed ?? [Unit.piece, Unit.g];
+Ingredient _ing({bool isNonFood = false, List<UnitId>? allowed}) {
+  final units = allowed ?? [UnitId.piece, UnitId.g];
   return Ingredient(
     id: 'onion',
     name: 'onion',
     displayNames: const {'en': 'Onion'},
     category: IngredientCategory.produce,
-    defaultUnit: Unit.piece,
+    defaultUnit: UnitId.piece,
     allowedUnits: units,
     isNonFood: isNonFood,
     scope: IngredientScope.global,
@@ -34,13 +35,17 @@ Ingredient _ing({bool isNonFood = false, List<Unit>? allowed}) {
   );
 }
 
-PantryItem _item({double qty = 3}) => PantryItem(
+PantryItem _item({
+  double qty = 3,
+  UnitId unit = UnitId.piece,
+  PantrySection section = PantrySection.food,
+}) => PantryItem(
   id: 'p1',
   householdId: 'h1',
   ingredientId: 'onion',
   quantity: qty,
-  unit: Unit.piece,
-  section: PantrySection.food,
+  unit: unit,
+  section: section,
   createdAt: DateTime.utc(2026),
   updatedAt: DateTime.utc(2026),
 );
@@ -48,6 +53,8 @@ PantryItem _item({double qty = 3}) => PantryItem(
 void main() {
   setUpAll(() {
     registerFallbackValue(_FakePantryItem());
+    registerFallbackValue(UnitId.piece);
+    registerFallbackValue(PantrySection.food);
   });
 
   late _MockPantry pantry;
@@ -57,9 +64,19 @@ void main() {
   setUp(() {
     pantry = _MockPantry();
     ingredients = _MockIngredients();
-    when(() => ingredients.getById('onion')).thenAnswer((_) async => _ing());
+    when(
+      () => ingredients.getById('onion', householdId: 'h1'),
+    ).thenAnswer((_) async => _ing());
     when(
       () => pantry.findByIngredient('h1', 'onion'),
+    ).thenAnswer((_) async => null);
+    when(
+      () => pantry.findByIngredientUnit(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        unit: any(named: 'unit'),
+        section: any(named: 'section'),
+      ),
     ).thenAnswer((_) async => null);
     when(() => pantry.add(any())).thenAnswer((_) async {});
     when(
@@ -80,7 +97,7 @@ void main() {
         householdId: 'h1',
         ingredientId: 'onion',
         quantity: 2,
-        unit: Unit.piece,
+        unit: UnitId.piece,
         section: PantrySection.food,
       ),
     );
@@ -97,7 +114,7 @@ void main() {
         householdId: 'h1',
         ingredientId: 'onion',
         quantity: 0,
-        unit: Unit.piece,
+        unit: UnitId.piece,
         section: PantrySection.food,
       ),
     );
@@ -113,10 +130,51 @@ void main() {
         householdId: 'h1',
         ingredientId: 'onion',
         quantity: 1,
-        unit: Unit.ml,
+        unit: UnitId.ml,
         section: PantrySection.food,
       ),
     );
+    expect(result, isA<ResultFailure<PantryItem>>());
+    final f = (result as ResultFailure<PantryItem>).failure;
+    expect(f, isA<ValidationFailure>());
+    expect((f as ValidationFailure).field, 'unit');
+  });
+
+  test('local unit in allowedUnits creates a new PantryItem', () async {
+    final tin = UnitId('tin');
+    when(
+      () => ingredients.getById('onion', householdId: 'h1'),
+    ).thenAnswer((_) async => _ing(allowed: [tin]));
+
+    final result = await makeUc().call(
+      AddPantryItemParams(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        quantity: 1,
+        unit: tin,
+        section: PantrySection.food,
+      ),
+    );
+
+    expect(result, isA<Success<PantryItem>>());
+    final item = (result as Success<PantryItem>).value;
+    expect(item.unit, tin);
+    verify(() => pantry.add(any())).called(1);
+  });
+
+  test('local unit not in allowedUnits returns ValidationFailure', () async {
+    final tin = UnitId('tin');
+
+    final result = await makeUc().call(
+      AddPantryItemParams(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        quantity: 1,
+        unit: tin,
+        section: PantrySection.food,
+      ),
+    );
+
     expect(result, isA<ResultFailure<PantryItem>>());
     final f = (result as ResultFailure<PantryItem>).failure;
     expect(f, isA<ValidationFailure>());
@@ -127,14 +185,14 @@ void main() {
     'non-food ingredient with food section returns ValidationFailure',
     () async {
       when(
-        () => ingredients.getById('onion'),
+        () => ingredients.getById('onion', householdId: 'h1'),
       ).thenAnswer((_) async => _ing(isNonFood: true));
       final result = await makeUc().call(
         const AddPantryItemParams(
           householdId: 'h1',
           ingredientId: 'onion',
           quantity: 1,
-          unit: Unit.piece,
+          unit: UnitId.piece,
           section: PantrySection.food,
         ),
       );
@@ -149,7 +207,12 @@ void main() {
     'existing same-unit+section item merges via setQuantity, no add called',
     () async {
       when(
-        () => pantry.findByIngredient('h1', 'onion'),
+        () => pantry.findByIngredientUnit(
+          householdId: 'h1',
+          ingredientId: 'onion',
+          unit: UnitId.piece,
+          section: PantrySection.food,
+        ),
       ).thenAnswer((_) async => _item());
 
       final result =
@@ -163,7 +226,7 @@ void main() {
               householdId: 'h1',
               ingredientId: 'onion',
               quantity: 2,
-              unit: Unit.piece,
+              unit: UnitId.piece,
               section: PantrySection.food,
             ),
           );
@@ -172,4 +235,65 @@ void main() {
       verifyNever(() => pantry.add(any()));
     },
   );
+
+  test('existing same local-unit item merges via setQuantity', () async {
+    final tin = UnitId('tin');
+    when(
+      () => ingredients.getById('onion', householdId: 'h1'),
+    ).thenAnswer((_) async => _ing(allowed: [tin]));
+    when(
+      () => pantry.findByIngredientUnit(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        unit: tin,
+        section: PantrySection.food,
+      ),
+    ).thenAnswer((_) async => _item(unit: tin));
+
+    final result = await makeUc().call(
+      AddPantryItemParams(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        quantity: 2,
+        unit: tin,
+        section: PantrySection.food,
+      ),
+    );
+
+    expect(result, isA<Success<PantryItem>>());
+    verify(() => pantry.setQuantity('h1', 'p1', 5)).called(1);
+    verifyNever(() => pantry.add(any()));
+  });
+
+  test('different informal unit does not merge', () async {
+    final tin = UnitId('tin');
+    when(
+      () => ingredients.getById('onion', householdId: 'h1'),
+    ).thenAnswer((_) async => _ing(allowed: [UnitId.piece, tin]));
+    when(
+      () => pantry.findByIngredientUnit(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        unit: tin,
+        section: PantrySection.food,
+      ),
+    ).thenAnswer((_) async => null);
+    when(
+      () => pantry.findByIngredient('h1', 'onion'),
+    ).thenAnswer((_) async => _item());
+
+    final result = await makeUc().call(
+      AddPantryItemParams(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        quantity: 2,
+        unit: tin,
+        section: PantrySection.food,
+      ),
+    );
+
+    expect(result, isA<Success<PantryItem>>());
+    verifyNever(() => pantry.setQuantity(any(), any(), any()));
+    verify(() => pantry.add(any())).called(1);
+  });
 }

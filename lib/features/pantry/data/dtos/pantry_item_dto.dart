@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 
@@ -10,7 +11,7 @@ class PantryItemMapper {
     'householdId': p.householdId,
     'ingredientId': p.ingredientId,
     'quantity': p.quantity,
-    'unit': p.unit.name,
+    'unit': p.unit.value,
     'section': p.section.name,
     'imageUrl': p.imageUrl,
     'note': p.note,
@@ -33,7 +34,7 @@ class PantryItemMapper {
     householdId: m['householdId'] as String,
     ingredientId: m['ingredientId'] as String,
     quantity: (m['quantity'] as num).toDouble(),
-    unit: _enumFromName(Unit.values, m['unit'] as String),
+    unit: UnitId(m['unit'] as String),
     section: _enumFromName(PantrySection.values, m['section'] as String),
     imageUrl: m['imageUrl'] as String?,
     note: m['note'] as String?,

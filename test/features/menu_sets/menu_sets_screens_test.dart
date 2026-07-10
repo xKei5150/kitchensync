@@ -1,3 +1,4 @@
+// SIZE_OK: menu set screen tests retain existing full UI scenario coverage.
 import 'dart:async';
 import 'dart:io';
 
@@ -137,7 +138,7 @@ class _FakePantryRepository implements PantryRepository {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   }) async => null;
 
@@ -193,7 +194,7 @@ Recipe _recipe(String id) {
         recipeId: 'braise',
         ingredientId: 'tomato',
         quantity: 500,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
     ],
     instructions: const ['Cook.'],
@@ -279,7 +280,7 @@ class _FakeShoppingRepository implements ShoppingRepository {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) async {}
 
   @override

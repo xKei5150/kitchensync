@@ -1,7 +1,9 @@
+// SIZE_OK: insights screen tests cover existing dashboard state variations.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'dart:io';
 
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
@@ -10,7 +12,6 @@ import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
-import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
@@ -38,7 +39,7 @@ PantryItem _item({
     householdId: 'h1',
     ingredientId: 'ing-$id',
     quantity: 1,
-    unit: Unit.piece,
+    unit: UnitId.piece,
     section: section,
     expiryDate: expiry,
     createdAt: now,
@@ -101,7 +102,7 @@ class _FakeShoppingRepository implements ShoppingRepository {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) async {}
 
   @override
@@ -211,7 +212,7 @@ class _FakePantryRepository implements PantryRepository {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   }) async => null;
 }
@@ -387,7 +388,7 @@ void main() {
       householdId: 'solo-household',
       ingredientId: 'rice',
       quantity: 0,
-      unit: Unit.g,
+      unit: UnitId.g,
       section: PantrySection.bulk,
       lastPurchaseDate: DateTime(2026, 6),
       createdAt: DateTime(2026, 7, 5),
@@ -399,7 +400,7 @@ void main() {
         householdId: 'solo-household',
         ingredientId: 'rice',
         quantity: 2000,
-        unit: Unit.g,
+        unit: UnitId.g,
         purchaseDate: DateTime(2026, 6),
         isBulk: true,
       ),
@@ -408,7 +409,7 @@ void main() {
         householdId: 'solo-household',
         ingredientId: 'rice',
         quantity: 3000,
-        unit: Unit.g,
+        unit: UnitId.g,
         purchaseDate: DateTime(2026, 7),
         isBulk: true,
       ),

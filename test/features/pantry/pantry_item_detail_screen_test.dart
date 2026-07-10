@@ -1,3 +1,4 @@
+// SIZE_OK: pantry detail tests cover existing item lifecycle UI branches.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -124,6 +125,9 @@ Ingredient _ingredient(
   String id,
   String name, {
   List<String> substituteIngredientIds = const [],
+  UnitId defaultUnit = UnitId.g,
+  List<UnitId> allowedUnits = const [UnitId.g],
+  List<UnitDefinition> localUnitDefinitions = const [],
 }) {
   final now = DateTime(2026, 7, 5);
   return Ingredient(
@@ -131,8 +135,9 @@ Ingredient _ingredient(
     name: name.toLowerCase(),
     displayNames: {'en': name},
     category: IngredientCategory.grain,
-    defaultUnit: Unit.g,
-    allowedUnits: const [Unit.g],
+    defaultUnit: defaultUnit,
+    allowedUnits: allowedUnits,
+    localUnitDefinitions: localUnitDefinitions,
     defaultShelfLifeDays: 365,
     allergens: const [Allergen.gluten],
     substituteIngredientIds: substituteIngredientIds,
@@ -149,11 +154,25 @@ PantryItem _pantryItem() {
     householdId: 'solo-household',
     ingredientId: 'rice',
     quantity: 2,
-    unit: Unit.kg,
+    unit: UnitId.kg,
     section: PantrySection.food,
     note: 'Keep dry.',
     lastPurchaseDate: DateTime(2026, 7),
     expiryDate: DateTime(2026, 7, 20),
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
+PantryItem _localUnitPantryItem() {
+  final now = DateTime(2026, 7, 5);
+  return PantryItem(
+    id: 'pepper-item',
+    householdId: 'solo-household',
+    ingredientId: 'pepper',
+    quantity: 3,
+    unit: UnitId('bundle'),
+    section: PantrySection.food,
     createdAt: now,
     updatedAt: now,
   );
@@ -181,7 +200,7 @@ Recipe _recipe() {
         recipeId: 'garlic-rice',
         ingredientId: 'rice',
         quantity: 300,
-        unit: Unit.g,
+        unit: UnitId.g,
         description: 'Rice',
       ),
     ],
@@ -225,7 +244,7 @@ Future<void> _pumpDetail(
           item.id,
         ).overrideWith((ref) => Stream.value(item)),
         pantryIngredientProvider(
-          'rice',
+          item.ingredientId,
         ).overrideWith((ref) async => Result.success(rice)),
         pantryIngredientProvider(
           'cauliflower-rice',
@@ -243,6 +262,50 @@ Future<void> _pumpDetail(
 }
 
 void main() {
+  testWidgets('PantryItemDetailScreen renders local unit plural label', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final bundle = UnitDefinition(
+      id: UnitId('bundle'),
+      label: 'Bundle',
+      pluralLabel: 'Bundles',
+      dimension: UnitDimension.informal,
+      family: UnitSystemFamily.local,
+    );
+    final pepper = _ingredient(
+      'pepper',
+      'Pepper',
+      defaultUnit: bundle.id,
+      allowedUnits: [bundle.id],
+      localUnitDefinitions: [bundle],
+    );
+
+    await _pumpDetail(
+      tester,
+      item: _localUnitPantryItem(),
+      rice: pepper,
+      cauliflower: _ingredient('cauliflower-rice', 'Cauliflower Rice'),
+      recipe: _recipe(),
+      meal: MealScheduleEntry(
+        id: 'meal-1',
+        recipeId: 'garlic-rice',
+        date: DateTime(2026, 7, 4),
+        mealLabel: 'Breakfast',
+        servingSize: 4,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Current quantity'), findsOneWidget);
+    expect(find.text('3 Bundles'), findsOneWidget);
+    expect(find.text('3 bundle'), findsNothing);
+  });
+
   testWidgets('PantryItemDetailScreen shows recipe usage context', (
     tester,
   ) async {
@@ -269,10 +332,10 @@ void main() {
       ingredientOverrides: const [
         MealIngredientOverride(
           originalIngredientId: 'rice',
-          originalUnit: Unit.g,
+          originalUnit: UnitId.g,
           substituteIngredientId: 'cauliflower-rice',
           substituteQuantity: 250,
-          substituteUnit: Unit.g,
+          substituteUnit: UnitId.g,
         ),
       ],
     );

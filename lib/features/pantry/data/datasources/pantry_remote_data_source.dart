@@ -48,13 +48,13 @@ class PantryRemoteDataSource {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   }) async {
     final snap = await _refs
         .pantryItems(householdId)
         .where('ingredientId', isEqualTo: ingredientId)
-        .where('unit', isEqualTo: unit.name)
+        .where('unit', isEqualTo: unit.value)
         .where('section', isEqualTo: section.name)
         .limit(1)
         .get();

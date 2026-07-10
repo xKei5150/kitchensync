@@ -23,10 +23,10 @@ void main() {
     ingredientOverrides: const [
       MealIngredientOverride(
         originalIngredientId: 'tomato',
-        originalUnit: Unit.g,
+        originalUnit: UnitId.g,
         substituteIngredientId: 'pepper',
         substituteQuantity: 300,
-        substituteUnit: Unit.g,
+        substituteUnit: UnitId.g,
       ),
     ],
   );

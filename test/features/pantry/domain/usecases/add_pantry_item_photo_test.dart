@@ -21,7 +21,7 @@ PantryItem _item() => PantryItem(
   householdId: 'h1',
   ingredientId: 'onion',
   quantity: 2,
-  unit: Unit.piece,
+  unit: UnitId.piece,
   section: PantrySection.food,
   createdAt: DateTime.utc(2026),
   updatedAt: DateTime.utc(2026),

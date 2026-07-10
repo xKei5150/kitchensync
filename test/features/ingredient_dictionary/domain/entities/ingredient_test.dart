@@ -5,13 +5,21 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingre
 
 void main() {
   test('Ingredient round-trips through JSON with curation metadata', () {
+    final localUnit = UnitDefinition(
+      id: UnitId('rice-bowl'),
+      label: 'Rice bowl',
+      pluralLabel: 'Rice bowls',
+      dimension: UnitDimension.informal,
+      family: UnitSystemFamily.local,
+    );
     final ing = Ingredient(
       id: '1',
       name: 'onion',
       displayNames: const {'en': 'Onion'},
       category: IngredientCategory.produce,
-      defaultUnit: Unit.piece,
-      allowedUnits: const [Unit.piece, Unit.g, Unit.kg],
+      defaultUnit: UnitId.tin,
+      allowedUnits: [UnitId.piece, UnitId.tin, localUnit.id],
+      localUnitDefinitions: [localUnit],
       taxonomyTags: const ['allium'],
       formTags: const ['fresh'],
       curation: const IngredientCuration(
@@ -28,6 +36,9 @@ void main() {
     final round = Ingredient.fromJson(ing.toJson());
 
     expect(round, ing);
+    expect(round.defaultUnit, UnitId.tin);
+    expect(round.allowedUnits, [UnitId.piece, UnitId.tin, localUnit.id]);
+    expect(round.localUnitDefinitions, [localUnit]);
     expect(round.taxonomyTags, ['allium']);
     expect(round.formTags, ['fresh']);
     expect(round.curation?.status, 'accepted');

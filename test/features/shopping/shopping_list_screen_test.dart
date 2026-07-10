@@ -1,3 +1,4 @@
+// SIZE_OK: shopping list tests cover existing broad list UI workflows.
 import 'dart:async';
 import 'dart:io';
 
@@ -12,6 +13,9 @@ import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
@@ -39,7 +43,7 @@ class _FakeShoppingRepository implements ShoppingRepository {
   ShoppingListItemStatus? updatedStatus;
   String? updatedSubstituteIngredientId;
   double? updatedSubstituteQuantity;
-  Unit? updatedSubstituteUnit;
+  UnitId? updatedSubstituteUnit;
   ShoppingListStatus? completedStatus;
   ShoppingListRecord? adjustedShopNowList;
 
@@ -81,7 +85,7 @@ class _FakeShoppingRepository implements ShoppingRepository {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) async {
     updatedHouseholdId = householdId;
     updatedListId = listId;
@@ -292,7 +296,7 @@ class _FakePantryRepository implements PantryRepository {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   }) async => _find(
     (item) =>
@@ -393,6 +397,105 @@ class _FakeCalendarRepository implements CalendarRepository {
   Future<void> upsertDaySettings(CalendarDaySettings settings) async {}
 }
 
+class _FakeIngredientRepository implements IngredientRepository {
+  _FakeIngredientRepository(this.ingredients);
+
+  final List<Ingredient> ingredients;
+
+  @override
+  Stream<List<Ingredient>> watchByIds(List<String> ids) => Stream.value(
+    ingredients
+        .where((ingredient) => ids.contains(ingredient.id))
+        .toList(growable: false),
+  );
+
+  @override
+  Future<Ingredient?> getById(String id, {String? householdId}) async {
+    for (final ingredient in ingredients) {
+      if (ingredient.id == id) {
+        return ingredient;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<Ingredient>> search({
+    required String query,
+    String? householdId,
+    int limit = 30,
+    String? startAfterId,
+  }) async => ingredients
+      .where((ingredient) => ingredient.name.contains(query))
+      .take(limit)
+      .toList(growable: false);
+
+  @override
+  Future<List<Ingredient>> listVariantsOf(String parentId) async => const [];
+
+  @override
+  Future<void> createCustom(Ingredient ingredient) async {}
+
+  @override
+  Future<void> updateCustom(Ingredient ingredient) async {}
+
+  @override
+  Future<int> upsertSeed(List<Ingredient> seed) async => seed.length;
+
+  @override
+  Stream<List<Ingredient>> watchByBarcode(String barcode) =>
+      Stream.value(const []);
+}
+
+Ingredient _ingredientWithLocalUnit() {
+  final now = DateTime(2026, 7, 5, 12);
+  return Ingredient(
+    id: 'pepper',
+    name: 'pepper',
+    displayNames: const {'en': 'Pepper'},
+    category: IngredientCategory.produce,
+    defaultUnit: UnitId('bundle'),
+    allowedUnits: [UnitId('bundle'), UnitId.g],
+    localUnitDefinitions: [
+      UnitDefinition(
+        id: UnitId('bundle'),
+        label: 'Bundle',
+        pluralLabel: 'Bundles',
+        dimension: UnitDimension.informal,
+        family: UnitSystemFamily.local,
+      ),
+    ],
+    scope: IngredientScope.householdCustom,
+    householdId: 'solo-household',
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
+Ingredient _basicIngredient(String id, UnitId unit) {
+  final now = DateTime(2026, 7, 5, 12);
+  return Ingredient(
+    id: id,
+    name: id,
+    displayNames: {'en': _displayNameForId(id)},
+    category: IngredientCategory.produce,
+    defaultUnit: unit,
+    allowedUnits: [unit],
+    scope: IngredientScope.householdCustom,
+    householdId: 'solo-household',
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
+String _displayNameForId(String id) => id
+    .split(RegExp('[-_]'))
+    .map(
+      (word) =>
+          word.isEmpty ? word : '${word[0].toUpperCase()}${word.substring(1)}',
+    )
+    .join(' ');
+
 ShoppingListRecord _record() {
   final now = DateTime(2026, 7, 5, 12);
   return ShoppingListRecord(
@@ -411,7 +514,7 @@ ShoppingListRecord _record() {
         shoppingListId: 'persisted-shop',
         ingredientId: 'beans',
         quantityNeeded: 2,
-        unit: Unit.piece,
+        unit: UnitId.piece,
         status: ShoppingListItemStatus.unchecked,
         sourceMealLinks: [],
       ),
@@ -420,7 +523,7 @@ ShoppingListRecord _record() {
         shoppingListId: 'persisted-shop',
         ingredientId: 'tomato',
         quantityNeeded: 500,
-        unit: Unit.g,
+        unit: UnitId.g,
         status: ShoppingListItemStatus.bought,
         sourceMealLinks: [],
       ),
@@ -446,11 +549,11 @@ ShoppingListRecord _substitutedRecord() {
         shoppingListId: 'sub-shop',
         ingredientId: 'tomato',
         quantityNeeded: 500,
-        unit: Unit.g,
+        unit: UnitId.g,
         status: ShoppingListItemStatus.substituted,
         substituteIngredientId: 'pepper',
         substituteQuantity: 300,
-        substituteUnit: Unit.g,
+        substituteUnit: UnitId.g,
         sourceMealLinks: [
           MealSourceLink(
             mealEntryId: 'meal-1',
@@ -601,6 +704,11 @@ void main() {
         ProviderScope(
           overrides: [
             activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
+            ingredientRepositoryProvider.overrideWithValue(
+              _FakeIngredientRepository([
+                _basicIngredient('pepper', UnitId.piece),
+              ]),
+            ),
             recipeRepositoryProvider.overrideWithValue(_FakeRecipeRepository()),
             shoppingRepositoryProvider.overrideWithValue(repo),
             pantryRepositoryProvider.overrideWithValue(
@@ -638,10 +746,132 @@ void main() {
       expect(repo.updatedStatus, ShoppingListItemStatus.substituted);
       expect(repo.updatedSubstituteIngredientId, 'pepper');
       expect(repo.updatedSubstituteQuantity, 3);
-      expect(repo.updatedSubstituteUnit, Unit.piece);
+      expect(repo.updatedSubstituteUnit, UnitId.piece);
       expect(find.textContaining('Pepper'), findsOneWidget);
     },
   );
+
+  testWidgets('records substitution with local informal unit', (tester) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repo = _FakeShoppingRepository([_record()]);
+    addTearDown(repo.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
+          ingredientRepositoryProvider.overrideWithValue(
+            _FakeIngredientRepository([_ingredientWithLocalUnit()]),
+          ),
+          recipeRepositoryProvider.overrideWithValue(_FakeRecipeRepository()),
+          shoppingRepositoryProvider.overrideWithValue(repo),
+          pantryRepositoryProvider.overrideWithValue(_FakePantryRepository([])),
+          purchaseHistoryRepositoryProvider.overrideWithValue(
+            _FakePurchaseHistoryRepository(),
+          ),
+          wasteRepositoryProvider.overrideWithValue(_FakeWasteRepository()),
+          calendarRepositoryProvider.overrideWithValue(
+            _FakeCalendarRepository([]),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const ShoppingListScreen(listId: 'persisted-shop'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byType(KsChecklistRow).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Record substitution'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Substitute ingredient ID'),
+      'pepper',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('substitution-unit-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bundle').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Quantity'), '3');
+    await tester.tap(find.text('Save substitution'));
+    await tester.pumpAndSettle();
+
+    expect(repo.updatedItemId, 'item-beans');
+    expect(repo.updatedStatus, ShoppingListItemStatus.substituted);
+    expect(repo.updatedSubstituteIngredientId, 'pepper');
+    expect(repo.updatedSubstituteQuantity, 3);
+    expect(repo.updatedSubstituteUnit, UnitId('bundle'));
+    expect(find.textContaining('Pepper'), findsOneWidget);
+    expect(find.textContaining('3 Bundles'), findsOneWidget);
+  });
+
+  testWidgets('requires valid substitution quantity and unit', (tester) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repo = _FakeShoppingRepository([_record()]);
+    addTearDown(repo.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
+          ingredientRepositoryProvider.overrideWithValue(
+            _FakeIngredientRepository([_ingredientWithLocalUnit()]),
+          ),
+          recipeRepositoryProvider.overrideWithValue(_FakeRecipeRepository()),
+          shoppingRepositoryProvider.overrideWithValue(repo),
+          pantryRepositoryProvider.overrideWithValue(_FakePantryRepository([])),
+          purchaseHistoryRepositoryProvider.overrideWithValue(
+            _FakePurchaseHistoryRepository(),
+          ),
+          wasteRepositoryProvider.overrideWithValue(_FakeWasteRepository()),
+          calendarRepositoryProvider.overrideWithValue(
+            _FakeCalendarRepository([]),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const ShoppingListScreen(listId: 'persisted-shop'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byType(KsChecklistRow).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Record substitution'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Substitute ingredient ID'),
+      'pepper',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('substitution-unit-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bundle').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Substitute ingredient ID'),
+      'unknown',
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Quantity'), '0');
+    await tester.tap(find.text('Save substitution'));
+    await tester.pumpAndSettle();
+
+    expect(repo.updatedItemId, isNull);
+    expect(find.text('Record substitution'), findsOneWidget);
+  });
 
   testWidgets('ShoppingListScreen completes persisted lists into pantry', (
     tester,
@@ -658,7 +888,7 @@ void main() {
         householdId: 'solo-household',
         ingredientId: 'tomato',
         quantity: 100,
-        unit: Unit.g,
+        unit: UnitId.g,
         section: PantrySection.food,
         createdAt: DateTime(2026, 7),
         updatedAt: DateTime(2026, 7),

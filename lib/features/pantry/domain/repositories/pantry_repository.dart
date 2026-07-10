@@ -15,7 +15,7 @@ abstract class PantryRepository {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   });
   Future<void> add(PantryItem item);

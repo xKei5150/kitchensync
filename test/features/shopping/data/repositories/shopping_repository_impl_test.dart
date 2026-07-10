@@ -1,3 +1,4 @@
+// SIZE_OK: shopping repository tests cover existing persistence variants.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,7 +32,7 @@ void main() {
         shoppingListId: 'list-1',
         ingredientId: 'tomato',
         quantityNeeded: 500,
-        unit: Unit.g,
+        unit: UnitId.g,
         status: ShoppingListItemStatus.unchecked,
         sourceMealLinks: [
           MealSourceLink(
@@ -66,7 +67,7 @@ void main() {
           shoppingListId: id,
           ingredientId: 'tomato',
           quantityNeeded: quantityNeeded,
-          unit: Unit.g,
+          unit: UnitId.g,
           status: ShoppingListItemStatus.unchecked,
           sourceMealLinks: [
             MealSourceLink(
@@ -131,7 +132,7 @@ void main() {
     },
   );
 
-  test('updateItemStatus stores substitution details', () async {
+  test('updateItemStatus stores arbitrary local substituteUnit', () async {
     await repo.upsertList(list);
 
     await repo.updateItemStatus(
@@ -141,7 +142,7 @@ void main() {
       status: ShoppingListItemStatus.substituted,
       substituteIngredientId: 'cherry-tomato',
       substituteQuantity: 450,
-      substituteUnit: Unit.g,
+      substituteUnit: UnitId('bundle'),
     );
 
     final itemSnap = await db
@@ -156,7 +157,13 @@ void main() {
     expect(itemSnap.data()!['status'], 'substituted');
     expect(itemSnap.data()!['substituteIngredientId'], 'cherry-tomato');
     expect(itemSnap.data()!['substituteQuantity'], 450);
-    expect(itemSnap.data()!['substituteUnit'], 'g');
+    expect(itemSnap.data()!['substituteUnit'], 'bundle');
+
+    final hydrated = await repo
+        .watchList(householdId: householdId, listId: list.id)
+        .first;
+
+    expect(hydrated!.items.single.substituteUnit, UnitId('bundle'));
   });
 
   test('updateListStatus marks a list completed', () async {
@@ -198,7 +205,7 @@ void main() {
             shoppingListId: 'shop-now',
             ingredientId: 'tomato',
             quantityNeeded: 700,
-            unit: Unit.g,
+            unit: UnitId.g,
             status: ShoppingListItemStatus.bought,
             sourceMealLinks: [
               MealSourceLink(

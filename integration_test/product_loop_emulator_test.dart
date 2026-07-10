@@ -1,3 +1,4 @@
+// SIZE_OK: product loop emulator coverage intentionally stays end-to-end.
 import 'dart:convert';
 import 'dart:io';
 
@@ -109,12 +110,12 @@ void main() {
                   RecipeIngredientDraft(
                     name: 'Emulator tomato',
                     quantity: 400,
-                    unit: Unit.g,
+                    unit: UnitId.g,
                   ),
                   RecipeIngredientDraft(
                     name: 'Emulator bean',
                     quantity: 2,
-                    unit: Unit.piece,
+                    unit: UnitId.piece,
                   ),
                 ],
                 instructions: ['Simmer.'],
@@ -125,10 +126,10 @@ void main() {
       },
     );
     final tomatoIngredientId = recipe.ingredients
-        .singleWhere((ingredient) => ingredient.unit == Unit.g)
+        .singleWhere((ingredient) => ingredient.unit == UnitId.g)
         .ingredientId;
     final beanIngredientId = recipe.ingredients
-        .singleWhere((ingredient) => ingredient.unit == Unit.piece)
+        .singleWhere((ingredient) => ingredient.unit == UnitId.piece)
         .ingredientId;
     expect(recipe.ingredients.map((ingredient) => ingredient.ingredientId), [
       tomatoIngredientId,
@@ -156,7 +157,7 @@ void main() {
           householdId: householdId,
           ingredientId: tomatoIngredientId,
           quantity: 100,
-          unit: Unit.g,
+          unit: UnitId.g,
           section: PantrySection.food,
         ),
       ),
@@ -195,7 +196,7 @@ void main() {
         status: ShoppingListItemStatus.substituted,
         substituteIngredientId: 'pepper',
         substituteQuantity: 300,
-        substituteUnit: Unit.g,
+        substituteUnit: UnitId.g,
       );
     });
     final readyList = await withTimeout(
@@ -226,7 +227,7 @@ void main() {
       await pantryRepository.findByIngredientUnit(
         householdId: householdId,
         ingredientId: 'pepper',
-        unit: Unit.g,
+        unit: UnitId.g,
         section: PantrySection.food,
       ),
       isNotNull,

@@ -16,13 +16,13 @@ class _MockIngredients extends Mock implements IngredientRepository {}
 
 class _FakePantryItem extends Fake implements PantryItem {}
 
-Ingredient _ing({bool isNonFood = false}) => Ingredient(
+Ingredient _ing({bool isNonFood = false, List<UnitId>? allowed}) => Ingredient(
   id: 'onion',
   name: 'onion',
   displayNames: const {'en': 'Onion'},
   category: IngredientCategory.produce,
-  defaultUnit: Unit.piece,
-  allowedUnits: const [Unit.piece, Unit.g],
+  defaultUnit: allowed?.first ?? UnitId.piece,
+  allowedUnits: allowed ?? const [UnitId.piece, UnitId.g],
   isNonFood: isNonFood,
   scope: IngredientScope.global,
   createdAt: DateTime.utc(2026),
@@ -31,7 +31,7 @@ Ingredient _ing({bool isNonFood = false}) => Ingredient(
 
 PantryItem _item({
   double qty = 2,
-  Unit unit = Unit.piece,
+  UnitId unit = UnitId.piece,
   PantrySection section = PantrySection.food,
 }) => PantryItem(
   id: 'p1',
@@ -55,7 +55,9 @@ void main() {
   setUp(() {
     pantry = _MockPantry();
     ingredients = _MockIngredients();
-    when(() => ingredients.getById('onion')).thenAnswer((_) async => _ing());
+    when(
+      () => ingredients.getById('onion', householdId: 'h1'),
+    ).thenAnswer((_) async => _ing());
     when(() => pantry.update(any())).thenAnswer((_) async {});
   });
 
@@ -69,12 +71,37 @@ void main() {
   });
 
   test('unit not in allowedUnits returns ValidationFailure', () async {
-    final item = _item(unit: Unit.ml);
+    final item = _item(unit: UnitId.ml);
     final result = await makeUc().call(item);
     expect(result, isA<ResultFailure<PantryItem>>());
     final f = (result as ResultFailure<PantryItem>).failure;
     expect(f, isA<ValidationFailure>());
     expect((f as ValidationFailure).field, 'unit');
+  });
+
+  test('local unit in allowedUnits calls repo.update', () async {
+    final tin = UnitId('tin');
+    when(
+      () => ingredients.getById('onion', householdId: 'h1'),
+    ).thenAnswer((_) async => _ing(allowed: [tin]));
+    final item = _item(unit: tin);
+
+    final result = await makeUc().call(item);
+
+    expect(result, isA<Success<PantryItem>>());
+    verify(() => pantry.update(item)).called(1);
+  });
+
+  test('local unit not in allowedUnits returns ValidationFailure', () async {
+    final item = _item(unit: UnitId('tin'));
+
+    final result = await makeUc().call(item);
+
+    expect(result, isA<ResultFailure<PantryItem>>());
+    final f = (result as ResultFailure<PantryItem>).failure;
+    expect(f, isA<ValidationFailure>());
+    expect((f as ValidationFailure).field, 'unit');
+    verifyNever(() => pantry.update(any()));
   });
 
   test('quantity < 0 returns ValidationFailure', () async {

@@ -23,7 +23,7 @@ class AddPantryItemParams {
   final String householdId;
   final String ingredientId;
   final double quantity;
-  final Unit unit;
+  final UnitId unit;
   final PantrySection section;
   final String? note;
 }
@@ -90,15 +90,15 @@ class AddPantryItem extends UseCase<PantryItem, AddPantryItemParams> {
         );
       }
 
-      final existing = await _pantry.findByIngredient(
-        params.householdId,
-        params.ingredientId,
+      final existing = await _pantry.findByIngredientUnit(
+        householdId: params.householdId,
+        ingredientId: params.ingredientId,
+        unit: params.unit,
+        section: params.section,
       );
       final now = clock.now();
 
-      if (existing != null &&
-          existing.unit == params.unit &&
-          existing.section == params.section) {
+      if (existing != null) {
         final newQty = existing.quantity + params.quantity;
         await _pantry.setQuantity(params.householdId, existing.id, newQty);
         return Result.success(

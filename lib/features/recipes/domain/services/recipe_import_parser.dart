@@ -160,22 +160,40 @@ class RecipeImportParser {
     return double.parse(match.group(0)!);
   }
 
-  Unit _parseUnit(String value) {
+  UnitId _parseUnit(String value) {
     final normalized = value.trim().toLowerCase();
     return switch (normalized) {
-      'g' || 'gram' || 'grams' => Unit.g,
-      'kg' || 'kilogram' || 'kilograms' => Unit.kg,
+      'mg' || 'milligram' || 'milligrams' => UnitId.mg,
+      'g' || 'gram' || 'grams' => UnitId.g,
+      'kg' || 'kilogram' || 'kilograms' => UnitId.kg,
       'ml' ||
       'millilitre' ||
       'millilitres' ||
       'milliliter' ||
-      'milliliters' => Unit.ml,
-      'l' || 'litre' || 'litres' || 'liter' || 'liters' => Unit.l,
-      'pcs' || 'pc' || 'piece' || 'pieces' => Unit.piece,
-      'tsp' || 'teaspoon' || 'teaspoons' => Unit.tsp,
-      'tbsp' || 'tablespoon' || 'tablespoons' => Unit.tbsp,
-      'cup' || 'cups' => Unit.cup,
-      _ => throw FormatException('Unit "$value" is not supported.'),
+      'milliliters' => UnitId.ml,
+      'l' || 'litre' || 'litres' || 'liter' || 'liters' => UnitId.l,
+      'oz' || 'ounce' || 'ounces' => UnitId.oz,
+      'lb' || 'lbs' || 'pound' || 'pounds' => UnitId.lb,
+      'fl oz' ||
+      'fl-oz' ||
+      'fluid oz' ||
+      'fluid ounce' ||
+      'fluid ounces' => UnitId.flOz,
+      'pt' || 'pint' || 'pints' => UnitId.pt,
+      'qt' || 'quart' || 'quarts' => UnitId.qt,
+      'gal' || 'gallon' || 'gallons' => UnitId.gal,
+      'pcs' || 'pc' || 'piece' || 'pieces' => UnitId.piece,
+      'tsp' || 'teaspoon' || 'teaspoons' => UnitId.tsp,
+      'tbsp' || 'tablespoon' || 'tablespoons' => UnitId.tbsp,
+      'cup' || 'cups' => UnitId.cup,
+      'tin' || 'tins' => UnitId.tin,
+      'bunch' || 'bunches' => UnitId.bunch,
+      'slice' || 'slices' => UnitId.slice,
+      'pack' || 'packs' => UnitId.pack,
+      _ => throw FormatException(
+        'Unit "$value" is not supported. '
+        'Add this unit through ingredient authoring first.',
+      ),
     };
   }
 

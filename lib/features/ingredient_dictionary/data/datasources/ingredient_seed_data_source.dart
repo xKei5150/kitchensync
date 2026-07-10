@@ -38,7 +38,7 @@ class IngredientSeedDataSource {
   Ingredient _fromSeed(Map<String, dynamic> m, DateTime now) {
     final allowedUnits = (m['allowedUnits'] as List)
         .cast<String>()
-        .map((s) => _enumByName(Unit.values, s))
+        .map(UnitId.new)
         .toList();
     final aliases = ((m['aliases'] as List?) ?? const []).cast<String>();
     final parentTokens = ((m['parentTokens'] as List?) ?? const [])
@@ -60,7 +60,7 @@ class IngredientSeedDataSource {
       displayNames: displayNames,
       parentIngredientId: m['parentIngredientId'] as String?,
       category: _enumByName(IngredientCategory.values, m['category']),
-      defaultUnit: _enumByName(Unit.values, m['defaultUnit']),
+      defaultUnit: UnitId(m['defaultUnit'] as String),
       allowedUnits: allowedUnits,
       defaultShelfLifeDays: m['defaultShelfLifeDays'] as int?,
       isBulkCandidate: (m['isBulkCandidate'] as bool?) ?? false,

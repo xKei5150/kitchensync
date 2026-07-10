@@ -12,6 +12,18 @@ void main() {
       expect(fmt.format(2, 'tins'), '2 tins');
     });
 
+    test('uses registry labels and plurals for informal units', () {
+      expect(fmt.format(1, 'tin'), '1 tin');
+      expect(fmt.format(2, 'tin'), '2 tins');
+      expect(fmt.format(1, 'bunch'), '1 bunch');
+      expect(fmt.format(2, 'bunch'), '2 bunches');
+    });
+
+    test('converts imperial formal mass units for metric display', () {
+      expect(fmt.format(16, 'oz'), '453.59 g');
+      expect(fmt.format(3, 'lb'), '1.36 kg');
+    });
+
     test('renders just the number when unit is empty', () {
       expect(fmt.format(1.5, ''), '1.5');
       expect(fmt.format(4, ''), '4');
@@ -43,6 +55,25 @@ void main() {
       expect(fmt.format(3, 'tbsp'), '3 tbsp');
       expect(fmt.format(2, 'tins'), '2 tins');
       expect(fmt.format(1, 'bunch'), '1 bunch');
+    });
+
+    test('passes through informal units unchanged', () {
+      expect(fmt.format(1, 'tin'), '1 tin');
+      expect(fmt.format(2, 'tin'), '2 tins');
+      expect(fmt.format(2, 'bunch'), '2 bunches');
+      expect(fmt.format(2, 'local tray'), '2 local tray');
+    });
+
+    test('does not convert informal units in imperial mode', () {
+      expect(fmt.format(28.349523125, 'tin'), '28.35 tins');
+      expect(fmt.format(453.59237, 'bunch'), '453.59 bunches');
+    });
+
+    test('keeps existing metric mass and volume conversion behavior', () {
+      expect(fmt.format(100, 'g'), '3.5 oz');
+      expect(fmt.format(1, 'kg'), '2.2 lb');
+      expect(fmt.format(100, 'ml'), '3.4 fl oz');
+      expect(fmt.format(1, 'l'), '4.2 cups');
     });
   });
 }

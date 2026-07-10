@@ -1,4 +1,4 @@
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/shopping/data/datasources/shopping_remote_data_source.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 import 'package:kitchensync/features/shopping/domain/repositories/shopping_repository.dart';
@@ -29,7 +29,7 @@ class ShoppingRepositoryImpl implements ShoppingRepository {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) => _remote.updateItemStatus(
     householdId: householdId,
     listId: listId,

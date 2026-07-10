@@ -1,3 +1,4 @@
+// SIZE_OK: lifecycle controller tests keep broad state-transition coverage.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -86,7 +87,7 @@ class _FakePantryRepository implements PantryRepository {
   Future<PantryItem?> findByIngredientUnit({
     required String householdId,
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required PantrySection section,
   }) async {
     for (final item in items) {
@@ -197,14 +198,14 @@ Recipe _recipe() {
         recipeId: 'braise',
         ingredientId: 'tomato',
         quantity: 400,
-        unit: Unit.g,
+        unit: UnitId.g,
       ),
       RecipeIngredient(
         id: 'bean-line',
         recipeId: 'braise',
         ingredientId: 'beans',
         quantity: 2,
-        unit: Unit.piece,
+        unit: UnitId.piece,
       ),
     ],
     instructions: const [],
@@ -218,7 +219,7 @@ PantryItem _pantryItem() {
     householdId: 'solo-household',
     ingredientId: 'tomato',
     quantity: 1000,
-    unit: Unit.g,
+    unit: UnitId.g,
     section: PantrySection.food,
     createdAt: now,
     updatedAt: now,
@@ -232,7 +233,7 @@ PantryItem _beanPantryItem() {
     householdId: 'solo-household',
     ingredientId: 'beans',
     quantity: 8,
-    unit: Unit.piece,
+    unit: UnitId.piece,
     section: PantrySection.food,
     createdAt: now,
     updatedAt: now,
@@ -314,7 +315,7 @@ void main() {
         householdId: 'solo-household',
         ingredientId: 'pepper',
         quantity: 500,
-        unit: Unit.g,
+        unit: UnitId.g,
         section: PantrySection.food,
         createdAt: DateTime(2026, 7),
         updatedAt: DateTime(2026, 7),
@@ -336,10 +337,10 @@ void main() {
           ingredientOverrides: const [
             MealIngredientOverride(
               originalIngredientId: 'tomato',
-              originalUnit: Unit.g,
+              originalUnit: UnitId.g,
               substituteIngredientId: 'pepper',
               substituteQuantity: 300,
-              substituteUnit: Unit.g,
+              substituteUnit: UnitId.g,
             ),
           ],
         ),
@@ -428,7 +429,7 @@ void main() {
       expect(leftover.relatedRecipeId, 'braise');
       expect(leftover.leftoverServings, 2);
       expect(leftover.quantity, 2);
-      expect(leftover.unit, Unit.piece);
+      expect(leftover.unit, UnitId.piece);
       expect(pantry.addedItems.single, leftover);
       expect(calendar.upserted?.state, ScheduledMealState.leftover);
       expect(
@@ -627,7 +628,7 @@ void main() {
       householdId: 'solo-household',
       ingredientId: 'leftover-braise',
       quantity: 3,
-      unit: Unit.piece,
+      unit: UnitId.piece,
       section: PantrySection.leftover,
       relatedRecipeId: 'braise',
       leftoverServings: 3,
@@ -757,7 +758,7 @@ void main() {
           householdId: 'solo-household',
           ingredientId: 'leftover-braise',
           quantity: 2,
-          unit: Unit.piece,
+          unit: UnitId.piece,
           section: PantrySection.leftover,
           relatedRecipeId: 'braise',
           leftoverServings: 2,
@@ -788,7 +789,7 @@ void main() {
           householdId: 'solo-household',
           ingredientId: 'leftover-braise',
           quantity: 3,
-          unit: Unit.piece,
+          unit: UnitId.piece,
           section: PantrySection.leftover,
           relatedRecipeId: 'braise',
           leftoverServings: 3,
@@ -828,7 +829,7 @@ void main() {
         householdId: 'solo-household',
         ingredientId: 'leftover-braise',
         quantity: 3,
-        unit: Unit.piece,
+        unit: UnitId.piece,
         section: PantrySection.leftover,
         relatedRecipeId: 'braise',
         leftoverServings: 3,

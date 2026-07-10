@@ -1,4 +1,4 @@
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 
 enum ScheduledMealState { scheduled, cooked, leftover, cancelled }
 
@@ -13,7 +13,7 @@ class RecipeIngredientRequirement {
 
   final String ingredientId;
   final double quantity;
-  final Unit unit;
+  final UnitId unit;
 }
 
 class PlannedRecipe {
@@ -96,10 +96,10 @@ class MealIngredientOverride {
   });
 
   final String originalIngredientId;
-  final Unit originalUnit;
+  final UnitId originalUnit;
   final String substituteIngredientId;
   final double substituteQuantity;
-  final Unit substituteUnit;
+  final UnitId substituteUnit;
 }
 
 class CalendarDefaults {

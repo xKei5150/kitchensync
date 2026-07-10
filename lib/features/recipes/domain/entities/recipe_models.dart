@@ -1,4 +1,4 @@
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 
 enum RecipeVisibility { private, public }
 
@@ -74,7 +74,7 @@ class RecipeIngredient {
   final String recipeId;
   final String ingredientId;
   final double quantity;
-  final Unit unit;
+  final UnitId unit;
   final String? description;
   final String? preparationNote;
   final int? shelfLifeDays;
@@ -109,7 +109,7 @@ class RecipeIngredientDraft {
   final String? ingredientId;
   final String name;
   final double quantity;
-  final Unit unit;
+  final UnitId unit;
   final String? preparationNote;
   final int? shelfLifeDays;
 }

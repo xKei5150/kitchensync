@@ -15,7 +15,7 @@ PurchaseRecord _record() => PurchaseRecord(
   householdId: 'h1',
   ingredientId: 'onion',
   quantity: 2,
-  unit: Unit.piece,
+  unit: UnitId.piece,
   purchaseDate: DateTime.utc(2026),
 );
 

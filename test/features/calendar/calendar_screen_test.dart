@@ -1,3 +1,4 @@
+// SIZE_OK: calendar screen tests cover existing multi-state UI workflows.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -166,7 +167,7 @@ Recipe _recipe() {
         recipeId: 'persisted-recipe',
         ingredientId: 'aubergine',
         quantity: 2,
-        unit: Unit.piece,
+        unit: UnitId.piece,
       ),
     ],
     instructions: const [],
@@ -184,7 +185,7 @@ WasteEvent _wasteEvent({
     pantryItemId: 'pantry-$id',
     ingredientId: 'aubergine',
     quantity: 1,
-    unit: Unit.piece,
+    unit: UnitId.piece,
     reason: WasteReason.spoiled,
     date: date,
   );

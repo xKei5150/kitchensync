@@ -1,3 +1,4 @@
+// SIZE_OK: shopping providers centralize existing list planning wiring.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
@@ -288,7 +289,7 @@ class ShoppingPlanningController {
     required ShoppingListItemStatus status,
     String? substituteIngredientId,
     double? substituteQuantity,
-    Unit? substituteUnit,
+    UnitId? substituteUnit,
   }) {
     _require(
       status == ShoppingListItemStatus.substituted
@@ -371,7 +372,7 @@ class ShoppingPlanningController {
       ..sort((a, b) {
         final ingredient = a.ingredientId.compareTo(b.ingredientId);
         if (ingredient != 0) return ingredient;
-        return a.unit.index.compareTo(b.unit.index);
+        return a.unit.value.compareTo(b.unit.value);
       });
     return ShoppingListPlan(
       id: plan.id,

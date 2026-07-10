@@ -1,3 +1,4 @@
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
@@ -47,19 +48,21 @@ class BulkPredictionEngine {
               item.section == PantrySection.nonFood,
         )
         .toList(growable: false);
-    final purchasesByIngredient = <String, List<PurchaseRecord>>{};
+    final purchasesByItemKey = <String, List<PurchaseRecord>>{};
     for (final purchase in purchaseHistory) {
-      purchasesByIngredient
-          .putIfAbsent(purchase.ingredientId, () => [])
+      purchasesByItemKey
+          .putIfAbsent(_itemKey(purchase.ingredientId, purchase.unit), () => [])
           .add(purchase);
     }
-    for (final records in purchasesByIngredient.values) {
+    for (final records in purchasesByItemKey.values) {
       records.sort((a, b) => a.purchaseDate.compareTo(b.purchaseDate));
     }
 
-    final usageByIngredient = <String, List<WasteEvent>>{};
+    final usageByItemKey = <String, List<WasteEvent>>{};
     for (final event in usageEvents) {
-      usageByIngredient.putIfAbsent(event.ingredientId, () => []).add(event);
+      usageByItemKey
+          .putIfAbsent(_itemKey(event.ingredientId, event.unit), () => [])
+          .add(event);
     }
 
     final statuses =
@@ -67,8 +70,12 @@ class BulkPredictionEngine {
           for (final item in bulkItems)
             _predictItem(
               item: item,
-              usageEvents: usageByIngredient[item.ingredientId] ?? const [],
-              purchases: purchasesByIngredient[item.ingredientId] ?? const [],
+              usageEvents:
+                  usageByItemKey[_itemKey(item.ingredientId, item.unit)] ??
+                  const [],
+              purchases:
+                  purchasesByItemKey[_itemKey(item.ingredientId, item.unit)] ??
+                  const [],
               now: now,
             ),
         ]..sort((a, b) {
@@ -122,7 +129,7 @@ class BulkPredictionEngine {
     DateTime now,
   ) {
     final matching = usageEvents
-        .where((event) => event.unit == item.unit && event.quantity > 0)
+        .where((event) => event.quantity > 0)
         .toList(growable: false);
     if (matching.isEmpty) return 0;
     matching.sort((a, b) => a.date.compareTo(b.date));
@@ -153,4 +160,7 @@ class BulkPredictionEngine {
         intervals.fold<int>(0, (sum, days) => sum + days) / intervals.length;
     return average.round();
   }
+
+  String _itemKey(String ingredientId, UnitId unit) =>
+      '$ingredientId\x1F${unit.value}';
 }

@@ -1,3 +1,4 @@
+// SIZE_OK: calendar repository wiring owns broad legacy provider overrides.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
@@ -266,7 +267,7 @@ class CookingLifecycleController {
         ingredientId: 'leftover-${recipe.id}',
         servings: servings,
         quantity: servings.toDouble(),
-        unit: Unit.piece,
+        unit: UnitId.piece,
       ),
     );
 
@@ -521,7 +522,7 @@ class CookingLifecycleController {
 
   Future<void> _deduct({
     required String ingredientId,
-    required Unit unit,
+    required UnitId unit,
     required double quantity,
   }) async {
     if (quantity <= 0) return;
@@ -570,7 +571,7 @@ class CookingIngredientRequirement {
   });
 
   final String ingredientId;
-  final Unit unit;
+  final UnitId unit;
   final double quantity;
 }
 

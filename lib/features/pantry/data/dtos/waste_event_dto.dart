@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 
@@ -11,7 +12,7 @@ class WasteEventMapper {
     'pantryItemId': e.pantryItemId,
     'ingredientId': e.ingredientId,
     'quantity': e.quantity,
-    'unit': e.unit.name,
+    'unit': e.unit.value,
     'reason': e.reason.name,
     'date': Timestamp.fromDate(e.date),
     'note': e.note,
@@ -24,7 +25,7 @@ class WasteEventMapper {
     pantryItemId: m['pantryItemId'] as String,
     ingredientId: m['ingredientId'] as String,
     quantity: (m['quantity'] as num).toDouble(),
-    unit: _enumFromName(Unit.values, m['unit'] as String),
+    unit: UnitId(m['unit'] as String),
     reason: _enumFromName(WasteReason.values, m['reason'] as String),
     date: (m['date'] as Timestamp).toDate(),
     note: m['note'] as String?,

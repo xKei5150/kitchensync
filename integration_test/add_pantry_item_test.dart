@@ -34,7 +34,7 @@ void main() {
         householdId: hid,
         ingredientId: 'onion',
         quantity: 3,
-        unit: Unit.piece,
+        unit: UnitId.piece,
         section: PantrySection.food,
       ),
     );

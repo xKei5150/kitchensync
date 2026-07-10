@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/features/ingredient_dictionary/data/datasources/ingredient_seed_data_source.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 
 class _FixedClock implements Clock {
   const _FixedClock();
@@ -47,7 +48,7 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMessageHandler(channel, (message) async {
           final key = const StringCodec().decodeMessage(message);
-          if (key == 'test_assets/ingredients.json') {
+          if (key == 'test_assets/curated_ingredients.json') {
             return const StringCodec().encodeMessage(seed);
           }
           return null;
@@ -55,7 +56,7 @@ void main() {
 
     final dataSource = IngredientSeedDataSource(
       clock: const _FixedClock(),
-      assetPath: 'test_assets/ingredients.json',
+      assetPath: 'test_assets/curated_ingredients.json',
     );
 
     final ingredients = await dataSource.load();
@@ -68,5 +69,40 @@ void main() {
       ingredient.searchTokens,
       containsAll(['white', 'onion', 'allium', 'fresh']),
     );
+  });
+
+  test('load accepts new built-in informal unit strings', () async {
+    final seed = jsonEncode({
+      'version': 1,
+      'ingredients': [
+        {
+          'id': 'canned-tomatoes',
+          'displayNames': {'en': 'Canned tomatoes'},
+          'category': 'produce',
+          'defaultUnit': 'tin',
+          'allowedUnits': ['piece', 'tin'],
+        },
+      ],
+    });
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler(channel, (message) async {
+          final key = const StringCodec().decodeMessage(message);
+          if (key == 'test_assets/informal_ingredients.json') {
+            return const StringCodec().encodeMessage(seed);
+          }
+          return null;
+        });
+
+    final dataSource = IngredientSeedDataSource(
+      clock: const _FixedClock(),
+      assetPath: 'test_assets/informal_ingredients.json',
+    );
+
+    final ingredient = (await dataSource.load()).single;
+
+    expect(ingredient.defaultUnit, UnitId.tin);
+    expect(ingredient.allowedUnits, [UnitId.piece, UnitId.tin]);
+    expect(ingredient.localUnitDefinitions, isEmpty);
   });
 }
