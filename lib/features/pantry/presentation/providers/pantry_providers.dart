@@ -6,24 +6,24 @@ import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
-import 'package:kitchensync/features/pantry/data/datasources/pantry_image_storage.dart';
 import 'package:kitchensync/features/pantry/data/datasources/consumption_history_remote_data_source.dart';
+import 'package:kitchensync/features/pantry/data/datasources/pantry_image_storage.dart';
 import 'package:kitchensync/features/pantry/data/datasources/pantry_remote_data_source.dart';
 import 'package:kitchensync/features/pantry/data/datasources/purchase_history_remote_data_source.dart';
 import 'package:kitchensync/features/pantry/data/datasources/waste_remote_data_source.dart';
-import 'package:kitchensync/features/pantry/data/repositories/pantry_repository_impl.dart';
 import 'package:kitchensync/features/pantry/data/repositories/consumption_history_repository_impl.dart';
+import 'package:kitchensync/features/pantry/data/repositories/pantry_repository_impl.dart';
 import 'package:kitchensync/features/pantry/data/repositories/purchase_history_repository_impl.dart';
 import 'package:kitchensync/features/pantry/data/repositories/waste_repository_impl.dart';
-import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
+import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/consumption_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/inventory_consumption_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/consumption_history_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
@@ -32,8 +32,8 @@ import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item_phot
 import 'package:kitchensync/features/pantry/domain/usecases/adjust_pantry_quantity.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/delete_pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/mark_as_waste.dart';
-import 'package:kitchensync/features/pantry/domain/usecases/record_leftover.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/record_consumption.dart';
+import 'package:kitchensync/features/pantry/domain/usecases/record_leftover.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/update_pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/watch_pantry_section.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/watch_waste_history.dart';
@@ -251,10 +251,21 @@ List<BulkPantryStatus> bulkPantryStatuses(Ref ref) {
   final purchases =
       ref.watch(purchaseHistoryStreamProvider).asData?.value ??
       const <PurchaseRecord>[];
+  final ingredientsById = <String, Ingredient>{};
+  for (final item in items) {
+    final result = ref
+        .watch(pantryIngredientProvider(item.ingredientId))
+        .asData
+        ?.value;
+    if (result case Success<Ingredient>(:final value)) {
+      ingredientsById[item.ingredientId] = value;
+    }
+  }
   return const BulkPredictionEngine().predict(
     pantryItems: items,
     usageEvents: usage,
     purchaseHistory: purchases,
+    ingredientsById: ingredientsById,
     now: ref.watch(clockProvider).now(),
   );
 }
@@ -267,5 +278,9 @@ Stream<PantryItem?> pantryItemStream(
 ) => ref.watch(pantryRepositoryProvider).watchById(householdId, itemId);
 
 @riverpod
-Future<Result<Ingredient>> pantryIngredient(Ref ref, String ingredientId) =>
-    ref.watch(getIngredientProvider)(ingredientId);
+Future<Result<Ingredient>> pantryIngredient(Ref ref, String ingredientId) => ref
+    .watch(getIngredientProvider)
+    .forHousehold(
+      ingredientId,
+      householdId: ref.watch(activeHouseholdIdProvider),
+    );

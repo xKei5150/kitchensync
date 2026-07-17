@@ -99,6 +99,16 @@ export async function createShoppingCommandHarness(): Promise<ShoppingCommandHar
     async seedItems(householdId: string, listId: string, count: number): Promise<void> {
       const batch = db.batch()
       for (let index = 0; index < count; index += 1) {
+        batch.set(db.doc(`ingredients/ingredient-${index}`), {
+          name: `ingredient-${index}`,
+          displayNames: { en: `ingredient-${index}` },
+          category: "other",
+          defaultUnit: "count",
+          allowedUnits: ["mg", "g", "kg", "ml", "l", "piece", "count", "tsp", "tbsp", "cup"],
+          isBulkCandidate: false,
+          isNonFood: false,
+          scope: "global",
+        })
         batch.set(db.doc(`households/${householdId}/shoppingLists/${listId}/items/item-${index}`), {
           shoppingListId: listId,
           ingredientId: `ingredient-${index}`,

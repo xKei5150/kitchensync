@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
+import 'package:kitchensync/features/ingredient_dictionary/data/dtos/ingredient_dto.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_unit_converter.dart';
 import 'package:kitchensync/features/recipes/data/dtos/recipe_dto.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 
@@ -27,6 +29,7 @@ class RecipeRemoteDataSource {
   }
 
   Future<void> upsert(Recipe recipe) async {
+    await _validateIngredientReferences(recipe);
     final recipeRef = _refs.recipe(recipe.id);
     final isCreate = recipe.createdAt.isAtSameMomentAs(recipe.updatedAt);
     final existingIngredients = isCreate
@@ -94,6 +97,7 @@ class RecipeRemoteDataSource {
     required String localRecipeId,
     required String savedRecipeId,
     required DateTime now,
+    Map<String, String> ingredientIdRewrites = const {},
   }) async {
     final sourceSnap = await _refs.recipe(sourceRecipeId).get();
     if (!sourceSnap.exists) {
@@ -109,7 +113,8 @@ class RecipeRemoteDataSource {
         RecipeIngredient(
           id: ingredient.id,
           recipeId: localRecipeId,
-          ingredientId: ingredient.ingredientId,
+          ingredientId:
+              ingredientIdRewrites[ingredient.id] ?? ingredient.ingredientId,
           quantity: ingredient.quantity,
           unit: ingredient.unit,
           description: ingredient.description,
@@ -145,6 +150,8 @@ class RecipeRemoteDataSource {
       sourceRecipeId: sourceRecipeId,
       localRecipeId: localRecipeId,
     );
+
+    await _validateIngredientReferences(localRecipe);
 
     final db = _refs.recipes().firestore;
     final batch = db.batch()
@@ -183,5 +190,33 @@ class RecipeRemoteDataSource {
       map: doc.data()!,
       ingredients: ingredients,
     );
+  }
+
+  Future<void> _validateIngredientReferences(Recipe recipe) async {
+    for (final line in recipe.ingredients) {
+      final global = await _refs.ingredient(line.ingredientId).get();
+      final custom = global.exists
+          ? null
+          : await _refs
+                .customIngredients(recipe.householdId)
+                .doc(line.ingredientId)
+                .get();
+      final snapshot = global.exists ? global : custom;
+      if (snapshot == null || !snapshot.exists) {
+        throw StateError(
+          'Ingredient ${line.ingredientId} is not accessible to '
+          '${recipe.householdId}.',
+        );
+      }
+      final ingredient = IngredientMapper.fromMap(
+        snapshot.id,
+        snapshot.data()!,
+      );
+      if (!IngredientUnitConverter.isPermitted(ingredient, line.unit)) {
+        throw StateError(
+          'Unit ${line.unit.value} is invalid for ${line.ingredientId}.',
+        );
+      }
+    }
   }
 }

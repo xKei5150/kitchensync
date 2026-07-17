@@ -40,6 +40,7 @@ void main() {
       expect(debugPaintBaselinesEnabled, isFalse);
       expect(debugPaintPointersEnabled, isFalse);
       await bootEmulatedApp();
+      await seedGlobalDictionaryThroughEmulatorAdmin();
       await binding.convertFlutterSurfaceToImage();
       await _prepareMvpScreenshot(tester);
       final user = FirebaseAuth.instance.currentUser;
@@ -255,7 +256,7 @@ void main() {
             mutation: const SetShoppingListItemStatusMutation(
               status: ShoppingListItemStatus.substituted,
               purchasedQuantity: null,
-              substituteIngredientId: 'cherry-tomato',
+              substituteIngredientId: 'tomato-cherry',
               substituteQuantity: 275,
               substituteUnit: UnitId.g,
             ),

@@ -251,6 +251,8 @@
         "tbsp"
       ],
       "defaultShelfLifeDays": 730,
+      "defaultPurchaseIntervalDays": 45,
+      "pricePerUnitHint": 0.07,
       "isBulkCandidate": true,
       "parentIngredientId": null,
       "aliases": [],
@@ -398,6 +400,8 @@
         "tbsp"
       ],
       "defaultShelfLifeDays": 1825,
+      "defaultPurchaseIntervalDays": 90,
+      "pricePerUnitHint": 0.04,
       "isBulkCandidate": true,
       "parentIngredientId": null,
       "aliases": [],
@@ -539,6 +543,8 @@
         "cup"
       ],
       "defaultShelfLifeDays": 365,
+      "defaultPurchaseIntervalDays": 30,
+      "pricePerUnitHint": 0.08,
       "isBulkCandidate": true,
       "parentIngredientId": null,
       "aliases": [],
@@ -895,6 +901,8 @@
         "cup"
       ],
       "defaultShelfLifeDays": 365,
+      "defaultPurchaseIntervalDays": 45,
+      "pricePerUnitHint": 0.06,
       "isBulkCandidate": true,
       "allergens": [
         "gluten"
@@ -1079,6 +1087,8 @@
         "cup"
       ],
       "defaultShelfLifeDays": 365,
+      "defaultPurchaseIntervalDays": 45,
+      "pricePerUnitHint": 0.14,
       "isBulkCandidate": true,
       "parentIngredientId": null,
       "aliases": [],
@@ -14355,6 +14365,96 @@
         "agrovocConfidence": 1.0,
         "agrovocStatus": "matched"
       }
+    },
+    {
+      "id": "dried-beans-bulk",
+      "displayNames": { "en": "Dried Beans" },
+      "category": "bulkStaple",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 730,
+      "defaultPurchaseIntervalDays": 45,
+      "pricePerUnitHint": 0.12,
+      "isBulkCandidate": true,
+      "isNonFood": false,
+      "aliases": ["Dry beans", "Bulk beans"],
+      "taxonomyTags": ["legume"],
+      "formTags": ["dried", "packaged"]
+    },
+    {
+      "id": "frozen-peas",
+      "displayNames": { "en": "Frozen Peas" },
+      "category": "frozen",
+      "defaultUnit": "g",
+      "allowedUnits": ["g", "kg", "cup"],
+      "defaultShelfLifeDays": 180,
+      "defaultPurchaseIntervalDays": 30,
+      "pricePerUnitHint": 0.18,
+      "isBulkCandidate": false,
+      "isNonFood": false,
+      "aliases": ["Green peas, frozen"],
+      "taxonomyTags": ["vegetable"],
+      "formTags": ["frozen"]
+    },
+    {
+      "id": "dish-soap",
+      "displayNames": { "en": "Dish Soap" },
+      "category": "nonFood",
+      "defaultUnit": "ml",
+      "allowedUnits": ["ml", "l", "bottle"],
+      "defaultShelfLifeDays": 1095,
+      "defaultPurchaseIntervalDays": 45,
+      "pricePerUnitHint": 0.22,
+      "isBulkCandidate": true,
+      "isNonFood": true,
+      "aliases": ["Dishwashing liquid"],
+      "taxonomyTags": ["cleaning"],
+      "formTags": ["liquid", "packaged"]
+    },
+    {
+      "id": "paper-towels",
+      "displayNames": { "en": "Paper Towels" },
+      "category": "nonFood",
+      "defaultUnit": "pack",
+      "allowedUnits": ["piece", "pack"],
+      "defaultShelfLifeDays": 1825,
+      "defaultPurchaseIntervalDays": 30,
+      "pricePerUnitHint": 85.0,
+      "isBulkCandidate": true,
+      "isNonFood": true,
+      "aliases": ["Kitchen roll"],
+      "taxonomyTags": ["paperGoods"],
+      "formTags": ["packaged"]
+    },
+    {
+      "id": "aluminum-foil",
+      "displayNames": { "en": "Aluminum Foil" },
+      "category": "nonFood",
+      "defaultUnit": "box",
+      "allowedUnits": ["box"],
+      "defaultShelfLifeDays": 3650,
+      "defaultPurchaseIntervalDays": 90,
+      "pricePerUnitHint": 110.0,
+      "isBulkCandidate": true,
+      "isNonFood": true,
+      "aliases": ["Aluminium foil", "Kitchen foil"],
+      "taxonomyTags": ["kitchenSupply"],
+      "formTags": ["packaged"]
+    },
+    {
+      "id": "trash-bags",
+      "displayNames": { "en": "Trash Bags" },
+      "category": "nonFood",
+      "defaultUnit": "pack",
+      "allowedUnits": ["piece", "pack"],
+      "defaultShelfLifeDays": 3650,
+      "defaultPurchaseIntervalDays": 45,
+      "pricePerUnitHint": 95.0,
+      "isBulkCandidate": true,
+      "isNonFood": true,
+      "aliases": ["Garbage bags", "Bin liners"],
+      "taxonomyTags": ["cleaning"],
+      "formTags": ["packaged"]
     }
   ]
 }

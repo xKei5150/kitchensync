@@ -3,6 +3,8 @@ import 'package:kitchensync/core/firebase/firestore_refs.dart';
 import 'package:kitchensync/features/calendar/data/dtos/calendar_dto.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
 import 'package:kitchensync/features/pantry/data/dtos/consumption_event_dto.dart';
 import 'package:kitchensync/features/pantry/data/dtos/pantry_item_dto.dart';
 import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
@@ -23,9 +25,10 @@ class CookingInventoryRequirement {
 }
 
 class CookingInventoryService {
-  const CookingInventoryService(this._refs);
+  const CookingInventoryService(this._refs, {this._ingredientRepository});
 
   final FirestoreRefs _refs;
+  final IngredientRepository? _ingredientRepository;
 
   Future<CookingDeductionPlan> inspect({
     required String householdId,
@@ -35,10 +38,15 @@ class CookingInventoryService {
       householdId: householdId,
       ingredientId: requirement.ingredientId,
     );
+    final ingredient = await _ingredientRepository?.getById(
+      requirement.ingredientId,
+      householdId: householdId,
+    );
     return CookingDeductionPlanner.plan(
       lots: lots,
       requiredQuantity: requirement.quantity,
       requiredUnit: requirement.unit,
+      localUnitDefinitions: ingredient?.localUnitDefinitions ?? const [],
     );
   }
 
@@ -49,11 +57,18 @@ class CookingInventoryService {
     required DateTime occurredAt,
   }) async {
     final initialLots = <List<PantryItem>>[];
+    final ingredients = <Ingredient?>[];
     for (final requirement in requirements) {
       initialLots.add(
         await _loadEligibleLots(
           householdId: householdId,
           ingredientId: requirement.ingredientId,
+        ),
+      );
+      ingredients.add(
+        await _ingredientRepository?.getById(
+          requirement.ingredientId,
+          householdId: householdId,
         ),
       );
     }
@@ -81,6 +96,8 @@ class CookingInventoryService {
           lots: currentLots,
           requiredQuantity: requirement.quantity,
           requiredUnit: requirement.unit,
+          localUnitDefinitions:
+              ingredients[index]?.localUnitDefinitions ?? const [],
         );
         if (!currentPlan.isComplete) {
           throw StateError('Pantry changed while cooking was being completed.');
@@ -158,35 +175,36 @@ class CookingInventoryService {
         throw StateError('Leftover $leftoverId is already empty.');
       }
       final remaining = leftover.quantity - used;
-      transaction.update(leftoverRef, {
-        'quantity': remaining,
-        'leftoverServings': remaining.round(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
       final eventId = 'leftover-${meal.id}-$leftoverId';
-      transaction.set(
-        _refs.consumptionEvents(householdId).doc(eventId),
-        ConsumptionEventMapper.toMap(
-          ConsumptionEvent(
-            id: eventId,
-            householdId: householdId,
-            pantryItemId: leftoverId,
-            ingredientId: leftover.ingredientId,
-            quantity: used,
-            unit: leftover.unit,
-            source: ConsumptionSource.leftover,
-            sourceMealId: meal.id,
-            date: occurredAt,
+      transaction
+        ..update(leftoverRef, {
+          'quantity': remaining,
+          'leftoverServings': remaining.round(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        })
+        ..set(
+          _refs.consumptionEvents(householdId).doc(eventId),
+          ConsumptionEventMapper.toMap(
+            ConsumptionEvent(
+              id: eventId,
+              householdId: householdId,
+              pantryItemId: leftoverId,
+              ingredientId: leftover.ingredientId,
+              quantity: used,
+              unit: leftover.unit,
+              source: ConsumptionSource.leftover,
+              sourceMealId: meal.id,
+              date: occurredAt,
+            ),
           ),
-        ),
-      );
-      transaction.set(
-        mealRef,
-        MealScheduleEntryMapper.toMap(
-          householdId: householdId,
-          entry: meal.copyWith(state: ScheduledMealState.cooked),
-        ),
-      );
+        )
+        ..set(
+          mealRef,
+          MealScheduleEntryMapper.toMap(
+            householdId: householdId,
+            entry: meal.copyWith(state: ScheduledMealState.cooked),
+          ),
+        );
     });
   }
 

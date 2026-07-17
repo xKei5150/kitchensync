@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:kitchensync/core/usecases/usecase.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/search_ingredients.dart';
@@ -18,12 +17,10 @@ void main() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    // Seed the global dictionary.
-    final seedResult = await withTimeout(
-      'seedGlobalDictionary',
-      () => container.read(seedGlobalDictionaryProvider)(const NoParams()),
+    await withTimeout(
+      'seedGlobalDictionaryThroughEmulatorAdmin',
+      seedGlobalDictionaryThroughEmulatorAdmin,
     );
-    expect(seedResult, isA<Success<int>>());
 
     // Search for 'onion'.
     final searchResult = await withTimeout(

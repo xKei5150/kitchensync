@@ -3,8 +3,8 @@ import type { DocumentReference } from "firebase-admin/firestore"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { HttpsError } from "firebase-functions/v2/https"
 import type { PantryItemSnapshot, PurchaseLine, ShoppingItemSnapshot } from "./completionTypes.js"
-import type { IngredientMetadata } from "./firestoreModels.js"
 import { assertNever } from "./exhaustiveness.js"
+import type { IngredientMetadata } from "./firestoreModels.js"
 import type { FirestoreWrite } from "./writePlan.js"
 
 export function purchaseLinesFor(
@@ -149,9 +149,7 @@ export function buildPantryAndPurchaseWrites(input: {
   return writes
 }
 
-export function sectionForIngredient(
-  metadata: IngredientMetadata,
-): "food" | "bulk" | "nonFood" {
+export function sectionForIngredient(metadata: IngredientMetadata): "food" | "bulk" | "nonFood" {
   if (metadata.isNonFood) return "nonFood"
   if (metadata.isBulkCandidate) return "bulk"
   return "food"

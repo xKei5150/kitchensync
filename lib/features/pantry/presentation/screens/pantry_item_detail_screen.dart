@@ -22,13 +22,13 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
 import 'package:kitchensync/features/pantry/domain/services/pantry_unit_conversion.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item_photo.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/adjust_pantry_quantity.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/delete_pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/record_consumption.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/update_pantry_item.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/pantry/presentation/widgets/mark_as_waste_sheet.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
@@ -944,7 +944,10 @@ class _ActionRow extends ConsumerWidget {
         ),
         const SizedBox(height: KsTokens.space8),
         OutlinedButton.icon(
-          onPressed: () => context.push('/ingredient/${item.ingredientId}'),
+          onPressed: () => context.push(
+            '/ingredient/${item.ingredientId}'
+            '?householdId=${Uri.encodeQueryComponent(item.householdId)}',
+          ),
           icon: const Icon(Icons.info_outline_rounded),
           label: const Text('Ingredient details'),
         ),

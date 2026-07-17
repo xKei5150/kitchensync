@@ -7,6 +7,7 @@ class _ShoppingListPlanFactory {
     required this.purchaseHistoryRepository,
     this.consumptionHistoryRepository,
     required this.recipeRepository,
+    this.ingredientRepository,
     required this.householdId,
     required this.idGenerator,
     required this.clock,
@@ -17,6 +18,7 @@ class _ShoppingListPlanFactory {
   final PurchaseHistoryRepository purchaseHistoryRepository;
   final ConsumptionHistoryRepository? consumptionHistoryRepository;
   final RecipeRepository recipeRepository;
+  final IngredientRepository? ingredientRepository;
   final String householdId;
   final IdGenerator idGenerator;
   final Clock clock;
@@ -74,11 +76,16 @@ class _ShoppingListPlanFactory {
         : await consumptionHistoryRepository!
               .watchByHousehold(householdId)
               .first;
+    final pantry = await _currentPantry();
+    final ingredientsById = await _ingredientsById([
+      ...pantry.map((item) => item.ingredientId),
+    ]);
     final bulkStatuses = _bulkPredictionEngine.predict(
-      pantryItems: await _currentPantry(),
+      pantryItems: pantry,
       usageEvents: usageEvents,
       purchaseHistory: purchaseHistory,
       now: clock.now(),
+      ingredientsById: ingredientsById,
     );
     return _withBulkReplenishments(
       plan,
@@ -157,6 +164,12 @@ class _ShoppingListPlanFactory {
       recipesById[recipe.id] = _plannedRecipe(recipe);
     }
 
+    final pantry = await _currentPantry();
+    final ingredientIds = <String>{
+      ...pantry.map((item) => item.ingredientId),
+      for (final recipe in recipesById.values)
+        ...recipe.ingredients.map((item) => item.ingredientId),
+    };
     return _shoppingEngine.generateList(
       id: id,
       type: type,
@@ -164,7 +177,8 @@ class _ShoppingListPlanFactory {
       endDate: endDate,
       meals: meals,
       recipesById: recipesById,
-      pantryItems: await _currentPantry(),
+      pantryItems: pantry,
+      ingredientsById: await _ingredientsById(ingredientIds),
     );
   }
 
@@ -196,5 +210,16 @@ class _ShoppingListPlanFactory {
           .watchBySection(householdId, PantrySection.nonFood)
           .first,
     ];
+  }
+
+  Future<Map<String, Ingredient>> _ingredientsById(Iterable<String> ids) async {
+    final repository = ingredientRepository;
+    if (repository == null) return const {};
+    final result = <String, Ingredient>{};
+    for (final id in ids.toSet()) {
+      final ingredient = await repository.getById(id, householdId: householdId);
+      if (ingredient != null) result[id] = ingredient;
+    }
+    return result;
   }
 }

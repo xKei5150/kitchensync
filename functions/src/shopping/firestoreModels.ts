@@ -133,6 +133,7 @@ export type IngredientMetadata = Readonly<{
   isBulkCandidate: boolean
   isNonFood: boolean
   defaultShelfLifeDays?: number | undefined
+  allowedUnits?: readonly string[] | undefined
 }>
 export type MealOverride = Readonly<z.infer<typeof mealOverrideSchema>>
 export type MealEntryData = Readonly<z.infer<typeof mealEntrySchema>>
@@ -169,7 +170,13 @@ export function parseIngredientMetadata(data: unknown): IngredientMetadata {
     .object({
       isBulkCandidate: z.boolean().default(false),
       isNonFood: z.boolean().default(false),
-      defaultShelfLifeDays: z.number().int().nonnegative().optional(),
+      defaultShelfLifeDays: z
+        .number()
+        .int()
+        .nonnegative()
+        .nullish()
+        .transform((value) => value ?? undefined),
+      allowedUnits: z.array(nonEmptyStringSchema),
     })
     .passthrough()
     .safeParse(data)

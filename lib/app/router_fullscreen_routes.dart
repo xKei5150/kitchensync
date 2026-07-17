@@ -90,17 +90,28 @@ List<RouteBase> _fullscreenRoutes() => [
     path: '/ingredient/create',
     name: 'ingredientCreate',
     parentNavigatorKey: _rootNavigatorKey,
-    pageBuilder: (context, state) => _page(
-      state,
-      CreateCustomIngredientScreen(initialName: state.extra as String?),
-    ),
+    pageBuilder: (context, state) {
+      final extra = state.extra;
+      return _page(
+        state,
+        CreateCustomIngredientScreen(
+          initialName: extra is String ? extra : null,
+          initialIngredient: extra is Ingredient ? extra : null,
+        ),
+      );
+    },
   ),
   GoRoute(
     path: '/ingredient/:id',
     name: 'ingredientDetail',
     parentNavigatorKey: _rootNavigatorKey,
-    pageBuilder: (context, state) =>
-        _page(state, IngredientDetailScreen(id: state.pathParameters['id']!)),
+    pageBuilder: (context, state) => _page(
+      state,
+      IngredientDetailScreen(
+        id: state.pathParameters['id']!,
+        householdId: state.uri.queryParameters['householdId'],
+      ),
+    ),
   ),
   if (kDebugMode)
     GoRoute(

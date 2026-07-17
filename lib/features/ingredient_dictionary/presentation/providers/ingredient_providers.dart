@@ -10,6 +10,7 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/i
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/create_custom_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/get_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/list_ingredient_variants.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/resolve_or_create_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/search_ingredients.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/seed_global_dictionary.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -60,6 +61,13 @@ CreateCustomIngredient createCustomIngredient(Ref ref) =>
       idGenerator: ref.watch(idGeneratorProvider),
       clock: ref.watch(clockProvider),
     );
+
+final resolveOrCreateIngredientProvider = Provider<ResolveOrCreateIngredient>(
+  (ref) => ResolveOrCreateIngredient(
+    ref.watch(ingredientRepositoryProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
 
 @riverpod
 SeedGlobalDictionary seedGlobalDictionary(Ref ref) => SeedGlobalDictionary(

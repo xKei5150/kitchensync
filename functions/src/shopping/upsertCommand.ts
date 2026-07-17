@@ -6,6 +6,7 @@ import {
   type ShoppingCommandExecution,
   shoppingCommandType,
 } from "./commandContext.js"
+import { requireIngredientReference } from "./ingredientIntegrity.js"
 import {
   parseStoredShoppingItem,
   parseStoredShoppingParent,
@@ -66,6 +67,24 @@ export async function upsertShoppingListTransaction(
       return [document.id, item] as const
     }),
   )
+  for (const item of execution.command.list.items) {
+    await requireIngredientReference(
+      execution.transaction,
+      execution.db,
+      execution.command.householdId,
+      item.ingredientId,
+      item.unit,
+    )
+    if (item.substituteIngredientId !== null && item.substituteUnit !== null) {
+      await requireIngredientReference(
+        execution.transaction,
+        execution.db,
+        execution.command.householdId,
+        item.substituteIngredientId,
+        item.substituteUnit,
+      )
+    }
+  }
   const writes = buildUpsertWrites({ execution, context, currentItems, revision, payloadHash })
   if (writes.length > maxTransactionWrites) {
     throw new HttpsError("resource-exhausted", "Shopping list upsert has too many writes")

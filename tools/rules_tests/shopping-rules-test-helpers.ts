@@ -117,6 +117,20 @@ export async function seedShoppingHousehold(
       doc(db, "households/solo-household/members/solo-member"),
       { role: "member" },
     );
+    for (const ingredient of [
+      { id: "onion", allowedUnits: ["piece", "g", "kg"] },
+      { id: "rice", allowedUnits: ["g", "kg", "cup"] },
+      { id: "leftover-adobo", allowedUnits: ["serving"] },
+    ] as const) {
+      await setDoc(doc(db, `ingredients/${ingredient.id}`), {
+        name: ingredient.id,
+        displayNames: { en: ingredient.id },
+        category: "other",
+        defaultUnit: ingredient.allowedUnits[0],
+        allowedUnits: ingredient.allowedUnits,
+        scope: "global",
+      });
+    }
   });
 }
 

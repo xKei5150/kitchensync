@@ -24,3 +24,15 @@ abstract class RecipeRepository {
     required DateTime now,
   });
 }
+
+abstract class IngredientRewriteRecipeRepository {
+  Future<SavedRecipe> savePublicRecipeAsLocalCopyWithIngredientRewrites({
+    required String sourceRecipeId,
+    required String userId,
+    required String householdId,
+    required String localRecipeId,
+    required String savedRecipeId,
+    required DateTime now,
+    required Map<String, String> ingredientIdRewrites,
+  });
+}

@@ -7,6 +7,7 @@ import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_identity.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/services/search_tokenizer.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/custom_ingredient_local_units.dart';
 
@@ -115,6 +116,24 @@ class CreateCustomIngredient
 
     final normalizedName = enName.toLowerCase();
 
+    if (p.defaultPurchaseIntervalDays != null &&
+        p.defaultPurchaseIntervalDays! <= 0) {
+      return const Result.failure(
+        Failure.validation(
+          field: 'defaultPurchaseIntervalDays',
+          message: 'Purchase interval must be greater than zero.',
+        ),
+      );
+    }
+    if (p.pricePerUnitHint != null && p.pricePerUnitHint! < 0) {
+      return const Result.failure(
+        Failure.validation(
+          field: 'pricePerUnitHint',
+          message: 'Price per unit cannot be negative.',
+        ),
+      );
+    }
+
     var parentTokens = const <String>[];
     if (p.parentIngredientId != null) {
       try {
@@ -171,8 +190,8 @@ class CreateCustomIngredient
 
     final now = clock.now();
     final ing = Ingredient(
-      id: idGenerator.newId(),
-      name: normalizedName,
+      id: IngredientIdentity.customDocumentId(enName),
+      name: IngredientIdentity.normalize(normalizedName),
       displayNames: p.displayNames,
       parentIngredientId: p.parentIngredientId,
       category: p.category,
@@ -184,7 +203,7 @@ class CreateCustomIngredient
       pricePerUnitHint: p.pricePerUnitHint,
       isBulkCandidate:
           p.isBulkCandidate || p.category == IngredientCategory.bulkStaple,
-      isNonFood: p.isNonFood,
+      isNonFood: p.isNonFood || p.category == IngredientCategory.nonFood,
       imageUrl: p.imageUrl,
       barcode: p.barcode,
       aliases: p.aliases,

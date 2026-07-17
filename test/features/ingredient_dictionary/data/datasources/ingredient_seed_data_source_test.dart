@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/features/ingredient_dictionary/data/datasources/ingredient_seed_data_source.dart';
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 
 class _FixedClock implements Clock {
   const _FixedClock();
@@ -105,4 +105,46 @@ void main() {
     expect(ingredient.allowedUnits, [UnitId.piece, UnitId.tin]);
     expect(ingredient.localUnitDefinitions, isEmpty);
   });
+
+  test(
+    'bundled seed covers categories, bulk, non-food, and price metadata',
+    () async {
+      final ingredients = await IngredientSeedDataSource(
+        clock: const _FixedClock(),
+      ).load();
+      final categories = ingredients
+          .map((ingredient) => ingredient.category)
+          .toSet();
+      expect(categories, containsAll(IngredientCategory.values));
+      expect(
+        ingredients.where(
+          (ingredient) => ingredient.category == IngredientCategory.nonFood,
+        ),
+        isNotEmpty,
+      );
+      expect(
+        ingredients
+            .where(
+              (ingredient) => ingredient.category == IngredientCategory.nonFood,
+            )
+            .every((ingredient) => ingredient.isNonFood),
+        isTrue,
+      );
+      expect(
+        ingredients
+            .where(
+              (ingredient) =>
+                  ingredient.category == IngredientCategory.bulkStaple,
+            )
+            .every((ingredient) => ingredient.isBulkCandidate),
+        isTrue,
+      );
+      for (final id in ['flour', 'salt', 'oil', 'rice']) {
+        final ingredient = ingredients.singleWhere((item) => item.id == id);
+        expect(ingredient.isBulkCandidate, isTrue, reason: id);
+        expect(ingredient.defaultPurchaseIntervalDays, isNotNull, reason: id);
+        expect(ingredient.pricePerUnitHint, isNotNull, reason: id);
+      }
+    },
+  );
 }

@@ -57,13 +57,31 @@ extension ShoppingPlanningControllerRecovery on ShoppingPlanningController {
         )
         .first;
     final recipes = await _plannedRecipes(meals);
+    final pantry = await _currentPantry();
+    final ingredientsById = <String, Ingredient>{};
+    final ingredientRepository = this.ingredientRepository;
+    if (ingredientRepository != null) {
+      final ids = <String>{
+        ...pantry.map((item) => item.ingredientId),
+        for (final recipe in recipes)
+          ...recipe.ingredients.map((item) => item.ingredientId),
+      };
+      for (final id in ids) {
+        final ingredient = await ingredientRepository.getById(
+          id,
+          householdId: householdId,
+        );
+        if (ingredient != null) ingredientsById[id] = ingredient;
+      }
+    }
     final result = _suggestionReconciler.reconcile(
       ShoppingSuggestionReconcileInput(
         householdId: householdId,
         meals: meals,
         recipes: recipes,
-        pantryItems: await _currentPantry(),
+        pantryItems: pantry,
         shoppingLists: await repository.watchLists(householdId).first,
+        ingredientsById: ingredientsById,
       ),
     );
     switch (result) {

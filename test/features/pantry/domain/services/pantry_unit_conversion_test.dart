@@ -40,4 +40,31 @@ void main() {
       3,
     );
   });
+
+  test('preserveAmount converts cooking volume and ingredient-local units', () {
+    expect(
+      PantryUnitConversion.preserveAmount(
+        quantity: 1,
+        from: UnitId.cup,
+        to: UnitId.ml,
+      ),
+      closeTo(236.5882365, 0.000001),
+    );
+    final sack = UnitDefinition.mass(
+      id: UnitId('sack'),
+      label: 'sack',
+      pluralLabel: 'sacks',
+      family: UnitSystemFamily.local,
+      gramsPerUnit: 5000,
+    );
+    expect(
+      PantryUnitConversion.preserveAmount(
+        quantity: 2,
+        from: sack.id,
+        to: UnitId.kg,
+        localUnitDefinitions: [sack],
+      ),
+      10,
+    );
+  });
 }

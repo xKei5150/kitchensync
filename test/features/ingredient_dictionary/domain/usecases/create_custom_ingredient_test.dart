@@ -97,7 +97,7 @@ void main() {
     );
     expect(r, isA<Success<Ingredient>>());
     final ing = (r as Success<Ingredient>).value;
-    expect(ing.id, 'new-id');
+    expect(ing.id, 'custom-bWFuZ29zdGVlbg');
     expect(ing.scope, IngredientScope.householdCustom);
     expect(ing.householdId, 'h1');
     expect(ing.name, 'mangosteen');

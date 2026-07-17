@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
-import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
+import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
@@ -202,7 +203,6 @@ void main() {
         _usage(
           ingredientId: 'rice',
           quantity: 500,
-          unit: UnitId.g,
           date: DateTime(2026, 7, 21),
         ),
       ],
@@ -210,13 +210,9 @@ void main() {
         _purchase(
           ingredientId: 'rice',
           unit: UnitId.kg,
-          date: DateTime(2026, 6, 1),
+          date: DateTime(2026, 6),
         ),
-        _purchase(
-          ingredientId: 'rice',
-          unit: UnitId.g,
-          date: DateTime(2026, 7, 1),
-        ),
+        _purchase(ingredientId: 'rice', date: DateTime(2026, 7)),
       ],
       now: DateTime(2026, 7, 31),
     );
@@ -293,8 +289,8 @@ void main() {
         ],
         usageEvents: const [],
         purchaseHistory: [
-          _purchase(ingredientId: 'rice', date: DateTime(2026, 5, 1)),
-          _purchase(ingredientId: 'rice', date: DateTime(2026, 6, 1)),
+          _purchase(ingredientId: 'rice', date: DateTime(2026, 5)),
+          _purchase(ingredientId: 'rice', date: DateTime(2026, 6)),
         ],
         now: now,
       );
@@ -303,4 +299,49 @@ void main() {
       expect(statuses.single.needsPurchaseSoon, isFalse);
     },
   );
+
+  test('dictionary interval is used until observed history is available', () {
+    final now = DateTime(2026, 7, 31);
+    final rice = Ingredient(
+      id: 'rice',
+      name: 'rice',
+      displayNames: const {'en': 'Rice'},
+      category: IngredientCategory.bulkStaple,
+      defaultUnit: UnitId.kg,
+      allowedUnits: const [UnitId.g, UnitId.kg],
+      defaultPurchaseIntervalDays: 30,
+      isBulkCandidate: true,
+      scope: IngredientScope.global,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final fallback = const BulkPredictionEngine().predict(
+      pantryItems: [
+        _item(
+          id: 'rice-stock',
+          ingredientId: 'rice',
+          quantity: 5000,
+          lastPurchaseDate: DateTime(2026, 6),
+        ),
+      ],
+      usageEvents: const [],
+      purchaseHistory: const [],
+      ingredientsById: {'rice': rice},
+      now: now,
+    );
+    expect(fallback.single.recommendedPurchaseIntervalDays, 30);
+    expect(fallback.single.needsPurchaseSoon, isTrue);
+
+    final observed = const BulkPredictionEngine().predict(
+      pantryItems: fallback.map((status) => status.item),
+      usageEvents: const [],
+      purchaseHistory: [
+        _purchase(ingredientId: 'rice', date: DateTime(2026, 7)),
+        _purchase(ingredientId: 'rice', date: DateTime(2026, 7, 21)),
+      ],
+      ingredientsById: {'rice': rice},
+      now: now,
+    );
+    expect(observed.single.recommendedPurchaseIntervalDays, 20);
+  });
 }

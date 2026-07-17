@@ -4,11 +4,9 @@ import {
   payloadHashForItemMutation,
   payloadHashForUpsert,
 } from "../../src/shopping/canonicalPayload.js"
+import { parseIngredientMetadata } from "../../src/shopping/firestoreModels.js"
 import { applyItemMutation } from "../../src/shopping/itemMutationPlanning.js"
-import {
-  defaultExpiryDate,
-  sectionForIngredient,
-} from "../../src/shopping/purchasePlanning.js"
+import { defaultExpiryDate, sectionForIngredient } from "../../src/shopping/purchasePlanning.js"
 import type { StoredShoppingItem } from "../../src/shopping/shoppingWriteModels.js"
 
 const item = {
@@ -99,6 +97,22 @@ describe("shopping item mutation planning", () => {
 })
 
 describe("shopping completion pantry metadata", () => {
+  it("accepts the null shelf-life shape persisted for custom ingredients", () => {
+    expect(
+      parseIngredientMetadata({
+        allowedUnits: ["piece"],
+        defaultShelfLifeDays: null,
+        isBulkCandidate: false,
+        isNonFood: false,
+      }),
+    ).toEqual({
+      allowedUnits: ["piece"],
+      defaultShelfLifeDays: undefined,
+      isBulkCandidate: false,
+      isNonFood: false,
+    })
+  })
+
   it("classifies non-food before bulk and ordinary food last", () => {
     expect(sectionForIngredient({ isNonFood: true, isBulkCandidate: true })).toBe("nonFood")
     expect(sectionForIngredient({ isNonFood: false, isBulkCandidate: true })).toBe("bulk")
@@ -113,8 +127,6 @@ describe("shopping completion pantry metadata", () => {
         now,
       )?.toMillis(),
     ).toBe(Date.UTC(2026, 6, 21))
-    expect(
-      defaultExpiryDate({ isNonFood: false, isBulkCandidate: false }, now),
-    ).toBeNull()
+    expect(defaultExpiryDate({ isNonFood: false, isBulkCandidate: false }, now)).toBeNull()
   })
 })

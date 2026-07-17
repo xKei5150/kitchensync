@@ -1,6 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:kitchensync/core/firebase/firebase_emulator_settings.dart';
 import 'package:kitchensync/core/firebase/firebase_initializer.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/search_tokenizer.dart';
 
 /// Runs `body`, throwing a labelled error if it does not complete within
 /// `seconds`. Integration tests that talk to the emulator must never hang
@@ -40,4 +47,124 @@ Future<void> bootEmulatedApp() async {
     'wait for authenticated user',
     () => auth.authStateChanges().firstWhere((user) => user != null),
   );
+}
+
+/// Seeds the bundled global dictionary through the Firestore emulator's
+/// admin-only REST surface.
+///
+/// Client writes to `/ingredients` are intentionally denied by both rule
+/// profiles. Integration tests therefore use the emulator's `owner` token
+/// instead of weakening application authorization merely to arrange fixtures.
+Future<void> seedGlobalDictionaryThroughEmulatorAdmin() async {
+  const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+  if (!useEmulator) {
+    throw StateError('Admin fixture seeding is emulator-only.');
+  }
+
+  final decoded =
+      jsonDecode(await rootBundle.loadString('assets/seed/ingredients.json'))
+          as Map<String, dynamic>;
+  final ingredients = (decoded['ingredients'] as List)
+      .cast<Map<String, dynamic>>();
+  final now = DateTime.now().toUtc();
+  final writes = <Map<String, dynamic>>[];
+  for (final ingredient in ingredients) {
+    final id = ingredient['id'] as String;
+    final displayNames = Map<String, String>.from(
+      ingredient['displayNames'] as Map,
+    );
+    final aliases = ((ingredient['aliases'] as List?) ?? const [])
+        .cast<String>();
+    final parentTokens = ((ingredient['parentTokens'] as List?) ?? const [])
+        .cast<String>();
+    final taxonomyTags = ((ingredient['taxonomyTags'] as List?) ?? const [])
+        .cast<String>();
+    final formTags = ((ingredient['formTags'] as List?) ?? const [])
+        .cast<String>();
+    final document = <String, Object?>{
+      for (final entry in ingredient.entries)
+        if (entry.key != 'id' && entry.key != 'parentTokens')
+          entry.key: entry.value,
+      'name': displayNames['en']!.toLowerCase(),
+      'searchTokens': SearchTokenizer.buildIndex(
+        displayNames: displayNames,
+        aliases: aliases,
+        parentTokens: parentTokens,
+        taxonomyTags: taxonomyTags,
+        formTags: formTags,
+      ),
+      'scope': 'global',
+      'schemaVersion': 1,
+      'createdAt': now,
+      'updatedAt': now,
+    };
+    writes.add({
+      'update': {
+        'name':
+            'projects/kitchensync-dev-da503/databases/(default)/documents/'
+            'ingredients/$id',
+        'fields': _firestoreFields(document),
+      },
+    });
+  }
+
+  final settings = firebaseEmulatorSettingsForTarget(defaultTargetPlatform);
+  final client = HttpClient();
+  try {
+    final request = await client.postUrl(
+      Uri(
+        scheme: 'http',
+        host: settings.firestoreHost,
+        port: settings.firestorePort,
+        path:
+            '/v1/projects/kitchensync-dev-da503/databases/(default)/'
+            'documents:batchWrite',
+      ),
+    );
+    request.headers
+      ..contentType = ContentType.json
+      ..set(HttpHeaders.authorizationHeader, 'Bearer owner');
+    request.write(jsonEncode({'writes': writes}));
+    final response = await request.close();
+    final body = await utf8.decoder.bind(response).join();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        'Emulator admin seed failed (${response.statusCode}): $body',
+      );
+    }
+  } finally {
+    client.close(force: true);
+  }
+}
+
+Map<String, dynamic> _firestoreFields(Map<String, Object?> value) => {
+  for (final entry in value.entries) entry.key: _firestoreValue(entry.value),
+};
+
+Map<String, dynamic> _firestoreValue(Object? value) {
+  if (value == null) return const {'nullValue': null};
+  if (value is bool) return {'booleanValue': value};
+  if (value is int) return {'integerValue': value.toString()};
+  if (value is double) return {'doubleValue': value};
+  if (value is String) return {'stringValue': value};
+  if (value is DateTime) {
+    return {'timestampValue': value.toUtc().toIso8601String()};
+  }
+  if (value is List) {
+    return {
+      'arrayValue': {
+        'values': [for (final item in value) _firestoreValue(item)],
+      },
+    };
+  }
+  if (value is Map) {
+    return {
+      'mapValue': {
+        'fields': _firestoreFields(
+          value.map((key, item) => MapEntry(key.toString(), item as Object?)),
+        ),
+      },
+    };
+  }
+  throw ArgumentError.value(value, 'value', 'Unsupported Firestore fixture.');
 }

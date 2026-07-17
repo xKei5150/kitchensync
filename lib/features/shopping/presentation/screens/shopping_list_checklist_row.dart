@@ -56,6 +56,15 @@ class _ShoppingChecklistRow extends ConsumerWidget {
       onToggle: onToggle,
       onLongPress: onLongPress,
       onAction: onLongPress,
+      onTap: line.ingredientId == null
+          ? null
+          : () {
+              final householdId = ref.read(activeHouseholdIdProvider);
+              context.push(
+                '/ingredient/${line.ingredientId}'
+                '?householdId=${Uri.encodeQueryComponent(householdId)}',
+              );
+            },
       isBusy: isBusy,
     );
   }

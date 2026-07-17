@@ -48,6 +48,23 @@ export async function createShoppingWriteHarness() {
     async seedMembership(householdId: string, role = "shopper", isJoint = true): Promise<void> {
       await db.doc(`households/${householdId}`).set({ isJoint })
       await db.doc(`households/${householdId}/members/${uid}`).set({ role })
+      for (const ingredient of [
+        { id: "rice", unit: "kg" },
+        { id: "server-ingredient", unit: "piece" },
+        { id: "tomato", unit: "g" },
+        { id: "cauliflower", unit: "piece" },
+      ] as const) {
+        await db.doc(`ingredients/${ingredient.id}`).set({
+          name: ingredient.id,
+          displayNames: { en: ingredient.id },
+          category: "other",
+          defaultUnit: ingredient.unit,
+          allowedUnits: ["mg", "g", "kg", "ml", "l", "piece", "count", "tsp", "tbsp", "cup"],
+          isBulkCandidate: false,
+          isNonFood: false,
+          scope: "global",
+        })
+      }
     },
     async seedList(
       householdId: string,
@@ -74,20 +91,31 @@ export async function createShoppingWriteHarness() {
       readonly itemId: string
       readonly data?: Readonly<Record<string, unknown>>
     }): Promise<void> {
+      const data = {
+        shoppingListId: input.listId,
+        ingredientId: `ingredient-${input.itemId}`,
+        quantityNeeded: 1,
+        unit: "piece",
+        status: "unchecked",
+        substituteIngredientId: null,
+        substituteQuantity: null,
+        substituteUnit: null,
+        sourceMealLinks: [],
+        ...input.data,
+      } as const
+      await db.doc(`ingredients/${data.ingredientId}`).set({
+        name: data.ingredientId,
+        displayNames: { en: data.ingredientId },
+        category: "other",
+        defaultUnit: data.unit,
+        allowedUnits: ["mg", "g", "kg", "ml", "l", "piece", "count", "tsp", "tbsp", "cup"],
+        isBulkCandidate: false,
+        isNonFood: false,
+        scope: "global",
+      })
       await db
         .doc(`households/${input.householdId}/shoppingLists/${input.listId}/items/${input.itemId}`)
-        .set({
-          shoppingListId: input.listId,
-          ingredientId: `ingredient-${input.itemId}`,
-          quantityNeeded: 1,
-          unit: "piece",
-          status: "unchecked",
-          substituteIngredientId: null,
-          substituteQuantity: null,
-          substituteUnit: null,
-          sourceMealLinks: [],
-          ...input.data,
-        })
+        .set(data)
     },
     async seedAllocationDraft(input: {
       readonly householdId: string

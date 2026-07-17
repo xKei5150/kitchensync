@@ -1,4 +1,5 @@
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 
@@ -18,6 +19,7 @@ class ShoppingSuggestionReconcileInput {
     required this.recipes,
     required this.pantryItems,
     required this.shoppingLists,
+    this.ingredientsById = const {},
   });
 
   final String householdId;
@@ -25,6 +27,7 @@ class ShoppingSuggestionReconcileInput {
   final Iterable<PlannedRecipe> recipes;
   final Iterable<PantryItem> pantryItems;
   final Iterable<ShoppingListRecord> shoppingLists;
+  final Map<String, Ingredient> ingredientsById;
 }
 
 enum ShoppingSuggestionWriteIntent { create, update, cancel }

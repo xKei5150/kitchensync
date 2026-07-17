@@ -10,6 +10,7 @@ import {
 import { canonicalPayloadHash } from "./canonicalPayload.js"
 import { authorizeHouseholdShoppingRole, shoppingCommandType } from "./commandContext.js"
 import { mapFirestoreErrors, requireAuthUid } from "./errors.js"
+import { requireIngredientReference } from "./ingredientIntegrity.js"
 import {
   type AllocationPlannerClient,
   PlannerConfigurationError,
@@ -101,6 +102,15 @@ async function consumeReadyDraft(
     requireReadyDraft(draft.data(), input.planned)
     const list = await transaction.get(context.listRef)
     if (list.exists) throw new HttpsError("failed-precondition", "Shopping list already exists")
+    for (const item of input.planned.list.items) {
+      await requireIngredientReference(
+        transaction,
+        input.db,
+        input.command.householdId,
+        item.ingredientId,
+        item.unit,
+      )
+    }
     const writes = writePlan({
       authUid: input.authUid,
       householdId: input.command.householdId,

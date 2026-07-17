@@ -10,6 +10,8 @@ import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_identity.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/search_tokenizer.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/create_custom_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/widgets/unit_picker.dart';
@@ -24,9 +26,14 @@ import 'package:kitchensync/features/ingredient_dictionary/presentation/widgets/
 /// Graduated from "KitchenSync — P3 Accessibility & Forms". Every control binds
 /// to a real [CreateCustomIngredientParams] field.
 class CreateCustomIngredientScreen extends ConsumerStatefulWidget {
-  const CreateCustomIngredientScreen({super.key, this.initialName});
+  const CreateCustomIngredientScreen({
+    super.key,
+    this.initialName,
+    this.initialIngredient,
+  });
 
   final String? initialName;
+  final Ingredient? initialIngredient;
 
   @override
   ConsumerState<CreateCustomIngredientScreen> createState() =>
@@ -36,9 +43,20 @@ class CreateCustomIngredientScreen extends ConsumerStatefulWidget {
 class _CreateCustomIngredientScreenState
     extends ConsumerState<CreateCustomIngredientScreen> {
   late final TextEditingController _name = TextEditingController(
-    text: widget.initialName ?? '',
+    text:
+        widget.initialName ??
+        widget.initialIngredient?.displayNames['en'] ??
+        widget.initialIngredient?.name ??
+        '',
   )..addListener(() => setState(() {}));
   final TextEditingController _aliasInput = TextEditingController();
+  late final TextEditingController _purchaseInterval = TextEditingController(
+    text:
+        widget.initialIngredient?.defaultPurchaseIntervalDays?.toString() ?? '',
+  );
+  late final TextEditingController _pricePerUnit = TextEditingController(
+    text: widget.initialIngredient?.pricePerUnitHint?.toString() ?? '',
+  );
   final List<String> _aliases = [];
   IngredientCategory _category = IngredientCategory.produce;
   UnitId _defaultUnit = UnitId.piece;
@@ -56,6 +74,23 @@ class _CreateCustomIngredientScreenState
   /// A failure surfaced by the use case (not field validation).
   String? _error;
 
+  @override
+  void initState() {
+    super.initState();
+    final ingredient = widget.initialIngredient;
+    if (ingredient == null) return;
+    _aliases.addAll(ingredient.aliases);
+    _category = ingredient.category;
+    _defaultUnit = ingredient.defaultUnit;
+    _allowedUnits
+      ..clear()
+      ..addAll(ingredient.allowedUnits);
+    _localUnitDefinitions.addAll(ingredient.localUnitDefinitions);
+    _allergens.addAll(ingredient.allergens);
+    _diet.addAll(ingredient.dietaryTags);
+    _shelfLifeDays = ingredient.defaultShelfLifeDays ?? _shelfLifeDays;
+  }
+
   /// A new ingredient needs a name to be findable later.
   String? get _nameError => _name.text.trim().isEmpty
       ? 'Give it a name so you can find it later.'
@@ -65,6 +100,8 @@ class _CreateCustomIngredientScreenState
   void dispose() {
     _name.dispose();
     _aliasInput.dispose();
+    _purchaseInterval.dispose();
+    _pricePerUnit.dispose();
     super.dispose();
   }
 
@@ -136,6 +173,21 @@ class _CreateCustomIngredientScreenState
       return;
     }
     final name = _name.text.trim();
+    final purchaseIntervalText = _purchaseInterval.text.trim();
+    final purchaseInterval = purchaseIntervalText.isEmpty
+        ? null
+        : int.tryParse(purchaseIntervalText);
+    final priceText = _pricePerUnit.text.trim();
+    final pricePerUnit = priceText.isEmpty ? null : double.tryParse(priceText);
+    if (purchaseIntervalText.isNotEmpty &&
+        (purchaseInterval == null || purchaseInterval <= 0)) {
+      setState(() => _error = 'Purchase interval must be a positive number.');
+      return;
+    }
+    if (priceText.isNotEmpty && (pricePerUnit == null || pricePerUnit < 0)) {
+      setState(() => _error = 'Price per unit cannot be negative.');
+      return;
+    }
     if (!_allowedUnits.contains(_defaultUnit)) {
       setState(() => _error = 'The default unit must be an allowed unit.');
       return;
@@ -145,6 +197,46 @@ class _CreateCustomIngredientScreenState
       _validated = true;
       _error = null;
     });
+    final initial = widget.initialIngredient;
+    if (initial != null) {
+      try {
+        final now = ref.read(clockProvider).now();
+        final updated = initial.copyWith(
+          name: IngredientIdentity.normalize(name),
+          displayNames: {'en': name},
+          category: _category,
+          defaultUnit: _defaultUnit,
+          allowedUnits: _allowedUnits.toList(growable: false),
+          localUnitDefinitions: List.unmodifiable(_localUnitDefinitions),
+          aliases: List.unmodifiable(_aliases),
+          allergens: _allergens.toList(growable: false),
+          dietaryTags: _diet.toList(growable: false),
+          defaultShelfLifeDays: _shelfLifeDays,
+          defaultPurchaseIntervalDays: purchaseInterval,
+          pricePerUnitHint: pricePerUnit,
+          isBulkCandidate:
+              initial.isBulkCandidate ||
+              _category == IngredientCategory.bulkStaple,
+          isNonFood:
+              initial.isNonFood || _category == IngredientCategory.nonFood,
+          searchTokens: SearchTokenizer.buildIndex(
+            displayNames: {'en': name},
+            aliases: _aliases,
+          ),
+          updatedAt: now,
+        );
+        await ref.read(ingredientRepositoryProvider).updateCustom(updated);
+        if (mounted) context.pop<Ingredient>(updated);
+      } catch (error) {
+        if (mounted) {
+          setState(() {
+            _submitting = false;
+            _error = error.toString();
+          });
+        }
+      }
+      return;
+    }
     final useCase = ref.read(createCustomIngredientProvider);
     final hid = ref.read(activeHouseholdIdProvider);
     final r = await useCase(
@@ -159,6 +251,8 @@ class _CreateCustomIngredientScreenState
         allergens: _allergens.toList(),
         dietaryTags: _diet.toList(),
         defaultShelfLifeDays: _shelfLifeDays,
+        defaultPurchaseIntervalDays: purchaseInterval,
+        pricePerUnitHint: pricePerUnit,
         isBulkCandidate: _category == IngredientCategory.bulkStaple,
         isNonFood: _category == IngredientCategory.nonFood,
       ),
@@ -194,7 +288,11 @@ class _CreateCustomIngredientScreenState
                 ),
                 children: [
                   _IdentityPreview(
-                    name: name.isEmpty ? 'New ingredient' : name,
+                    name: name.isEmpty
+                        ? widget.initialIngredient == null
+                              ? 'New ingredient'
+                              : 'Edit ingredient'
+                        : name,
                     category: _category,
                     shelfLifeDays: _shelfLifeDays,
                     placeholder: name.isEmpty,
@@ -238,6 +336,22 @@ class _CreateCustomIngredientScreenState
                     value: _shelfSlider,
                     enabled: !_submitting,
                     onChanged: _onShelfSlider,
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Typical purchase interval (days)'),
+                  _PlainField(
+                    controller: _purchaseInterval,
+                    hintText: 'Optional, e.g. 30',
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: KsTokens.space16),
+                  const KsFieldLabel('Price per default unit'),
+                  _PlainField(
+                    controller: _pricePerUnit,
+                    hintText: 'Optional estimate',
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                   ),
                   const SizedBox(height: KsTokens.space16),
                   const KsFieldLabel('Default unit'),
@@ -483,6 +597,7 @@ class _PlainField extends StatelessWidget {
     this.textInputAction,
     this.onSubmitted,
     this.errorText,
+    this.keyboardType,
   });
 
   final TextEditingController controller;
@@ -490,6 +605,7 @@ class _PlainField extends StatelessWidget {
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
   final String? errorText;
+  final TextInputType? keyboardType;
 
   @override
   Widget build(BuildContext context) {
@@ -499,6 +615,7 @@ class _PlainField extends StatelessWidget {
       controller: controller,
       textInputAction: textInputAction,
       onSubmitted: onSubmitted,
+      keyboardType: keyboardType,
       style: KsTokens.bodyLarge.copyWith(color: ks.textPrimary),
       decoration: InputDecoration(
         hintText: hintText,

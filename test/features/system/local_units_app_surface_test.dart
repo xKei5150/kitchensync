@@ -31,8 +31,9 @@ import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/consumption_history_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
@@ -482,7 +483,8 @@ class _IngredientRepositoryFake implements IngredientRepository {
   );
 }
 
-class _PantryRepositoryFake implements PantryRepository {
+class _PantryRepositoryFake
+    implements PantryRepository, InventoryQuantityRepository {
   final items = <PantryItem>[];
 
   @override
@@ -498,6 +500,56 @@ class _PantryRepositoryFake implements PantryRepository {
   ) async {
     final index = items.indexWhere((item) => item.id == itemId);
     items[index] = items[index].copyWith(quantity: newQty);
+  }
+
+  @override
+  Future<PantryItem> adjustQuantityAtomic({
+    required String householdId,
+    required String pantryItemId,
+    required double delta,
+    required String eventId,
+    required DateTime occurredAt,
+    required QuantityDecreaseAudit decreaseAudit,
+  }) async {
+    final current = _required(pantryItemId);
+    final updated = current.copyWith(
+      quantity: current.quantity + delta,
+      updatedAt: occurredAt,
+    );
+    await update(updated);
+    return updated;
+  }
+
+  @override
+  Future<PantryItem> updateWithQuantityAuditAtomic({
+    required PantryItem item,
+    required String eventId,
+    required DateTime occurredAt,
+    required QuantityDecreaseAudit decreaseAudit,
+  }) async {
+    final updated = item.copyWith(updatedAt: occurredAt);
+    await update(updated);
+    return updated;
+  }
+
+  @override
+  Future<PantryItem> restockAtomic({
+    required String householdId,
+    required String pantryItemId,
+    required double quantityToAdd,
+    required String eventId,
+    required DateTime occurredAt,
+    required DateTime? incomingExpiryDate,
+  }) async {
+    final current = _required(pantryItemId);
+    final updated = current.copyWith(
+      quantity: current.quantity + quantityToAdd,
+      lastPurchaseDate: occurredAt,
+      expiryDate: incomingExpiryDate ?? current.expiryDate,
+      updatedAt: occurredAt,
+    );
+    await update(updated);
+    return updated;
   }
 
   @override
@@ -566,6 +618,12 @@ class _PantryRepositoryFake implements PantryRepository {
       if (test(item)) return item;
     }
     return null;
+  }
+
+  PantryItem _required(String itemId) {
+    final item = _find((candidate) => candidate.id == itemId);
+    if (item == null) throw StateError('Missing pantry item $itemId.');
+    return item;
   }
 }
 

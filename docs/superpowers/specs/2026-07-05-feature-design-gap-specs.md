@@ -60,6 +60,16 @@ The main incomplete area is the product loop described by the Feature Design: Re
 
 ## Implementation Specs For Later Work
 
+## Ingredient Price Hint Semantics
+
+`pricePerUnitHint` is the estimated price for one `defaultUnit` of the
+ingredient, in the household's display currency. Recipe and shopping estimates
+convert each line to that ingredient default unit using the same built-in and
+`localUnitDefinitions` conversion path used by pantry and shopping arithmetic.
+An estimate is omitted when any line lacks a price hint or cannot be converted;
+the system never silently prices incompatible dimensions. A manually authored
+recipe `priceEstimate` always overrides the ingredient-derived estimate.
+
 ### Spec 1: Replace Auth Placeholders With Real Account Onboarding
 
 **Goal:** Users can register/sign in with email, Google, or Apple, then create/select/join a household without debug fallback.

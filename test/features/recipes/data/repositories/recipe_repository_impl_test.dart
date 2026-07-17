@@ -17,9 +17,23 @@ void main() {
   late Recipe publicRecipe;
   late Recipe privateRecipe;
 
-  setUp(() {
+  setUp(() async {
     db = FakeFirebaseFirestore();
     repo = RecipeRepositoryImpl(RecipeRemoteDataSource(FirestoreRefs(db)));
+    for (final entry in {
+      'chicken-thighs': ['kg', 'g'],
+      'lentils': ['g', 'kg'],
+      'garlic': ['piece'],
+    }.entries) {
+      await db.collection('ingredients').doc(entry.key).set({
+        'name': entry.key,
+        'displayNames': {'en': entry.key},
+        'category': 'other',
+        'defaultUnit': entry.value.first,
+        'allowedUnits': entry.value,
+        'scope': 'global',
+      });
+    }
     publicRecipe = Recipe(
       id: 'public-1',
       authorUserId: 'author-1',

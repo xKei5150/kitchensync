@@ -16,8 +16,8 @@ import 'package:kitchensync/features/calendar/presentation/providers/calendar_re
 import 'package:kitchensync/features/calendar/presentation/providers/shopping_schedule_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
-import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
@@ -36,6 +36,10 @@ void main() {
     tester,
   ) async {
     await bootEmulatedApp();
+    await withTimeout(
+      'seed global ingredient dictionary',
+      seedGlobalDictionaryThroughEmulatorAdmin,
+    );
 
     final authSession = await withTimeout(
       'create auth emulator session',
@@ -216,31 +220,37 @@ void main() {
       (item) => item.ingredientId == tomatoIngredientId,
     );
 
-    await withTimeout('mark shopping rows', () async {
-      await shopping.updateItemStatus(
+    final readyRevision = await withTimeout('mark shopping rows', () async {
+      final beanResult = await shopping.updateItemStatus(
         listId: list.id,
         itemId: beanLine.id,
         expectedRevision: list.revision,
         status: ShoppingListItemStatus.bought,
       );
-      final afterBeanList = await shoppingRepository
-          .watchList(householdId: householdId, listId: list.id)
-          .firstWhere((current) => current?.revision == 1);
-      await shopping.updateItemStatus(
+      final beanRevision = beanResult?.revision;
+      if (beanRevision == null) {
+        throw StateError('Bought mutation did not return a revision.');
+      }
+      final tomatoResult = await shopping.updateItemStatus(
         listId: list.id,
         itemId: tomatoLine.id,
-        expectedRevision: afterBeanList!.revision,
+        expectedRevision: beanRevision,
         status: ShoppingListItemStatus.substituted,
         substituteIngredientId: 'pepper',
         substituteQuantity: 300,
         substituteUnit: UnitId.g,
       );
+      final tomatoRevision = tomatoResult?.revision;
+      if (tomatoRevision == null) {
+        throw StateError('Substitution mutation did not return a revision.');
+      }
+      return tomatoRevision;
     });
     final readyList = await withTimeout(
       'load updated shopping list',
       () => shoppingRepository
           .watchList(householdId: householdId, listId: list.id)
-          .firstWhere((current) => current?.revision == 2),
+          .firstWhere((current) => current?.revision == readyRevision),
     );
     final shoppingCommands = ShoppingCommandController(
       repository: shoppingCommandRepository,
@@ -258,7 +268,7 @@ void main() {
       () => container
           .read(purchaseHistoryRepositoryProvider)
           .watchByHousehold(householdId)
-          .first,
+          .firstWhere((items) => items.length == 2),
     );
     expect(purchases.map((purchase) => purchase.ingredientId).toSet(), {
       beanIngredientId,
@@ -302,12 +312,32 @@ void main() {
           quantity: 0.5,
           unit: UnitId.kg,
           section: PantrySection.bulk,
-          expiryDate: DateTime(2026, 8, 1),
-          createdAt: DateTime(2026, 7, 1),
-          updatedAt: DateTime(2026, 7, 1),
+          expiryDate: DateTime(2026, 8),
+          createdAt: DateTime(2026, 7),
+          updatedAt: DateTime(2026, 7),
         ),
       );
     });
+
+    await withTimeout(
+      'persist cooking substitution override',
+      () => container
+          .read(calendarRepositoryProvider)
+          .upsertMeal(
+            householdId: householdId,
+            entry: meal.copyWith(
+              ingredientOverrides: [
+                MealIngredientOverride(
+                  originalIngredientId: tomatoIngredientId,
+                  originalUnit: UnitId.g,
+                  substituteIngredientId: 'pepper',
+                  substituteQuantity: 300,
+                  substituteUnit: UnitId.g,
+                ),
+              ],
+            ),
+          ),
+    );
 
     final overriddenMeal = await withTimeout(
       'load meal with substitution override',
@@ -318,8 +348,13 @@ void main() {
             startDate: DateTime(2026, 7, 6),
             endDate: DateTime(2026, 7, 6),
           )
-          .first
-          .then((meals) => meals.single),
+          .firstWhere(
+            (meals) => meals.any(
+              (entry) =>
+                  entry.id == meal.id && entry.ingredientOverrides.isNotEmpty,
+            ),
+          )
+          .then((meals) => meals.singleWhere((entry) => entry.id == meal.id)),
     );
     expect(
       overriddenMeal.ingredientOverrides.single.substituteIngredientId,
@@ -353,16 +388,22 @@ void main() {
             startDate: DateTime(2026, 7, 6),
             endDate: DateTime(2026, 7, 6),
           )
-          .first
-          .then((meals) => meals.single),
+          .firstWhere(
+            (meals) => meals.any(
+              (entry) =>
+                  entry.id == meal.id &&
+                  entry.state == ScheduledMealState.cooked,
+            ),
+          )
+          .then((meals) => meals.singleWhere((entry) => entry.id == meal.id)),
     );
     expect(cookedMeal.state, ScheduledMealState.cooked);
     final expiringLot = await pantryRepository
         .watchById(householdId, 'pepper-bulk-expiring')
-        .first;
+        .firstWhere((item) => item?.quantity == 0);
     final laterLot = await pantryRepository
         .watchById(householdId, 'pepper-bulk-later')
-        .first;
+        .firstWhere((item) => ((item?.quantity ?? 0) - 0.3).abs() < 0.000001);
     expect(expiringLot?.quantity, 0);
     expect(laterLot?.quantity, closeTo(0.3, 0.000001));
 
@@ -371,14 +412,20 @@ void main() {
       () => cookingContainer
           .read(consumptionHistoryRepositoryProvider)
           .watchByHousehold(householdId)
-          .first,
+          .firstWhere(
+            (events) =>
+                events
+                    .where((event) => event.ingredientId == 'pepper')
+                    .length ==
+                2,
+          ),
     );
     final pepperEvents = cookingEvents
         .where((event) => event.ingredientId == 'pepper')
         .toList(growable: false);
     expect(pepperEvents, hasLength(2));
     expect(
-      pepperEvents.fold<double>(0, (sum, event) => sum + event.quantity),
+      pepperEvents.fold<double>(0, (total, event) => total + event.quantity),
       closeTo(0.3, 0.000001),
     );
     expect(pepperEvents.every((event) => event.unit == UnitId.kg), isTrue);
@@ -404,8 +451,15 @@ void main() {
             startDate: DateTime(2026, 7, 7),
             endDate: DateTime(2026, 7, 7),
           )
-          .first
-          .then((meals) => meals.single),
+          .firstWhere(
+            (meals) =>
+                meals.any((entry) => entry.linkedLeftoverId == leftover.id),
+          )
+          .then(
+            (meals) => meals.singleWhere(
+              (entry) => entry.linkedLeftoverId == leftover.id,
+            ),
+          ),
     );
     await withTimeout(
       'set partial leftover serving',
@@ -418,7 +472,9 @@ void main() {
     );
     final remainingLeftover = await withTimeout(
       'load remaining leftover',
-      () => pantryRepository.watchById(householdId, leftover.id).first,
+      () => pantryRepository
+          .watchById(householdId, leftover.id)
+          .firstWhere((item) => item?.quantity == 1),
     );
     expect(remainingLeftover?.quantity, 1);
     expect(remainingLeftover?.leftoverServings, 1);
@@ -432,10 +488,10 @@ void main() {
       () => cookingContainer
           .read(wasteRepositoryProvider)
           .watchByHousehold(householdId)
-          .first,
+          .firstWhere((events) => events.any((event) => event.id == 'waste-1')),
     );
     expect(wasteEvents.single.id, 'waste-1');
-    expect(wasteEvents.single.ingredientId, tomatoIngredientId);
+    expect(wasteEvents.single.ingredientId, leftover.ingredientId);
     expect(wasteEvents.single.quantity, 1);
 
     final leftoverMeal = await withTimeout(
@@ -447,8 +503,18 @@ void main() {
             startDate: DateTime(2026, 7, 7),
             endDate: DateTime(2026, 7, 7),
           )
-          .first
-          .then((meals) => meals.single),
+          .firstWhere(
+            (meals) => meals.any(
+              (entry) =>
+                  entry.linkedLeftoverId == leftover.id &&
+                  entry.state == ScheduledMealState.cooked,
+            ),
+          )
+          .then(
+            (meals) => meals.singleWhere(
+              (entry) => entry.linkedLeftoverId == leftover.id,
+            ),
+          ),
     );
     expect(leftoverMeal.linkedLeftoverId, leftover.id);
     expect(leftoverMeal.state, ScheduledMealState.cooked);

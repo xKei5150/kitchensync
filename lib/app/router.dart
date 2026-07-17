@@ -15,6 +15,7 @@ import 'package:kitchensync/features/dev_tools/system_states_screen.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/household/presentation/screens/household_screen.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/create_custom_ingredient_screen.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/ingredient_detail_screen.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/ingredient_picker_screen.dart';
@@ -24,8 +25,8 @@ import 'package:kitchensync/features/notifications/presentation/screens/notifica
 import 'package:kitchensync/features/onboarding/presentation/screens/household_setup_screen.dart';
 import 'package:kitchensync/features/onboarding/presentation/screens/sign_in_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/add_pantry_item_screen.dart';
-import 'package:kitchensync/features/pantry/presentation/screens/insights_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/bulk_purchase_screen.dart';
+import 'package:kitchensync/features/pantry/presentation/screens/insights_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/pantry_home_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/pantry_item_detail_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/waste_log_screen.dart';

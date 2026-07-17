@@ -18,7 +18,67 @@ interface SeedIngredient {
   readonly formTags?: readonly string[];
   readonly allergens?: readonly string[];
   readonly dietaryTags?: readonly string[];
+  readonly category?: string;
+  readonly defaultUnit?: string;
+  readonly allowedUnits?: readonly string[];
+  readonly defaultPurchaseIntervalDays?: number | null;
+  readonly pricePerUnitHint?: number | null;
+  readonly isBulkCandidate?: boolean;
+  readonly isNonFood?: boolean;
   readonly [key: string]: unknown;
+}
+
+const SUPPORTED_CATEGORIES = [
+  "produce", "meat", "seafood", "dairy", "grain", "bakery", "spice",
+  "condiment", "baking", "beverage", "frozen", "bulkStaple", "nonFood",
+  "other",
+] as const;
+
+function validateSeed(seed: SeedDoc): void {
+  if (!Number.isInteger(seed.version) || seed.version < 1) {
+    throw new Error("Seed version must be a positive integer.");
+  }
+  const ids = new Set<string>();
+  const categories = new Set<string>();
+  for (const ingredient of seed.ingredients) {
+    if (!ingredient.id || ids.has(ingredient.id)) {
+      throw new Error(`Duplicate or empty ingredient id: "${ingredient.id}".`);
+    }
+    ids.add(ingredient.id);
+    if (!ingredient.category ||
+        !SUPPORTED_CATEGORIES.includes(
+          ingredient.category as typeof SUPPORTED_CATEGORIES[number]
+        )) {
+      throw new Error(`Ingredient "${ingredient.id}" has an invalid category.`);
+    }
+    categories.add(ingredient.category);
+    if (!ingredient.defaultUnit ||
+        !ingredient.allowedUnits?.includes(ingredient.defaultUnit)) {
+      throw new Error(
+        `Ingredient "${ingredient.id}" must allow its default unit.`,
+      );
+    }
+    if ((ingredient.defaultPurchaseIntervalDays ?? 1) <= 0) {
+      throw new Error(
+        `Ingredient "${ingredient.id}" has an invalid purchase interval.`,
+      );
+    }
+    if ((ingredient.pricePerUnitHint ?? 0) < 0) {
+      throw new Error(`Ingredient "${ingredient.id}" has a negative price.`);
+    }
+    if (ingredient.category === "nonFood" && ingredient.isNonFood !== true) {
+      throw new Error(`Ingredient "${ingredient.id}" must be non-food.`);
+    }
+    if (ingredient.category === "bulkStaple" &&
+        ingredient.isBulkCandidate !== true) {
+      throw new Error(`Ingredient "${ingredient.id}" must be bulk-capable.`);
+    }
+  }
+  for (const category of SUPPORTED_CATEGORIES) {
+    if (!categories.has(category)) {
+      throw new Error(`Seed has no coverage for category "${category}".`);
+    }
+  }
 }
 
 // Project ids per env — required when authenticating via Application Default
@@ -114,6 +174,7 @@ async function main() {
   const db = getFirestore(app);
 
   const seed = JSON.parse(readFileSync(seedPath, "utf-8")) as SeedDoc;
+  validateSeed(seed);
   console.log(`Uploading ${seed.ingredients.length} ingredients to ${env}...`);
 
   let written = 0;

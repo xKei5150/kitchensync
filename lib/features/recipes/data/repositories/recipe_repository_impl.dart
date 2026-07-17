@@ -2,7 +2,8 @@ import 'package:kitchensync/features/recipes/data/datasources/recipe_remote_data
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
 
-class RecipeRepositoryImpl implements RecipeRepository {
+class RecipeRepositoryImpl
+    implements RecipeRepository, IngredientRewriteRecipeRepository {
   RecipeRepositoryImpl(this._remote);
 
   final RecipeRemoteDataSource _remote;
@@ -46,5 +47,24 @@ class RecipeRepositoryImpl implements RecipeRepository {
     localRecipeId: localRecipeId,
     savedRecipeId: savedRecipeId,
     now: now,
+  );
+
+  @override
+  Future<SavedRecipe> savePublicRecipeAsLocalCopyWithIngredientRewrites({
+    required String sourceRecipeId,
+    required String userId,
+    required String householdId,
+    required String localRecipeId,
+    required String savedRecipeId,
+    required DateTime now,
+    required Map<String, String> ingredientIdRewrites,
+  }) => _remote.savePublicRecipeAsLocalCopy(
+    sourceRecipeId: sourceRecipeId,
+    userId: userId,
+    householdId: householdId,
+    localRecipeId: localRecipeId,
+    savedRecipeId: savedRecipeId,
+    now: now,
+    ingredientIdRewrites: ingredientIdRewrites,
   );
 }

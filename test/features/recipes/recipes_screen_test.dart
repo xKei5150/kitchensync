@@ -13,7 +13,7 @@ import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
-import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/create_custom_ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/resolve_or_create_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
@@ -45,7 +45,8 @@ Future<Widget> _wrap(
   );
 }
 
-class _FakeRecipeRepository implements RecipeRepository {
+class _FakeRecipeRepository
+    implements RecipeRepository, IngredientRewriteRecipeRepository {
   _FakeRecipeRepository([List<Recipe> initial = const []])
     : _recipes = List.of(initial);
 
@@ -122,6 +123,25 @@ class _FakeRecipeRepository implements RecipeRepository {
     required String localRecipeId,
     required String savedRecipeId,
     required DateTime now,
+  }) => savePublicRecipeAsLocalCopyWithIngredientRewrites(
+    sourceRecipeId: sourceRecipeId,
+    userId: userId,
+    householdId: householdId,
+    localRecipeId: localRecipeId,
+    savedRecipeId: savedRecipeId,
+    now: now,
+    ingredientIdRewrites: const {},
+  );
+
+  @override
+  Future<SavedRecipe> savePublicRecipeAsLocalCopyWithIngredientRewrites({
+    required String sourceRecipeId,
+    required String userId,
+    required String householdId,
+    required String localRecipeId,
+    required String savedRecipeId,
+    required DateTime now,
+    required Map<String, String> ingredientIdRewrites,
   }) async {
     final source = _recipes.singleWhere(
       (recipe) => recipe.id == sourceRecipeId,
@@ -148,7 +168,8 @@ class _FakeRecipeRepository implements RecipeRepository {
           RecipeIngredient(
             id: ingredient.id,
             recipeId: localRecipeId,
-            ingredientId: ingredient.ingredientId,
+            ingredientId:
+                ingredientIdRewrites[ingredient.id] ?? ingredient.ingredientId,
             quantity: ingredient.quantity,
             unit: ingredient.unit,
             description: ingredient.description,
@@ -235,6 +256,39 @@ class _FakeIngredientRepository implements IngredientRepository {
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       Stream.value(const []);
 }
+
+class _FailingIngredientRepository extends _FakeIngredientRepository {
+  @override
+  Future<void> createCustom(Ingredient ingredient) async {
+    throw StateError('dictionary unavailable');
+  }
+}
+
+ResolveOrCreateIngredient _resolver(
+  IngredientRepository repository,
+  DateTime now,
+) => ResolveOrCreateIngredient(repository, clock: FakeClock(now));
+
+Ingredient _globalIngredient({
+  required String id,
+  required String name,
+  required IngredientCategory category,
+  required List<UnitId> units,
+  List<String> aliases = const [],
+  bool isBulkCandidate = false,
+}) => Ingredient(
+  id: id,
+  name: name.toLowerCase(),
+  displayNames: {'en': name},
+  category: category,
+  defaultUnit: units.first,
+  allowedUnits: units,
+  aliases: aliases,
+  isBulkCandidate: isBulkCandidate,
+  scope: IngredientScope.global,
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026),
+);
 
 List<Recipe> _publicRecipes() {
   final now = DateTime(2026, 7, 5);
@@ -389,10 +443,15 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final repo = _FakeRecipeRepository(_publicRecipes());
+      final ingredients = _FakeIngredientRepository();
       addTearDown(repo.dispose);
 
       await tester.pumpWidget(
-        await _wrap(const RecipesScreen(), recipeRepository: repo),
+        await _wrap(
+          const RecipesScreen(),
+          recipeRepository: repo,
+          ingredientRepository: ingredients,
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -419,10 +478,15 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final repo = _FakeRecipeRepository(_publicRecipes());
+      final ingredients = _FakeIngredientRepository();
       addTearDown(repo.dispose);
 
       await tester.pumpWidget(
-        await _wrap(const RecipesScreen(), recipeRepository: repo),
+        await _wrap(
+          const RecipesScreen(),
+          recipeRepository: repo,
+          ingredientRepository: ingredients,
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -470,7 +534,29 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final repo = _FakeRecipeRepository();
-    final ingredients = _FakeIngredientRepository();
+    final ingredients = _FakeIngredientRepository([
+      _globalIngredient(
+        id: 'flour',
+        name: 'Flour',
+        category: IngredientCategory.baking,
+        units: const [UnitId.g, UnitId.kg, UnitId.cup],
+        isBulkCandidate: true,
+      ),
+      _globalIngredient(
+        id: 'salt',
+        name: 'Salt',
+        category: IngredientCategory.spice,
+        units: const [UnitId.g, UnitId.tsp, UnitId.tbsp],
+        isBulkCandidate: true,
+      ),
+      _globalIngredient(
+        id: 'oil',
+        name: 'Oil',
+        category: IngredientCategory.condiment,
+        units: const [UnitId.ml, UnitId.l, UnitId.tbsp, UnitId.cup],
+        isBulkCandidate: true,
+      ),
+    ]);
     addTearDown(repo.dispose);
 
     await tester.pumpWidget(
@@ -501,16 +587,17 @@ void main() {
     expect(find.text('Private · Serves 4'), findsOneWidget);
     expect(find.byType(KsRecipeCard), findsOneWidget);
     expect(repo.recipes.single.name, 'Fried Chicken');
-    expect(ingredients.created.map((ingredient) => ingredient.name), [
-      'chicken thighs',
-      'flour',
-      'salt',
-      'oil',
-    ]);
     expect(
-      repo.recipes.single.ingredients.first.ingredientId,
-      ingredients.created.first.id,
+      ingredients.created
+          .where(
+            (ingredient) => ingredient.scope == IngredientScope.householdCustom,
+          )
+          .map((ingredient) => ingredient.name),
+      ['chicken thighs'],
     );
+    expect(repo.recipes.single.ingredients[1].ingredientId, 'flour');
+    expect(repo.recipes.single.ingredients[2].ingredientId, 'salt');
+    expect(repo.recipes.single.ingredients[3].ingredientId, 'oil');
   });
 
   testWidgets('RecipesScreen saves manual recipe with multiple ingredients', (
@@ -521,7 +608,23 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final repo = _FakeRecipeRepository();
-    final ingredients = _FakeIngredientRepository();
+    final ingredients = _FakeIngredientRepository([
+      _globalIngredient(
+        id: 'soy-sauce',
+        name: 'Soy Sauce',
+        category: IngredientCategory.condiment,
+        units: const [
+          UnitId.g,
+          UnitId.kg,
+          UnitId.ml,
+          UnitId.l,
+          UnitId.piece,
+          UnitId.tsp,
+          UnitId.tbsp,
+          UnitId.cup,
+        ],
+      ),
+    ]);
     addTearDown(repo.dispose);
 
     await tester.pumpWidget(
@@ -596,21 +699,16 @@ void main() {
     expect(repo.recipes.single.mealTimeTags, ['Lunch', 'Dinner']);
     expect(repo.recipes.single.recipeTags, ['Chicken', 'Filipino']);
     expect(repo.recipes.single.priceEstimate, 320);
-    expect(ingredients.created.map((ingredient) => ingredient.name), [
-      'chicken thighs',
-      'soy sauce',
-    ]);
-    expect(ingredients.created.first.category, IngredientCategory.meat);
-    expect(ingredients.created.last.category, IngredientCategory.condiment);
+    final custom = ingredients.created
+        .where(
+          (ingredient) => ingredient.scope == IngredientScope.householdCustom,
+        )
+        .single;
+    expect(custom.name, 'chicken thighs');
+    expect(custom.category, IngredientCategory.meat);
     expect(repo.recipes.single.ingredients, hasLength(2));
-    expect(
-      repo.recipes.single.ingredients.first.ingredientId,
-      ingredients.created.first.id,
-    );
-    expect(
-      repo.recipes.single.ingredients.last.ingredientId,
-      ingredients.created.last.id,
-    );
+    expect(repo.recipes.single.ingredients.first.ingredientId, custom.id);
+    expect(repo.recipes.single.ingredients.last.ingredientId, 'soy-sauce');
     expect(repo.recipes.single.ingredients.first.preparationNote, 'bone-in');
     expect(repo.recipes.single.ingredients.last.preparationNote, 'dark');
     expect(repo.recipes.single.instructions, [
@@ -718,7 +816,19 @@ void main() {
     'RecipeImportController links picked ingredient id without duplication',
     () async {
       final repo = _FakeRecipeRepository();
-      final ingredients = _FakeIngredientRepository();
+      final ingredients = _FakeIngredientRepository([
+        Ingredient(
+          id: 'seed-egg',
+          name: 'egg',
+          displayNames: const {'en': 'Egg'},
+          category: IngredientCategory.produce,
+          defaultUnit: UnitId.piece,
+          allowedUnits: const [UnitId.piece],
+          scope: IngredientScope.global,
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        ),
+      ]);
       addTearDown(repo.dispose);
       final controller = RecipeImportController(
         repository: repo,
@@ -726,10 +836,9 @@ void main() {
         userId: 'demo-user',
         idGenerator: FakeIdGenerator(['recipe-1', 'recipe-ing-1']),
         clock: FakeClock(DateTime(2026, 7, 5, 9)),
-        createCustomIngredient: CreateCustomIngredient(
+        resolveOrCreateIngredient: _resolver(
           ingredients,
-          idGenerator: FakeIdGenerator(['custom-ingredient-1']),
-          clock: FakeClock(DateTime(2026, 7, 5, 9)),
+          DateTime(2026, 7, 5, 9),
         ),
       );
 
@@ -755,7 +864,7 @@ void main() {
 
       expect(imported.single.ingredients.single.ingredientId, 'seed-egg');
       expect(repo.recipes.single.ingredients.single.ingredientId, 'seed-egg');
-      expect(ingredients.created, isEmpty);
+      expect(ingredients.created, hasLength(1));
     },
   );
 
@@ -776,10 +885,9 @@ void main() {
       userId: 'demo-user',
       idGenerator: FakeIdGenerator(['recipe-1']),
       clock: FakeClock(DateTime(2026, 7, 5, 9)),
-      createCustomIngredient: CreateCustomIngredient(
+      resolveOrCreateIngredient: _resolver(
         ingredients,
-        idGenerator: FakeIdGenerator(['custom-ingredient-1']),
-        clock: FakeClock(DateTime(2026, 7, 5, 9)),
+        DateTime(2026, 7, 5, 9),
       ),
     );
 
@@ -821,11 +929,7 @@ void main() {
       ),
       idGenerator: FakeIdGenerator(['recipe-ing-1']),
       clock: FakeClock(now),
-      createCustomIngredient: () => CreateCustomIngredient(
-        ingredients,
-        idGenerator: FakeIdGenerator(['custom-ingredient-1']),
-        clock: FakeClock(now),
-      ),
+      resolveOrCreateIngredient: () => _resolver(ingredients, now),
     );
 
     expect(
@@ -876,10 +980,9 @@ void main() {
       userId: 'demo-user',
       idGenerator: FakeIdGenerator(['recipe-1']),
       clock: FakeClock(DateTime(2026, 7, 5, 9)),
-      createCustomIngredient: CreateCustomIngredient(
+      resolveOrCreateIngredient: _resolver(
         ingredients,
-        idGenerator: FakeIdGenerator(['custom-ingredient-1']),
-        clock: FakeClock(DateTime(2026, 7, 5, 9)),
+        DateTime(2026, 7, 5, 9),
       ),
     );
 
@@ -902,6 +1005,100 @@ void main() {
     );
     expect(repo.recipes, isEmpty);
     expect(ingredients.created, isEmpty);
+  });
+
+  test(
+    'public copy rewrites an inaccessible source custom ingredient',
+    () async {
+      final now = DateTime(2026, 7, 5, 9);
+      final source = Recipe(
+        id: 'public-custom',
+        authorUserId: 'author',
+        householdId: 'source-household',
+        name: 'House Curry',
+        description: '',
+        defaultServingSize: 4,
+        mealTimeTags: const ['Dinner'],
+        recipeTags: const [],
+        location: '',
+        visibility: RecipeVisibility.public,
+        monetization: RecipeMonetization.free,
+        createdAt: now,
+        updatedAt: now,
+        ingredients: const [
+          RecipeIngredient(
+            id: 'line-spice',
+            recipeId: 'public-custom',
+            ingredientId: 'source-random-custom-id',
+            quantity: 10,
+            unit: UnitId.g,
+            description: 'House Spice',
+          ),
+        ],
+        instructions: const ['Cook.'],
+      );
+      final recipes = _FakeRecipeRepository([source]);
+      final ingredients = _FakeIngredientRepository();
+      addTearDown(recipes.dispose);
+      final controller = RecipeDiscoveryController(
+        repository: recipes,
+        householdId: 'destination',
+        userId: 'user',
+        idGenerator: FakeIdGenerator(['local-copy', 'saved-link']),
+        clock: FakeClock(now),
+        resolveOrCreateIngredient: _resolver(ingredients, now),
+      );
+
+      final saved = await controller.savePublicRecipe(source);
+      final copied = recipes.recipes.singleWhere(
+        (recipe) => recipe.id == 'local-copy',
+      );
+      final destinationIngredient = ingredients.created.single;
+      expect(saved.localRecipeId, 'local-copy');
+      expect(destinationIngredient.householdId, 'destination');
+      expect(copied.ingredients.single.ingredientId, destinationIngredient.id);
+      expect(
+        copied.ingredients.single.ingredientId,
+        isNot('source-random-custom-id'),
+      );
+    },
+  );
+
+  test('ingredient failure leaves a recipe completely unsaved', () async {
+    final recipes = _FakeRecipeRepository();
+    final ingredients = _FailingIngredientRepository();
+    addTearDown(recipes.dispose);
+    final controller = RecipeImportController(
+      repository: recipes,
+      householdId: 'h1',
+      userId: 'user',
+      idGenerator: FakeIdGenerator(['recipe', 'line']),
+      clock: FakeClock(DateTime(2026, 7, 5)),
+      resolveOrCreateIngredient: _resolver(ingredients, DateTime(2026, 7, 5)),
+    );
+
+    await expectLater(
+      controller.importDrafts([
+        const RecipeDraft(
+          name: 'Failure stew',
+          defaultServingSize: 2,
+          timeTags: [],
+          recipeTags: [],
+          description: '',
+          ingredients: [
+            RecipeIngredientDraft(
+              name: 'Missing spice',
+              quantity: 1,
+              unit: UnitId.g,
+            ),
+          ],
+          instructions: ['Cook.'],
+          visibility: RecipeVisibility.private,
+        ),
+      ]),
+      throwsStateError,
+    );
+    expect(recipes.recipes, isEmpty);
   });
 
   testWidgets('RecipesScreen renders in dark theme without error', (

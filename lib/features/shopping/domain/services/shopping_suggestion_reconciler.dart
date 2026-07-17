@@ -4,6 +4,7 @@
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_unit_converter.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_recovery.dart';

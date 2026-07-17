@@ -3,7 +3,7 @@ import 'package:diacritic/diacritic.dart';
 class SearchTokenizer {
   const SearchTokenizer._();
 
-  static final _splitter = RegExp(r'\s+');
+  static final _splitter = RegExp('[^a-z0-9]+');
 
   static List<String> tokenize(String input) {
     final normalized = removeDiacritics(input.toLowerCase()).trim();

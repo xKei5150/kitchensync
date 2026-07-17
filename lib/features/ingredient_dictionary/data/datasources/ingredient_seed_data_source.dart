@@ -40,6 +40,22 @@ class IngredientSeedDataSource {
         .cast<String>()
         .map(UnitId.new)
         .toList();
+    final defaultUnit = UnitId(m['defaultUnit'] as String);
+    if (!allowedUnits.contains(defaultUnit)) {
+      throw FormatException(
+        'Ingredient "${m['id']}" must allow its default unit.',
+      );
+    }
+    final purchaseInterval = m['defaultPurchaseIntervalDays'] as int?;
+    if (purchaseInterval != null && purchaseInterval <= 0) {
+      throw FormatException(
+        'Ingredient "${m['id']}" has an invalid purchase interval.',
+      );
+    }
+    final priceHint = (m['pricePerUnitHint'] as num?)?.toDouble();
+    if (priceHint != null && priceHint < 0) {
+      throw FormatException('Ingredient "${m['id']}" has a negative price.');
+    }
     final aliases = ((m['aliases'] as List?) ?? const []).cast<String>();
     final parentTokens = ((m['parentTokens'] as List?) ?? const [])
         .cast<String>();
@@ -60,11 +76,24 @@ class IngredientSeedDataSource {
       displayNames: displayNames,
       parentIngredientId: m['parentIngredientId'] as String?,
       category: _enumByName(IngredientCategory.values, m['category']),
-      defaultUnit: UnitId(m['defaultUnit'] as String),
+      defaultUnit: defaultUnit,
       allowedUnits: allowedUnits,
+      localUnitDefinitions: ((m['localUnitDefinitions'] as List?) ?? const [])
+          .map(
+            (value) => UnitDefinition.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+          )
+          .toList(growable: false),
       defaultShelfLifeDays: m['defaultShelfLifeDays'] as int?,
-      isBulkCandidate: (m['isBulkCandidate'] as bool?) ?? false,
-      isNonFood: (m['isNonFood'] as bool?) ?? false,
+      defaultPurchaseIntervalDays: purchaseInterval,
+      pricePerUnitHint: priceHint,
+      isBulkCandidate:
+          ((m['isBulkCandidate'] as bool?) ?? false) ||
+          m['category'] == IngredientCategory.bulkStaple.name,
+      isNonFood:
+          ((m['isNonFood'] as bool?) ?? false) ||
+          m['category'] == IngredientCategory.nonFood.name,
       imageUrl: m['imageUrl'] as String?,
       barcode: m['barcode'] as String?,
       aliases: aliases,

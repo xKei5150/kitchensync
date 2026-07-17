@@ -5,11 +5,11 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:kitchensync/core/firebase/firebase_initializer.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
@@ -19,6 +19,7 @@ import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_identity.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/create_custom_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
@@ -45,7 +46,9 @@ void main() {
       final householdId = 'itest-local-units-$uid';
       final now = DateTime(2026, 7, 10, 8);
       final tray = UnitId('tray');
-      const ingredientId = 'qa-tray-spinach';
+      final ingredientId = IngredientIdentity.customDocumentId(
+        'QA tray spinach',
+      );
 
       await withTimeout(
         'seed local unit household',
@@ -65,7 +68,6 @@ void main() {
           activeUserIdProvider.overrideWithValue(uid),
           idGeneratorProvider.overrideWithValue(
             FakeIdGenerator(const [
-              ingredientId,
               'pantry-tray',
               'pantry-piece',
               'pantry-tin',
@@ -346,29 +348,12 @@ void main() {
   });
 }
 
-bool _emulatorsConfigured = false;
-
 Future<void> _bootEmulatedFirebase() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await withTimeout('Firebase.initializeApp for local unit QA', () async {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: const FirebaseOptions(
-          apiKey: 'emulator-api-key',
-          appId: '1:000000000000:ios:0000000000000000000000',
-          messagingSenderId: '000000000000',
-          projectId: 'kitchensync-dev-da503',
-          storageBucket: 'kitchensync-dev-da503.appspot.com',
-          iosBundleId: 'com.example.kitchensync',
-        ),
-      );
-    }
-  });
-  if (!_emulatorsConfigured) {
-    FirebaseFirestore.instance.useFirestoreEmulator('127.0.0.1', 8080);
-    await FirebaseAuth.instance.useAuthEmulator('127.0.0.1', 9099);
-    _emulatorsConfigured = true;
-  }
+  await withTimeout(
+    'FirebaseInitializer.initialize for local unit QA',
+    () => const FirebaseInitializer().initialize(AppEnv.dev),
+  );
   if (FirebaseAuth.instance.currentUser == null) {
     await withTimeout(
       'signInAnonymously for local unit QA',

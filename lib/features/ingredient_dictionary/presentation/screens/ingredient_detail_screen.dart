@@ -1,26 +1,31 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
 class IngredientDetailScreen extends ConsumerWidget {
-  const IngredientDetailScreen({super.key, required this.id});
+  const IngredientDetailScreen({super.key, required this.id, this.householdId});
 
   final String id;
+  final String? householdId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final getIngredient = ref.watch(getIngredientProvider);
+    final activeHouseholdId =
+        householdId ?? ref.watch(activeHouseholdIdProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ingredient')),
       body: FutureBuilder(
-        future: getIngredient(id),
+        future: getIngredient.forHousehold(id, householdId: activeHouseholdId),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -129,6 +134,31 @@ class IngredientDetailScreen extends ConsumerWidget {
                     ),
                   ),
                 ],
+                if (ing.defaultPurchaseIntervalDays != null) ...[
+                  const SizedBox(height: KsTokens.space20),
+                  _MetadataSection(
+                    label: 'Typical purchase interval',
+                    child: Text(
+                      'Every ${ing.defaultPurchaseIntervalDays} days',
+                      style: KsTokens.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+                if (ing.pricePerUnitHint != null) ...[
+                  const SizedBox(height: KsTokens.space20),
+                  _MetadataSection(
+                    label: 'Price hint',
+                    child: Text(
+                      '${ing.pricePerUnitHint!.toStringAsFixed(2)} per '
+                      '$defaultUnitLabel',
+                      style: KsTokens.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
                 if (ing.dietaryTags.isNotEmpty) ...[
                   const SizedBox(height: KsTokens.space20),
                   _MetadataSection(
@@ -152,6 +182,15 @@ class IngredientDetailScreen extends ConsumerWidget {
                     style: KsTokens.bodySmall.copyWith(
                       color: context.ksColors.textTertiary,
                     ),
+                  ),
+                ],
+                if (ing.scope == IngredientScope.householdCustom) ...[
+                  const SizedBox(height: KsTokens.space24),
+                  FilledButton.icon(
+                    onPressed: () =>
+                        context.push('/ingredient/create', extra: ing),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit ingredient'),
                   ),
                 ],
                 const SizedBox(height: KsTokens.space32),

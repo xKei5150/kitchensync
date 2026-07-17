@@ -1,24 +1,19 @@
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_unit_converter.dart';
 
 abstract final class PantryUnitConversion {
   static double preserveAmount({
     required double quantity,
     required UnitId from,
     required UnitId to,
+    List<UnitDefinition> localUnitDefinitions = const [],
   }) {
-    if (from == to) return quantity;
-    final normalized = UnitRegistry.normalizeFormalQuantity(
-      quantity: quantity,
-      unit: from,
-    );
-    final targetFactor = UnitRegistry.normalizeFormalQuantity(
-      quantity: 1,
-      unit: to,
-    );
-    if (normalized.unit != targetFactor.unit ||
-        from == normalized.unit && to == targetFactor.unit) {
-      return quantity;
-    }
-    return normalized.quantity / targetFactor.quantity;
+    return IngredientUnitConverter.convert(
+          quantity: quantity,
+          from: from,
+          to: to,
+          localUnitDefinitions: localUnitDefinitions,
+        ) ??
+        quantity;
   }
 }

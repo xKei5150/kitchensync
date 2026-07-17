@@ -8,7 +8,7 @@ import 'package:kitchensync/features/household/domain/entities/household_policy_
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
-import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/create_custom_ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/resolve_or_create_ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/data/datasources/recipe_remote_data_source.dart';
 import 'package:kitchensync/features/recipes/data/repositories/recipe_repository_impl.dart';
@@ -64,7 +64,7 @@ final recipeImportControllerProvider = Provider<RecipeImportController>((ref) {
     userId: ref.watch(activeUserIdProvider),
     idGenerator: ref.watch(idGeneratorProvider),
     clock: ref.watch(clockProvider),
-    createCustomIngredient: ref.watch(createCustomIngredientProvider),
+    resolveOrCreateIngredient: ref.watch(resolveOrCreateIngredientProvider),
   );
 });
 
@@ -78,6 +78,7 @@ final recipeDiscoveryControllerProvider = Provider<RecipeDiscoveryController>((
     userId: ref.watch(activeUserIdProvider),
     idGenerator: ref.watch(idGeneratorProvider),
     clock: ref.watch(clockProvider),
+    resolveOrCreateIngredient: ref.watch(resolveOrCreateIngredientProvider),
   );
 });
 
@@ -90,7 +91,8 @@ final recipeLibraryControllerProvider = Provider<RecipeLibraryController>((
     household: ref.watch(activeHouseholdContextProvider),
     idGenerator: ref.watch(idGeneratorProvider),
     clock: ref.watch(clockProvider),
-    createCustomIngredient: () => ref.read(createCustomIngredientProvider),
+    resolveOrCreateIngredient: () =>
+        ref.read(resolveOrCreateIngredientProvider),
   );
 });
 
@@ -134,7 +136,7 @@ class RecipeImportController {
     required this.userId,
     required this.idGenerator,
     required this.clock,
-    required this.createCustomIngredient,
+    required this.resolveOrCreateIngredient,
   });
 
   final RecipeRepository repository;
@@ -143,7 +145,7 @@ class RecipeImportController {
   final String userId;
   final IdGenerator idGenerator;
   final Clock clock;
-  final CreateCustomIngredient createCustomIngredient;
+  final ResolveOrCreateIngredient resolveOrCreateIngredient;
   static const _policy = HouseholdPolicy();
 
   Future<List<Recipe>> importDrafts(List<RecipeDraft> drafts) async {
@@ -166,12 +168,12 @@ class RecipeImportController {
     final now = clock.now();
     final ingredients = <RecipeIngredient>[];
     for (final ingredient in draft.ingredients) {
-      final ingredientId = await _ensureIngredient(ingredient);
+      final resolved = await _resolveIngredient(ingredient);
       ingredients.add(
         RecipeIngredient(
           id: idGenerator.newId(),
           recipeId: recipeId,
-          ingredientId: ingredientId,
+          ingredientId: resolved.id,
           quantity: ingredient.quantity,
           unit: ingredient.unit,
           description: ingredient.name,
@@ -201,26 +203,21 @@ class RecipeImportController {
     );
   }
 
-  Future<String> _ensureIngredient(RecipeIngredientDraft draft) async {
-    final existingId = draft.ingredientId?.trim();
-    if (existingId != null && existingId.isNotEmpty) {
-      return existingId;
-    }
-    final result = await createCustomIngredient(
-      CreateCustomIngredientParams(
+  Future<Ingredient> _resolveIngredient(RecipeIngredientDraft draft) async {
+    final result = await resolveOrCreateIngredient(
+      ResolveOrCreateIngredientParams(
         householdId: householdId,
-        displayNames: {'en': draft.name.trim()},
+        name: draft.name,
+        unit: draft.unit,
         category: _categoryFor(draft.name),
-        defaultUnit: draft.unit,
-        allowedUnits: [draft.unit],
-        aliases: [_ingredientKey(draft.name)],
+        ingredientId: draft.ingredientId,
       ),
     );
     switch (result) {
       case Success<Ingredient>(:final value):
-        return value.id;
-      case ResultFailure<Ingredient>():
-        return _ingredientKey(draft.name);
+        return value;
+      case ResultFailure<Ingredient>(:final failure):
+        throw StateError('Could not resolve ${draft.name}: $failure');
     }
   }
 
@@ -250,15 +247,6 @@ class RecipeImportController {
     return IngredientCategory.other;
   }
 
-  String _ingredientKey(String name) {
-    final key = name
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp('[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-    return key.isEmpty ? idGenerator.newId() : key;
-  }
-
   void _require(HouseholdCapability capability) {
     final household = this.household;
     if (household == null) return;
@@ -280,6 +268,7 @@ class RecipeDiscoveryController {
     required this.userId,
     required this.idGenerator,
     required this.clock,
+    required this.resolveOrCreateIngredient,
   });
 
   final RecipeRepository repository;
@@ -288,19 +277,68 @@ class RecipeDiscoveryController {
   final String userId;
   final IdGenerator idGenerator;
   final Clock clock;
+  final ResolveOrCreateIngredient resolveOrCreateIngredient;
   static const _policy = HouseholdPolicy();
 
-  Future<SavedRecipe> savePublicRecipe(Recipe recipe) {
+  Future<SavedRecipe> savePublicRecipe(Recipe recipe) async {
     _require(HouseholdCapability.savePublicRecipes);
+    final rewrites = <String, String>{};
+    for (final line in recipe.ingredients) {
+      final name = line.description?.trim().isNotEmpty ?? false
+          ? line.description!.trim()
+          : line.ingredientId;
+      final result = await resolveOrCreateIngredient(
+        ResolveOrCreateIngredientParams(
+          householdId: householdId,
+          name: name,
+          unit: line.unit,
+          category: _categoryFor(name),
+          ingredientId: line.ingredientId,
+          fallbackToNameWhenIdMissing: true,
+        ),
+      );
+      switch (result) {
+        case Success<Ingredient>(:final value):
+          rewrites[line.id] = value.id;
+        case ResultFailure<Ingredient>(:final failure):
+          throw StateError('Could not copy ingredient $name: $failure');
+      }
+    }
+    final localRecipeId = idGenerator.newId();
+    final savedRecipeId = idGenerator.newId();
+    final rewriteRepository = repository is IngredientRewriteRecipeRepository
+        ? repository as IngredientRewriteRecipeRepository
+        : null;
+    if (rewriteRepository != null) {
+      return rewriteRepository
+          .savePublicRecipeAsLocalCopyWithIngredientRewrites(
+            sourceRecipeId: recipe.id,
+            userId: userId,
+            householdId: householdId,
+            localRecipeId: localRecipeId,
+            savedRecipeId: savedRecipeId,
+            now: clock.now(),
+            ingredientIdRewrites: rewrites,
+          );
+    }
+    final changesIdentity = recipe.ingredients.any(
+      (line) => rewrites[line.id] != line.ingredientId,
+    );
+    if (changesIdentity) {
+      throw StateError('Recipe repository cannot safely rewrite ingredients.');
+    }
     return repository.savePublicRecipeAsLocalCopy(
       sourceRecipeId: recipe.id,
       userId: userId,
       householdId: householdId,
-      localRecipeId: idGenerator.newId(),
-      savedRecipeId: idGenerator.newId(),
+      localRecipeId: localRecipeId,
+      savedRecipeId: savedRecipeId,
       now: clock.now(),
     );
   }
+
+  IngredientCategory _categoryFor(String name) =>
+      _ingredientCategoryForName(name);
 
   void _require(HouseholdCapability capability) {
     final household = this.household;
@@ -322,7 +360,7 @@ class RecipeLibraryController {
     this.household,
     required this.idGenerator,
     required this.clock,
-    this.createCustomIngredient,
+    this.resolveOrCreateIngredient,
   });
 
   final RecipeRepository repository;
@@ -330,7 +368,7 @@ class RecipeLibraryController {
   final ActiveHouseholdContext? household;
   final IdGenerator idGenerator;
   final Clock clock;
-  final CreateCustomIngredient Function()? createCustomIngredient;
+  final ResolveOrCreateIngredient Function()? resolveOrCreateIngredient;
   static const _policy = HouseholdPolicy();
 
   Future<void> deleteLocalRecipe(Recipe recipe) {
@@ -356,7 +394,7 @@ class RecipeLibraryController {
     final ingredients = <RecipeIngredient>[];
     for (var i = 0; i < draft.ingredients.length; i++) {
       final ingredient = draft.ingredients[i];
-      final ingredientId = await _ensureIngredient(ingredient);
+      final resolved = await _resolveIngredient(ingredient);
       final existing = i < recipe.ingredients.length
           ? recipe.ingredients[i]
           : null;
@@ -364,7 +402,7 @@ class RecipeLibraryController {
         RecipeIngredient(
           id: existing?.id ?? idGenerator.newId(),
           recipeId: recipe.id,
-          ingredientId: ingredientId,
+          ingredientId: resolved.id,
           quantity: ingredient.quantity,
           unit: ingredient.unit,
           description: ingredient.name,
@@ -398,30 +436,25 @@ class RecipeLibraryController {
     return updated;
   }
 
-  Future<String> _ensureIngredient(RecipeIngredientDraft draft) async {
-    final existingId = draft.ingredientId?.trim();
-    if (existingId != null && existingId.isNotEmpty) {
-      return existingId;
-    }
-    final createCustomIngredient = this.createCustomIngredient;
-    if (createCustomIngredient == null) {
+  Future<Ingredient> _resolveIngredient(RecipeIngredientDraft draft) async {
+    final resolveOrCreateIngredient = this.resolveOrCreateIngredient;
+    if (resolveOrCreateIngredient == null) {
       throw StateError('Ingredient creation is not configured.');
     }
-    final result = await createCustomIngredient()(
-      CreateCustomIngredientParams(
+    final result = await resolveOrCreateIngredient()(
+      ResolveOrCreateIngredientParams(
         householdId: householdId,
-        displayNames: {'en': draft.name.trim()},
+        name: draft.name,
+        unit: draft.unit,
         category: _categoryFor(draft.name),
-        defaultUnit: draft.unit,
-        allowedUnits: [draft.unit],
-        aliases: [_ingredientKey(draft.name)],
+        ingredientId: draft.ingredientId,
       ),
     );
     switch (result) {
       case Success<Ingredient>(:final value):
-        return value.id;
-      case ResultFailure<Ingredient>():
-        return _ingredientKey(draft.name);
+        return value;
+      case ResultFailure<Ingredient>(:final failure):
+        throw StateError('Could not resolve ${draft.name}: $failure');
     }
   }
 
@@ -451,15 +484,6 @@ class RecipeLibraryController {
     return IngredientCategory.other;
   }
 
-  String _ingredientKey(String name) {
-    final key = name
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp('[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-    return key.isEmpty ? idGenerator.newId() : key;
-  }
-
   void _require(HouseholdCapability capability) {
     final household = this.household;
     if (household == null) return;
@@ -471,4 +495,30 @@ class RecipeLibraryController {
       throw StateError('${household.role.label} cannot ${capability.name}.');
     }
   }
+}
+
+IngredientCategory _ingredientCategoryForName(String name) {
+  final normalized = name.toLowerCase();
+  if (normalized.contains('chicken') ||
+      normalized.contains('beef') ||
+      normalized.contains('pork')) {
+    return IngredientCategory.meat;
+  }
+  if (normalized.contains('fish') || normalized.contains('salmon')) {
+    return IngredientCategory.seafood;
+  }
+  if (normalized.contains('flour') ||
+      normalized.contains('rice') ||
+      normalized.contains('pasta')) {
+    return IngredientCategory.grain;
+  }
+  if (normalized.contains('salt') ||
+      normalized.contains('pepper') ||
+      normalized.contains('spice')) {
+    return IngredientCategory.spice;
+  }
+  if (normalized.contains('oil') || normalized.contains('sauce')) {
+    return IngredientCategory.condiment;
+  }
+  return IngredientCategory.other;
 }

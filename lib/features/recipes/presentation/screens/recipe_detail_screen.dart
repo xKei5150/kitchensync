@@ -12,6 +12,7 @@ import 'package:kitchensync/features/household/domain/entities/household_policy_
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_price_estimator.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
@@ -82,13 +83,18 @@ class RecipeDetailScreen extends ConsumerWidget {
                 ingredients: recipe.ingredients
                     .map(
                       (ingredient) => _scaledIngredient(
+                        context,
+                        recipe.householdId,
                         ingredient,
                         ingredientsById[ingredient.ingredientId],
                       ),
                     )
                     .toList(growable: false),
                 tags: [...recipe.mealTimeTags, ...recipe.recipeTags],
-                priceEstimate: recipe.priceEstimate,
+                priceEstimate: IngredientPriceEstimator.recipe(
+                  recipe,
+                  ingredientsById,
+                ),
                 instructions: recipe.instructions,
                 onBack: () => context.pop(),
               );
@@ -138,6 +144,8 @@ class RecipeDetailScreen extends ConsumerWidget {
   }
 
   static KsScalableIngredient _scaledIngredient(
+    BuildContext context,
+    String householdId,
     RecipeIngredient ingredient,
     Ingredient? linkedIngredient,
   ) {
@@ -148,6 +156,10 @@ class RecipeDetailScreen extends ConsumerWidget {
         ingredient.unit,
         ingredient.quantity,
         linkedIngredient?.localUnitDefinitions ?? const [],
+      ),
+      onTap: () => context.push(
+        '/ingredient/${ingredient.ingredientId}'
+        '?householdId=${Uri.encodeQueryComponent(householdId)}',
       ),
     );
   }

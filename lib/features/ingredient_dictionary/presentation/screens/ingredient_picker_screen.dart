@@ -118,6 +118,16 @@ class _IngredientPickerScreenState
                         ingredient: ing,
                         indent: ing.parentIngredientId != null,
                         onTap: () => context.pop<Ingredient>(ing),
+                        onDetails: () {
+                          final householdId = ref.read(
+                            activeHouseholdIdProvider,
+                          );
+                          context.push(
+                            '/ingredient/${ing.id}'
+                            '?householdId='
+                            '${Uri.encodeQueryComponent(householdId)}',
+                          );
+                        },
                       );
                     },
                   ),

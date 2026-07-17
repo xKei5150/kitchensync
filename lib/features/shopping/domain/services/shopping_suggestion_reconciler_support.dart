@@ -101,22 +101,28 @@ final class _SourceKey implements Comparable<_SourceKey> {
 Map<_SourceKey, double> _validItemLinks(
   ShoppingListItemRecord item,
   _RecoveryWindow window,
+  ShoppingSuggestionReconcileInput input,
 ) {
   if (item.ingredientId.trim().isEmpty ||
       !item.quantityNeeded.isFinite ||
       item.quantityNeeded <= 0) {
     return const {};
   }
-  final normalizedItem = UnitRegistry.normalizeFormalQuantity(
+  final localUnits =
+      input.ingredientsById[item.ingredientId]?.localUnitDefinitions ??
+      const [];
+  final normalizedItem = IngredientUnitConverter.normalize(
     quantity: item.quantityNeeded,
     unit: item.unit,
+    localUnitDefinitions: localUnits,
   );
   final candidates = <_SourceKey, double>{};
   for (final link in item.sourceMealLinks) {
     if (!link.quantity.isFinite || link.quantity <= 0) continue;
-    final normalized = UnitRegistry.normalizeFormalQuantity(
+    final normalized = IngredientUnitConverter.normalize(
       quantity: link.quantity,
       unit: item.unit,
+      localUnitDefinitions: localUnits,
     );
     final key = _SourceKey(
       itemKey: _ItemKey(item.ingredientId, normalized.unit),

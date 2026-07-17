@@ -56,6 +56,20 @@ beforeAll(async () => {
         role,
       });
     }
+    for (const ingredient of [
+      { id: "onion", allowedUnits: ["piece", "g"] },
+      { id: "rice", allowedUnits: ["g", "kg", "cup"] },
+      { id: "leftover-adobo", allowedUnits: ["serving"] },
+    ] as const) {
+      await setDoc(doc(db, `ingredients/${ingredient.id}`), {
+        name: ingredient.id,
+        displayNames: { en: ingredient.id },
+        category: "other",
+        defaultUnit: ingredient.allowedUnits[0],
+        allowedUnits: ingredient.allowedUnits,
+        scope: "global",
+      });
+    }
     await setDoc(doc(db, "households/joinable-household/pantryItems/shared"), {
       householdId: "joinable-household",
       ingredientId: "rice",
@@ -467,7 +481,7 @@ describe("/households/{hid}/customIngredients", () => {
   test("create succeeds when scope and householdId match", async () => {
     const db = env.authenticatedContext("u1").firestore();
     await assertSucceeds(
-      setDoc(doc(db, "households/solo-household/customIngredients/c1"), {
+      setDoc(doc(db, "households/solo-household/customIngredients/custom-bWFuZ29zdGVlbg"), {
         name: "mangosteen",
         scope: "householdCustom",
         householdId: "solo-household",
@@ -483,7 +497,7 @@ describe("/households/{hid}/customIngredients", () => {
   test("create rejected with wrong scope", async () => {
     const db = env.authenticatedContext("u1").firestore();
     await assertFails(
-      setDoc(doc(db, "households/solo-household/customIngredients/c2"), {
+      setDoc(doc(db, "households/solo-household/customIngredients/custom-eA"), {
         scope: "global",
         householdId: "solo-household",
         name: "x",

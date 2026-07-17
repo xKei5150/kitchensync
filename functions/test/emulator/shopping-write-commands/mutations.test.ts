@@ -54,6 +54,70 @@ describe("trusted shopping item mutation callable", () => {
     ).toEqual([])
   })
 
+  it("rejects dangling, invalid-unit, and foreign custom ingredient references", async () => {
+    const { current, householdId, listId } = await setup()
+    const base = {
+      kind: "add" as const,
+      quantityNeeded: 1,
+      purchasedQuantity: null,
+      status: "unchecked" as const,
+      substituteIngredientId: null,
+      substituteQuantity: null,
+      substituteUnit: null,
+    }
+    await expectCallableCode(
+      () =>
+        current.mutate({
+          householdId,
+          listId,
+          itemId: "missing",
+          commandId: randomId("command"),
+          expectedRevision: 0,
+          mutation: { ...base, ingredientId: "missing", unit: "kg" },
+        }),
+      "failed-precondition",
+    )
+    await expectCallableCode(
+      () =>
+        current.mutate({
+          householdId,
+          listId,
+          itemId: "bad-unit",
+          commandId: randomId("command"),
+          expectedRevision: 0,
+          mutation: { ...base, ingredientId: "rice", unit: "bag" },
+        }),
+      "failed-precondition",
+    )
+    const foreignHousehold = randomId("foreign")
+    await current.db.doc(`households/${foreignHousehold}`).set({ isJoint: true })
+    await current.db.doc(`households/${foreignHousehold}/customIngredients/custom-Zm9yZWlnbg`).set({
+      name: "foreign",
+      displayNames: { en: "Foreign" },
+      category: "other",
+      defaultUnit: "kg",
+      allowedUnits: ["kg"],
+      scope: "householdCustom",
+      householdId: foreignHousehold,
+    })
+    await expectCallableCode(
+      () =>
+        current.mutate({
+          householdId,
+          listId,
+          itemId: "foreign",
+          commandId: randomId("command"),
+          expectedRevision: 0,
+          mutation: {
+            ...base,
+            ingredientId: "custom-Zm9yZWlnbg",
+            unit: "kg",
+          },
+        }),
+      "failed-precondition",
+    )
+  })
+
   it("removes an item and replays the exact command", async () => {
     const { current, householdId, listId } = await setup()
     await current.seedItem({ householdId, listId, itemId: "item-1" })

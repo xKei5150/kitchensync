@@ -47,7 +47,7 @@ void main() {
           id: 'oldest-no-expiry',
           quantity: 400,
           unit: UnitId.g,
-          createdAt: DateTime(2026, 1),
+          createdAt: DateTime(2026),
         ),
       ],
       requiredQuantity: 450,
@@ -68,7 +68,7 @@ void main() {
           quantity: 1,
           unit: UnitId.kg,
           section: PantrySection.bulk,
-          createdAt: DateTime(2026, 1),
+          createdAt: DateTime(2026),
         ),
       ],
       requiredQuantity: 250,
@@ -87,7 +87,7 @@ void main() {
           id: 'created-first-bought-later',
           quantity: 100,
           unit: UnitId.g,
-          createdAt: DateTime(2026, 1),
+          createdAt: DateTime(2026),
           lastPurchaseDate: DateTime(2026, 6),
         ),
         lot(
@@ -103,5 +103,33 @@ void main() {
     );
 
     expect(plan.deductions.single.item.id, 'created-later-bought-first');
+  });
+
+  test('deducts using an ingredient-local convertible unit', () {
+    final sack = UnitDefinition.mass(
+      id: UnitId('sack'),
+      label: 'sack',
+      pluralLabel: 'sacks',
+      family: UnitSystemFamily.local,
+      gramsPerUnit: 5000,
+    );
+    final plan = CookingDeductionPlanner.plan(
+      lots: [
+        lot(
+          id: 'rice-sack',
+          quantity: 1,
+          unit: sack.id,
+          section: PantrySection.bulk,
+          createdAt: DateTime(2026),
+        ),
+      ],
+      requiredQuantity: 2,
+      requiredUnit: UnitId.kg,
+      localUnitDefinitions: [sack],
+    );
+
+    expect(plan.isComplete, isTrue);
+    expect(plan.deductions.single.quantity, closeTo(0.4, 1e-9));
+    expect(plan.deductions.single.remainingQuantity, closeTo(0.6, 1e-9));
   });
 }

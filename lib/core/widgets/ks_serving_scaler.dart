@@ -11,6 +11,7 @@ class KsScalableIngredient {
     required this.name,
     required this.baseAmount,
     this.unit = '',
+    this.onTap,
   });
 
   final String name;
@@ -18,6 +19,7 @@ class KsScalableIngredient {
   /// Amount at the recipe's [KsServingScaler.baseServings].
   final double baseAmount;
   final String unit;
+  final VoidCallback? onTap;
 }
 
 /// The serving-size scaler — a display-serif serving numeral over a slider,
@@ -193,7 +195,7 @@ class _IngredientRow extends StatelessWidget {
     final value = MeasurementFormatter(
       unitSystem,
     ).format(amount, ingredient.unit);
-    return Row(
+    final row = Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
@@ -215,6 +217,8 @@ class _IngredientRow extends StatelessWidget {
         ),
       ],
     );
+    if (ingredient.onTap == null) return row;
+    return InkWell(onTap: ingredient.onTap, child: row);
   }
 }
 

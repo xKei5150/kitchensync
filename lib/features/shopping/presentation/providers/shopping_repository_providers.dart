@@ -11,13 +11,15 @@ import 'package:kitchensync/features/calendar/presentation/providers/shopping_sc
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
-import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
+import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/consumption_history_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
@@ -108,6 +110,11 @@ final shoppingPlanningControllerProvider = Provider<ShoppingPlanningController>(
   (ref) {
     final householdId = ref.watch(activeHouseholdIdProvider);
     final idGenerator = ref.watch(idGeneratorProvider);
+    // Ingredient metadata enriches conversions, but the controller must remain
+    // usable in unauthenticated/widget-test contexts where Firebase is absent.
+    final ingredientRepository = ref.watch(firebaseAuthProvider) == null
+        ? null
+        : ref.watch(ingredientRepositoryProvider);
     final writeCoordinator = ShoppingWriteCoordinator(
       repository: ref.watch(shoppingCommandRepositoryProvider),
       allocationRepository: ref.watch(
@@ -127,6 +134,7 @@ final shoppingPlanningControllerProvider = Provider<ShoppingPlanningController>(
       ),
       wasteRepository: ref.watch(wasteRepositoryProvider),
       recipeRepository: ref.watch(recipeRepositoryProvider),
+      ingredientRepository: ingredientRepository,
       householdId: householdId,
       household: ref.watch(activeHouseholdContextProvider),
       idGenerator: idGenerator,

@@ -9,11 +9,13 @@ class IngredientListTile extends StatelessWidget {
     super.key,
     required this.ingredient,
     this.onTap,
+    this.onDetails,
     this.indent = false,
   });
 
   final Ingredient ingredient;
   final VoidCallback? onTap;
+  final VoidCallback? onDetails;
   final bool indent;
 
   @override
@@ -79,7 +81,13 @@ class IngredientListTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (onTap != null)
+                if (onDetails != null)
+                  IconButton(
+                    tooltip: 'Ingredient details',
+                    onPressed: onDetails,
+                    icon: const Icon(Icons.info_outline, size: 20),
+                  )
+                else if (onTap != null)
                   Icon(
                     Icons.chevron_right,
                     size: 20,

@@ -81,9 +81,24 @@ abstract final class UnitRegistry {
       family: UnitSystemFamily.imperial,
       millilitersPerUnit: 3785.411784,
     ),
-    UnitDefinition.cooking(id: UnitId.tsp, label: 'tsp', pluralLabel: 'tsp'),
-    UnitDefinition.cooking(id: UnitId.tbsp, label: 'tbsp', pluralLabel: 'tbsp'),
-    UnitDefinition.cooking(id: UnitId.cup, label: 'cup', pluralLabel: 'cups'),
+    UnitDefinition.cooking(
+      id: UnitId.tsp,
+      label: 'tsp',
+      pluralLabel: 'tsp',
+      millilitersPerUnit: 4.92892159375,
+    ),
+    UnitDefinition.cooking(
+      id: UnitId.tbsp,
+      label: 'tbsp',
+      pluralLabel: 'tbsp',
+      millilitersPerUnit: 14.78676478125,
+    ),
+    UnitDefinition.cooking(
+      id: UnitId.cup,
+      label: 'cup',
+      pluralLabel: 'cups',
+      millilitersPerUnit: 236.5882365,
+    ),
     UnitDefinition.count(
       id: UnitId.piece,
       label: 'piece',
@@ -159,8 +174,21 @@ abstract final class UnitRegistry {
   static NormalizedUnitQuantity normalizeFormalQuantity({
     required double quantity,
     required UnitId unit,
+  }) => normalizeQuantity(quantity: quantity, unit: unit);
+
+  static NormalizedUnitQuantity normalizeQuantity({
+    required double quantity,
+    required UnitId unit,
+    List<UnitDefinition> localUnitDefinitions = const [],
   }) {
-    final definition = find(unit);
+    UnitDefinition? definition;
+    for (final local in localUnitDefinitions) {
+      if (local.id == unit) {
+        definition = local;
+        break;
+      }
+    }
+    definition ??= find(unit);
     final gramsPerUnit = definition?.gramsPerUnit;
     if (gramsPerUnit != null) {
       return NormalizedUnitQuantity(

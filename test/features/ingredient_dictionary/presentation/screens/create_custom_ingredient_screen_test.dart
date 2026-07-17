@@ -12,6 +12,7 @@ import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/
 
 class _CapturingIngredientRepository implements IngredientRepository {
   final List<Ingredient> created = [];
+  final List<Ingredient> updated = [];
 
   @override
   Future<void> createCustom(Ingredient ingredient) async {
@@ -34,7 +35,9 @@ class _CapturingIngredientRepository implements IngredientRepository {
   }) async => const <Ingredient>[];
 
   @override
-  Future<void> updateCustom(Ingredient ingredient) async {}
+  Future<void> updateCustom(Ingredient ingredient) async {
+    updated.add(ingredient);
+  }
 
   @override
   Future<int> upsertSeed(List<Ingredient> seed) async => seed.length;
@@ -54,6 +57,7 @@ void main() {
     ThemeData theme, {
     String? initialName,
     _CapturingIngredientRepository? repository,
+    Ingredient? initialIngredient,
   }) async {
     tester.view.physicalSize = const Size(400, 2000);
     tester.view.devicePixelRatio = 1.0;
@@ -69,8 +73,10 @@ void main() {
           routes: [
             GoRoute(
               path: 'create',
-              builder: (context, state) =>
-                  CreateCustomIngredientScreen(initialName: initialName),
+              builder: (context, state) => CreateCustomIngredientScreen(
+                initialName: initialName,
+                initialIngredient: initialIngredient,
+              ),
             ),
           ],
         ),
@@ -227,5 +233,74 @@ void main() {
       ),
       hasLength(1),
     );
+  });
+
+  testWidgets('authors purchase interval and price metadata', (tester) async {
+    final repository = _CapturingIngredientRepository();
+    await pump(
+      tester,
+      AppTheme.light(),
+      initialName: 'Bulk oats',
+      repository: repository,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Optional, e.g. 30'),
+      '21',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Optional estimate'),
+      '0.12',
+    );
+    await tapVisible(
+      tester,
+      find.widgetWithText(FilledButton, 'Create ingredient'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.created.single.defaultPurchaseIntervalDays, 21);
+    expect(repository.created.single.pricePerUnitHint, 0.12);
+  });
+
+  testWidgets('edits custom ingredient purchase and price metadata', (
+    tester,
+  ) async {
+    final repository = _CapturingIngredientRepository();
+    final ingredient = Ingredient(
+      id: 'custom-dGVh',
+      name: 'tea',
+      displayNames: const {'en': 'Tea'},
+      category: IngredientCategory.beverage,
+      defaultUnit: UnitId.g,
+      allowedUnits: const [UnitId.g],
+      defaultPurchaseIntervalDays: 30,
+      pricePerUnitHint: 1.5,
+      scope: IngredientScope.householdCustom,
+      householdId: 'household-1',
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    await pump(
+      tester,
+      AppTheme.light(),
+      repository: repository,
+      initialIngredient: ingredient,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Optional, e.g. 30'),
+      '14',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Optional estimate'),
+      '2.25',
+    );
+    await tapVisible(
+      tester,
+      find.widgetWithText(FilledButton, 'Create ingredient'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.updated.single.id, ingredient.id);
+    expect(repository.updated.single.defaultPurchaseIntervalDays, 14);
+    expect(repository.updated.single.pricePerUnitHint, 2.25);
   });
 }

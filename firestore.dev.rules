@@ -48,6 +48,7 @@ service cloud.firestore {
         && request.resource.data.quantity > 0
         && request.resource.data.unit is string
         && request.resource.data.unit.size() > 0
+        && ingredientExistsForHousehold(hid, request.resource.data.ingredientId)
         && request.resource.data.createdAt is timestamp
         && request.resource.data.expiryDate is timestamp
         && request.resource.data.expiryDate > request.resource.data.createdAt
@@ -79,6 +80,62 @@ service cloud.firestore {
     }
     function shoppingListExists(hid, listId) {
       return exists(shoppingListRef(hid, listId));
+    }
+    function globalIngredientRef(ingredientId) {
+      return /databases/$(database)/documents/ingredients/$(ingredientId);
+    }
+    function customIngredientRef(hid, ingredientId) {
+      return /databases/$(database)/documents/households/$(hid)/customIngredients/$(ingredientId);
+    }
+    function pantryItemRef(hid, pantryItemId) {
+      return /databases/$(database)/documents/households/$(hid)/pantryItems/$(pantryItemId);
+    }
+    function ingredientExistsForHousehold(hid, ingredientId) {
+      return ingredientId is string
+        && ingredientId.size() > 0
+        && (exists(globalIngredientRef(ingredientId)) || exists(customIngredientRef(hid, ingredientId)));
+    }
+    function isMassUnit(unit) {
+      return unit in ['mg', 'g', 'kg', 'oz', 'lb'];
+    }
+    function isVolumeUnit(unit) {
+      return unit in ['ml', 'l', 'fl-oz', 'pt', 'qt', 'gal', 'tsp', 'tbsp', 'cup'];
+    }
+    function unitsAllow(allowedUnits, unit) {
+      return allowedUnits is list && (
+        allowedUnits.hasAny([unit]) ||
+        (isMassUnit(unit) && allowedUnits.hasAny(['mg', 'g', 'kg', 'oz', 'lb'])) ||
+        (isVolumeUnit(unit) && allowedUnits.hasAny(['ml', 'l', 'fl-oz', 'pt', 'qt', 'gal', 'tsp', 'tbsp', 'cup']))
+      );
+    }
+    function isValidIngredientReference(hid, ingredientId, unit) {
+      return unit is string && (
+        (exists(globalIngredientRef(ingredientId)) && unitsAllow(get(globalIngredientRef(ingredientId)).data.allowedUnits, unit)) ||
+        (exists(customIngredientRef(hid, ingredientId)) && unitsAllow(get(customIngredientRef(hid, ingredientId)).data.allowedUnits, unit))
+      );
+    }
+    function isValidLeftoverEventReference(hid) {
+      return request.resource.data.pantryItemId is string
+        && exists(pantryItemRef(hid, request.resource.data.pantryItemId))
+        && get(pantryItemRef(hid, request.resource.data.pantryItemId)).data.section == 'leftover'
+        && get(pantryItemRef(hid, request.resource.data.pantryItemId)).data.ingredientId == request.resource.data.ingredientId
+        && get(pantryItemRef(hid, request.resource.data.pantryItemId)).data.unit == request.resource.data.unit
+        && ingredientExistsForHousehold(hid, request.resource.data.ingredientId);
+    }
+    function isValidCustomIngredientData(hid) {
+      return request.resource.data.scope == 'householdCustom'
+        && request.resource.data.householdId == hid
+        && request.resource.data.category is string
+        && request.resource.data.defaultUnit is string
+        && request.resource.data.allowedUnits is list
+        && request.resource.data.allowedUnits.hasAny([request.resource.data.defaultUnit])
+        && (request.resource.data.category != 'nonFood' || request.resource.data.isNonFood == true)
+        && (request.resource.data.category != 'bulkStaple' || request.resource.data.isBulkCandidate == true)
+        && (!('defaultPurchaseIntervalDays' in request.resource.data) || request.resource.data.defaultPurchaseIntervalDays == null || request.resource.data.defaultPurchaseIntervalDays > 0)
+        && (!('pricePerUnitHint' in request.resource.data) || request.resource.data.pricePerUnitHint == null || request.resource.data.pricePerUnitHint >= 0);
+    }
+    function isValidCustomIngredient(hid, id) {
+      return id.matches('^custom-.*') && isValidCustomIngredientData(hid);
     }
     function canManageWeeklyShoppingSchedule(hid) {
       return isHouseholdAdmin(hid) || (
@@ -186,6 +243,49 @@ service cloud.firestore {
         && scheduleId == 'weekly';
     }
 
+    match /recipes/{recipeId} {
+      allow read: if isSignedIn() && (
+        resource.data.visibility == 'public' || isHouseholdMember(resource.data.householdId)
+      );
+      allow create, update: if isSignedIn()
+        && hasHouseholdRole(request.resource.data.householdId, ['admin', 'cook']);
+      allow delete: if isSignedIn()
+        && hasHouseholdRole(resource.data.householdId, ['admin', 'cook']);
+
+      match /ingredients/{ingredientLineId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public' ||
+          isHouseholdMember(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId)
+        );
+        allow create, update: if isSignedIn()
+          && hasHouseholdRole(getAfter(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId, ['admin', 'cook'])
+          && request.resource.data.recipeId == recipeId
+          && isValidIngredientReference(
+            getAfter(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId,
+            request.resource.data.ingredientId,
+            request.resource.data.unit
+          );
+        allow delete: if isSignedIn()
+          && hasHouseholdRole(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId, ['admin', 'cook']);
+      }
+    }
+
+    match /households/{hid}/customIngredients/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create: if isHouseholdMutator(hid) && isValidCustomIngredient(hid, id);
+      allow update: if isHouseholdMutator(hid)
+        && isValidCustomIngredientData(hid);
+      allow delete: if isHouseholdAdmin(hid);
+    }
+
+    match /households/{hid}/purchases/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create: if isHouseholdMutator(hid)
+        && request.resource.data.householdId == hid
+        && isValidIngredientReference(hid, request.resource.data.ingredientId, request.resource.data.unit);
+      allow update, delete: if false;
+    }
+
     match /households/{hid}/shoppingLists/{listId} {
       allow read: if isHouseholdMember(hid);
       allow write: if false;
@@ -216,7 +316,9 @@ service cloud.firestore {
         request.resource.data.section == 'leftover'
           ? (hasFullPantryAccess(hid) || hasHouseholdRole(hid, ['cook']))
             && isValidLeftoverCreate(hid)
-          : hasFullPantryAccess(hid) && request.resource.data.householdId == hid
+          : hasFullPantryAccess(hid)
+            && request.resource.data.householdId == hid
+            && isValidIngredientReference(hid, request.resource.data.ingredientId, request.resource.data.unit)
       );
       allow update: if resource.data.section == 'leftover'
         ? (hasFullPantryAccess(hid) || hasHouseholdRole(hid, ['cook']))
@@ -232,14 +334,23 @@ service cloud.firestore {
     match /households/{hid}/wasteEvents/{id} {
       allow read: if isHouseholdMember(hid);
       allow create: if (hasFullPantryAccess(hid) || hasHouseholdRole(hid, ['cook']))
-        && request.resource.data.householdId == hid;
+        && request.resource.data.householdId == hid
+        && (
+          isValidLeftoverEventReference(hid) ||
+          isValidIngredientReference(hid, request.resource.data.ingredientId, request.resource.data.unit)
+        );
       allow update, delete: if false;
     }
 
     match /households/{hid}/consumptionEvents/{id} {
       allow read: if isHouseholdMember(hid);
       allow create: if (hasFullPantryAccess(hid) || hasHouseholdRole(hid, ['cook']))
-        && request.resource.data.householdId == hid;
+        && request.resource.data.householdId == hid
+        && (
+          request.resource.data.source == 'leftover'
+            ? isValidLeftoverEventReference(hid)
+            : isValidIngredientReference(hid, request.resource.data.ingredientId, request.resource.data.unit)
+        );
       allow update, delete: if false;
     }
 
@@ -253,7 +364,8 @@ service cloud.firestore {
         && request.resource.data.previousQuantity is number
         && request.resource.data.previousQuantity >= 0
         && request.resource.data.newQuantity is number
-        && request.resource.data.newQuantity >= 0;
+        && request.resource.data.newQuantity >= 0
+        && isValidIngredientReference(hid, request.resource.data.ingredientId, request.resource.data.unit);
       allow update, delete: if false;
     }
 
@@ -267,7 +379,9 @@ service cloud.firestore {
         && collection != 'pantryItems'
         && collection != 'wasteEvents'
         && collection != 'consumptionEvents'
-        && collection != 'inventoryAdjustmentEvents';
+        && collection != 'inventoryAdjustmentEvents'
+        && collection != 'customIngredients'
+        && collection != 'purchases';
       allow write: if isHouseholdMutator(hid)
         && collection != 'shoppingSchedules'
         && collection != 'shoppingLists'
@@ -277,7 +391,9 @@ service cloud.firestore {
         && collection != 'pantryItems'
         && collection != 'wasteEvents'
         && collection != 'consumptionEvents'
-        && collection != 'inventoryAdjustmentEvents';
+        && collection != 'inventoryAdjustmentEvents'
+        && collection != 'customIngredients'
+        && collection != 'purchases';
     }
 
     match /{rootCollection}/{document=**} {

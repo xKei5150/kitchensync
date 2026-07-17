@@ -10,6 +10,7 @@ class ShoppingPlanningController {
     this.consumptionHistoryRepository,
     required this.wasteRepository,
     required this.recipeRepository,
+    this.ingredientRepository,
     required this.householdId,
     this.household,
     required this.idGenerator,
@@ -30,6 +31,7 @@ class ShoppingPlanningController {
          purchaseHistoryRepository: purchaseHistoryRepository,
          consumptionHistoryRepository: consumptionHistoryRepository,
          recipeRepository: recipeRepository,
+         ingredientRepository: ingredientRepository,
          householdId: householdId,
          idGenerator: idGenerator,
          clock: clock,
@@ -44,6 +46,7 @@ class ShoppingPlanningController {
   final ConsumptionHistoryRepository? consumptionHistoryRepository;
   final WasteRepository wasteRepository;
   final RecipeRepository recipeRepository;
+  final IngredientRepository? ingredientRepository;
   final String householdId;
   final ActiveHouseholdContext? household;
   final IdGenerator idGenerator;

@@ -139,6 +139,29 @@ void main() {
     expect(back.exists, isTrue);
   });
 
+  test(
+    'concurrent deterministic custom creation does not duplicate or overwrite',
+    () async {
+      final first = _ing(
+        'custom-c3RyYXdiZXJyeQ',
+        'strawberry',
+        scope: IngredientScope.householdCustom,
+        hid: 'h1',
+      );
+      final second = first.copyWith(category: IngredientCategory.other);
+      await Future.wait([repo.createCustom(first), repo.createCustom(second)]);
+
+      final snapshot = await db
+          .collection('households')
+          .doc('h1')
+          .collection('customIngredients')
+          .where('name', isEqualTo: 'strawberry')
+          .get();
+      expect(snapshot.docs, hasLength(1));
+      expect(snapshot.docs.single.id, first.id);
+    },
+  );
+
   test('upsertSeed writes all entries', () async {
     final seed = [_ing('s1', 'salt'), _ing('s2', 'pepper')];
     final n = await repo.upsertSeed(seed);

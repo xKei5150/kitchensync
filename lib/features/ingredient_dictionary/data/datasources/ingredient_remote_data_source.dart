@@ -71,10 +71,12 @@ class IngredientRemoteDataSource {
     if (hid == null) {
       throw ArgumentError('Custom ingredient must have a householdId.');
     }
-    await _refs
-        .customIngredients(hid)
-        .doc(ingredient.id)
-        .set(IngredientMapper.toMap(ingredient));
+    final reference = _refs.customIngredients(hid).doc(ingredient.id);
+    await reference.firestore.runTransaction((transaction) async {
+      final existing = await transaction.get(reference);
+      if (existing.exists) return;
+      transaction.set(reference, IngredientMapper.toMap(ingredient));
+    });
   }
 
   Future<int> upsertSeedBatched(List<Ingredient> seed) async {

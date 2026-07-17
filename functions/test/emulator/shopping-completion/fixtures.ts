@@ -21,20 +21,59 @@ export async function seedShoppingItem(
     readonly data?: Readonly<Record<string, unknown>>
   },
 ): Promise<void> {
+  const data = {
+    shoppingListId: input.listId,
+    ingredientId: `ingredient-${input.itemId}`,
+    quantityNeeded: 1,
+    unit: "count",
+    status: "unchecked",
+    substituteIngredientId: null,
+    substituteQuantity: null,
+    substituteUnit: null,
+    sourceMealLinks: [],
+    ...input.data,
+  } as const
+  await harness.db.doc(`ingredients/${data.ingredientId}`).set({
+    name: data.ingredientId,
+    displayNames: { en: data.ingredientId },
+    category: "other",
+    defaultUnit: data.unit,
+    allowedUnits: [
+      ...new Set(["mg", "g", "kg", "ml", "l", "piece", "count", "tsp", "tbsp", "cup", data.unit]),
+    ],
+    isBulkCandidate: false,
+    isNonFood: false,
+    scope: "global",
+  })
+  if (typeof data.substituteIngredientId === "string" && typeof data.substituteUnit === "string") {
+    await harness.db.doc(`ingredients/${data.substituteIngredientId}`).set({
+      name: data.substituteIngredientId,
+      displayNames: { en: data.substituteIngredientId },
+      category: "other",
+      defaultUnit: data.substituteUnit,
+      allowedUnits: [
+        ...new Set([
+          "mg",
+          "g",
+          "kg",
+          "ml",
+          "l",
+          "piece",
+          "count",
+          "tsp",
+          "tbsp",
+          "cup",
+          data.substituteUnit,
+        ]),
+      ],
+      isBulkCandidate: false,
+      isNonFood: false,
+      scope: "global",
+    })
+  }
   await harness.db
     .doc(`households/${input.householdId}/shoppingLists/${input.listId}/items/${input.itemId}`)
-    .set({
-      shoppingListId: input.listId,
-      ingredientId: `ingredient-${input.itemId}`,
-      quantityNeeded: 1,
-      unit: "count",
-      status: "unchecked",
-      substituteIngredientId: null,
-      substituteQuantity: null,
-      substituteUnit: null,
-      sourceMealLinks: [],
-      ...input.data,
-    })
+    .set(data)
 }
 
 export async function seedMeal(

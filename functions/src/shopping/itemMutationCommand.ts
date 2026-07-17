@@ -7,6 +7,7 @@ import {
   shoppingCommandType,
 } from "./commandContext.js"
 import { assertNever } from "./exhaustiveness.js"
+import { requireIngredientReference } from "./ingredientIntegrity.js"
 import { applyItemMutation } from "./itemMutationPlanning.js"
 import {
   parseStoredShoppingItem,
@@ -56,6 +57,29 @@ export async function mutateShoppingListItemTransaction(
   const item = itemSnapshot.exists ? parseStoredShoppingItem(itemSnapshot.data()) : undefined
   if (item !== undefined && item.shoppingListId !== execution.command.listId) {
     throw new HttpsError("failed-precondition", "Shopping list item is malformed")
+  }
+  const mutation = execution.command.mutation
+  if (mutation.kind === "add") {
+    await requireIngredientReference(
+      execution.transaction,
+      execution.db,
+      execution.command.householdId,
+      mutation.ingredientId,
+      mutation.unit,
+    )
+  }
+  if (
+    mutation.kind === "setStatus" &&
+    mutation.substituteIngredientId !== null &&
+    mutation.substituteUnit !== null
+  ) {
+    await requireIngredientReference(
+      execution.transaction,
+      execution.db,
+      execution.command.householdId,
+      mutation.substituteIngredientId,
+      mutation.substituteUnit,
+    )
   }
   const revision = parent.revision + 1
   const itemWrite = itemMutationWrite(execution.command, itemRef, item)

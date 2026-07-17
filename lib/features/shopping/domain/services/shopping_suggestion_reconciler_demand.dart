@@ -52,7 +52,9 @@ final class _RecoveryDemandBuilder {
         MealIngredientOverride? override;
         for (var index = 0; index < overrides.length; index++) {
           final candidate = overrides[index];
-          if (!_sameNormalizedIngredient(ingredient, candidate)) continue;
+          if (!_sameNormalizedIngredient(ingredient, candidate, input)) {
+            continue;
+          }
           override = candidate;
           overrides.removeAt(index);
           break;
@@ -67,9 +69,12 @@ final class _RecoveryDemandBuilder {
             quantity <= 0) {
           continue;
         }
-        final normalized = UnitRegistry.normalizeFormalQuantity(
+        final normalized = IngredientUnitConverter.normalize(
           quantity: quantity,
           unit: unit,
+          localUnitDefinitions:
+              input.ingredientsById[ingredientId]?.localUnitDefinitions ??
+              const [],
         );
         final key = _SourceKey(
           itemKey: _ItemKey(ingredientId, normalized.unit),
@@ -93,7 +98,7 @@ final class _RecoveryDemandBuilder {
       final listCoverage = <_SourceKey, double>{};
       for (final item in list.items) {
         if (item.shoppingListId != list.id) continue;
-        for (final entry in _validItemLinks(item, window).entries) {
+        for (final entry in _validItemLinks(item, window, input).entries) {
           listCoverage[entry.key] =
               (listCoverage[entry.key] ?? 0) + entry.value;
         }
@@ -115,7 +120,7 @@ final class _RecoveryDemandBuilder {
         if (item.shoppingListId != list.id || !_isUnresolved(item.status)) {
           continue;
         }
-        for (final entry in _validItemLinks(item, window).entries) {
+        for (final entry in _validItemLinks(item, window, input).entries) {
           final current = demand[entry.key];
           if (current == null) continue;
           listEvidence[entry.key] = _minimum(
@@ -135,9 +140,12 @@ final class _RecoveryDemandBuilder {
   Map<_SourceKey, double> _subtractPantry(Map<_SourceKey, double> demand) {
     final available = <_ItemKey, double>{};
     for (final item in _canonicalPantry(input)) {
-      final normalized = UnitRegistry.normalizeFormalQuantity(
+      final normalized = IngredientUnitConverter.normalize(
         quantity: item.quantity,
         unit: item.unit,
+        localUnitDefinitions:
+            input.ingredientsById[item.ingredientId]?.localUnitDefinitions ??
+            const [],
       );
       final key = _ItemKey(item.ingredientId, normalized.unit);
       available[key] = (available[key] ?? 0) + normalized.quantity;
@@ -207,15 +215,21 @@ final class _RecoveryDemandBuilder {
 bool _sameNormalizedIngredient(
   RecipeIngredientRequirement ingredient,
   MealIngredientOverride override,
+  ShoppingSuggestionReconcileInput input,
 ) {
   if (ingredient.ingredientId != override.originalIngredientId) return false;
-  final ingredientUnit = UnitRegistry.normalizeFormalQuantity(
+  final localUnits =
+      input.ingredientsById[ingredient.ingredientId]?.localUnitDefinitions ??
+      const [];
+  final ingredientUnit = IngredientUnitConverter.normalize(
     quantity: 1,
     unit: ingredient.unit,
+    localUnitDefinitions: localUnits,
   ).unit;
-  final overrideUnit = UnitRegistry.normalizeFormalQuantity(
+  final overrideUnit = IngredientUnitConverter.normalize(
     quantity: 1,
     unit: override.originalUnit,
+    localUnitDefinitions: localUnits,
   ).unit;
   return ingredientUnit == overrideUnit;
 }

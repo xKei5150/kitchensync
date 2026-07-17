@@ -12,9 +12,9 @@ import 'package:kitchensync/features/household/domain/entities/household_policy_
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
+import 'package:kitchensync/features/pantry/data/services/cooking_inventory_service.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
-import 'package:kitchensync/features/pantry/data/services/cooking_inventory_service.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/mark_as_waste.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/record_leftover.dart';
@@ -67,7 +67,10 @@ final calendarSettingsControllerProvider = Provider<CalendarSettingsController>(
 );
 
 final cookingInventoryServiceProvider = Provider<CookingInventoryService?>(
-  (ref) => CookingInventoryService(ref.watch(firestoreRefsProvider)),
+  (ref) => CookingInventoryService(
+    ref.watch(firestoreRefsProvider),
+    ingredientRepository: ref.watch(ingredientRepositoryProvider),
+  ),
 );
 
 final cookingLifecycleControllerProvider = Provider<CookingLifecycleController>(
@@ -291,7 +294,8 @@ class CookingLifecycleController {
     }
     if (recipe.ingredients.isEmpty) {
       throw StateError(
-        'Cannot save leftovers for ${recipe.name} without a dictionary ingredient.',
+        'Cannot save leftovers for ${recipe.name} without a dictionary '
+        'ingredient.',
       );
     }
 

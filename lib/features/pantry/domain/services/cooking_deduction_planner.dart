@@ -1,4 +1,5 @@
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_unit_converter.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 
 class PantryDeduction {
@@ -32,17 +33,20 @@ abstract final class CookingDeductionPlanner {
     required Iterable<PantryItem> lots,
     required double requiredQuantity,
     required UnitId requiredUnit,
+    List<UnitDefinition> localUnitDefinitions = const [],
   }) {
-    final normalizedRequired = UnitRegistry.normalizeFormalQuantity(
+    final normalizedRequired = IngredientUnitConverter.normalize(
       quantity: requiredQuantity,
       unit: requiredUnit,
+      localUnitDefinitions: localUnitDefinitions,
     );
     final compatible = <({PantryItem item, double normalizedQuantity})>[];
     for (final item in lots) {
       if (item.quantity <= 0) continue;
-      final normalized = UnitRegistry.normalizeFormalQuantity(
+      final normalized = IngredientUnitConverter.normalize(
         quantity: item.quantity,
         unit: item.unit,
+        localUnitDefinitions: localUnitDefinitions,
       );
       if (normalized.unit == normalizedRequired.unit) {
         compatible.add((item: item, normalizedQuantity: normalized.quantity));

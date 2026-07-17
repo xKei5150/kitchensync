@@ -1,5 +1,7 @@
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_unit_converter.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
@@ -17,6 +19,7 @@ class ShoppingEngine {
     required Iterable<MealScheduleEntry> meals,
     required Map<String, PlannedRecipe> recipesById,
     required Iterable<PantryItem> pantryItems,
+    Map<String, Ingredient> ingredientsById = const {},
   }) {
     final windowStart = _dateOnly(startDate);
     final windowEnd = _dateOnly(endDate);
@@ -29,7 +32,7 @@ class ShoppingEngine {
     }
 
     final required = <(String, UnitId), _RequirementBucket>{};
-    final pantry = _pantryByIngredientUnit(pantryItems);
+    final pantry = _pantryByIngredientUnit(pantryItems, ingredientsById);
 
     for (final meal in meals) {
       final mealDate = _dateOnly(meal.date);
@@ -62,9 +65,12 @@ class ShoppingEngine {
         if (needed <= 0) {
           continue;
         }
-        final normalized = UnitRegistry.normalizeFormalQuantity(
+        final normalized = IngredientUnitConverter.normalize(
           quantity: needed,
           unit: ingredient.unit,
+          localUnitDefinitions:
+              ingredientsById[ingredient.ingredientId]?.localUnitDefinitions ??
+              const [],
         );
         final key = (ingredient.ingredientId, normalized.unit);
         required
@@ -164,12 +170,16 @@ class ShoppingEngine {
 
   Map<(String, UnitId), double> _pantryByIngredientUnit(
     Iterable<PantryItem> pantryItems,
+    Map<String, Ingredient> ingredientsById,
   ) {
     final result = <(String, UnitId), double>{};
     for (final item in pantryItems) {
-      final normalized = UnitRegistry.normalizeFormalQuantity(
+      final normalized = IngredientUnitConverter.normalize(
         quantity: item.quantity,
         unit: item.unit,
+        localUnitDefinitions:
+            ingredientsById[item.ingredientId]?.localUnitDefinitions ??
+            const [],
       );
       final key = (item.ingredientId, normalized.unit);
       result[key] = (result[key] ?? 0) + normalized.quantity;

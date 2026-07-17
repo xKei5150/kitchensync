@@ -25,6 +25,7 @@ import {
   parseShoppingItem,
   parseShoppingListState,
 } from "./firestoreModels.js"
+import { unitIsAllowed } from "./ingredientIntegrity.js"
 import { buildMealOverrideWrites, substitutionMealIds } from "./mealPlanning.js"
 import { buildPantryAndPurchaseWrites, purchaseLinesFor } from "./purchasePlanning.js"
 import { applyFirestoreWrites, type FirestoreWrite, maxTransactionWrites } from "./writePlan.js"
@@ -78,6 +79,15 @@ export async function completeShoppingListTransaction(
   const lines = purchaseLinesFor(items, execution.command.listId)
   const pantryItems = await readPantryItems(execution, context, lines.length > 0)
   const ingredientMetadata = await readIngredientMetadata(execution, context, lines)
+  for (const line of lines) {
+    const metadata = ingredientMetadata.get(line.purchasedIngredientId)
+    if (metadata === undefined || !unitIsAllowed(line.purchasedUnit, metadata.allowedUnits ?? [])) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Ingredient ${line.purchasedIngredientId} has an invalid purchase unit`,
+      )
+    }
+  }
   const meals = await readMealEntries(execution, context, substitutionMealIds(lines))
   const scheduledItems = await readScheduledItems(execution, context, list.type === "shop_now")
   const writes: readonly FirestoreWrite[] = [
@@ -136,11 +146,7 @@ async function readIngredientMetadata(
       context.householdRef.collection("customIngredients").doc(ingredientId),
     )
     if (!custom.exists) {
-      // Legacy shopping documents can predate dictionary enforcement. Keep
-      // completion backward-compatible while new clients always select a
-      // dictionary-backed ingredient.
-      result.set(ingredientId, { isBulkCandidate: false, isNonFood: false })
-      continue
+      throw new HttpsError("failed-precondition", `Ingredient ${ingredientId} is not accessible`)
     }
     result.set(ingredientId, parseIngredientMetadata(custom.data()))
   }

@@ -28,6 +28,7 @@ class KsChecklistRow extends StatelessWidget {
     this.onToggle,
     this.onLongPress,
     this.onAction,
+    this.onTap,
     this.isBusy = false,
     this.actionTooltip = 'More item actions',
     super.key,
@@ -55,6 +56,7 @@ class KsChecklistRow extends StatelessWidget {
   final VoidCallback? onLongPress;
 
   final VoidCallback? onAction;
+  final VoidCallback? onTap;
   final bool isBusy;
   final String actionTooltip;
 
@@ -67,7 +69,13 @@ class KsChecklistRow extends StatelessWidget {
       opacity: opacity,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onLongPress: isBusy ? null : onLongPress,
+        onTap: isBusy ? null : onTap,
+        // Keep a long press from falling through to [onTap] on read-only rows.
+        // This lets rows remain navigable without making completed/cancelled
+        // shopping lists expose mutation actions.
+        onLongPress: isBusy
+            ? null
+            : onLongPress ?? (onTap == null ? null : () {}),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
           child: Row(
