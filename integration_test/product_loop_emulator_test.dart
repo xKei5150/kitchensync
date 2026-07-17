@@ -13,14 +13,17 @@ import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/shopping_schedule_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
+import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
+import 'package:kitchensync/features/shopping/presentation/controllers/shopping_write_coordinator.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -89,7 +92,7 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    await withTimeout(
+    final household = await withTimeout(
       'wait for active household context',
       () => _waitForActiveHousehold(container, householdId),
     );
@@ -163,7 +166,36 @@ void main() {
       ),
     );
 
-    final shopping = container.read(shoppingPlanningControllerProvider);
+    final shoppingRepository = container.read(shoppingRepositoryProvider);
+    final shoppingCommandRepository = container.read(
+      shoppingCommandRepositoryProvider,
+    );
+    final shopping = ShoppingPlanningController(
+      repository: shoppingRepository,
+      writeCoordinator: ShoppingWriteCoordinator(
+        repository: shoppingCommandRepository,
+        householdId: householdId,
+        idGenerator: FakeIdGenerator(const [
+          'create-shopping-list-command',
+          'buy-bean-command',
+          'substitute-tomato-command',
+        ]),
+      ),
+      calendarRepository: container.read(calendarRepositoryProvider),
+      pantryRepository: container.read(pantryRepositoryProvider),
+      purchaseHistoryRepository: container.read(
+        purchaseHistoryRepositoryProvider,
+      ),
+      wasteRepository: container.read(wasteRepositoryProvider),
+      recipeRepository: container.read(recipeRepositoryProvider),
+      householdId: householdId,
+      household: household,
+      idGenerator: container.read(idGeneratorProvider),
+      clock: container.read(clockProvider),
+      shoppingScheduleRepository: container.read(
+        shoppingScheduleRepositoryProvider,
+      ),
+    );
     final list = await withTimeout(
       'generate shopping list',
       () => shopping.generateAdaptiveList(
@@ -188,11 +220,16 @@ void main() {
       await shopping.updateItemStatus(
         listId: list.id,
         itemId: beanLine.id,
+        expectedRevision: list.revision,
         status: ShoppingListItemStatus.bought,
       );
+      final afterBeanList = await shoppingRepository
+          .watchList(householdId: householdId, listId: list.id)
+          .firstWhere((current) => current?.revision == 1);
       await shopping.updateItemStatus(
         listId: list.id,
         itemId: tomatoLine.id,
+        expectedRevision: afterBeanList!.revision,
         status: ShoppingListItemStatus.substituted,
         substituteIngredientId: 'pepper',
         substituteQuantity: 300,
@@ -201,15 +238,19 @@ void main() {
     });
     final readyList = await withTimeout(
       'load updated shopping list',
-      () => container
-          .read(shoppingRepositoryProvider)
+      () => shoppingRepository
           .watchList(householdId: householdId, listId: list.id)
-          .first,
+          .firstWhere((current) => current?.revision == 2),
     );
-    await withTimeout(
-      'complete shopping',
-      () => shopping.completeList(readyList!),
+    final shoppingCommands = ShoppingCommandController(
+      repository: shoppingCommandRepository,
+      householdId: householdId,
+      household: household,
+      idGenerator: FakeIdGenerator(const ['complete-shopping-command']),
     );
+    await withTimeout<void>('complete shopping', () async {
+      await shoppingCommands.completeList(readyList!.id);
+    });
 
     final pantryRepository = container.read(pantryRepositoryProvider);
     final purchases = await withTimeout(
@@ -232,6 +273,41 @@ void main() {
       ),
       isNotNull,
     );
+    final purchasedPepper = await pantryRepository.findByIngredientUnit(
+      householdId: householdId,
+      ingredientId: 'pepper',
+      unit: UnitId.g,
+      section: PantrySection.food,
+    );
+    await withTimeout('replace pepper with bulk lots', () async {
+      await pantryRepository.setQuantity(householdId, purchasedPepper!.id, 0);
+      await pantryRepository.add(
+        PantryItem(
+          id: 'pepper-bulk-expiring',
+          householdId: householdId,
+          ingredientId: 'pepper',
+          quantity: 0.1,
+          unit: UnitId.kg,
+          section: PantrySection.bulk,
+          expiryDate: DateTime(2026, 7, 8),
+          createdAt: DateTime(2026, 7, 2),
+          updatedAt: DateTime(2026, 7, 2),
+        ),
+      );
+      await pantryRepository.add(
+        PantryItem(
+          id: 'pepper-bulk-later',
+          householdId: householdId,
+          ingredientId: 'pepper',
+          quantity: 0.5,
+          unit: UnitId.kg,
+          section: PantrySection.bulk,
+          expiryDate: DateTime(2026, 8, 1),
+          createdAt: DateTime(2026, 7, 1),
+          updatedAt: DateTime(2026, 7, 1),
+        ),
+      );
+    });
 
     final overriddenMeal = await withTimeout(
       'load meal with substitution override',
@@ -281,10 +357,35 @@ void main() {
           .then((meals) => meals.single),
     );
     expect(cookedMeal.state, ScheduledMealState.cooked);
+    final expiringLot = await pantryRepository
+        .watchById(householdId, 'pepper-bulk-expiring')
+        .first;
+    final laterLot = await pantryRepository
+        .watchById(householdId, 'pepper-bulk-later')
+        .first;
+    expect(expiringLot?.quantity, 0);
+    expect(laterLot?.quantity, closeTo(0.3, 0.000001));
+
+    final cookingEvents = await withTimeout(
+      'watch cooking consumption events',
+      () => cookingContainer
+          .read(consumptionHistoryRepositoryProvider)
+          .watchByHousehold(householdId)
+          .first,
+    );
+    final pepperEvents = cookingEvents
+        .where((event) => event.ingredientId == 'pepper')
+        .toList(growable: false);
+    expect(pepperEvents, hasLength(2));
+    expect(
+      pepperEvents.fold<double>(0, (sum, event) => sum + event.quantity),
+      closeTo(0.3, 0.000001),
+    );
+    expect(pepperEvents.every((event) => event.unit == UnitId.kg), isTrue);
 
     final leftover = await withTimeout(
       'save leftovers',
-      () => cooking.saveLeftovers(meal: cookedMeal, servings: 1),
+      () => cooking.saveLeftovers(meal: cookedMeal, servings: 2),
     );
     await withTimeout(
       'schedule leftover',
@@ -294,9 +395,36 @@ void main() {
         mealLabel: 'Lunch',
       ),
     );
+    final scheduledLeftoverMeal = await withTimeout(
+      'load scheduled leftover meal',
+      () => cookingContainer
+          .read(calendarRepositoryProvider)
+          .watchMealsInRange(
+            householdId: householdId,
+            startDate: DateTime(2026, 7, 7),
+            endDate: DateTime(2026, 7, 7),
+          )
+          .first
+          .then((meals) => meals.single),
+    );
+    await withTimeout(
+      'set partial leftover serving',
+      () => cooking.changeServingSize(scheduledLeftoverMeal, 1),
+    );
+    final partialLeftoverMeal = scheduledLeftoverMeal.copyWith(servingSize: 1);
+    await withTimeout(
+      'consume partial leftover',
+      () => cooking.consumeLeftoverMeal(partialLeftoverMeal),
+    );
+    final remainingLeftover = await withTimeout(
+      'load remaining leftover',
+      () => pantryRepository.watchById(householdId, leftover.id).first,
+    );
+    expect(remainingLeftover?.quantity, 1);
+    expect(remainingLeftover?.leftoverServings, 1);
     await withTimeout(
       'mark leftover spoiled',
-      () => cooking.markLeftoverSpoiled(leftover),
+      () => cooking.markLeftoverSpoiled(remainingLeftover!),
     );
 
     final wasteEvents = await withTimeout(
@@ -307,7 +435,8 @@ void main() {
           .first,
     );
     expect(wasteEvents.single.id, 'waste-1');
-    expect(wasteEvents.single.ingredientId, 'leftover-braise');
+    expect(wasteEvents.single.ingredientId, tomatoIngredientId);
+    expect(wasteEvents.single.quantity, 1);
 
     final leftoverMeal = await withTimeout(
       'watch scheduled leftover meal',
@@ -322,7 +451,7 @@ void main() {
           .then((meals) => meals.single),
     );
     expect(leftoverMeal.linkedLeftoverId, leftover.id);
-    expect(leftoverMeal.state, ScheduledMealState.leftover);
+    expect(leftoverMeal.state, ScheduledMealState.cooked);
   });
 }
 

@@ -9,23 +9,30 @@ import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/entities/shopping_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
+import 'package:kitchensync/features/calendar/domain/repositories/shopping_schedule_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/shopping_schedule_providers.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/consumption_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
+import 'package:kitchensync/features/shopping/domain/entities/shopping_command.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
+import 'package:kitchensync/features/shopping/domain/repositories/shopping_command_repository.dart';
 import 'package:kitchensync/features/shopping/domain/repositories/shopping_repository.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 import 'package:kitchensync/features/today/presentation/screens/day_view_screen.dart';
@@ -169,53 +176,128 @@ class _FakePantryRepository implements PantryRepository {
   }) async {}
 }
 
-class _FakeShoppingRepository implements ShoppingRepository {
+class _FakeShoppingRepository extends ShoppingRepository {
   ShoppingListRecord? upserted;
 
   @override
   Stream<List<ShoppingListRecord>> watchLists(String householdId) =>
-      const Stream.empty();
+      Stream.value(upserted == null ? const [] : [upserted!]);
 
   @override
   Stream<ShoppingListRecord?> watchList({
     required String householdId,
     required String listId,
-  }) => const Stream.empty();
+  }) => Stream.value(upserted?.id == listId ? upserted : null);
+}
+
+class _FakeShoppingCommandRepository
+    implements ShoppingAllocationCommandRepository {
+  _FakeShoppingCommandRepository(this.shopping);
+
+  final _FakeShoppingRepository shopping;
 
   @override
-  Future<void> upsertList(ShoppingListRecord list) async {
-    upserted = list;
+  Future<ShoppingCommandResult> createAndConsumeAllocation(
+    ConsumeShoppingAllocationIntent command,
+  ) async {
+    const listId = 'server-emergency-list';
+    shopping.upserted = ShoppingListRecord(
+      id: listId,
+      householdId: command.intent.householdId,
+      type: ShoppingListType.emergency,
+      shoppingDate: command.intent.startDate,
+      generatedForRangeStart: command.intent.startDate,
+      generatedForRangeEnd: command.intent.endDate,
+      status: ShoppingListStatus.pending,
+      createdAt: command.intent.startDate,
+      updatedAt: command.intent.startDate,
+      items: [
+        const ShoppingListItemRecord(
+          id: 'server-tomato',
+          shoppingListId: listId,
+          ingredientId: 'tomato',
+          quantityNeeded: 800,
+          unit: UnitId.g,
+          status: ShoppingListItemStatus.unchecked,
+          sourceMealLinks: [],
+        ),
+      ],
+    );
+    return const ShoppingCommandResult(
+      listId: listId,
+      status: ShoppingCommandStatus.pending,
+      revision: 0,
+      alreadyApplied: false,
+    );
   }
 
   @override
-  Future<void> updateItemStatus({
-    required String householdId,
-    required String listId,
-    required String itemId,
-    required ShoppingListItemStatus status,
-    String? substituteIngredientId,
-    double? substituteQuantity,
-    UnitId? substituteUnit,
-  }) async {}
+  Future<ShoppingCommandResult> upsertList(
+    ShoppingListUpsertCommand command,
+  ) async {
+    final currentRevision = shopping.upserted?.revision;
+    if (command.expectedRevision != currentRevision) {
+      throw StateError('Unexpected shopping list revision.');
+    }
+    final revision = currentRevision == null ? 0 : currentRevision + 1;
+    shopping.upserted = _withRevision(command.list, revision);
+    return ShoppingCommandResult(
+      listId: command.listId,
+      status: _commandStatus(command.list.status),
+      revision: revision,
+      alreadyApplied: false,
+    );
+  }
 
   @override
-  Future<void> updateListStatus({
-    required String householdId,
-    required String listId,
-    required ShoppingListStatus status,
-  }) async {}
+  Future<ShoppingCommandResult> mutateItem(
+    ShoppingListItemMutationCommand command,
+  ) => throw UnsupportedError('Item mutations are not used in these tests.');
 
   @override
-  Future<void> applyShopNowPurchasesToScheduledLists({
-    required String householdId,
-    required ShoppingListRecord shopNowList,
-  }) async {}
+  Future<ShoppingCommandResult> completeList(ShoppingCommandRequest request) =>
+      throw UnsupportedError('List completion is not used in these tests.');
 
   @override
-  Future<void> deleteList({
-    required String householdId,
-    required String listId,
-  }) async {}
+  Future<ShoppingCommandResult> deleteList(ShoppingCommandRequest request) =>
+      throw UnsupportedError('List deletion is not used in these tests.');
+}
+
+ShoppingCommandStatus _commandStatus(ShoppingListStatus status) =>
+    switch (status) {
+      ShoppingListStatus.pending => ShoppingCommandStatus.pending,
+      ShoppingListStatus.cancelled => ShoppingCommandStatus.cancelled,
+      ShoppingListStatus.completed => ShoppingCommandStatus.completed,
+    };
+
+ShoppingListRecord _withRevision(ShoppingListRecord list, int revision) =>
+    ShoppingListRecord(
+      id: list.id,
+      householdId: list.householdId,
+      type: list.type,
+      shoppingDate: list.shoppingDate,
+      generatedForRangeStart: list.generatedForRangeStart,
+      generatedForRangeEnd: list.generatedForRangeEnd,
+      status: list.status,
+      originId: list.originId,
+      completionId: list.completionId,
+      completedAt: list.completedAt,
+      completedByUserId: list.completedByUserId,
+      schemaVersion: list.schemaVersion,
+      revision: revision,
+      createdAt: list.createdAt,
+      updatedAt: list.updatedAt,
+      items: list.items,
+    );
+
+class _EmptyShoppingScheduleRepository implements ShoppingScheduleRepository {
+  const _EmptyShoppingScheduleRepository();
+
+  @override
+  Future<void> save(ShoppingSchedule schedule) async {}
+
+  @override
+  Stream<ShoppingSchedule?> watch(String householdId) => Stream.value(null);
 }
 
 class _FakePurchaseHistoryRepository implements PurchaseHistoryRepository {
@@ -242,6 +324,16 @@ class _FakeWasteRepository implements WasteRepository {
 
   @override
   Future<void> log(WasteEvent event) async {}
+}
+
+class _FakeConsumptionHistoryRepository
+    implements ConsumptionHistoryRepository {
+  @override
+  Stream<List<ConsumptionEvent>> watchByHousehold(String householdId) =>
+      Stream.value(const []);
+
+  @override
+  Future<void> add(ConsumptionEvent event) async {}
 }
 
 class _FakeRecipeRepository implements RecipeRepository {
@@ -320,16 +412,28 @@ Widget _wrap(
   ThemeData? theme,
 }) {
   final shopping = shoppingRepository ?? _FakeShoppingRepository();
+  final shoppingCommands = _FakeShoppingCommandRepository(shopping);
   return ProviderScope(
     overrides: [
       activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
       calendarRepositoryProvider.overrideWithValue(calendarRepository),
+      cookingInventoryServiceProvider.overrideWithValue(null),
       pantryRepositoryProvider.overrideWithValue(pantryRepository),
       purchaseHistoryRepositoryProvider.overrideWithValue(
         _FakePurchaseHistoryRepository(),
       ),
+      consumptionHistoryRepositoryProvider.overrideWithValue(
+        _FakeConsumptionHistoryRepository(),
+      ),
       wasteRepositoryProvider.overrideWithValue(_FakeWasteRepository()),
       shoppingRepositoryProvider.overrideWithValue(shopping),
+      shoppingCommandRepositoryProvider.overrideWithValue(shoppingCommands),
+      shoppingAllocationCommandRepositoryProvider.overrideWithValue(
+        shoppingCommands,
+      ),
+      shoppingScheduleRepositoryProvider.overrideWithValue(
+        const _EmptyShoppingScheduleRepository(),
+      ),
       recipeRepositoryProvider.overrideWithValue(_FakeRecipeRepository()),
       idGeneratorProvider.overrideWithValue(
         FakeIdGenerator(['leftover-1', 'emergency-1', 'line-1']),
@@ -466,6 +570,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(calendar.upserted?.marking, ScheduledMealMarking.problem);
+      expect(shopping.upserted, isNull);
+      expect(find.text('Add missing items'), findsOneWidget);
+
+      await tester.tap(find.text('Add missing items'));
+      await tester.pumpAndSettle();
+
       expect(shopping.upserted?.type, ShoppingListType.emergency);
       expect(shopping.upserted?.items.single.ingredientId, 'tomato');
       expect(shopping.upserted?.items.single.quantityNeeded, 800);

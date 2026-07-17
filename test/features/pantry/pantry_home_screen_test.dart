@@ -5,12 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/pantry_home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -187,7 +191,7 @@ void main() {
     expect(find.text('Jasmine Rice'), findsOneWidget);
     expect(find.text('Bleach'), findsOneWidget);
     expect(find.textContaining('Last purchased 2026-07-01'), findsOneWidget);
-    expect(find.textContaining('Fresh'), findsOneWidget);
+    expect(find.textContaining('Expiry unknown'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'jasmine');
     await tester.pumpAndSettle();
@@ -219,6 +223,88 @@ void main() {
 
     expect(find.text('Lemon'), findsOneWidget);
     expect(find.text('2 pieces'), findsOneWidget);
+  });
+
+  testWidgets('Bulk and Non-food rows show dictionary and prediction data', (
+    tester,
+  ) async {
+    final now = DateTime(2026, 7, 17);
+    final rice = _ingredient('rice', 'Jasmine Rice');
+    final detergent = _ingredient(
+      'detergent',
+      'Laundry Detergent',
+      category: IngredientCategory.nonFood,
+    );
+    final item = _item(
+      'rice-stock',
+      'rice',
+      section: PantrySection.bulk,
+      quantity: 5000,
+      lastPurchaseDate: DateTime(2026, 7, 10),
+    );
+    final status = BulkPantryStatus(
+      item: item,
+      estimatedConsumptionRatePerDay: 250,
+      estimatedEmptyDate: DateTime(2026, 8, 6),
+      recommendedPurchaseIntervalDays: 30,
+      needsPurchaseSoon: false,
+    );
+    final nonFoodItem = _item(
+      'detergent-stock',
+      'detergent',
+      section: PantrySection.nonFood,
+      quantity: 2,
+      unit: UnitId.piece,
+      lastPurchaseDate: DateTime(2026, 7, 5),
+    );
+    final nonFoodStatus = BulkPantryStatus(
+      item: nonFoodItem,
+      estimatedConsumptionRatePerDay: 0.1,
+      estimatedEmptyDate: DateTime(2026, 8, 6),
+      recommendedPurchaseIntervalDays: 45,
+      needsPurchaseSoon: false,
+    );
+
+    await tester.pumpWidget(
+      await _wrap(
+        overrides: [
+          activeHouseholdContextProvider.overrideWithValue(
+            const ActiveHouseholdContext(
+              id: 'solo-household',
+              name: 'Test kitchen',
+              role: HouseholdRole.admin,
+              isJoint: false,
+              hasPremium: true,
+            ),
+          ),
+          clockProvider.overrideWithValue(FakeClock(now)),
+          pantryAllItemsStreamProvider.overrideWith(
+            (ref) => Stream.value([item, nonFoodItem]),
+          ),
+          bulkPantryStatusesProvider.overrideWith(
+            (ref) => [status, nonFoodStatus],
+          ),
+          pantryIngredientProvider(
+            'rice',
+          ).overrideWith((ref) async => Result.success(rice)),
+          pantryIngredientProvider(
+            'detergent',
+          ).overrideWith((ref) async => Result.success(detergent)),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Jasmine Rice'), findsOneWidget);
+    expect(
+      find.textContaining('20 estimated days remaining'),
+      findsNWidgets(2),
+    );
+    expect(find.textContaining('Buy every 30 days'), findsOneWidget);
+    expect(find.textContaining('Last purchased 2026-07-10'), findsOneWidget);
+    expect(find.text('Laundry Detergent'), findsOneWidget);
+    expect(find.textContaining('Buy every 45 days'), findsOneWidget);
+    expect(find.textContaining('Last purchased 2026-07-05'), findsOneWidget);
   });
 
   testWidgets('PantryHomeScreen keeps Leftovers behind the filter control', (

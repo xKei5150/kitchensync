@@ -14,6 +14,13 @@ class ShoppingListMapper {
     'generatedForRangeEnd': _dateKey(list.generatedForRangeEnd),
     'status': list.status.name,
     'originId': list.originId,
+    if (list.completionId != null) 'completionId': list.completionId,
+    if (list.completedAt != null)
+      'completedAt': Timestamp.fromDate(list.completedAt!),
+    if (list.completedByUserId != null)
+      'completedByUserId': list.completedByUserId,
+    if (list.schemaVersion != 1) 'schemaVersion': list.schemaVersion,
+    if (list.revision != 0) 'revision': list.revision,
     'createdAt': Timestamp.fromDate(list.createdAt),
     'updatedAt': Timestamp.fromDate(list.updatedAt),
   };
@@ -37,6 +44,11 @@ class ShoppingListMapper {
         map['status'] as String? ?? ShoppingListStatus.pending.name,
       ),
       originId: map['originId'] as String?,
+      completionId: map['completionId'] as String?,
+      completedAt: (map['completedAt'] as Timestamp?)?.toDate(),
+      completedByUserId: map['completedByUserId'] as String?,
+      schemaVersion: (map['schemaVersion'] as int?) ?? 1,
+      revision: (map['revision'] as int?) ?? 0,
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
       items: List.unmodifiable(items),
@@ -51,6 +63,8 @@ class ShoppingListItemMapper {
     'shoppingListId': item.shoppingListId,
     'ingredientId': item.ingredientId,
     'quantityNeeded': item.quantityNeeded,
+    if (item.purchasedQuantity != null)
+      'purchasedQuantity': item.purchasedQuantity,
     'unit': item.unit.value,
     'status': item.status.name,
     'substituteIngredientId': item.substituteIngredientId,
@@ -69,6 +83,7 @@ class ShoppingListItemMapper {
       shoppingListId: map['shoppingListId'] as String,
       ingredientId: map['ingredientId'] as String,
       quantityNeeded: (map['quantityNeeded'] as num).toDouble(),
+      purchasedQuantity: (map['purchasedQuantity'] as num?)?.toDouble(),
       unit: UnitId(map['unit'] as String),
       status: _enumFromName(
         ShoppingListItemStatus.values,
@@ -108,8 +123,18 @@ String _dateKey(DateTime date) {
 }
 
 DateTime _dateFromKey(String key) {
-  final parts = key.split('-').map(int.parse).toList(growable: false);
-  return DateTime(parts[0], parts[1], parts[2]);
+  final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(key);
+  if (match == null) {
+    throw FormatException('Invalid date key in Firestore doc: "$key"', key);
+  }
+  final year = int.parse(match.group(1)!);
+  final month = int.parse(match.group(2)!);
+  final day = int.parse(match.group(3)!);
+  final value = DateTime(year, month, day);
+  if (value.year != year || value.month != month || value.day != day) {
+    throw FormatException('Invalid date key in Firestore doc: "$key"', key);
+  }
+  return value;
 }
 
 String _typeName(ShoppingListType type) {

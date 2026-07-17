@@ -1,53 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 
-/// A field-scoped validation message — a small danger glyph beside specific,
-/// house-voice copy, sitting directly beneath the input it belongs to.
-///
-/// From "KitchenSync — P4 Accessibility States", Screen 25: errors are
-/// "attached to the field that owns them — never a colour-only signal." The
-/// leading icon and the explicit text are what carry the meaning, so the error
-/// survives colour-blindness and greyscale; it is announced as a live region.
-class KsFieldError extends StatelessWidget {
-  const KsFieldError(this.message, {super.key});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final danger = context.ksColors.danger;
-    return Padding(
-      padding: const EdgeInsets.only(
-        top: KsTokens.space6,
-        left: KsTokens.space2,
-      ),
-      child: Semantics(
-        liveRegion: true,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 1),
-              child: Icon(Icons.error_outline, size: 13, color: danger),
-            ),
-            const SizedBox(width: KsTokens.space6),
-            Expanded(
-              child: Text(
-                message,
-                style: KsTokens.bodySmall.copyWith(
-                  color: danger,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+part 'ks_form_field_error.dart';
 
 /// The error-summary banner shown at the top of a form once a submit attempt
 /// surfaces validation problems — a count, a danger glyph, and a pointer to the
@@ -189,15 +143,28 @@ class KsSelectChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
+    final enabled = onTap != null;
     final accent = color ?? ks.brandPrimary;
-    final fill = selected
+    final fill = !enabled
+        ? ks.disabledFill
+        : selected
         ? Color.alphaBlend(accent.withValues(alpha: 0.15), ks.surfaceRaised)
         : ks.surfaceRaised;
-    final borderColor = selected ? accent : ks.borderStrong;
-    final textColor = selected ? accent : ks.textSecondary;
+    final borderColor = !enabled
+        ? ks.border
+        : selected
+        ? accent
+        : ks.borderStrong;
+    final textColor = !enabled
+        ? ks.disabledText
+        : selected
+        ? accent
+        : ks.textSecondary;
+    final indicatorColor = enabled ? accent : ks.disabledText;
 
     return Semantics(
       button: true,
+      enabled: enabled,
       selected: selected,
       label: label,
       child: Material(
@@ -222,7 +189,11 @@ class KsSelectChip extends StatelessWidget {
                 if (selected)
                   Padding(
                     padding: const EdgeInsets.only(right: KsTokens.space6),
-                    child: Icon(Icons.check_rounded, size: 14, color: accent),
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 14,
+                      color: indicatorColor,
+                    ),
                   )
                 else if (dotColor != null)
                   Padding(
@@ -231,7 +202,7 @@ class KsSelectChip extends StatelessWidget {
                       width: 9,
                       height: 9,
                       decoration: BoxDecoration(
-                        color: dotColor,
+                        color: enabled ? dotColor : ks.disabledText,
                         shape: BoxShape.circle,
                       ),
                     ),

@@ -1,0 +1,27 @@
+{
+  "path": "/households/household-1/shoppingLists/scheduled_weekly_20260105/items/tomato%2Fred__fl-oz",
+  "id": "tomato%2Fred__fl-oz",
+  "shoppingListId": "scheduled_weekly_20260105",
+  "ingredientId": "tomato/red",
+  "quantityNeeded": 6,
+  "purchasedQuantity": 5.5,
+  "unit": "fl-oz",
+  "status": "bought",
+  "substituteIngredientId": null,
+  "substituteQuantity": null,
+  "substituteUnit": null,
+  "sourceMealLinks": [
+    {
+      "mealEntryId": "meal-1",
+      "recipeId": "recipe-1",
+      "date": "2026-01-05",
+      "quantity": 2
+    },
+    {
+      "mealEntryId": "meal-2",
+      "recipeId": "recipe-2",
+      "date": "2026-01-06",
+      "quantity": 4
+    }
+  ]
+}

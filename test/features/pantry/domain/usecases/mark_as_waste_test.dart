@@ -81,28 +81,34 @@ void main() {
     },
   );
 
-  test('qty 99 from item(3) clamps newPantryQuantity to 0', () async {
-    when(
-      () => repo.watchById('h1', 'p1'),
-    ).thenAnswer((_) => Stream.value(_item(3)));
+  test(
+    'qty 99 from item(3) records only the quantity actually removed',
+    () async {
+      when(
+        () => repo.watchById('h1', 'p1'),
+      ).thenAnswer((_) => Stream.value(_item(3)));
 
-    final uc = MarkAsWaste(repo, idGenerator: idGen, clock: clock);
-    final result = await uc.call(
-      const MarkAsWasteParams(
-        householdId: 'h1',
-        pantryItemId: 'p1',
-        quantity: 99,
-        reason: WasteReason.expired,
-      ),
-    );
-    expect(result, isA<Success<void>>());
-    verify(
-      () => repo.markAsWasteAtomic(
-        householdId: 'h1',
-        pantryItemId: 'p1',
-        newPantryQuantity: 0,
-        wasteEvent: any(named: 'wasteEvent'),
-      ),
-    ).called(1);
-  });
+      final uc = MarkAsWaste(repo, idGenerator: idGen, clock: clock);
+      final result = await uc.call(
+        const MarkAsWasteParams(
+          householdId: 'h1',
+          pantryItemId: 'p1',
+          quantity: 99,
+          reason: WasteReason.expired,
+        ),
+      );
+      expect(result, isA<Success<void>>());
+      final event =
+          verify(
+                () => repo.markAsWasteAtomic(
+                  householdId: 'h1',
+                  pantryItemId: 'p1',
+                  newPantryQuantity: 0,
+                  wasteEvent: captureAny(named: 'wasteEvent'),
+                ),
+              ).captured.single
+              as WasteEvent;
+      expect(event.quantity, 3);
+    },
+  );
 }

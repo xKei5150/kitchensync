@@ -3,9 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/utils/freshness_helper.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
@@ -107,6 +111,16 @@ class _PantryHomeScreenState extends ConsumerState<PantryHomeScreen> {
               eyebrow: 'The Pantry',
               title: 'On the shelves',
               actions: [
+                KsHeaderAction(
+                  icon: Icons.insights_outlined,
+                  tooltip: 'Pantry insights',
+                  onTap: () => context.push('/insights'),
+                ),
+                KsHeaderAction(
+                  icon: Icons.add_shopping_cart_outlined,
+                  tooltip: 'Bulk foods to purchase',
+                  onTap: () => context.push('/pantry/bulk-purchases'),
+                ),
                 KsHeaderAction(
                   icon: Icons.delete_outline_rounded,
                   tooltip: 'Waste log',
@@ -225,6 +239,9 @@ class _ShelfList extends ConsumerWidget {
       final f = FreshnessHelper.fromExpiry(i.expiryDate);
       return f == Freshness.expiringSoon || f == Freshness.expired;
     }).toList();
+    final groupedFood = filter == _PantryFilter.food
+        ? _groupFoodByCategory(ref, filtered)
+        : const <IngredientCategory, List<PantryItem>>{};
 
     DateTime? soonest;
     for (final i in atRisk) {
@@ -256,14 +273,37 @@ class _ShelfList extends ConsumerWidget {
           ),
           const SizedBox(height: KsTokens.space16),
         ],
-        for (final item in filtered) ...[
-          PantryItemTile(
-            key: ValueKey(item.id),
-            item: item,
-            onTap: () => context.push('/pantry/${item.id}'),
-          ),
-          const SizedBox(height: KsTokens.space8),
-        ],
+        if (groupedFood.isNotEmpty)
+          for (final entry in groupedFood.entries) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: KsTokens.space8),
+              child: Text(
+                entry.key.name.toUpperCase(),
+                style: KsTokens.labelSmall.copyWith(
+                  color: context.ksColors.textTertiary,
+                  letterSpacing: .8,
+                ),
+              ),
+            ),
+            for (final item in entry.value) ...[
+              PantryItemTile(
+                key: ValueKey(item.id),
+                item: item,
+                onTap: () => context.push('/pantry/${item.id}'),
+              ),
+              const SizedBox(height: KsTokens.space8),
+            ],
+            const SizedBox(height: KsTokens.space4),
+          ]
+        else
+          for (final item in filtered) ...[
+            PantryItemTile(
+              key: ValueKey(item.id),
+              item: item,
+              onTap: () => context.push('/pantry/${item.id}'),
+            ),
+            const SizedBox(height: KsTokens.space8),
+          ],
         const SizedBox(height: KsTokens.space4),
         const _AddBar(),
       ],
@@ -304,6 +344,23 @@ class _ShelfList extends ConsumerWidget {
       },
       loading: () => null,
       error: (_, __) => null,
+    );
+  }
+
+  Map<IngredientCategory, List<PantryItem>> _groupFoodByCategory(
+    WidgetRef ref,
+    List<PantryItem> items,
+  ) {
+    final grouped = <IngredientCategory, List<PantryItem>>{};
+    for (final item in items) {
+      final category =
+          _ingredientFor(ref, item.ingredientId)?.category ??
+          IngredientCategory.other;
+      grouped.putIfAbsent(category, () => []).add(item);
+    }
+    return Map.fromEntries(
+      grouped.entries.toList()
+        ..sort((a, b) => a.key.name.compareTo(b.key.name)),
     );
   }
 }
@@ -484,11 +541,20 @@ class _SkeletonRow extends StatelessWidget {
 }
 
 /// The "Add" pill — the section home's primary write action.
-class _AddBar extends StatelessWidget {
+class _AddBar extends ConsumerWidget {
   const _AddBar();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final household = ref.watch(activeHouseholdContextProvider);
+    final canAdd =
+        household != null &&
+        const HouseholdPolicy().roleCan(
+          household.role,
+          HouseholdCapability.addPantryItems,
+          isSoloHousehold: household.isSolo,
+        );
+    if (!canAdd) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: KsTokens.space16),
       child: SizedBox(

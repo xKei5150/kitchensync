@@ -107,7 +107,9 @@ class _FakePantryRepository implements PantryRepository {
   }
 
   @override
-  Future<void> update(PantryItem item) async {}
+  Future<void> update(PantryItem item) async {
+    quantities[item.id] = item.quantity;
+  }
 
   @override
   Future<void> setQuantity(
@@ -176,7 +178,7 @@ class _FakeRecipeRepository implements RecipeRepository {
   }
 }
 
-Recipe _recipe() {
+Recipe _recipe({bool duplicateTomato = false}) {
   final now = DateTime(2026, 7);
   return Recipe(
     id: 'braise',
@@ -192,15 +194,23 @@ Recipe _recipe() {
     monetization: RecipeMonetization.free,
     createdAt: now,
     updatedAt: now,
-    ingredients: const [
-      RecipeIngredient(
+    ingredients: [
+      const RecipeIngredient(
         id: 'tomato-line',
         recipeId: 'braise',
         ingredientId: 'tomato',
         quantity: 400,
         unit: UnitId.g,
       ),
-      RecipeIngredient(
+      if (duplicateTomato)
+        const RecipeIngredient(
+          id: 'tomato-line-2',
+          recipeId: 'braise',
+          ingredientId: 'tomato',
+          quantity: 100,
+          unit: UnitId.g,
+        ),
+      const RecipeIngredient(
         id: 'bean-line',
         recipeId: 'braise',
         ingredientId: 'beans',
@@ -354,6 +364,31 @@ void main() {
   );
 
   test(
+    'markCooked combines duplicate recipe ingredient requirements',
+    () async {
+      final recipe = _recipe(duplicateTomato: true);
+      final calendar = _FakeCalendarRepository();
+      final pantry = _FakePantryRepository([_pantryItem(), _beanPantryItem()]);
+
+      await controller(
+        calendar: calendar,
+        pantry: pantry,
+        recipe: recipe,
+      ).markCooked(
+        MealScheduleEntry(
+          id: 'meal-duplicate',
+          recipeId: 'braise',
+          date: DateTime(2026, 7, 6),
+          mealLabel: 'Dinner',
+          servingSize: 2,
+        ),
+      );
+
+      expect(pantry.quantities['pantry-tomato'], 500);
+    },
+  );
+
+  test(
     'markCooked marks problem and reports missing ingredients before cooking',
     () async {
       final calendar = _FakeCalendarRepository();
@@ -429,7 +464,7 @@ void main() {
       expect(leftover.relatedRecipeId, 'braise');
       expect(leftover.leftoverServings, 2);
       expect(leftover.quantity, 2);
-      expect(leftover.unit, UnitId.piece);
+      expect(leftover.unit, UnitId.serving);
       expect(pantry.addedItems.single, leftover);
       expect(calendar.upserted?.state, ScheduledMealState.leftover);
       expect(

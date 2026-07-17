@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
-import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 import 'package:kitchensync/features/shopping/data/dtos/shopping_dto.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 
@@ -17,142 +15,108 @@ class ShoppingRemoteDataSource {
         .shoppingLists(householdId)
         .orderBy('shoppingDate')
         .snapshots()
-        .asyncMap(
-          (snapshot) => Future.wait(
+        .asyncMap((snapshot) async {
+          final records = await Future.wait(
             snapshot.docs.map((doc) => _hydrateList(householdId, doc)),
-          ),
-        );
+          );
+          return records
+              .where((list) => list.status != ShoppingListStatus.cancelled)
+              .toList(growable: false);
+        });
+  }
+
+  Future<ShoppingHistoryPage> loadCompletedHistory(
+    String householdId, {
+    String? afterListId,
+  }) async {
+    Query<Map<String, dynamic>> query = _refs
+        .shoppingLists(householdId)
+        .where('status', isEqualTo: ShoppingListStatus.completed.name)
+        .orderBy('updatedAt', descending: true)
+        .limit(20);
+    if (afterListId != null) {
+      final lastDocument = await _refs
+          .shoppingLists(householdId)
+          .doc(afterListId)
+          .get();
+      if (!lastDocument.exists) {
+        throw StateError('Completed shopping history cursor no longer exists.');
+      }
+      query = query.startAfterDocument(lastDocument);
+    }
+    final snapshot = await query.get();
+    final records = await Future.wait(
+      snapshot.docs.map((document) => _hydrateList(householdId, document)),
+    );
+    return ShoppingHistoryPage(
+      records: List.unmodifiable(records),
+      nextCursorId: snapshot.docs.length == 20 ? snapshot.docs.last.id : null,
+    );
   }
 
   Stream<ShoppingListRecord?> watchList({
     required String householdId,
     required String listId,
   }) {
-    return _refs.shoppingLists(householdId).doc(listId).snapshots().asyncMap((
-      doc,
-    ) async {
-      if (!doc.exists) {
-        return null;
-      }
-      return _hydrateList(householdId, doc);
-    });
-  }
+    late StreamController<ShoppingListRecord?> controller;
+    StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? parent;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? items;
+    DocumentSnapshot<Map<String, dynamic>>? parentValue;
+    QuerySnapshot<Map<String, dynamic>>? itemValue;
 
-  Future<void> upsertList(ShoppingListRecord list) async {
-    final db = _refs.shoppingLists(list.householdId).firestore;
-    final batch = db.batch();
-    final listRef = _refs.shoppingLists(list.householdId).doc(list.id);
-    batch.set(listRef, ShoppingListMapper.toMap(list));
-    for (final item in list.items) {
-      batch.set(
-        _refs.shoppingListItems(list.householdId, list.id).doc(item.id),
-        ShoppingListItemMapper.toMap(item),
+    void emit() {
+      final currentParent = parentValue;
+      if (currentParent == null || controller.isClosed) return;
+      if (!currentParent.exists) {
+        controller.add(null);
+        return;
+      }
+      final currentItems = itemValue;
+      if (currentItems == null) return;
+      controller.add(
+        ShoppingListMapper.fromMap(
+          id: currentParent.id,
+          map: currentParent.data()!,
+          items: currentItems.docs
+              .map((doc) => ShoppingListItemMapper.fromMap(doc.id, doc.data()))
+              .toList(growable: false),
+        ),
       );
     }
-    await batch.commit();
-  }
 
-  Future<void> updateItemStatus({
-    required String householdId,
-    required String listId,
-    required String itemId,
-    required ShoppingListItemStatus status,
-    String? substituteIngredientId,
-    double? substituteQuantity,
-    UnitId? substituteUnit,
-  }) {
-    return _refs.shoppingListItems(householdId, listId).doc(itemId).update({
-      'status': status.name,
-      'substituteIngredientId': substituteIngredientId,
-      'substituteQuantity': substituteQuantity,
-      'substituteUnit': substituteUnit?.value,
-    });
-  }
-
-  Future<void> updateListStatus({
-    required String householdId,
-    required String listId,
-    required ShoppingListStatus status,
-  }) {
-    return _refs.shoppingLists(householdId).doc(listId).update({
-      'status': status.name,
-      'updatedAt': Timestamp.now(),
-    });
-  }
-
-  Future<void> applyShopNowPurchasesToScheduledLists({
-    required String householdId,
-    required ShoppingListRecord shopNowList,
-  }) async {
-    final purchases = shopNowList.items
-        .where(
-          (item) =>
-              item.status == ShoppingListItemStatus.bought ||
-              item.status == ShoppingListItemStatus.substituted,
-        )
-        .expand(
-          (item) => item.sourceMealLinks.map(
-            (link) => _ScheduledAdjustment(
-              ingredientId: item.ingredientId,
-              unit: item.unit,
-              quantity: link.quantity,
-              mealEntryId: link.mealEntryId,
-            ),
-          ),
-        )
-        .where((adjustment) => adjustment.quantity > 0)
-        .toList(growable: false);
-    if (purchases.isEmpty) return;
-
-    final lists = await _refs
-        .shoppingLists(householdId)
-        .where('type', isEqualTo: ShoppingListType.scheduled.name)
-        .where('status', isEqualTo: ShoppingListStatus.pending.name)
-        .get();
-    if (lists.docs.isEmpty) return;
-
-    final db = _refs.shoppingLists(householdId).firestore;
-    final batch = db.batch();
-    var hasWrites = false;
-
-    for (final listDoc in lists.docs) {
-      final items = await _refs
-          .shoppingListItems(householdId, listDoc.id)
-          .get();
-      for (final itemDoc in items.docs) {
-        final item = ShoppingListItemMapper.fromMap(itemDoc.id, itemDoc.data());
-        for (final adjustment in purchases) {
-          if (!adjustment.matches(item)) continue;
-          final applied = adjustment.take(item.quantityNeeded);
-          if (applied <= 0) continue;
-          final remaining = item.quantityNeeded - applied;
-          batch.update(itemDoc.reference, {
-            'quantityNeeded': remaining <= 0 ? 0 : remaining,
-            if (remaining <= 0) 'status': ShoppingListItemStatus.skipped.name,
-          });
-          hasWrites = true;
-          break;
-        }
-      }
-    }
-
-    if (hasWrites) {
-      await batch.commit();
-    }
-  }
-
-  Future<void> deleteList({
-    required String householdId,
-    required String listId,
-  }) async {
-    final items = await _refs.shoppingListItems(householdId, listId).get();
-    final db = _refs.shoppingLists(householdId).firestore;
-    final batch = db.batch();
-    for (final item in items.docs) {
-      batch.delete(item.reference);
-    }
-    batch.delete(_refs.shoppingLists(householdId).doc(listId));
-    await batch.commit();
+    controller = StreamController<ShoppingListRecord?>(
+      onListen: () {
+        parent = _refs
+            .shoppingLists(householdId)
+            .doc(listId)
+            .snapshots()
+            .listen((snapshot) {
+              parentValue = snapshot;
+              emit();
+            }, onError: controller.addError);
+        items = _refs
+            .shoppingListItems(householdId, listId)
+            .orderBy('ingredientId')
+            .snapshots()
+            .listen((snapshot) {
+              itemValue = snapshot;
+              emit();
+            }, onError: controller.addError);
+      },
+      onPause: () {
+        parent?.pause();
+        items?.pause();
+      },
+      onResume: () {
+        parent?.resume();
+        items?.resume();
+      },
+      onCancel: () async {
+        await parent?.cancel();
+        await items?.cancel();
+      },
+    );
+    return controller.stream;
   }
 
   Future<ShoppingListRecord> _hydrateList(
@@ -174,37 +138,5 @@ class ShoppingRemoteDataSource {
       map: doc.data()!,
       items: items,
     );
-  }
-}
-
-class _ScheduledAdjustment {
-  _ScheduledAdjustment({
-    required this.ingredientId,
-    required this.unit,
-    required double quantity,
-    required this.mealEntryId,
-  }) : _remaining = quantity;
-
-  final String ingredientId;
-  final UnitId unit;
-  final String mealEntryId;
-  double _remaining;
-
-  double get quantity => _remaining;
-
-  bool matches(ShoppingListItemRecord item) {
-    if (_remaining <= 0 ||
-        item.ingredientId != ingredientId ||
-        item.unit != unit ||
-        item.status != ShoppingListItemStatus.unchecked) {
-      return false;
-    }
-    return item.sourceMealLinks.any((link) => link.mealEntryId == mealEntryId);
-  }
-
-  double take(double requested) {
-    final applied = requested < _remaining ? requested : _remaining;
-    _remaining -= applied;
-    return applied;
   }
 }

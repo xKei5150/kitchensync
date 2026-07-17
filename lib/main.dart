@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/app/app.dart';
@@ -8,7 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final env = FirebaseInitializer.envFromDartDefine();
-  await const FirebaseInitializer().initialize(env);
+  const firebaseInitializer = FirebaseInitializer();
+  await firebaseInitializer.bootstrap(env);
   final prefs = await SharedPreferences.getInstance();
   runApp(
     ProviderScope(
@@ -16,4 +19,7 @@ Future<void> main() async {
       child: const KitchenSyncApp(),
     ),
   );
+
+  // Never hold the first Flutter frame behind remote Firebase services.
+  unawaited(firebaseInitializer.finishInitialization(env));
 }

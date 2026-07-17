@@ -8,7 +8,7 @@ import {
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deleteDoc, setDoc, doc, getDoc } from "firebase/firestore";
+import { deleteDoc, setDoc, doc, getDoc, updateDoc } from "firebase/firestore";
 
 let env: RulesTestEnvironment;
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
@@ -50,6 +50,20 @@ beforeAll(async () => {
     });
     await setDoc(doc(db, "households/joinable-household/members/admin"), {
       role: "admin",
+    });
+    for (const role of ["cook", "shopper", "member"] as const) {
+      await setDoc(doc(db, `households/joinable-household/members/${role}`), {
+        role,
+      });
+    }
+    await setDoc(doc(db, "households/joinable-household/pantryItems/shared"), {
+      householdId: "joinable-household",
+      ingredientId: "rice",
+      quantity: 5,
+      unit: "kg",
+      section: "bulk",
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
     await setDoc(doc(db, "householdInvites/KS-JOIN1"), {
       householdId: "joinable-household",
@@ -244,6 +258,61 @@ describe("/households/{hid}/pantryItems", () => {
     );
   });
 
+  test("admin has full access", async () => {
+    const db = env.authenticatedContext("admin").firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, "households/joinable-household/pantryItems/shared"), {
+        note: "Admin correction",
+        updatedAt: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      deleteDoc(doc(db, "households/joinable-household/pantryItems/shared")),
+    );
+  });
+
+  test("cook and shopper can make constrained quantity updates", async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "households/joinable-household/pantryItems/shared"), {
+        householdId: "joinable-household",
+        ingredientId: "rice",
+        quantity: 5,
+        unit: "kg",
+        section: "bulk",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    });
+    for (const role of ["cook", "shopper"] as const) {
+      const db = env.authenticatedContext(role).firestore();
+      await assertSucceeds(
+        updateDoc(doc(db, "households/joinable-household/pantryItems/shared"), {
+          quantity: role === "cook" ? 4 : 4.5,
+          updatedAt: new Date(),
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(db, "households/joinable-household/pantryItems/shared"), {
+          section: "food",
+          updatedAt: new Date(),
+        }),
+      );
+    }
+  });
+
+  test("member is read-only", async () => {
+    const db = env.authenticatedContext("member").firestore();
+    await assertSucceeds(
+      getDoc(doc(db, "households/joinable-household/pantryItems/shared")),
+    );
+    await assertFails(
+      updateDoc(doc(db, "households/joinable-household/pantryItems/shared"), {
+        quantity: 1,
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
   test("write with mismatching householdId rejected", async () => {
     const db = env.authenticatedContext("u1").firestore();
     await assertFails(
@@ -256,6 +325,66 @@ describe("/households/{hid}/pantryItems", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }),
+    );
+  });
+
+  test("valid leftovers require lifecycle metadata and a three-day shelf life", async () => {
+    const cookDb = env.authenticatedContext("cook").firestore();
+    const adminDb = env.authenticatedContext("admin").firestore();
+    const createdAt = new Date("2026-07-17T00:00:00.000Z");
+    const valid = {
+      householdId: "joinable-household",
+      ingredientId: "leftover-adobo",
+      quantity: 2,
+      unit: "serving",
+      section: "leftover",
+      relatedRecipeId: "adobo",
+      leftoverServings: 2,
+      expiryDate: new Date("2026-07-20T00:00:00.000Z"),
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    await assertSucceeds(
+      setDoc(doc(cookDb, "households/joinable-household/pantryItems/valid-leftover"), valid),
+    );
+    await assertFails(
+      setDoc(doc(adminDb, "households/joinable-household/pantryItems/no-recipe"), {
+        ...valid,
+        relatedRecipeId: null,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(adminDb, "households/joinable-household/pantryItems/long-life"), {
+        ...valid,
+        expiryDate: new Date("2026-07-24T00:00:00.000Z"),
+      }),
+    );
+  });
+
+  test("ordinary items cannot be edited into leftovers and leftovers only allow depletion", async () => {
+    const adminDb = env.authenticatedContext("admin").firestore();
+    const cookDb = env.authenticatedContext("cook").firestore();
+    await assertFails(
+      updateDoc(doc(adminDb, "households/joinable-household/pantryItems/shared"), {
+        section: "leftover",
+        relatedRecipeId: "rice-bowl",
+        leftoverServings: 2,
+        expiryDate: new Date("2026-07-20T00:00:00.000Z"),
+        updatedAt: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(
+        doc(cookDb, "households/joinable-household/pantryItems/valid-leftover"),
+        { quantity: 1, leftoverServings: 1, updatedAt: new Date() },
+      ),
+    );
+    await assertFails(
+      updateDoc(
+        doc(adminDb, "households/joinable-household/pantryItems/valid-leftover"),
+        { relatedRecipeId: "different-recipe", updatedAt: new Date() },
+      ),
     );
   });
 });
@@ -281,6 +410,56 @@ describe("/households/{hid}/wasteEvents append-only", () => {
         { merge: true },
       ),
     );
+  });
+});
+
+describe("manual inventory audit events", () => {
+  const correction = {
+    householdId: "joinable-household",
+    pantryItemId: "shared",
+    ingredientId: "rice",
+    quantityDelta: 1,
+    previousQuantity: 4,
+    newQuantity: 5,
+    unit: "kg",
+    reason: "manualCorrection",
+    date: new Date(),
+    schemaVersion: 1,
+  };
+
+  test("shopper corrections and admin restocks are append-only", async () => {
+    const shopperDb = env.authenticatedContext("shopper").firestore();
+    const adminDb = env.authenticatedContext("admin").firestore();
+    await assertSucceeds(
+      setDoc(
+        doc(shopperDb, "households/joinable-household/inventoryAdjustmentEvents/correction"),
+        correction,
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(adminDb, "households/joinable-household/inventoryAdjustmentEvents/restock"),
+        { ...correction, reason: "manualRestock" },
+      ),
+    );
+    await assertFails(
+      updateDoc(
+        doc(shopperDb, "households/joinable-household/inventoryAdjustmentEvents/correction"),
+        { quantityDelta: 2 },
+      ),
+    );
+  });
+
+  test("cook and member cannot forge correction events", async () => {
+    for (const role of ["cook", "member"] as const) {
+      const db = env.authenticatedContext(role).firestore();
+      await assertFails(
+        setDoc(
+          doc(db, `households/joinable-household/inventoryAdjustmentEvents/${role}`),
+          correction,
+        ),
+      );
+    }
   });
 });
 
@@ -446,7 +625,7 @@ describe("household role-gated feature collections", () => {
     );
   });
 
-  test("shopping lists are shopper-writable and cook is denied", async () => {
+  test("direct shopping list and item writes are denied", async () => {
     const shopperDb = env.authenticatedContext("shopper").firestore();
     const cookDb = env.authenticatedContext("cook").firestore();
     const payload = {
@@ -460,13 +639,13 @@ describe("household role-gated feature collections", () => {
       updatedAt: new Date(),
     };
 
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(shopperDb, "households/joint-household/shoppingLists/list-1"), payload),
     );
     await assertFails(
       setDoc(doc(cookDb, "households/joint-household/shoppingLists/list-2"), payload),
     );
-    await assertSucceeds(
+    await assertFails(
       setDoc(
         doc(shopperDb, "households/joint-household/shoppingLists/list-1/items/i1"),
         {

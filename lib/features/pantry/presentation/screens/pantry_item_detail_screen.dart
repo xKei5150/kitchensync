@@ -16,12 +16,19 @@ import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/services/pantry_unit_conversion.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item_photo.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/adjust_pantry_quantity.dart';
+import 'package:kitchensync/features/pantry/domain/usecases/delete_pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/usecases/record_consumption.dart';
+import 'package:kitchensync/features/pantry/domain/usecases/update_pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/pantry/presentation/widgets/mark_as_waste_sheet.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
@@ -86,6 +93,7 @@ class _BodyState extends ConsumerState<_Body> {
   bool _uploadingPhoto = false;
 
   Future<void> _pickAndUpload() async {
+    if (!_hasFullPantryAccess()) return;
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked == null || !mounted) return;
@@ -121,6 +129,7 @@ class _BodyState extends ConsumerState<_Body> {
   }
 
   Future<void> _adjustQuantity(double delta) async {
+    if (!_can(HouseholdCapability.editPantryItems)) return;
     final hid = ref.read(activeHouseholdIdProvider);
     final useCase = ref.read(adjustPantryQuantityProvider);
     final result = await useCase(
@@ -157,12 +166,20 @@ class _BodyState extends ConsumerState<_Body> {
     );
 
     final name = ingredient?.displayNames['en'] ?? item.ingredientId;
+    final sourceRecipeId = item.relatedRecipeId;
+    final sourceRecipe = sourceRecipeId == null
+        ? null
+        : ref.watch(recipeRecordProvider(sourceRecipeId)).valueOrNull;
     final qty = QuantityFormatter.format(item.quantity);
     final unit = _unitLabel(
       item.unit,
       item.quantity,
       ingredient?.localUnitDefinitions ?? const <UnitDefinition>[],
     );
+    final canConsume = _can(HouseholdCapability.markIngredientsConsumed);
+    final canIncrease =
+        _hasFullPantryAccess() && item.section != PantrySection.leftover;
+    final canManagePhoto = _hasFullPantryAccess();
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -171,7 +188,7 @@ class _BodyState extends ConsumerState<_Body> {
           imageUrl: item.imageUrl,
           uploading: _uploadingPhoto,
           ingredient: ingredient,
-          onTapPhoto: _pickAndUpload,
+          onTapPhoto: canManagePhoto ? _pickAndUpload : null,
           onBack: () => context.pop(),
         ),
         Padding(
@@ -216,14 +233,26 @@ class _BodyState extends ConsumerState<_Body> {
                   fontSize: 13,
                 ),
               ),
+              if (sourceRecipeId != null) ...[
+                const SizedBox(height: KsTokens.space6),
+                TextButton.icon(
+                  onPressed: () => context.push('/recipe/$sourceRecipeId'),
+                  icon: const Icon(Icons.restaurant_menu_rounded, size: 16),
+                  label: Text(
+                    'Leftover from ${sourceRecipe?.name ?? sourceRecipeId}',
+                  ),
+                ),
+              ],
               const SizedBox(height: KsTokens.space16),
               _QuantitySummaryCard(item: item, ingredient: ingredient),
               const SizedBox(height: KsTokens.space12),
               KsQuantityStepper(
                 qty: qty,
                 unit: unit,
-                onDecrease: () => _adjustQuantity(-1),
-                onIncrease: () => _adjustQuantity(1),
+                onDecrease: canConsume && item.quantity > 0
+                    ? () => _adjustQuantity(-1)
+                    : null,
+                onIncrease: canIncrease ? () => _adjustQuantity(1) : null,
               ),
               const SizedBox(height: KsTokens.space16),
               _MetadataCard(
@@ -241,6 +270,22 @@ class _BodyState extends ConsumerState<_Body> {
         ),
       ],
     );
+  }
+
+  bool _can(HouseholdCapability capability) {
+    final household = ref.read(activeHouseholdContextProvider);
+    if (household == null) return false;
+    return const HouseholdPolicy().roleCan(
+      household.role,
+      capability,
+      isSoloHousehold: household.isSolo,
+    );
+  }
+
+  bool _hasFullPantryAccess() {
+    final household = ref.read(activeHouseholdContextProvider);
+    return household != null &&
+        (household.isSolo || household.role == HouseholdRole.admin);
   }
 
   static const _months = [
@@ -341,7 +386,7 @@ class _Hero extends StatelessWidget {
   final String? imageUrl;
   final bool uploading;
   final Ingredient? ingredient;
-  final VoidCallback onTapPhoto;
+  final VoidCallback? onTapPhoto;
   final VoidCallback onBack;
 
   @override
@@ -359,7 +404,11 @@ class _Hero extends StatelessWidget {
         children: [
           Semantics(
             button: true,
-            label: imageUrl != null ? 'Change photo' : 'Add photo',
+            label: onTapPhoto == null
+                ? 'Pantry item photo'
+                : imageUrl != null
+                ? 'Change photo'
+                : 'Add photo',
             child: GestureDetector(
               onTap: uploading ? null : onTapPhoto,
               child: _heroSurface(context, tint, raised),
@@ -475,6 +524,22 @@ class _MetadataCard extends StatelessWidget {
             value: _sectionLabel(item.section),
             color: item.section.color,
           ),
+          if (item.expiryDate != null) ...[
+            const SizedBox(height: KsTokens.space12),
+            KsMetadataRow(
+              icon: Icons.event_busy_outlined,
+              label: 'Expiry date',
+              value: _formatDate(item.expiryDate!),
+            ),
+          ],
+          if (item.openedAt != null) ...[
+            const SizedBox(height: KsTokens.space12),
+            KsMetadataRow(
+              icon: Icons.event_available_outlined,
+              label: 'Opened date',
+              value: _formatDate(item.openedAt!),
+            ),
+          ],
           const SizedBox(height: KsTokens.space12),
           KsMetadataRow(
             icon: freshness.icon,
@@ -822,31 +887,338 @@ String _ingredientName(WidgetRef ref, String id) {
 
 /// The thumb-zone action row — a calm Edit beside the filled, destructive
 /// Mark-as-waste that opens the confirmation sheet.
-class _ActionRow extends StatelessWidget {
+class _ActionRow extends ConsumerWidget {
   const _ActionRow({required this.item});
 
   final PantryItem item;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final household = ref.watch(activeHouseholdContextProvider);
+    const policy = HouseholdPolicy();
+    bool can(HouseholdCapability capability) =>
+        household == null ||
+        policy.roleCan(
+          household.role,
+          capability,
+          isSoloHousehold: household.isSolo,
+        );
+    final canEdit =
+        item.section != PantrySection.leftover &&
+        can(HouseholdCapability.editPantryItems);
+    final canFullyEdit =
+        household != null &&
+        (household.isSolo || household.role == HouseholdRole.admin);
+    final ingredient = switch (ref
+        .watch(pantryIngredientProvider(item.ingredientId))
+        .valueOrNull) {
+      Success(:final value) => value,
+      _ => null,
+    };
+    final canConsume = can(HouseholdCapability.markIngredientsConsumed);
+    final canWaste = can(HouseholdCapability.markPantryWaste);
+    final canDelete = can(HouseholdCapability.removePantryItems);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: OutlinedButton(onPressed: () {}, child: const Text('Edit')),
+        OutlinedButton.icon(
+          onPressed: canEdit
+              ? () => _showEditDialog(
+                  context,
+                  ref,
+                  ingredient: ingredient,
+                  fullEdit: canFullyEdit,
+                )
+              : null,
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Edit item'),
         ),
-        const SizedBox(width: KsTokens.space10),
-        Expanded(
-          child: FilledButton(
-            style: KsButtonStyles.destructive(context),
-            onPressed: () => showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              builder: (_) => MarkAsWasteSheet(item: item),
-            ),
-            child: const Text('Mark as waste'),
-          ),
+        const SizedBox(height: KsTokens.space8),
+        OutlinedButton.icon(
+          onPressed: canConsume && item.quantity > 0
+              ? () => _markFullyUsed(context, ref)
+              : null,
+          icon: const Icon(Icons.done_all_rounded),
+          label: const Text('Mark fully used'),
+        ),
+        const SizedBox(height: KsTokens.space8),
+        OutlinedButton.icon(
+          onPressed: () => context.push('/ingredient/${item.ingredientId}'),
+          icon: const Icon(Icons.info_outline_rounded),
+          label: const Text('Ingredient details'),
+        ),
+        const SizedBox(height: KsTokens.space8),
+        FilledButton.icon(
+          style: KsButtonStyles.destructive(context),
+          onPressed: canWaste
+              ? () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => MarkAsWasteSheet(item: item),
+                )
+              : null,
+          icon: const Icon(Icons.delete_sweep_outlined),
+          label: const Text('Mark as waste'),
+        ),
+        const SizedBox(height: KsTokens.space8),
+        TextButton.icon(
+          onPressed: canDelete ? () => _delete(context, ref) : null,
+          icon: const Icon(Icons.delete_forever_outlined),
+          label: const Text('Delete item'),
         ),
       ],
     );
+  }
+
+  Future<void> _markFullyUsed(BuildContext context, WidgetRef ref) async {
+    final confirmed = await _confirm(
+      context,
+      title: 'Mark fully used?',
+      body: 'This records ${item.quantity} ${item.unit.value} as consumption.',
+      confirmLabel: 'Mark used',
+    );
+    if (!confirmed || !context.mounted) return;
+    final result = await ref.read(recordConsumptionProvider)(
+      RecordConsumptionParams(
+        householdId: item.householdId,
+        pantryItemId: item.id,
+        quantity: item.quantity,
+      ),
+    );
+    if (!context.mounted) return;
+    _showResult(context, result, success: 'Usage recorded.');
+  }
+
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await _confirm(
+      context,
+      title: 'Delete pantry item?',
+      body: 'This removes the inventory record and cannot be undone.',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed || !context.mounted) return;
+    final result = await ref.read(deletePantryItemProvider)(
+      DeletePantryItemParams(
+        householdId: item.householdId,
+        itemId: item.id,
+        force: true,
+      ),
+    );
+    if (!context.mounted) return;
+    if (result case Success<void>()) {
+      context.pop();
+    } else {
+      _showResult(context, result, success: 'Deleted.');
+    }
+  }
+
+  Future<void> _showEditDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    required Ingredient? ingredient,
+    required bool fullEdit,
+  }) async {
+    final quantity = TextEditingController(text: item.quantity.toString());
+    final note = TextEditingController(text: item.note ?? '');
+    var unit = item.unit;
+    var section = item.section;
+    var expiry = item.expiryDate;
+    var opened = item.openedAt;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Edit pantry item'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: quantity,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Quantity (${item.unit.value})',
+                  ),
+                ),
+                if (fullEdit) ...[
+                  DropdownButtonFormField<UnitId>(
+                    initialValue: unit,
+                    decoration: const InputDecoration(labelText: 'Unit'),
+                    items: [
+                      for (final value
+                          in ingredient?.allowedUnits ?? [item.unit])
+                        DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            _unitLabel(
+                              value,
+                              double.tryParse(quantity.text) ?? item.quantity,
+                              ingredient?.localUnitDefinitions ?? const [],
+                            ),
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null || value == unit) return;
+                      final currentQuantity =
+                          double.tryParse(quantity.text.trim()) ??
+                          item.quantity;
+                      final converted = PantryUnitConversion.preserveAmount(
+                        quantity: currentQuantity,
+                        from: unit,
+                        to: value,
+                      );
+                      setState(() {
+                        unit = value;
+                        quantity.text = _editableQuantity(converted);
+                      });
+                    },
+                  ),
+                  TextField(
+                    controller: note,
+                    decoration: const InputDecoration(labelText: 'Notes'),
+                  ),
+                  DropdownButtonFormField<PantrySection>(
+                    initialValue: section,
+                    decoration: const InputDecoration(labelText: 'Section'),
+                    items: [
+                      for (final value in PantrySection.values.where(
+                        (value) => value != PantrySection.leftover,
+                      ))
+                        DropdownMenuItem(
+                          value: value,
+                          child: Text(_sectionLabel(value)),
+                        ),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => section = value ?? section),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Expiry date'),
+                    subtitle: Text(
+                      expiry == null ? 'Unknown' : _formatDate(expiry!),
+                    ),
+                    trailing: const Icon(Icons.calendar_today_outlined),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                        initialDate: expiry ?? DateTime.now(),
+                      );
+                      if (picked != null) setState(() => expiry = picked);
+                    },
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Opened date'),
+                    subtitle: Text(
+                      opened == null ? 'Not recorded' : _formatDate(opened!),
+                    ),
+                    trailing: const Icon(Icons.event_available_outlined),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                        initialDate: opened ?? DateTime.now(),
+                      );
+                      if (picked != null) setState(() => opened = picked);
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final parsed = double.tryParse(quantity.text.trim());
+    if (saved != true || parsed == null || !context.mounted) return;
+    final household = ref.read(activeHouseholdContextProvider);
+    if (household?.role == HouseholdRole.cook && parsed > item.quantity) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cooks can record usage but cannot add pantry stock.'),
+        ),
+      );
+      return;
+    }
+    final decreaseAudit = household?.role == HouseholdRole.shopper
+        ? QuantityDecreaseAudit.correction
+        : QuantityDecreaseAudit.consumption;
+    final result = await ref.read(updatePantryItemProvider)(
+      UpdatePantryItemParams(
+        item: item.copyWith(
+          quantity: parsed,
+          unit: unit,
+          section: section,
+          note: note.text.trim().isEmpty ? null : note.text.trim(),
+          expiryDate: expiry,
+          openedAt: opened,
+          updatedAt: DateTime.now(),
+        ),
+        decreaseAudit: decreaseAudit,
+      ),
+    );
+    if (context.mounted) _showResult(context, result, success: 'Item updated.');
+  }
+
+  static String _editableQuantity(double value) =>
+      value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toString();
+
+  static Future<bool> _confirm(
+    BuildContext context, {
+    required String title,
+    required String body,
+    required String confirmLabel,
+  }) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(confirmLabel),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  static void _showResult<T>(
+    BuildContext context,
+    Result<T> result, {
+    required String success,
+  }) {
+    final message = switch (result) {
+      Success<T>() => success,
+      ResultFailure<T>(:final failure) => failure.toString(),
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

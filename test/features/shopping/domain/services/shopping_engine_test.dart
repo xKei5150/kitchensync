@@ -151,13 +151,24 @@ void main() {
 
   test('shop now purchases update pantry and reduce future deficits', () {
     var nextId = 0;
-    final recipe = _recipe();
-    final meal = calendar.scheduleRecipe(
+    const recipe = PlannedRecipe(
+      id: 'five-hundred-grams',
+      title: 'Five hundred grams',
+      defaultServingSize: 1,
+      ingredients: [
+        RecipeIngredientRequirement(
+          ingredientId: 'tomato',
+          quantity: 500,
+          unit: UnitId.g,
+        ),
+      ],
+    );
+    final meal = MealScheduleEntry(
       id: 'future-meal',
-      recipe: recipe,
+      recipeId: recipe.id,
       date: DateTime.utc(2026, 7, 10),
       mealLabel: 'Dinner',
-      defaults: const CalendarDefaults(defaultServingSize: 4),
+      servingSize: 1,
     );
 
     final pantryAfterShopNow = engine.applyPurchasesToPantry(
@@ -187,7 +198,8 @@ void main() {
     final tomato = futureList.items.singleWhere(
       (i) => i.ingredientId == 'tomato',
     );
-    expect(tomato.quantity, 500);
+    expect(tomato.quantity, 200);
+    expect(tomato.sourceMealLinks.single.quantity, 200);
     expect(pantryAfterShopNow.single.id, 'new-0');
     expect(
       pantryAfterShopNow.single.lastPurchaseDate,

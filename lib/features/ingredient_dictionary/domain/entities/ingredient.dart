@@ -20,6 +20,8 @@ class Ingredient with _$Ingredient {
     @UnitDefinitionListJsonConverter()
     List<UnitDefinition> localUnitDefinitions,
     int? defaultShelfLifeDays,
+    int? defaultPurchaseIntervalDays,
+    double? pricePerUnitHint,
     @Default(false) bool isBulkCandidate,
     @Default(false) bool isNonFood,
     String? imageUrl,

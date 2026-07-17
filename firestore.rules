@@ -14,30 +14,71 @@ service cloud.firestore {
     function isHouseholdAdmin(hid) {
       return isHouseholdMember(hid) && householdRole(hid) == 'admin';
     }
+    function hasHouseholdRole(hid, roles) {
+      return isHouseholdMember(hid) && householdRole(hid) in roles;
+    }
     function isHouseholdMutator(hid) {
-      return isHouseholdMember(hid)
-        && (
-          householdRole(hid) == 'admin' ||
-          householdRole(hid) == 'cook' ||
-          householdRole(hid) == 'shopper'
-        );
+      return hasHouseholdRole(hid, ['admin', 'cook', 'shopper']);
     }
     function isHouseholdCook(hid) {
-      return isHouseholdMember(hid)
-        && (
-          householdRole(hid) == 'admin' ||
-          householdRole(hid) == 'cook'
-        );
+      return hasHouseholdRole(hid, ['admin', 'cook']);
     }
-    function isHouseholdShopper(hid) {
+    function isSoloHousehold(hid) {
       return isHouseholdMember(hid)
-        && (
-          householdRole(hid) == 'admin' ||
-          householdRole(hid) == 'shopper'
-        );
+        && get(/databases/$(database)/documents/households/$(hid)).data.isJoint == false;
+    }
+    function hasFullPantryAccess(hid) {
+      return isHouseholdAdmin(hid) || isSoloHousehold(hid);
+    }
+    function isConstrainedQuantityUpdate(hid) {
+      return request.resource.data.householdId == hid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'quantity',
+          'leftoverServings',
+          'updatedAt',
+        ])
+        && request.resource.data.quantity is number
+        && request.resource.data.quantity >= 0;
+    }
+    function isValidLeftoverCreate(hid) {
+      return request.resource.data.householdId == hid
+        && request.resource.data.section == 'leftover'
+        && request.resource.data.relatedRecipeId is string
+        && request.resource.data.relatedRecipeId.size() > 0
+        && request.resource.data.leftoverServings is int
+        && request.resource.data.leftoverServings > 0
+        && request.resource.data.quantity is number
+        && request.resource.data.quantity > 0
+        && request.resource.data.unit is string
+        && request.resource.data.unit.size() > 0
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.expiryDate is timestamp
+        && request.resource.data.expiryDate > request.resource.data.createdAt
+        && request.resource.data.expiryDate <= request.resource.data.createdAt + duration.value(3, 'd');
+    }
+    function isValidLeftoverQuantityUpdate(hid) {
+      return resource.data.section == 'leftover'
+        && request.resource.data.section == 'leftover'
+        && resource.data.relatedRecipeId is string
+        && resource.data.relatedRecipeId.size() > 0
+        && request.resource.data.relatedRecipeId == resource.data.relatedRecipeId
+        && request.resource.data.expiryDate == resource.data.expiryDate
+        && isConstrainedQuantityUpdate(hid)
+        && request.resource.data.leftoverServings is int
+        && request.resource.data.leftoverServings >= 0;
     }
     function hasHouseholdId(hid) {
       return request.resource.data.householdId == hid;
+    }
+    function isDateKey(value) {
+      return value is string
+        && value.matches('^((\\d{4}-(01|03|05|07|08|10|12)-(0[1-9]|[12]\\d|3[01]))|(\\d{4}-(04|06|09|11)-(0[1-9]|[12]\\d|30))|(\\d{4}-02-(0[1-9]|1\\d|2[0-8]))|((\\d{2}(0[48]|[2468][048]|[13579][26])|([02468][048]00|[13579][26]00))-02-29))$');
+    }
+    function shoppingListRef(hid, listId) {
+      return /databases/$(database)/documents/households/$(hid)/shoppingLists/$(listId);
+    }
+    function shoppingListExists(hid, listId) {
+      return exists(shoppingListRef(hid, listId));
     }
     function recipeHouseholdId() {
       return request.resource.data.householdId;
@@ -47,6 +88,42 @@ service cloud.firestore {
     }
     function inviteDoc(code) {
       return get(/databases/$(database)/documents/householdInvites/$(code));
+    }
+    function canManageWeeklyShoppingSchedule(hid) {
+      return isHouseholdAdmin(hid) || (
+        isHouseholdMember(hid) &&
+        get(/databases/$(database)/documents/households/$(hid)).data.isJoint == false
+      );
+    }
+    function isValidWeeklyShoppingSchedule(hid, scheduleId) {
+      return scheduleId == 'weekly'
+        && request.resource.data.keys().hasOnly([
+          'householdId',
+          'cadence',
+          'isoWeekday',
+          'effectiveFrom',
+          'isActive',
+          'createdAt',
+          'updatedAt',
+          'updatedByUserId',
+        ])
+        && request.resource.data.keys().size() == 8
+        && request.resource.data.householdId == hid
+        && request.resource.data.cadence == 'weekly'
+        && request.resource.data.isoWeekday is int
+        && request.resource.data.isoWeekday >= 1
+        && request.resource.data.isoWeekday <= 7
+        && isDateKey(request.resource.data.effectiveFrom)
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedByUserId is string
+        && request.resource.data.updatedByUserId.size() > 0
+        && request.resource.data.updatedByUserId == request.auth.uid;
+    }
+
+    match /shoppingCommandReceipts/{commandId} {
+      allow read, write: if false;
     }
 
     match /users/{uid} {
@@ -114,6 +191,17 @@ service cloud.firestore {
           && request.resource.data.plan in ['annual', 'monthly'];
         allow delete: if false;
       }
+
+      match /shoppingSchedules/{scheduleId} {
+        allow read: if isHouseholdMember(hid) && scheduleId == 'weekly';
+        allow create: if canManageWeeklyShoppingSchedule(hid)
+          && isValidWeeklyShoppingSchedule(hid, scheduleId);
+        allow update: if canManageWeeklyShoppingSchedule(hid)
+          && isValidWeeklyShoppingSchedule(hid, scheduleId)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if canManageWeeklyShoppingSchedule(hid)
+          && scheduleId == 'weekly';
+      }
     }
 
     match /recipes/{recipeId} {
@@ -151,15 +239,49 @@ service cloud.firestore {
 
     match /households/{hid}/pantryItems/{id} {
       allow read: if isHouseholdMember(hid);
-      allow create, update: if isHouseholdMutator(hid)
-        && request.resource.data.householdId == hid;
-      allow delete: if isHouseholdAdmin(hid);
+      allow create: if (
+        request.resource.data.section == 'leftover'
+          ? (hasFullPantryAccess(hid) || hasHouseholdRole(hid, ['cook']))
+            && isValidLeftoverCreate(hid)
+          : hasFullPantryAccess(hid) && request.resource.data.householdId == hid
+      );
+      allow update: if resource.data.section == 'leftover'
+        ? (hasFullPantryAccess(hid) || hasHouseholdRole(hid, ['cook']))
+          && isValidLeftoverQuantityUpdate(hid)
+        : request.resource.data.section != 'leftover'
+          && (
+            hasFullPantryAccess(hid) ||
+            (hasHouseholdRole(hid, ['cook', 'shopper']) && isConstrainedQuantityUpdate(hid))
+          );
+      allow delete: if hasFullPantryAccess(hid);
     }
 
     match /households/{hid}/wasteEvents/{id} {
       allow read: if isHouseholdMember(hid);
-      allow create: if isHouseholdMutator(hid)
+      allow create: if (hasFullPantryAccess(hid) || hasHouseholdRole(hid, ['cook']))
         && request.resource.data.householdId == hid;
+      allow update, delete: if false;
+    }
+
+    match /households/{hid}/consumptionEvents/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create: if (hasFullPantryAccess(hid) || hasHouseholdRole(hid, ['cook']))
+        && request.resource.data.householdId == hid
+        && request.resource.data.source in ['cooking', 'manual', 'leftover'];
+      allow update, delete: if false;
+    }
+
+    match /households/{hid}/inventoryAdjustmentEvents/{id} {
+      allow read: if isHouseholdMember(hid);
+      allow create: if (hasFullPantryAccess(hid) || hasHouseholdRole(hid, ['shopper']))
+        && request.resource.data.householdId == hid
+        && request.resource.data.reason in ['manualCorrection', 'manualRestock']
+        && request.resource.data.quantityDelta is number
+        && request.resource.data.quantityDelta != 0
+        && request.resource.data.previousQuantity is number
+        && request.resource.data.previousQuantity >= 0
+        && request.resource.data.newQuantity is number
+        && request.resource.data.newQuantity >= 0;
       allow update, delete: if false;
     }
 
@@ -193,16 +315,19 @@ service cloud.firestore {
 
     match /households/{hid}/shoppingLists/{listId} {
       allow read: if isHouseholdMember(hid);
-      allow create, update: if isHouseholdShopper(hid)
-        && hasHouseholdId(hid);
-      allow delete: if isHouseholdShopper(hid);
+      allow write: if false;
 
       match /items/{itemId} {
-        allow read: if isHouseholdMember(hid);
-        allow create, update: if isHouseholdShopper(hid)
-          && request.resource.data.shoppingListId == listId;
-        allow delete: if isHouseholdShopper(hid);
+        allow read: if isHouseholdMember(hid)
+          && shoppingListExists(hid, listId);
+        allow write: if false;
       }
+    }
+
+    // Planner drafts are server-owned command inputs and must never be exposed
+    // to Firebase clients. Admin SDK and Cloud Functions bypass Rules.
+    match /households/{hid}/shoppingAllocationDrafts/{draftId} {
+      allow read, write: if false;
     }
 
     match /households/{hid}/menuSets/{menuSetId} {

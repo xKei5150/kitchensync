@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
@@ -28,20 +29,21 @@ PantryItem _item({
   );
 }
 
-WasteEvent _usage({
+ConsumptionEvent _usage({
   required String ingredientId,
   required double quantity,
   required DateTime date,
   UnitId unit = UnitId.g,
+  ConsumptionSource source = ConsumptionSource.cooking,
 }) {
-  return WasteEvent(
+  return ConsumptionEvent(
     id: 'w-$ingredientId-${date.day}',
     householdId: 'h1',
     pantryItemId: 'p-$ingredientId',
     ingredientId: ingredientId,
     quantity: quantity,
     unit: unit,
-    reason: WasteReason.other,
+    source: source,
     date: date,
   );
 }
@@ -185,4 +187,120 @@ void main() {
     expect(statuses.single.estimatedConsumptionRatePerDay, 0.2);
     expect(statuses.single.recommendedPurchaseIntervalDays, isNull);
   });
+
+  test('predict normalizes compatible formal stock and history units', () {
+    final statuses = const BulkPredictionEngine().predict(
+      pantryItems: [
+        _item(
+          id: 'rice-stock',
+          ingredientId: 'rice',
+          quantity: 1,
+          unit: UnitId.kg,
+        ),
+      ],
+      usageEvents: [
+        _usage(
+          ingredientId: 'rice',
+          quantity: 500,
+          unit: UnitId.g,
+          date: DateTime(2026, 7, 21),
+        ),
+      ],
+      purchaseHistory: [
+        _purchase(
+          ingredientId: 'rice',
+          unit: UnitId.kg,
+          date: DateTime(2026, 6, 1),
+        ),
+        _purchase(
+          ingredientId: 'rice',
+          unit: UnitId.g,
+          date: DateTime(2026, 7, 1),
+        ),
+      ],
+      now: DateTime(2026, 7, 31),
+    );
+
+    expect(statuses.single.estimatedConsumptionRatePerDay, 50);
+    expect(statuses.single.estimatedEmptyDate, DateTime(2026, 8, 20));
+    expect(statuses.single.recommendedPurchaseIntervalDays, 30);
+  });
+
+  test('waste does not increase the consumption rate', () {
+    final wasteHistory = [
+      WasteEvent(
+        id: 'spoiled-rice',
+        householdId: 'h1',
+        pantryItemId: 'rice-stock',
+        ingredientId: 'rice',
+        quantity: 900,
+        unit: UnitId.g,
+        reason: WasteReason.spoiled,
+        date: DateTime(2026, 7, 30),
+      ),
+    ];
+    expect(wasteHistory.single.quantity, 900);
+
+    final statuses = const BulkPredictionEngine().predict(
+      pantryItems: [
+        _item(id: 'rice-stock', ingredientId: 'rice', quantity: 1000),
+      ],
+      usageEvents: [
+        _usage(
+          ingredientId: 'rice',
+          quantity: 100,
+          date: DateTime(2026, 7, 21),
+        ),
+      ],
+      purchaseHistory: const [],
+      now: DateTime(2026, 7, 31),
+    );
+
+    expect(statuses.single.estimatedConsumptionRatePerDay, 10);
+  });
+
+  test('legitimate manual usage contributes to bulk predictions', () {
+    final statuses = const BulkPredictionEngine().predict(
+      pantryItems: [_item(id: 'oil-stock', ingredientId: 'oil', quantity: 300)],
+      usageEvents: [
+        _usage(
+          ingredientId: 'oil',
+          quantity: 100,
+          date: DateTime(2026, 7, 21),
+          source: ConsumptionSource.manual,
+        ),
+      ],
+      purchaseHistory: const [],
+      now: DateTime(2026, 7, 31),
+    );
+
+    expect(statuses.single.estimatedConsumptionRatePerDay, 10);
+    expect(statuses.single.estimatedEmptyDate, DateTime(2026, 8, 30));
+  });
+
+  test(
+    'recent restock date clears an interval-only overdue recommendation',
+    () {
+      final now = DateTime(2026, 7, 31);
+      final statuses = const BulkPredictionEngine().predict(
+        pantryItems: [
+          _item(
+            id: 'rice-stock',
+            ingredientId: 'rice',
+            quantity: 5000,
+            lastPurchaseDate: now,
+          ),
+        ],
+        usageEvents: const [],
+        purchaseHistory: [
+          _purchase(ingredientId: 'rice', date: DateTime(2026, 5, 1)),
+          _purchase(ingredientId: 'rice', date: DateTime(2026, 6, 1)),
+        ],
+        now: now,
+      );
+
+      expect(statuses.single.recommendedPurchaseIntervalDays, 31);
+      expect(statuses.single.needsPurchaseSoon, isFalse);
+    },
+  );
 }

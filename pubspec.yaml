@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
 
   # State / DI
@@ -23,6 +25,7 @@ dependencies:
   # Firebase
   firebase_core: ^3.4.1
   cloud_firestore: ^5.4.1
+  cloud_functions: ^5.6.2
   firebase_auth: ^5.2.1
   firebase_storage: ^12.3.0
   firebase_crashlytics: ^4.1.0
@@ -45,7 +48,7 @@ dependencies:
   uuid: ^4.5.0
   collection: ^1.18.0
   diacritic: ^0.1.5
-  intl: ^0.19.0
+  intl: ^0.20.2
   logger: ^2.4.0
   connectivity_plus: ^6.0.5
 

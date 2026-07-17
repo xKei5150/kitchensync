@@ -1,4 +1,7 @@
 const debugUserId = 'demo-user';
-const debugHouseholdId = 'solo-household';
+const debugPreviewHouseholdId = 'solo-household';
 const debugHouseholdName = 'Debug kitchen';
-const debugHouseholdInviteCode = 'DEBUG-001';
+
+String debugHouseholdIdForUser(String uid) => 'debug-household-$uid';
+
+String debugHouseholdInviteCodeForUser(String uid) => 'DEBUG-$uid';

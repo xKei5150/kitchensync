@@ -25,6 +25,8 @@ class CreateCustomIngredientParams {
     this.barcode,
     this.imageUrl,
     this.defaultShelfLifeDays,
+    this.defaultPurchaseIntervalDays,
+    this.pricePerUnitHint,
     this.isBulkCandidate = false,
     this.isNonFood = false,
   }) : localUnitDefinitions = List<UnitDefinition>.unmodifiable(
@@ -44,6 +46,8 @@ class CreateCustomIngredientParams {
   final String? barcode;
   final String? imageUrl;
   final int? defaultShelfLifeDays;
+  final int? defaultPurchaseIntervalDays;
+  final double? pricePerUnitHint;
   final bool isBulkCandidate;
   final bool isNonFood;
 }
@@ -176,7 +180,10 @@ class CreateCustomIngredient
       allowedUnits: p.allowedUnits,
       localUnitDefinitions: localUnitDefinitions,
       defaultShelfLifeDays: p.defaultShelfLifeDays,
-      isBulkCandidate: p.isBulkCandidate,
+      defaultPurchaseIntervalDays: p.defaultPurchaseIntervalDays,
+      pricePerUnitHint: p.pricePerUnitHint,
+      isBulkCandidate:
+          p.isBulkCandidate || p.category == IngredientCategory.bulkStaple,
       isNonFood: p.isNonFood,
       imageUrl: p.imageUrl,
       barcode: p.barcode,

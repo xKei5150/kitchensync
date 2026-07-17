@@ -52,11 +52,24 @@ class FirestoreRefs {
   CollectionReference<Map<String, dynamic>> wasteEvents(String hid) =>
       household(hid).collection('wasteEvents');
 
+  CollectionReference<Map<String, dynamic>> consumptionEvents(String hid) =>
+      household(hid).collection('consumptionEvents');
+
+  CollectionReference<Map<String, dynamic>> inventoryAdjustmentEvents(
+    String hid,
+  ) => household(hid).collection('inventoryAdjustmentEvents');
+
   CollectionReference<Map<String, dynamic>> purchases(String hid) =>
       household(hid).collection('purchases');
 
   CollectionReference<Map<String, dynamic>> shoppingLists(String hid) =>
       household(hid).collection('shoppingLists');
+
+  CollectionReference<Map<String, dynamic>> shoppingSchedules(String hid) =>
+      household(hid).collection('shoppingSchedules');
+
+  DocumentReference<Map<String, dynamic>> weeklyShoppingSchedule(String hid) =>
+      shoppingSchedules(hid).doc('weekly');
 
   CollectionReference<Map<String, dynamic>> shoppingListItems(
     String hid,

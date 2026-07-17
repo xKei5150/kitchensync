@@ -4,9 +4,13 @@ import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/utils/freshness_helper.dart';
 import 'package:kitchensync/core/utils/result.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 
 class PantryItemTile extends ConsumerWidget {
@@ -32,12 +36,16 @@ class PantryItemTile extends ConsumerWidget {
 
     final category = ingredient?.category;
 
-    final name = ingredient?.displayNames['en'] ?? item.ingredientId;
+    final name =
+        ingredient?.displayNames['en'] ?? ingredient?.name ?? item.ingredientId;
 
     final freshness = FreshnessHelper.fromExpiry(item.expiryDate);
     final expiryLabel = FreshnessHelper.relativeLabel(item.expiryDate);
+    final baseFreshnessLabel = freshness == Freshness.unknown
+        ? 'Expiry unknown'
+        : freshness.label;
     final freshnessLabel = expiryLabel.isEmpty
-        ? freshness.label
+        ? baseFreshnessLabel
         : '${freshness.label} · $expiryLabel';
     final measurement = ref.watch(localeFormattersProvider).measurement;
     final quantityLabel = measurement.formatUnit(
@@ -48,9 +56,16 @@ class PantryItemTile extends ConsumerWidget {
     );
     final isLowStock = item.quantity <= 1;
     final ks = context.ksColors;
+    final household = ref.watch(activeHouseholdContextProvider);
+    final isBulkLike =
+        item.section == PantrySection.bulk ||
+        item.section == PantrySection.nonFood;
+    final prediction = household?.hasPremium == true && isBulkLike
+        ? _statusFor(ref.watch(bulkPantryStatusesProvider), item.id)
+        : null;
 
     return Semantics(
-      label: '$name $quantityLabel ${freshness.label}',
+      label: '$name $quantityLabel $baseFreshnessLabel',
       button: onTap != null,
       child: Material(
         color: Colors.transparent,
@@ -105,13 +120,24 @@ class PantryItemTile extends ConsumerWidget {
                             const SizedBox(height: KsTokens.space6),
                             KsExpiryBadge(
                               freshness: freshness,
-                              label: freshness.label,
+                              label: baseFreshnessLabel,
                             ),
                           ],
                           if (item.lastPurchaseDate != null) ...[
                             const SizedBox(height: KsTokens.space6),
                             _LastPurchased(date: item.lastPurchaseDate!),
                           ],
+                          if (household?.hasPremium == true && isBulkLike) ...[
+                            const SizedBox(height: KsTokens.space6),
+                            _BulkMetadata(status: prediction),
+                          ],
+                          const SizedBox(height: KsTokens.space4),
+                          Text(
+                            'Updated ${_formatPantryDate(item.updatedAt)}',
+                            style: KsTokens.bodySmall.copyWith(
+                              color: ks.textTertiary,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -122,6 +148,35 @@ class PantryItemTile extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  BulkPantryStatus? _statusFor(List<BulkPantryStatus> statuses, String itemId) {
+    for (final status in statuses) {
+      if (status.item.id == itemId) return status;
+    }
+    return null;
+  }
+}
+
+class _BulkMetadata extends ConsumerWidget {
+  const _BulkMetadata({required this.status});
+
+  final BulkPantryStatus? status;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = this.status;
+    final days = status?.daysLeftFrom(ref.watch(clockProvider).now());
+    final interval = status?.recommendedPurchaseIntervalDays;
+    return Text(
+      [
+        days == null
+            ? 'Estimated days remaining unavailable'
+            : '$days estimated days remaining',
+        if (interval != null) 'Buy every $interval days',
+      ].join(' · '),
+      style: KsTokens.bodySmall.copyWith(color: context.ksColors.textSecondary),
     );
   }
 }
@@ -151,11 +206,13 @@ class _LastPurchased extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
+  String _formatDate(DateTime date) => _formatPantryDate(date);
 }
+
+String _formatPantryDate(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
 
 class _Header extends StatelessWidget {
   const _Header({required this.name, this.category});

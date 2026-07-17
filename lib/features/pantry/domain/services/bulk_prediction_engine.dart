@@ -2,7 +2,7 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
-import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
+import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
 
 class BulkPantryStatus {
   const BulkPantryStatus({
@@ -37,7 +37,7 @@ class BulkPredictionEngine {
 
   List<BulkPantryStatus> predict({
     required Iterable<PantryItem> pantryItems,
-    required Iterable<WasteEvent> usageEvents,
+    required Iterable<ConsumptionEvent> usageEvents,
     required Iterable<PurchaseRecord> purchaseHistory,
     required DateTime now,
   }) {
@@ -51,17 +51,23 @@ class BulkPredictionEngine {
     final purchasesByItemKey = <String, List<PurchaseRecord>>{};
     for (final purchase in purchaseHistory) {
       purchasesByItemKey
-          .putIfAbsent(_itemKey(purchase.ingredientId, purchase.unit), () => [])
+          .putIfAbsent(
+            _itemKey(purchase.ingredientId, _normalizedUnit(purchase.unit)),
+            () => [],
+          )
           .add(purchase);
     }
     for (final records in purchasesByItemKey.values) {
       records.sort((a, b) => a.purchaseDate.compareTo(b.purchaseDate));
     }
 
-    final usageByItemKey = <String, List<WasteEvent>>{};
+    final usageByItemKey = <String, List<ConsumptionEvent>>{};
     for (final event in usageEvents) {
       usageByItemKey
-          .putIfAbsent(_itemKey(event.ingredientId, event.unit), () => [])
+          .putIfAbsent(
+            _itemKey(event.ingredientId, _normalizedUnit(event.unit)),
+            () => [],
+          )
           .add(event);
     }
 
@@ -71,10 +77,16 @@ class BulkPredictionEngine {
             _predictItem(
               item: item,
               usageEvents:
-                  usageByItemKey[_itemKey(item.ingredientId, item.unit)] ??
+                  usageByItemKey[_itemKey(
+                    item.ingredientId,
+                    _normalizedUnit(item.unit),
+                  )] ??
                   const [],
               purchases:
-                  purchasesByItemKey[_itemKey(item.ingredientId, item.unit)] ??
+                  purchasesByItemKey[_itemKey(
+                    item.ingredientId,
+                    _normalizedUnit(item.unit),
+                  )] ??
                   const [],
               now: now,
             ),
@@ -93,18 +105,22 @@ class BulkPredictionEngine {
 
   BulkPantryStatus _predictItem({
     required PantryItem item,
-    required List<WasteEvent> usageEvents,
+    required List<ConsumptionEvent> usageEvents,
     required List<PurchaseRecord> purchases,
     required DateTime now,
   }) {
     final rate = _consumptionRatePerDay(item, usageEvents, now);
+    final normalizedStock = UnitRegistry.normalizeFormalQuantity(
+      quantity: item.quantity,
+      unit: item.unit,
+    ).quantity;
     final emptyDate = rate <= 0
         ? null
         : DateTime(
             now.year,
             now.month,
             now.day,
-          ).add(Duration(days: (item.quantity / rate).ceil()));
+          ).add(Duration(days: (normalizedStock / rate).ceil()));
     final interval = _purchaseIntervalDays(purchases);
     final daysLeft = emptyDate?.difference(now).inDays;
     final intervalDue =
@@ -125,7 +141,7 @@ class BulkPredictionEngine {
 
   double _consumptionRatePerDay(
     PantryItem item,
-    List<WasteEvent> usageEvents,
+    List<ConsumptionEvent> usageEvents,
     DateTime now,
   ) {
     final matching = usageEvents
@@ -137,7 +153,12 @@ class BulkPredictionEngine {
     final observedDays = now.difference(firstDate).inDays.clamp(1, 3650);
     final totalUsed = matching.fold<double>(
       0,
-      (sum, event) => sum + event.quantity,
+      (sum, event) =>
+          sum +
+          UnitRegistry.normalizeFormalQuantity(
+            quantity: event.quantity,
+            unit: event.unit,
+          ).quantity,
     );
     return totalUsed / observedDays;
   }
@@ -163,4 +184,7 @@ class BulkPredictionEngine {
 
   String _itemKey(String ingredientId, UnitId unit) =>
       '$ingredientId\x1F${unit.value}';
+
+  UnitId _normalizedUnit(UnitId unit) =>
+      UnitRegistry.normalizeFormalQuantity(quantity: 1, unit: unit).unit;
 }

@@ -33,10 +33,10 @@ class ActiveHouseholdContext {
 }
 
 const previewHouseholdContext = ActiveHouseholdContext(
-  id: debugHouseholdId,
+  id: debugPreviewHouseholdId,
   name: debugHouseholdName,
   role: HouseholdRole.admin,
-  isJoint: true,
+  isJoint: false,
   hasPremium: true,
 );
 

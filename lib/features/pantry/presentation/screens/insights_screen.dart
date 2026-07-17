@@ -4,8 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/freshness_helper.dart';
+import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
@@ -47,8 +50,15 @@ class InsightsScreen extends ConsumerWidget {
     final itemsAsync = ref.watch(pantryAllItemsStreamProvider);
     final wasteAsync = ref.watch(wasteHistoryStreamProvider);
     final bulkStatuses = ref.watch(bulkPantryStatusesProvider);
-    final hasPremium =
-        ref.watch(activeHouseholdContextProvider)?.hasPremium ?? false;
+    final household = ref.watch(activeHouseholdContextProvider);
+    final hasPremium = household?.hasPremium ?? false;
+    final canViewMetrics =
+        household == null ||
+        const HouseholdPolicy().roleCan(
+          household.role,
+          HouseholdCapability.viewPantryMetrics,
+          isSoloHousehold: household.isSolo,
+        );
 
     final items = itemsAsync.asData?.value ?? const <PantryItem>[];
     final events = wasteAsync.asData?.value ?? const <WasteEvent>[];
@@ -112,7 +122,7 @@ class InsightsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: KsTokens.space20),
-            if (hasPremium)
+            if (hasPremium && canViewMetrics)
               insightContent
             else
               KsPremiumLock(
@@ -170,6 +180,16 @@ class _BulkPredictionCard extends ConsumerWidget {
                     : null,
               ),
             ],
+          if (statuses.length > visible.length) ...[
+            const SizedBox(height: KsTokens.space12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => context.push('/pantry/bulk-purchases'),
+                child: const Text('View all bulk foods to purchase'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -181,20 +201,26 @@ class _BulkPredictionCard extends ConsumerWidget {
     BulkPantryStatus status,
   ) async {
     try {
-      final record = await ref
+      await ref
           .read(shoppingPlanningControllerProvider)
           .createSuggestedListFromBulkStatus(status);
       ref.invalidate(activeShoppingListsProvider);
       if (!context.mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${record.items.single.ingredientId} added to shopping',
-          ),
-        ),
-      );
+      final ingredient = switch (ref
+          .read(pantryIngredientProvider(status.item.ingredientId))
+          .valueOrNull) {
+        Success(:final value) => value,
+        _ => null,
+      };
+      final name =
+          ingredient?.displayNames['en'] ??
+          ingredient?.name ??
+          status.item.ingredientId;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$name added to shopping')));
     } catch (error) {
       if (!context.mounted) {
         return;
@@ -206,18 +232,28 @@ class _BulkPredictionCard extends ConsumerWidget {
   }
 }
 
-class _BulkPredictionRow extends StatelessWidget {
+class _BulkPredictionRow extends ConsumerWidget {
   const _BulkPredictionRow({required this.status, required this.onAdd});
 
   final BulkPantryStatus status;
   final VoidCallback? onAdd;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
     final now = DateTime.now();
     final daysLeft = status.daysLeftFrom(now);
     final interval = status.recommendedPurchaseIntervalDays;
+    final ingredient = switch (ref
+        .watch(pantryIngredientProvider(status.item.ingredientId))
+        .valueOrNull) {
+      Success(:final value) => value,
+      _ => null,
+    };
+    final name =
+        ingredient?.displayNames['en'] ??
+        ingredient?.name ??
+        status.item.ingredientId;
     final leadingColor = status.needsPurchaseSoon
         ? KsTokens.expiringSoon
         : status.item.section.color;
@@ -237,7 +273,7 @@ class _BulkPredictionRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                status.item.ingredientId,
+                name,
                 style: KsTokens.titleSmall.copyWith(
                   color: ks.textPrimary,
                   fontSize: 14,
@@ -468,15 +504,15 @@ class _SectionBalanceCard extends StatelessWidget {
   }
 }
 
-/// A four-week waste trend — items binned per trailing week, newest at the
+/// A four-week waste trend — events binned per trailing week, newest at the
 /// right. One accent ([KsTokens.expired]); structure stays in hairline + tint.
-class _WasteTrendCard extends StatelessWidget {
+class _WasteTrendCard extends ConsumerWidget {
   const _WasteTrendCard({required this.events});
 
   final List<WasteEvent> events;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
     final weeks = _binnedByWeek(events);
     final peak = weeks.fold<int>(1, (m, w) => w > m ? w : m);
@@ -485,58 +521,62 @@ class _WasteTrendCard extends StatelessWidget {
     return _InsightCard(
       title: 'Waste · last 4 weeks',
       trailing: Text(
-        total == 1 ? '1 item' : '$total items',
+        total == 1 ? '1 event' : '$total events',
         style: KsTokens.titleSmall.copyWith(
           color: ks.textPrimary,
           fontSize: 13,
         ),
       ),
-      child: SizedBox(
-        height: 72,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            for (var i = 0; i < weeks.length; i++) ...[
-              if (i > 0) const SizedBox(width: KsTokens.space10),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${weeks[i]}',
-                      style: KsTokens.labelSmall.copyWith(
-                        color: ks.textTertiary,
-                        fontSize: 10,
-                        letterSpacing: 0,
-                      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 72,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var i = 0; i < weeks.length; i++) ...[
+                  if (i > 0) const SizedBox(width: KsTokens.space10),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text('${weeks[i]}'),
+                        const SizedBox(height: KsTokens.space4),
+                        Container(
+                          height: 8 + 40 * (weeks[i] / peak),
+                          decoration: BoxDecoration(
+                            color: weeks[i] == 0
+                                ? ks.neutralSubtle
+                                : KsTokens.expired.withValues(
+                                    alpha: 0.35 + 0.65 * (weeks[i] / peak),
+                                  ),
+                            borderRadius: BorderRadius.circular(
+                              KsTokens.radius4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: KsTokens.space6),
+                        Text('W${i + 1}'),
+                      ],
                     ),
-                    const SizedBox(height: KsTokens.space4),
-                    Container(
-                      height: 8 + 40 * (weeks[i] / peak),
-                      decoration: BoxDecoration(
-                        color: weeks[i] == 0
-                            ? ks.neutralSubtle
-                            : KsTokens.expired.withValues(
-                                alpha: 0.35 + 0.65 * (weeks[i] / peak),
-                              ),
-                        borderRadius: BorderRadius.circular(KsTokens.radius4),
-                      ),
-                    ),
-                    const SizedBox(height: KsTokens.space6),
-                    Text(
-                      'W${i + 1}',
-                      style: KsTokens.labelSmall.copyWith(
-                        color: ks.textTertiary,
-                        fontSize: 9,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          for (final event in events.take(3)) ...[
+            const Divider(),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${_wasteIngredientName(ref, event.ingredientId)} · '
+                '${event.quantity} ${event.unit.value} · '
+                '${event.reason.name} · ${_wasteDate(event.date)}',
+                style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -555,3 +595,15 @@ class _WasteTrendCard extends StatelessWidget {
     return weeks;
   }
 }
+
+String _wasteIngredientName(WidgetRef ref, String ingredientId) {
+  final async = ref.watch(pantryIngredientProvider(ingredientId));
+  return switch (async.asData?.value) {
+    Success(:final value) => value.displayNames['en'] ?? ingredientId,
+    _ => ingredientId,
+  };
+}
+
+String _wasteDate(DateTime value) =>
+    '${value.year}-${value.month.toString().padLeft(2, '0')}-'
+    '${value.day.toString().padLeft(2, '0')}';

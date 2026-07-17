@@ -52,7 +52,8 @@ class MarkAsWaste extends UseCase<void, MarkAsWasteParams> {
         );
       }
 
-      final clamped = (item.quantity - params.quantity).clamp(
+      final actualRemoved = params.quantity.clamp(0.0, item.quantity);
+      final clamped = (item.quantity - actualRemoved).clamp(
         0.0,
         double.infinity,
       );
@@ -62,7 +63,7 @@ class MarkAsWaste extends UseCase<void, MarkAsWasteParams> {
         householdId: params.householdId,
         pantryItemId: params.pantryItemId,
         ingredientId: item.ingredientId,
-        quantity: params.quantity,
+        quantity: actualRemoved,
         unit: item.unit,
         reason: params.reason,
         date: clock.now(),

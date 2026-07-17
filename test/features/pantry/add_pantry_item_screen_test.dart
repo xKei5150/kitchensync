@@ -15,6 +15,7 @@ import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/add_pantry_item_screen.dart';
 
@@ -112,7 +113,8 @@ class _IngredientRepositoryFake implements IngredientRepository {
       const Stream<List<Ingredient>>.empty();
 }
 
-class _PantryRepositoryFake implements PantryRepository {
+class _PantryRepositoryFake
+    implements PantryRepository, InventoryQuantityRepository {
   final List<PantryItem> added = [];
 
   @override
@@ -171,6 +173,34 @@ class _PantryRepositoryFake implements PantryRepository {
     String householdId,
     PantrySection section,
   ) => const Stream<List<PantryItem>>.empty();
+
+  @override
+  Future<PantryItem> adjustQuantityAtomic({
+    required String householdId,
+    required String pantryItemId,
+    required double delta,
+    required String eventId,
+    required DateTime occurredAt,
+    required QuantityDecreaseAudit decreaseAudit,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<PantryItem> restockAtomic({
+    required String householdId,
+    required String pantryItemId,
+    required double quantityToAdd,
+    required String eventId,
+    required DateTime occurredAt,
+    required DateTime? incomingExpiryDate,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<PantryItem> updateWithQuantityAuditAtomic({
+    required PantryItem item,
+    required String eventId,
+    required DateTime occurredAt,
+    required QuantityDecreaseAudit decreaseAudit,
+  }) => throw UnimplementedError();
 }
 
 void main() {
@@ -187,6 +217,14 @@ void main() {
     );
     await tester.pump();
   }
+
+  testWidgets('normal pantry add does not offer the Leftover section', (
+    tester,
+  ) async {
+    await pump(tester, AppTheme.light());
+
+    expect(find.text('Leftovers'), findsNothing);
+  });
 
   Future<_PantryRepositoryFake> pumpRoutedAdd(
     WidgetTester tester,

@@ -159,6 +159,7 @@ class _CreateCustomIngredientScreenState
         allergens: _allergens.toList(),
         dietaryTags: _diet.toList(),
         defaultShelfLifeDays: _shelfLifeDays,
+        isBulkCandidate: _category == IngredientCategory.bulkStaple,
         isNonFood: _category == IngredientCategory.nonFood,
       ),
     );

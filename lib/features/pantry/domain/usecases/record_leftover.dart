@@ -28,14 +28,33 @@ class RecordLeftoverParams {
 }
 
 class RecordLeftover extends UseCase<PantryItem, RecordLeftoverParams> {
-  RecordLeftover(this._repo, {required this.idGenerator, required this.clock});
+  RecordLeftover(
+    this._repo, {
+    required this.idGenerator,
+    required this.clock,
+    this.leftoverShelfLifeDays = 3,
+  }) : assert(
+         leftoverShelfLifeDays > 0 && leftoverShelfLifeDays <= 3,
+         'Leftovers must expire within one to three days.',
+       );
 
   final PantryRepository _repo;
   final IdGenerator idGenerator;
   final Clock clock;
+  final int leftoverShelfLifeDays;
 
   @override
   Future<Result<PantryItem>> call(RecordLeftoverParams params) async {
+    if (params.recipeId.trim().isEmpty ||
+        params.ingredientId.trim().isEmpty ||
+        params.unit.value.trim().isEmpty) {
+      return const Result.failure(
+        Failure.validation(
+          field: 'recipe/ingredient/unit',
+          message: 'A leftover needs a recipe, ingredient, and valid unit.',
+        ),
+      );
+    }
     if (params.servings <= 0 || params.quantity <= 0) {
       return const Result.failure(
         Failure.validation(
@@ -56,6 +75,7 @@ class RecordLeftover extends UseCase<PantryItem, RecordLeftoverParams> {
         section: PantrySection.leftover,
         relatedRecipeId: params.recipeId,
         leftoverServings: params.servings,
+        expiryDate: now.add(Duration(days: leftoverShelfLifeDays)),
         createdAt: now,
         updatedAt: now,
       );

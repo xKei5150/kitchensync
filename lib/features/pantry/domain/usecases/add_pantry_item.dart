@@ -9,6 +9,7 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/i
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
 
 class AddPantryItemParams {
   const AddPantryItemParams({
@@ -18,6 +19,8 @@ class AddPantryItemParams {
     required this.unit,
     required this.section,
     this.note,
+    this.expiryDate,
+    this.openedAt,
   });
 
   final String householdId;
@@ -26,18 +29,22 @@ class AddPantryItemParams {
   final UnitId unit;
   final PantrySection section;
   final String? note;
+  final DateTime? expiryDate;
+  final DateTime? openedAt;
 }
 
 class AddPantryItem extends UseCase<PantryItem, AddPantryItemParams> {
   AddPantryItem(
     this._pantry,
     this._ingredients, {
+    required InventoryQuantityRepository inventoryQuantityRepository,
     required this.idGenerator,
     required this.clock,
-  });
+  }) : _inventoryQuantity = inventoryQuantityRepository;
 
   final PantryRepository _pantry;
   final IngredientRepository _ingredients;
+  final InventoryQuantityRepository _inventoryQuantity;
   final IdGenerator idGenerator;
   final Clock clock;
 
@@ -48,6 +55,14 @@ class AddPantryItem extends UseCase<PantryItem, AddPantryItemParams> {
         Failure.validation(
           field: 'quantity',
           message: 'Quantity must be greater than zero.',
+        ),
+      );
+    }
+    if (params.section == PantrySection.leftover) {
+      return const Result.failure(
+        Failure.validation(
+          field: 'section',
+          message: 'Leftovers can only be created after cooking.',
         ),
       );
     }
@@ -97,13 +112,22 @@ class AddPantryItem extends UseCase<PantryItem, AddPantryItemParams> {
         section: params.section,
       );
       final now = clock.now();
+      final expiryDate =
+          params.expiryDate ??
+          (ing.defaultShelfLifeDays == null
+              ? null
+              : now.add(Duration(days: ing.defaultShelfLifeDays!)));
 
       if (existing != null) {
-        final newQty = existing.quantity + params.quantity;
-        await _pantry.setQuantity(params.householdId, existing.id, newQty);
-        return Result.success(
-          existing.copyWith(quantity: newQty, updatedAt: now),
+        final updated = await _inventoryQuantity.restockAtomic(
+          householdId: params.householdId,
+          pantryItemId: existing.id,
+          quantityToAdd: params.quantity,
+          eventId: idGenerator.newId(),
+          occurredAt: now,
+          incomingExpiryDate: expiryDate,
         );
+        return Result.success(updated);
       }
 
       final item = PantryItem(
@@ -115,6 +139,8 @@ class AddPantryItem extends UseCase<PantryItem, AddPantryItemParams> {
         section: params.section,
         note: params.note,
         lastPurchaseDate: now,
+        expiryDate: expiryDate,
+        openedAt: params.openedAt,
         createdAt: now,
         updatedAt: now,
       );

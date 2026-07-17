@@ -15,19 +15,24 @@ import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/entities/shopping_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
+import 'package:kitchensync/features/calendar/domain/repositories/shopping_schedule_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/shopping_schedule_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/create_custom_ingredient_screen.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/ingredient_picker_screen.dart';
+import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/consumption_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
@@ -36,7 +41,9 @@ import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart'
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 import 'package:kitchensync/features/recipes/presentation/screens/recipes_screen.dart';
+import 'package:kitchensync/features/shopping/domain/entities/shopping_command.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
+import 'package:kitchensync/features/shopping/domain/repositories/shopping_command_repository.dart';
 import 'package:kitchensync/features/shopping/domain/repositories/shopping_repository.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 import 'package:kitchensync/features/shopping/presentation/screens/shopping_list_screen.dart';
@@ -56,7 +63,9 @@ void main() {
   late _RecipeRepositoryFake recipes;
   late _CalendarRepositoryFake calendar;
   late _ShoppingRepositoryFake shopping;
+  late _ShoppingCommandRepositoryFake shoppingCommands;
   late _PurchaseHistoryRepositoryFake purchases;
+  late _ConsumptionHistoryRepositoryFake consumption;
   late _WasteRepositoryFake waste;
   late FakeIdGenerator ids;
 
@@ -115,7 +124,15 @@ void main() {
           recipeRepositoryProvider.overrideWithValue(recipes),
           calendarRepositoryProvider.overrideWithValue(calendar),
           shoppingRepositoryProvider.overrideWithValue(shopping),
+          shoppingCommandRepositoryProvider.overrideWithValue(shoppingCommands),
+          shoppingAllocationCommandRepositoryProvider.overrideWithValue(
+            shoppingCommands,
+          ),
+          shoppingScheduleRepositoryProvider.overrideWithValue(
+            const _ShoppingScheduleRepositoryFake(),
+          ),
           purchaseHistoryRepositoryProvider.overrideWithValue(purchases),
+          consumptionHistoryRepositoryProvider.overrideWithValue(consumption),
           wasteRepositoryProvider.overrideWithValue(waste),
         ],
         child: MaterialApp.router(
@@ -133,7 +150,9 @@ void main() {
     recipes = _RecipeRepositoryFake();
     calendar = _CalendarRepositoryFake();
     shopping = _ShoppingRepositoryFake();
+    shoppingCommands = _ShoppingCommandRepositoryFake(shopping);
     purchases = _PurchaseHistoryRepositoryFake();
+    consumption = _ConsumptionHistoryRepositoryFake();
     waste = _WasteRepositoryFake();
     ids = FakeIdGenerator([
       'qa-tray-spinach',
@@ -144,6 +163,7 @@ void main() {
       'tray-recipe-line',
       'tray-shopping-list',
       'tray-shopping-line',
+      'tray-shopping-command',
     ]);
   });
 
@@ -664,14 +684,13 @@ class _CalendarRepositoryFake implements CalendarRepository {
   Future<void> upsertDaySettings(CalendarDaySettings settings) async {}
 }
 
-class _ShoppingRepositoryFake implements ShoppingRepository {
+class _ShoppingRepositoryFake extends ShoppingRepository {
   final lists = <ShoppingListRecord>[];
   final _changes = StreamController<void>.broadcast();
 
   void dispose() => _changes.close();
 
-  @override
-  Future<void> upsertList(ShoppingListRecord list) async {
+  void store(ShoppingListRecord list) {
     lists
       ..removeWhere((current) => current.id == list.id)
       ..add(list);
@@ -702,37 +721,134 @@ class _ShoppingRepositoryFake implements ShoppingRepository {
     yield byId();
     yield* _changes.stream.map((_) => byId());
   }
-
-  @override
-  Future<void> updateItemStatus({
-    required String householdId,
-    required String listId,
-    required String itemId,
-    required ShoppingListItemStatus status,
-    String? substituteIngredientId,
-    double? substituteQuantity,
-    UnitId? substituteUnit,
-  }) async {}
-
-  @override
-  Future<void> updateListStatus({
-    required String householdId,
-    required String listId,
-    required ShoppingListStatus status,
-  }) async {}
-
-  @override
-  Future<void> applyShopNowPurchasesToScheduledLists({
-    required String householdId,
-    required ShoppingListRecord shopNowList,
-  }) async {}
-
-  @override
-  Future<void> deleteList({
-    required String householdId,
-    required String listId,
-  }) async {}
 }
+
+class _ShoppingCommandRepositoryFake
+    implements ShoppingAllocationCommandRepository {
+  _ShoppingCommandRepositoryFake(this.shopping);
+
+  final _ShoppingRepositoryFake shopping;
+
+  @override
+  Future<ShoppingCommandResult> createAndConsumeAllocation(
+    ConsumeShoppingAllocationIntent command,
+  ) async {
+    final intent = command.intent;
+    final listId = 'server-${command.commandId}';
+    shopping.store(
+      ShoppingListRecord(
+        id: listId,
+        householdId: intent.householdId,
+        type: ShoppingListType.shopNow,
+        shoppingDate: intent.startDate,
+        generatedForRangeStart: intent.startDate,
+        generatedForRangeEnd: intent.endDate,
+        status: ShoppingListStatus.pending,
+        createdAt: intent.startDate,
+        updatedAt: intent.startDate,
+        items: [
+          ShoppingListItemRecord(
+            id: 'server-tray-item',
+            shoppingListId: listId,
+            ingredientId: 'server-tray-ingredient',
+            quantityNeeded: 2,
+            unit: UnitId('tray'),
+            status: ShoppingListItemStatus.unchecked,
+            sourceMealLinks: const [],
+          ),
+        ],
+      ),
+    );
+    return ShoppingCommandResult(
+      listId: listId,
+      status: ShoppingCommandStatus.pending,
+      alreadyApplied: false,
+      revision: 0,
+    );
+  }
+
+  @override
+  Future<ShoppingCommandResult> upsertList(
+    ShoppingListUpsertCommand command,
+  ) async {
+    ShoppingListRecord? existing;
+    for (final list in shopping.lists) {
+      if (list.householdId == command.householdId &&
+          list.id == command.listId) {
+        existing = list;
+        break;
+      }
+    }
+    final nextRevision = switch ((existing, command.expectedRevision)) {
+      (null, null) => 0,
+      (final list?, final expected?) when list.revision == expected =>
+        expected + 1,
+      _ => throw const ShoppingCommandFailure(
+        ShoppingCommandFailureKind.conflict,
+      ),
+    };
+    final stored = _shoppingRecordWithRevision(command.list, nextRevision);
+    shopping.store(stored);
+    return ShoppingCommandResult(
+      listId: command.listId,
+      status: _shoppingCommandStatus(stored.status),
+      alreadyApplied: false,
+      revision: nextRevision,
+    );
+  }
+
+  @override
+  Future<ShoppingCommandResult> mutateItem(
+    ShoppingListItemMutationCommand command,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<ShoppingCommandResult> completeList(ShoppingCommandRequest request) =>
+      throw UnimplementedError();
+
+  @override
+  Future<ShoppingCommandResult> deleteList(ShoppingCommandRequest request) =>
+      throw UnimplementedError();
+}
+
+class _ShoppingScheduleRepositoryFake implements ShoppingScheduleRepository {
+  const _ShoppingScheduleRepositoryFake();
+
+  @override
+  Future<void> save(ShoppingSchedule schedule) async {}
+
+  @override
+  Stream<ShoppingSchedule?> watch(String householdId) => Stream.value(null);
+}
+
+ShoppingCommandStatus _shoppingCommandStatus(ShoppingListStatus status) =>
+    switch (status) {
+      ShoppingListStatus.pending => ShoppingCommandStatus.pending,
+      ShoppingListStatus.cancelled => ShoppingCommandStatus.cancelled,
+      ShoppingListStatus.completed => ShoppingCommandStatus.completed,
+    };
+
+ShoppingListRecord _shoppingRecordWithRevision(
+  ShoppingListRecord list,
+  int revision,
+) => ShoppingListRecord(
+  id: list.id,
+  householdId: list.householdId,
+  type: list.type,
+  shoppingDate: list.shoppingDate,
+  generatedForRangeStart: list.generatedForRangeStart,
+  generatedForRangeEnd: list.generatedForRangeEnd,
+  status: list.status,
+  originId: list.originId,
+  completionId: list.completionId,
+  completedAt: list.completedAt,
+  completedByUserId: list.completedByUserId,
+  schemaVersion: list.schemaVersion,
+  revision: revision,
+  createdAt: list.createdAt,
+  updatedAt: list.updatedAt,
+  items: list.items,
+);
 
 class _PurchaseHistoryRepositoryFake implements PurchaseHistoryRepository {
   @override
@@ -747,6 +863,16 @@ class _PurchaseHistoryRepositoryFake implements PurchaseHistoryRepository {
 
   @override
   Future<void> record(PurchaseRecord record) async {}
+}
+
+class _ConsumptionHistoryRepositoryFake
+    implements ConsumptionHistoryRepository {
+  @override
+  Stream<List<ConsumptionEvent>> watchByHousehold(String householdId) =>
+      Stream.value(const []);
+
+  @override
+  Future<void> add(ConsumptionEvent event) async {}
 }
 
 class _WasteRepositoryFake implements WasteRepository {

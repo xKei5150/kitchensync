@@ -4,6 +4,8 @@ import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
 
+part 'shopping_engine_requirement_bucket.dart';
+
 class ShoppingEngine {
   const ShoppingEngine();
 
@@ -86,15 +88,22 @@ class ShoppingEngine {
     for (final bucket in required.values) {
       final available = pantry[(bucket.ingredientId, bucket.unit)] ?? 0;
       final deficit = bucket.quantity - available;
-      if (deficit <= 0) {
+      final roundedDeficit = _roundQuantity(deficit);
+      if (roundedDeficit <= 0) {
         continue;
       }
       items.add(
         ShoppingListItemPlan(
           ingredientId: bucket.ingredientId,
-          quantity: _roundQuantity(deficit),
+          quantity: roundedDeficit,
           unit: bucket.unit,
-          sourceMealLinks: List.unmodifiable(bucket.sourceMealLinks),
+          sourceMealLinks: List.unmodifiable(
+            bucket.deficitSourceMealLinks(
+              available: available,
+              roundedDeficit: roundedDeficit,
+              roundQuantity: _roundQuantity,
+            ),
+          ),
         ),
       );
     }
@@ -174,19 +183,5 @@ class ShoppingEngine {
 
   double _roundQuantity(double value) {
     return (value * 1000).roundToDouble() / 1000;
-  }
-}
-
-class _RequirementBucket {
-  _RequirementBucket(this.ingredientId, this.unit);
-
-  final String ingredientId;
-  final UnitId unit;
-  double quantity = 0;
-  final List<MealSourceLink> sourceMealLinks = [];
-
-  void add(MealSourceLink link) {
-    quantity += link.quantity;
-    sourceMealLinks.add(link);
   }
 }

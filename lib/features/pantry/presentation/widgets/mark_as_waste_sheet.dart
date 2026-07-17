@@ -125,7 +125,7 @@ class _MarkAsWasteSheetState extends ConsumerState<MarkAsWasteSheet> {
           ),
           const SizedBox(height: KsTokens.space12),
           DropdownButtonFormField<WasteReason>(
-            value: _reason,
+            initialValue: _reason,
             decoration: const InputDecoration(labelText: 'Reason'),
             items: WasteReason.values
                 .map((r) => DropdownMenuItem(value: r, child: Text(r.name)))

@@ -64,7 +64,7 @@ void main() {
     expect(list.items.single.ingredientId, 'oats');
     expect(list.items.single.quantity, 1000);
     expect(list.items.single.unit, UnitId.g);
-    expect(list.items.single.sourceMealLinks.single.quantity, 1500);
+    expect(list.items.single.sourceMealLinks.single.quantity, 1000);
   });
 
   test(
@@ -106,7 +106,7 @@ void main() {
       expect(list.items.single.ingredientId, 'stock');
       expect(list.items.single.quantity, 500);
       expect(list.items.single.unit, UnitId.ml);
-      expect(list.items.single.sourceMealLinks.single.quantity, 1500);
+      expect(list.items.single.sourceMealLinks.single.quantity, 500);
     },
   );
 
@@ -150,7 +150,7 @@ void main() {
     expect(list.items.single.unit, UnitId.g);
     expect(
       list.items.single.sourceMealLinks.single.quantity,
-      closeTo(453.592, 0.001),
+      closeTo(226.796, 0.001),
     );
   });
 
@@ -194,7 +194,7 @@ void main() {
     expect(list.items.single.unit, UnitId.ml);
     expect(
       list.items.single.sourceMealLinks.single.quantity,
-      closeTo(3785.412, 0.001),
+      closeTo(3312.235, 0.001),
     );
   });
 }

@@ -9,10 +9,14 @@ import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
+import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/entities/shopping_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
+import 'package:kitchensync/features/calendar/domain/repositories/shopping_schedule_repository.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
+import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
@@ -24,8 +28,11 @@ import 'package:kitchensync/features/pantry/presentation/providers/pantry_provid
 import 'package:kitchensync/features/pantry/presentation/screens/insights_screen.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
+import 'package:kitchensync/features/shopping/domain/entities/shopping_command.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
+import 'package:kitchensync/features/shopping/domain/repositories/shopping_command_repository.dart';
 import 'package:kitchensync/features/shopping/domain/repositories/shopping_repository.dart';
+import 'package:kitchensync/features/shopping/presentation/controllers/shopping_write_coordinator.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
 PantryItem _item({
@@ -76,7 +83,7 @@ Future<void> _pump(WidgetTester tester, List<PantryItem> items) async {
   await tester.pump();
 }
 
-class _FakeShoppingRepository implements ShoppingRepository {
+class _FakeShoppingRepository extends ShoppingRepository {
   ShoppingListRecord? upserted;
 
   @override
@@ -88,41 +95,117 @@ class _FakeShoppingRepository implements ShoppingRepository {
     required String householdId,
     required String listId,
   }) => Stream.value(upserted?.id == listId ? upserted : null);
+}
+
+class _FakeShoppingCommandRepository
+    implements ShoppingAllocationCommandRepository {
+  _FakeShoppingCommandRepository(this.shopping);
+
+  final _FakeShoppingRepository shopping;
 
   @override
-  Future<void> upsertList(ShoppingListRecord list) async {
-    upserted = list;
+  Future<ShoppingCommandResult> createAndConsumeAllocation(
+    ConsumeShoppingAllocationIntent command,
+  ) async {
+    const listId = 'server-bulk-list';
+    shopping.upserted = ShoppingListRecord(
+      id: listId,
+      householdId: command.intent.householdId,
+      type: ShoppingListType.suggested,
+      shoppingDate: command.intent.startDate,
+      generatedForRangeStart: command.intent.startDate,
+      generatedForRangeEnd: command.intent.endDate,
+      status: ShoppingListStatus.pending,
+      originId: 'bulk',
+      createdAt: command.intent.startDate,
+      updatedAt: command.intent.startDate,
+      items: [
+        const ShoppingListItemRecord(
+          id: 'server-rice',
+          shoppingListId: listId,
+          ingredientId: 'rice',
+          quantityNeeded: 2500,
+          unit: UnitId.g,
+          status: ShoppingListItemStatus.unchecked,
+          sourceMealLinks: [],
+        ),
+      ],
+    );
+    return const ShoppingCommandResult(
+      listId: listId,
+      status: ShoppingCommandStatus.pending,
+      revision: 0,
+      alreadyApplied: false,
+    );
   }
 
   @override
-  Future<void> updateItemStatus({
-    required String householdId,
-    required String listId,
-    required String itemId,
-    required ShoppingListItemStatus status,
-    String? substituteIngredientId,
-    double? substituteQuantity,
-    UnitId? substituteUnit,
-  }) async {}
+  Future<ShoppingCommandResult> upsertList(
+    ShoppingListUpsertCommand command,
+  ) async {
+    final currentRevision = shopping.upserted?.revision;
+    if (command.expectedRevision != currentRevision) {
+      throw StateError('Unexpected shopping list revision.');
+    }
+    final revision = currentRevision == null ? 0 : currentRevision + 1;
+    shopping.upserted = _withRevision(command.list, revision);
+    return ShoppingCommandResult(
+      listId: command.listId,
+      status: _commandStatus(command.list.status),
+      revision: revision,
+      alreadyApplied: false,
+    );
+  }
 
   @override
-  Future<void> updateListStatus({
-    required String householdId,
-    required String listId,
-    required ShoppingListStatus status,
-  }) async {}
+  Future<ShoppingCommandResult> mutateItem(
+    ShoppingListItemMutationCommand command,
+  ) => throw UnsupportedError('Item mutations are not used in these tests.');
 
   @override
-  Future<void> applyShopNowPurchasesToScheduledLists({
-    required String householdId,
-    required ShoppingListRecord shopNowList,
-  }) async {}
+  Future<ShoppingCommandResult> completeList(ShoppingCommandRequest request) =>
+      throw UnsupportedError('List completion is not used in these tests.');
 
   @override
-  Future<void> deleteList({
-    required String householdId,
-    required String listId,
-  }) async {}
+  Future<ShoppingCommandResult> deleteList(ShoppingCommandRequest request) =>
+      throw UnsupportedError('List deletion is not used in these tests.');
+}
+
+ShoppingCommandStatus _commandStatus(ShoppingListStatus status) =>
+    switch (status) {
+      ShoppingListStatus.pending => ShoppingCommandStatus.pending,
+      ShoppingListStatus.cancelled => ShoppingCommandStatus.cancelled,
+      ShoppingListStatus.completed => ShoppingCommandStatus.completed,
+    };
+
+ShoppingListRecord _withRevision(ShoppingListRecord list, int revision) =>
+    ShoppingListRecord(
+      id: list.id,
+      householdId: list.householdId,
+      type: list.type,
+      shoppingDate: list.shoppingDate,
+      generatedForRangeStart: list.generatedForRangeStart,
+      generatedForRangeEnd: list.generatedForRangeEnd,
+      status: list.status,
+      originId: list.originId,
+      completionId: list.completionId,
+      completedAt: list.completedAt,
+      completedByUserId: list.completedByUserId,
+      schemaVersion: list.schemaVersion,
+      revision: revision,
+      createdAt: list.createdAt,
+      updatedAt: list.updatedAt,
+      items: list.items,
+    );
+
+class _EmptyShoppingScheduleRepository implements ShoppingScheduleRepository {
+  const _EmptyShoppingScheduleRepository();
+
+  @override
+  Future<void> save(ShoppingSchedule schedule) async {}
+
+  @override
+  Stream<ShoppingSchedule?> watch(String householdId) => Stream.value(null);
 }
 
 class _EmptyCalendarRepository implements CalendarRepository {
@@ -369,7 +452,7 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.byType(KsPremiumLock), findsOneWidget);
     expect(find.text('See your pantry, measured'), findsOneWidget);
@@ -383,6 +466,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final shopping = _FakeShoppingRepository();
+    final shoppingCommands = _FakeShoppingCommandRepository(shopping);
     final bulkItem = PantryItem(
       id: 'rice-stock',
       householdId: 'solo-household',
@@ -436,9 +520,30 @@ void main() {
           purchaseHistoryStreamProvider.overrideWith(
             (ref) => Stream.value(purchases),
           ),
+          pantryIngredientProvider('rice').overrideWith(
+            (ref) async => Result.success(
+              Ingredient(
+                id: 'rice',
+                name: 'jasmine rice',
+                displayNames: const {'en': 'Jasmine Rice'},
+                category: IngredientCategory.grain,
+                defaultUnit: UnitId.g,
+                allowedUnits: const [UnitId.g],
+                scope: IngredientScope.global,
+                createdAt: DateTime(2026, 7),
+                updatedAt: DateTime(2026, 7),
+              ),
+            ),
+          ),
           shoppingPlanningControllerProvider.overrideWithValue(
             ShoppingPlanningController(
               repository: shopping,
+              writeCoordinator: ShoppingWriteCoordinator(
+                repository: shoppingCommands,
+                allocationRepository: shoppingCommands,
+                householdId: 'solo-household',
+                idGenerator: FakeIdGenerator(['bulk-write']),
+              ),
               calendarRepository: _EmptyCalendarRepository(),
               pantryRepository: _FakePantryRepository([bulkItem]),
               purchaseHistoryRepository: _FakePurchaseHistoryRepository(
@@ -456,6 +561,8 @@ void main() {
               ),
               idGenerator: FakeIdGenerator(['bulk-list', 'rice-line']),
               clock: FakeClock(DateTime(2026, 7, 6, 9)),
+              shoppingScheduleRepository:
+                  const _EmptyShoppingScheduleRepository(),
             ),
           ),
         ],
@@ -465,7 +572,10 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Jasmine Rice'), findsOneWidget);
+    expect(find.text('rice'), findsNothing);
 
     await tester.tap(find.byTooltip('Add to shopping'));
     await tester.pumpAndSettle();
@@ -474,7 +584,7 @@ void main() {
     expect(shopping.upserted!.type, ShoppingListType.suggested);
     expect(shopping.upserted!.items.single.ingredientId, 'rice');
     expect(shopping.upserted!.items.single.quantityNeeded, 2500);
-    expect(find.text('rice added to shopping'), findsOneWidget);
+    expect(find.text('Jasmine Rice added to shopping'), findsOneWidget);
   });
 
   testWidgets('Insights renders in dark theme without error', (tester) async {

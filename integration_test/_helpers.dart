@@ -26,10 +26,18 @@ Future<void> bootEmulatedApp() async {
     'FirebaseInitializer.initialize',
     () => const FirebaseInitializer().initialize(AppEnv.dev),
   );
-  if (FirebaseAuth.instance.currentUser == null) {
-    await withTimeout(
+  final auth = FirebaseAuth.instance;
+  if (auth.currentUser == null) {
+    final credential = await withTimeout(
       'signInAnonymously',
-      () => FirebaseAuth.instance.signInAnonymously(),
+      auth.signInAnonymously,
     );
+    if (credential.user == null) {
+      throw StateError('[itest] anonymous sign-in returned no user');
+    }
   }
+  await withTimeout(
+    'wait for authenticated user',
+    () => auth.authStateChanges().firstWhere((user) => user != null),
+  );
 }

@@ -1,0 +1,17 @@
+{
+  "path": "/households/household-1/shoppingLists/scheduled_weekly_20260105",
+  "id": "scheduled_weekly_20260105",
+  "householdId": "household-1",
+  "type": "scheduled",
+  "shoppingDate": "2026-99-05",
+  "generatedForRangeStart": "2026-01-05",
+  "generatedForRangeEnd": "2026-01-11",
+  "status": "completed",
+  "originId": "calendar-week-2026-01-05",
+  "completionId": "completion-1",
+  "completedAt": "2026-01-12T10:15:30.000Z",
+  "completedByUserId": "user-1",
+  "schemaVersion": 2,
+  "createdAt": "2026-01-01T08:00:00.000Z",
+  "updatedAt": "2026-01-12T10:15:30.000Z"
+}

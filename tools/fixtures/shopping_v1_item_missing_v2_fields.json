@@ -1,0 +1,20 @@
+{
+  "path": "/households/household-1/shoppingLists/scheduled_20260105/items/tomato__piece",
+  "id": "tomato__piece",
+  "shoppingListId": "scheduled_20260105",
+  "ingredientId": "tomato",
+  "quantityNeeded": 3,
+  "unit": "piece",
+  "status": "unchecked",
+  "substituteIngredientId": null,
+  "substituteQuantity": null,
+  "substituteUnit": null,
+  "sourceMealLinks": [
+    {
+      "mealEntryId": "meal-1",
+      "recipeId": "recipe-1",
+      "date": "2026-01-05",
+      "quantity": 3
+    }
+  ]
+}

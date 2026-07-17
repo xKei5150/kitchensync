@@ -1,4 +1,7 @@
 // SIZE_OK: shopping repository tests cover existing persistence variants.
+import 'dart:async';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -46,45 +49,48 @@ void main() {
     ],
   );
 
-  ShoppingListRecord scheduledList({
-    required String id,
-    required double quantityNeeded,
-    required String mealEntryId,
-  }) {
-    return ShoppingListRecord(
-      id: id,
-      householdId: householdId,
-      type: ShoppingListType.scheduled,
-      shoppingDate: DateTime(2026, 7, 9),
-      generatedForRangeStart: DateTime(2026, 7, 9),
-      generatedForRangeEnd: DateTime(2026, 7, 12),
-      status: ShoppingListStatus.pending,
-      createdAt: now,
-      updatedAt: now,
-      items: [
-        ShoppingListItemRecord(
-          id: '$id-item',
-          shoppingListId: id,
-          ingredientId: 'tomato',
-          quantityNeeded: quantityNeeded,
-          unit: UnitId.g,
-          status: ShoppingListItemStatus.unchecked,
-          sourceMealLinks: [
-            MealSourceLink(
-              mealEntryId: mealEntryId,
-              recipeId: 'braise',
-              date: DateTime(2026, 7, 10),
-              quantity: quantityNeeded,
-            ),
-          ],
-        ),
-      ],
-    );
+  Future<void> seedList(ShoppingListRecord value) async {
+    final listRef = db
+        .collection('households')
+        .doc(value.householdId)
+        .collection('shoppingLists')
+        .doc(value.id);
+    await listRef.set(ShoppingListMapper.toMap(value));
+    for (final item in value.items) {
+      await listRef
+          .collection('items')
+          .doc(item.id)
+          .set(ShoppingListItemMapper.toMap(item));
+    }
   }
 
   setUp(() {
     db = FakeFirebaseFirestore();
     repo = ShoppingRepositoryImpl(ShoppingRemoteDataSource(FirestoreRefs(db)));
+  });
+
+  test('shopping observation APIs expose no direct write methods', () {
+    final sources = {
+      'ShoppingRepository': File(
+        'lib/features/shopping/domain/repositories/shopping_repository.dart',
+      ).readAsStringSync(),
+      'ShoppingRemoteDataSource': File(
+        'lib/features/shopping/data/datasources/shopping_remote_data_source.dart',
+      ).readAsStringSync(),
+    };
+
+    for (final MapEntry(key: type, value: source) in sources.entries) {
+      expect(
+        source,
+        isNot(contains('upsertList')),
+        reason: '$type is read-only',
+      );
+      expect(
+        source,
+        isNot(contains('updateItemStatus')),
+        reason: '$type is read-only',
+      );
+    }
   });
 
   test('ShoppingListMapper stores design-doc field names', () {
@@ -115,45 +121,66 @@ void main() {
     expect(roundTrip.sourceMealLinks.single.date, DateTime(2026, 7, 6));
   });
 
-  test(
-    'upsertList writes list and items then watchLists hydrates them',
-    () async {
-      await repo.upsertList(list);
+  test('watchLists hydrates directly persisted lists and items', () async {
+    await seedList(list);
 
-      final lists = await repo.watchLists(householdId).first;
+    final lists = await repo.watchLists(householdId).first;
 
-      expect(lists, hasLength(1));
-      expect(lists.single.type, ShoppingListType.shopNow);
-      expect(lists.single.items.single.ingredientId, 'tomato');
-      expect(
-        lists.single.items.single.sourceMealLinks.single.recipeId,
-        'braise',
-      );
-    },
-  );
+    expect(lists, hasLength(1));
+    expect(lists.single.type, ShoppingListType.shopNow);
+    expect(lists.single.items.single.ingredientId, 'tomato');
+    expect(lists.single.items.single.sourceMealLinks.single.recipeId, 'braise');
+  });
 
-  test('updateItemStatus stores arbitrary local substituteUnit', () async {
-    await repo.upsertList(list);
-
-    await repo.updateItemStatus(
-      householdId: householdId,
-      listId: list.id,
-      itemId: 'item-1',
-      status: ShoppingListItemStatus.substituted,
-      substituteIngredientId: 'cherry-tomato',
-      substituteQuantity: 450,
-      substituteUnit: UnitId('bundle'),
+  test('a second watchList listener receives an item-only mutation', () async {
+    await seedList(list);
+    final firstInitial = Completer<ShoppingListRecord?>();
+    final firstListener = repo
+        .watchList(householdId: householdId, listId: list.id)
+        .listen((value) {
+          if (!firstInitial.isCompleted) firstInitial.complete(value);
+        });
+    addTearDown(firstListener.cancel);
+    expect(
+      (await firstInitial.future)!.items.single.status,
+      ShoppingListItemStatus.unchecked,
     );
 
-    final itemSnap = await db
+    final secondEmissions = repo
+        .watchList(householdId: householdId, listId: list.id)
+        .take(2)
+        .toList();
+    await Future<void>.delayed(Duration.zero);
+    await db
         .collection('households')
         .doc(householdId)
         .collection('shoppingLists')
         .doc(list.id)
         .collection('items')
         .doc('item-1')
-        .get();
+        .update({'status': ShoppingListItemStatus.bought.name});
 
+    final values = await secondEmissions.timeout(const Duration(seconds: 1));
+    expect(values.last!.items.single.status, ShoppingListItemStatus.bought);
+  });
+
+  test('watchList hydrates directly persisted substitute fields', () async {
+    await seedList(list);
+    final itemRef = db
+        .collection('households')
+        .doc(householdId)
+        .collection('shoppingLists')
+        .doc(list.id)
+        .collection('items')
+        .doc('item-1');
+    await itemRef.update({
+      'status': ShoppingListItemStatus.substituted.name,
+      'substituteIngredientId': 'cherry-tomato',
+      'substituteQuantity': 450,
+      'substituteUnit': 'bundle',
+    });
+
+    final itemSnap = await itemRef.get();
     expect(itemSnap.data()!['status'], 'substituted');
     expect(itemSnap.data()!['substituteIngredientId'], 'cherry-tomato');
     expect(itemSnap.data()!['substituteQuantity'], 450);
@@ -163,135 +190,61 @@ void main() {
         .watchList(householdId: householdId, listId: list.id)
         .first;
 
-    expect(hydrated!.items.single.substituteUnit, UnitId('bundle'));
-  });
-
-  test('updateListStatus marks a list completed', () async {
-    await repo.upsertList(list);
-
-    await repo.updateListStatus(
-      householdId: householdId,
-      listId: list.id,
-      status: ShoppingListStatus.completed,
-    );
-
-    final listSnap = await db
-        .collection('households')
-        .doc(householdId)
-        .collection('shoppingLists')
-        .doc(list.id)
-        .get();
-
-    expect(listSnap.data()!['status'], 'completed');
-    expect(listSnap.data()!['updatedAt'], isA<Timestamp>());
+    expect(hydrated!.items.single.status, ShoppingListItemStatus.substituted);
+    expect(hydrated.items.single.substituteIngredientId, 'cherry-tomato');
+    expect(hydrated.items.single.substituteQuantity, 450);
+    expect(hydrated.items.single.substituteUnit, UnitId('bundle'));
   });
 
   test(
-    'applyShopNowPurchasesToScheduledLists reduces matching future deficits',
+    'loads completed history by updated time and document id in pages',
     () async {
-      final shopNow = ShoppingListRecord(
-        id: 'shop-now',
-        householdId: householdId,
-        type: ShoppingListType.shopNow,
-        shoppingDate: DateTime(2026, 7, 5),
-        generatedForRangeStart: DateTime(2026, 7, 5),
-        generatedForRangeEnd: DateTime(2026, 7, 12),
-        status: ShoppingListStatus.pending,
-        createdAt: now,
-        updatedAt: now,
-        items: [
-          ShoppingListItemRecord(
-            id: 'shop-now-tomato',
-            shoppingListId: 'shop-now',
-            ingredientId: 'tomato',
-            quantityNeeded: 700,
-            unit: UnitId.g,
-            status: ShoppingListItemStatus.bought,
-            sourceMealLinks: [
-              MealSourceLink(
-                mealEntryId: 'meal-1',
-                recipeId: 'braise',
-                date: DateTime(2026, 7, 10),
-                quantity: 500,
-              ),
-              MealSourceLink(
-                mealEntryId: 'meal-2',
-                recipeId: 'braise',
-                date: DateTime(2026, 7, 11),
-                quantity: 200,
-              ),
-            ],
+      final completedAt = DateTime(2026, 7, 8, 12);
+      for (var index = 0; index < 21; index++) {
+        final id = 'completed-${index.toString().padLeft(2, '0')}';
+        await seedList(
+          ShoppingListRecord(
+            id: id,
+            householdId: householdId,
+            type: ShoppingListType.shopNow,
+            shoppingDate: completedAt,
+            generatedForRangeStart: completedAt,
+            generatedForRangeEnd: completedAt,
+            status: ShoppingListStatus.completed,
+            completedAt: index == 20 ? null : completedAt,
+            completedByUserId: 'member-1',
+            createdAt: completedAt,
+            updatedAt: index == 20
+                ? completedAt.subtract(const Duration(minutes: 1))
+                : completedAt,
+            items: const [],
           ),
-        ],
+        );
+      }
+
+      final first = await repo.loadCompletedHistory(householdId);
+      expect(first.records, hasLength(20));
+      // fake_cloud_firestore does not reproduce Firestore's implicit descending
+      // document-name tie-break. The emulator suite covers that backend detail;
+      // this adapter test keeps the page boundary and cursor continuity honest.
+      expect(
+        first.records.map((list) => list.id),
+        orderedEquals([
+          for (var index = 0; index < 20; index++)
+            'completed-${index.toString().padLeft(2, '0')}',
+        ]),
       );
-      await repo.upsertList(shopNow);
-      await repo.upsertList(
-        scheduledList(
-          id: 'scheduled-partial',
-          quantityNeeded: 900,
-          mealEntryId: 'meal-1',
+      expect(first.nextCursorId, first.records.last.id);
+      expect(
+        File(
+          'lib/features/shopping/data/datasources/shopping_remote_data_source.dart',
+        ).readAsStringSync(),
+        allOf(
+          contains(".orderBy('updatedAt', descending: true)"),
+          contains('startAfterDocument(lastDocument)'),
+          isNot(contains('FieldPath.documentId')),
         ),
       );
-      await repo.upsertList(
-        scheduledList(
-          id: 'scheduled-full',
-          quantityNeeded: 200,
-          mealEntryId: 'meal-2',
-        ),
-      );
-
-      await repo.applyShopNowPurchasesToScheduledLists(
-        householdId: householdId,
-        shopNowList: shopNow,
-      );
-
-      final partial = await db
-          .collection('households')
-          .doc(householdId)
-          .collection('shoppingLists')
-          .doc('scheduled-partial')
-          .collection('items')
-          .doc('scheduled-partial-item')
-          .get();
-      final full = await db
-          .collection('households')
-          .doc(householdId)
-          .collection('shoppingLists')
-          .doc('scheduled-full')
-          .collection('items')
-          .doc('scheduled-full-item')
-          .get();
-
-      expect(partial.data()!['quantityNeeded'], 400);
-      expect(partial.data()!['status'], 'unchecked');
-      expect(full.data()!['quantityNeeded'], 0);
-      expect(full.data()!['status'], 'skipped');
-    },
-  );
-
-  test(
-    'deleteList removes the list and its item subcollection documents',
-    () async {
-      await repo.upsertList(list);
-
-      await repo.deleteList(householdId: householdId, listId: list.id);
-
-      final listSnap = await db
-          .collection('households')
-          .doc(householdId)
-          .collection('shoppingLists')
-          .doc(list.id)
-          .get();
-      final itemsSnap = await db
-          .collection('households')
-          .doc(householdId)
-          .collection('shoppingLists')
-          .doc(list.id)
-          .collection('items')
-          .get();
-
-      expect(listSnap.exists, isFalse);
-      expect(itemsSnap.docs, isEmpty);
     },
   );
 }

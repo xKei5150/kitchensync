@@ -5,6 +5,7 @@ import 'package:kitchensync/features/calendar/data/datasources/calendar_remote_d
 import 'package:kitchensync/features/calendar/data/dtos/calendar_dto.dart';
 import 'package:kitchensync/features/calendar/data/repositories/calendar_repository_impl.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/exceptions/invalid_active_calendar_range_exception.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 
 void main() {
@@ -73,6 +74,55 @@ void main() {
       roundTrip.ingredientOverrides.single.substituteIngredientId,
       'pepper',
     );
+  });
+
+  test('CalendarDaySettingsMapper rejects reversed active ranges', () {
+    final reversed = CalendarDaySettings(
+      id: 'backwards',
+      householdId: householdId,
+      dateRangeStart: DateTime(2026, 7, 8),
+      dateRangeEnd: DateTime(2026, 7),
+      mealsPerDay: 3,
+      dishesPerMeal: 1,
+      mealModeName: 'Invalid range',
+      isActive: true,
+    );
+    expect(
+      () => CalendarDaySettingsMapper.toMap(reversed),
+      throwsArgumentError,
+    );
+
+    final stored = CalendarDaySettingsMapper.toMap(settings)
+      ..['dateRangeStart'] = '2026-07-08'
+      ..['dateRangeEnd'] = '2026-07-01';
+    expect(
+      () => CalendarDaySettingsMapper.fromMap('backwards', stored),
+      throwsA(
+        isA<InvalidActiveCalendarRangeException>()
+            .having((error) => error.start, 'start', DateTime(2026, 7, 8))
+            .having((error) => error.end, 'end', DateTime(2026, 7)),
+      ),
+    );
+  });
+
+  test('CalendarDaySettingsMapper preserves reversed inactive ranges', () {
+    final inactive = CalendarDaySettings(
+      id: 'inactive-backwards',
+      householdId: householdId,
+      dateRangeStart: DateTime(2026, 7, 8),
+      dateRangeEnd: DateTime(2026, 7),
+      mealsPerDay: 3,
+      dishesPerMeal: 1,
+      mealModeName: 'Inactive range',
+      isActive: false,
+    );
+
+    final map = CalendarDaySettingsMapper.toMap(inactive);
+    final roundTrip = CalendarDaySettingsMapper.fromMap(inactive.id, map);
+
+    expect(roundTrip.dateRangeStart, DateTime(2026, 7, 8));
+    expect(roundTrip.dateRangeEnd, DateTime(2026, 7));
+    expect(roundTrip.isActive, isFalse);
   });
 
   test('upsertMeal writes and watchMealsInRange reads ordered meals', () async {

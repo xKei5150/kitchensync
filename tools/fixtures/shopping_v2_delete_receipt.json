@@ -1,0 +1,10 @@
+{
+  "path": "/shoppingCommandReceipts/command-1",
+  "clientAccess": "not_client_readable_or_writable",
+  "id": "command-1",
+  "householdId": "household-1",
+  "commandType": "deleteShoppingList",
+  "targetListId": "scheduled_weekly_20260105",
+  "appliedAt": "2026-01-12T10:20:00.000Z",
+  "appliedByUserId": "user-1"
+}

@@ -14,6 +14,7 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
+import 'package:kitchensync/features/pantry/data/services/cooking_inventory_service.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/mark_as_waste.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/record_leftover.dart';
@@ -65,6 +66,10 @@ final calendarSettingsControllerProvider = Provider<CalendarSettingsController>(
   },
 );
 
+final cookingInventoryServiceProvider = Provider<CookingInventoryService?>(
+  (ref) => CookingInventoryService(ref.watch(firestoreRefsProvider)),
+);
+
 final cookingLifecycleControllerProvider = Provider<CookingLifecycleController>(
   (ref) {
     return CookingLifecycleController(
@@ -73,6 +78,8 @@ final cookingLifecycleControllerProvider = Provider<CookingLifecycleController>(
       recipeRepository: ref.watch(recipeRepositoryProvider),
       recordLeftover: ref.watch(recordLeftoverProvider),
       markAsWaste: ref.watch(markAsWasteProvider),
+      cookingInventory: ref.watch(cookingInventoryServiceProvider),
+      clock: ref.watch(clockProvider),
       householdId: ref.watch(activeHouseholdIdProvider),
       household: ref.watch(activeHouseholdContextProvider),
     );
@@ -174,6 +181,8 @@ class CookingLifecycleController {
     required this.recipeRepository,
     required this.recordLeftover,
     required this.markAsWaste,
+    this.cookingInventory,
+    this.clock,
     required this.householdId,
     this.household,
   });
@@ -183,6 +192,8 @@ class CookingLifecycleController {
   final RecipeRepository recipeRepository;
   final RecordLeftover recordLeftover;
   final MarkAsWaste markAsWaste;
+  final CookingInventoryService? cookingInventory;
+  final Clock? clock;
   final String householdId;
   final ActiveHouseholdContext? household;
   static const _policy = HouseholdPolicy();
@@ -194,8 +205,7 @@ class CookingLifecycleController {
     if (recipe == null) {
       throw StateError('Cannot cook missing recipe ${meal.recipeId}.');
     }
-    final requirements = <CookingIngredientRequirement>[];
-    final missing = <CookingIngredientRequirement>[];
+    final rawRequirements = <CookingIngredientRequirement>[];
     for (final ingredient in recipe.ingredients) {
       final override = _overrideFor(meal, ingredient);
       if (override != null) {
@@ -204,9 +214,7 @@ class CookingLifecycleController {
           unit: override.substituteUnit,
           quantity: override.substituteQuantity,
         );
-        requirements.add(requirement);
-        final missingRequirement = await _missingRequirement(requirement);
-        if (missingRequirement != null) missing.add(missingRequirement);
+        rawRequirements.add(requirement);
         continue;
       }
       final required = _scaledQuantity(recipe, meal, ingredient);
@@ -216,7 +224,11 @@ class CookingLifecycleController {
         unit: ingredient.unit,
         quantity: required,
       );
-      requirements.add(requirement);
+      rawRequirements.add(requirement);
+    }
+    final requirements = _combineRequirements(rawRequirements);
+    final missing = <CookingIngredientRequirement>[];
+    for (final requirement in requirements) {
       final missingRequirement = await _missingRequirement(requirement);
       if (missingRequirement != null) missing.add(missingRequirement);
     }
@@ -229,6 +241,24 @@ class CookingLifecycleController {
         meal: meal,
         missingIngredients: List.unmodifiable(missing),
       );
+    }
+
+    final cookingInventory = this.cookingInventory;
+    if (cookingInventory != null) {
+      await cookingInventory.complete(
+        householdId: householdId,
+        meal: meal,
+        requirements: [
+          for (final requirement in requirements)
+            CookingInventoryRequirement(
+              ingredientId: requirement.ingredientId,
+              quantity: requirement.quantity,
+              unit: requirement.unit,
+            ),
+        ],
+        occurredAt: clock?.now() ?? DateTime.now(),
+      );
+      return;
     }
 
     for (final requirement in requirements) {
@@ -259,15 +289,20 @@ class CookingLifecycleController {
         'Cannot save leftovers for missing recipe ${meal.recipeId}.',
       );
     }
+    if (recipe.ingredients.isEmpty) {
+      throw StateError(
+        'Cannot save leftovers for ${recipe.name} without a dictionary ingredient.',
+      );
+    }
 
     final result = await recordLeftover(
       RecordLeftoverParams(
         householdId: householdId,
         recipeId: recipe.id,
-        ingredientId: 'leftover-${recipe.id}',
+        ingredientId: recipe.ingredients.first.ingredientId,
         servings: servings,
         quantity: servings.toDouble(),
-        unit: UnitId.piece,
+        unit: UnitId.serving,
       ),
     );
 
@@ -451,17 +486,31 @@ class CookingLifecycleController {
         'A leftover meal must reference a pantry leftover.',
       );
     }
+    final cookingInventory = this.cookingInventory;
+    if (cookingInventory != null) {
+      await cookingInventory.consumeLeftover(
+        householdId: householdId,
+        meal: meal,
+        leftoverId: leftoverId,
+        occurredAt: clock?.now() ?? DateTime.now(),
+      );
+      return;
+    }
     final leftover = await pantryRepository
         .watchById(householdId, leftoverId)
         .first;
     if (leftover == null) {
       throw StateError('Cannot consume missing leftover $leftoverId.');
     }
-    final remaining = leftover.quantity - meal.servingSize;
-    await pantryRepository.setQuantity(
-      householdId,
-      leftoverId,
-      remaining < 0 ? 0 : remaining,
+    final nextQuantity = (leftover.quantity - meal.servingSize)
+        .clamp(0, double.infinity)
+        .toDouble();
+    await pantryRepository.update(
+      leftover.copyWith(
+        quantity: nextQuantity,
+        leftoverServings: nextQuantity.round(),
+        updatedAt: clock?.now() ?? DateTime.now(),
+      ),
     );
     await calendarRepository.upsertMeal(
       householdId: householdId,
@@ -520,6 +569,34 @@ class CookingLifecycleController {
     return null;
   }
 
+  List<CookingIngredientRequirement> _combineRequirements(
+    Iterable<CookingIngredientRequirement> requirements,
+  ) {
+    final totals =
+        <String, ({String ingredientId, UnitId unit, double quantity})>{};
+    for (final requirement in requirements) {
+      final normalized = UnitRegistry.normalizeFormalQuantity(
+        quantity: requirement.quantity,
+        unit: requirement.unit,
+      );
+      final key = '${requirement.ingredientId}\u001f${normalized.unit.value}';
+      final existing = totals[key];
+      totals[key] = (
+        ingredientId: requirement.ingredientId,
+        unit: normalized.unit,
+        quantity: (existing?.quantity ?? 0) + normalized.quantity,
+      );
+    }
+    return [
+      for (final value in totals.values)
+        CookingIngredientRequirement(
+          ingredientId: value.ingredientId,
+          unit: value.unit,
+          quantity: value.quantity,
+        ),
+    ];
+  }
+
   Future<void> _deduct({
     required String ingredientId,
     required UnitId unit,
@@ -546,6 +623,23 @@ class CookingLifecycleController {
   Future<CookingIngredientRequirement?> _missingRequirement(
     CookingIngredientRequirement requirement,
   ) async {
+    final cookingInventory = this.cookingInventory;
+    if (cookingInventory != null) {
+      final plan = await cookingInventory.inspect(
+        householdId: householdId,
+        requirement: CookingInventoryRequirement(
+          ingredientId: requirement.ingredientId,
+          quantity: requirement.quantity,
+          unit: requirement.unit,
+        ),
+      );
+      if (plan.isComplete) return null;
+      return CookingIngredientRequirement(
+        ingredientId: requirement.ingredientId,
+        unit: plan.missingUnit,
+        quantity: plan.missingQuantity,
+      );
+    }
     final pantryItem = await pantryRepository.findByIngredientUnit(
       householdId: householdId,
       ingredientId: requirement.ingredientId,

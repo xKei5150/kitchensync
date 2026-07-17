@@ -139,7 +139,6 @@ const Set<HouseholdCapability> _cookCapabilities = {
 
 const Set<HouseholdCapability> _shopperCapabilities = {
   ..._viewCapabilities,
-  HouseholdCapability.manageShoppingSchedules,
   HouseholdCapability.generateShoppingLists,
   HouseholdCapability.editShoppingLists,
   HouseholdCapability.finalizeShoppingLists,

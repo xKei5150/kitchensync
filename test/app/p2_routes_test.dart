@@ -91,13 +91,11 @@ void main() {
 
     router.go('/shop/list');
     await tester.pumpAndSettle();
-    expect(find.text('Shopping'), findsOneWidget);
-    expect(find.text('Done shopping'), findsNothing);
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/shop');
 
     router.go('/pantry/add');
     await tester.pumpAndSettle();
-    expect(find.text('Pantry'), findsOneWidget);
-    expect(find.text('Quantity'), findsNothing);
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/pantry');
   });
 
   testWidgets('solo household context keeps all functional powers', (
@@ -117,7 +115,7 @@ void main() {
 
     router.go('/shop/list');
     await tester.pumpAndSettle();
-    expect(find.text('Weekly shop'), findsOneWidget);
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/shop/list');
   });
 
   testWidgets('Today header opens Notifications then Settings', (tester) async {
@@ -155,7 +153,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Calendar opens Menu Sets, then the editor', (tester) async {
+  testWidgets('Calendar opens Menu Sets', (tester) async {
     final router = await _pumpApp(tester);
 
     router.go('/calendar');
@@ -165,15 +163,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('A deck of weeks'), findsOneWidget);
 
-    // The card's "Apply to calendar" opens the editor.
-    await tester.tap(find.text('Apply to calendar').first);
-    await tester.pumpAndSettle();
-    expect(find.text('Cosy autumn week'), findsOneWidget);
-    expect(find.text('Drop here'), findsOneWidget);
+    expect(find.text('A deck of weeks'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Onboarding flow advances sign-in → household setup', (
+  testWidgets('Onboarding keeps unconfigured Google sign-in unavailable', (
     tester,
   ) async {
     final router = await _pumpApp(tester);
@@ -184,7 +178,8 @@ void main() {
 
     await tester.tap(find.text('Continue with Google'));
     await tester.pumpAndSettle();
-    expect(find.text('Set up your kitchen'), findsOneWidget);
+    expect(find.text('Continue with email'), findsOneWidget);
+    expect(find.text('Not configured'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 }

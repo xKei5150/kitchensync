@@ -3,6 +3,8 @@ import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/widgets/ks_dashed.dart';
 import 'package:kitchensync/core/widgets/ks_member.dart';
 
+part 'ks_checklist_row_checkbox.dart';
+
 /// The lifecycle of a shopping-list line.
 enum ChecklistItemState { toBuy, bought, substituted, unavailable, skipped }
 
@@ -25,6 +27,9 @@ class KsChecklistRow extends StatelessWidget {
     this.memberSeat,
     this.onToggle,
     this.onLongPress,
+    this.onAction,
+    this.isBusy = false,
+    this.actionTooltip = 'More item actions',
     super.key,
   });
 
@@ -49,6 +54,10 @@ class KsChecklistRow extends StatelessWidget {
   /// Optional row action handler, used for secondary checklist states.
   final VoidCallback? onLongPress;
 
+  final VoidCallback? onAction;
+  final bool isBusy;
+  final String actionTooltip;
+
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
@@ -58,15 +67,30 @@ class KsChecklistRow extends StatelessWidget {
       opacity: opacity,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onLongPress: onLongPress,
+        onLongPress: isBusy ? null : onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
           child: Row(
             children: [
-              _Checkbox(state: state, onTap: onToggle),
+              _Checkbox(state: state, onTap: isBusy ? null : onToggle),
               const SizedBox(width: 13),
               Expanded(child: _label(context)),
               ..._trailing(context, ks),
+              if (isBusy) ...[
+                const SizedBox(width: KsTokens.space10),
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ] else if (onAction != null) ...[
+                const SizedBox(width: KsTokens.space4),
+                IconButton(
+                  tooltip: actionTooltip,
+                  onPressed: isBusy ? null : onAction,
+                  icon: const Icon(Icons.more_horiz_rounded),
+                ),
+              ],
             ],
           ),
         ),
@@ -172,69 +196,5 @@ class KsChecklistRow extends StatelessWidget {
       ];
     }
     return const [];
-  }
-}
-
-class _Checkbox extends StatelessWidget {
-  const _Checkbox({required this.state, this.onTap});
-
-  final ChecklistItemState state;
-  final VoidCallback? onTap;
-
-  static const double _size = 22;
-
-  @override
-  Widget build(BuildContext context) {
-    final ks = context.ksColors;
-
-    Widget box;
-    switch (state) {
-      case ChecklistItemState.bought:
-      case ChecklistItemState.substituted:
-        box = Container(
-          width: _size,
-          height: _size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: ks.brandPrimary,
-            borderRadius: BorderRadius.circular(KsTokens.radius6),
-          ),
-          child: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
-        );
-      case ChecklistItemState.unavailable:
-        box = Container(
-          width: _size,
-          height: _size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(KsTokens.radius6),
-            border: Border.all(color: ks.danger, width: 2),
-          ),
-          child: Icon(Icons.close_rounded, size: 13, color: ks.danger),
-        );
-      case ChecklistItemState.skipped:
-        box = KsDashedBorder(
-          color: ks.borderStrong,
-          radius: KsTokens.radius6,
-          strokeWidth: 2,
-          child: const SizedBox(width: _size, height: _size),
-        );
-      case ChecklistItemState.toBuy:
-        box = Container(
-          width: _size,
-          height: _size,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(KsTokens.radius6),
-            border: Border.all(color: ks.borderStrong, width: 2),
-          ),
-        );
-    }
-
-    if (onTap == null) return box;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: box,
-    );
   }
 }

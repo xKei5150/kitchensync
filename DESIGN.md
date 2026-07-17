@@ -50,6 +50,20 @@ KitchenSync is a quiet kitchen command center: warm, scannable, and practical wi
 - Form surfaces use uppercase 10px field labels from `KsFieldLabel`.
 - Chip labels use compact `labelMedium` with zero letter spacing.
 
+### Shopping Home Preservation Styles
+
+These component-scoped tokens preserve the established Shopping home raster;
+they are not additions to the general type scale.
+
+| Token | Exact style | Usage |
+|-------|-------------|-------|
+| `KsTokens.shoppingHomeSectionLabel` | DM Sans 10px / 700 / 1.35 / 1px tracking | Uppercase section labels |
+| `KsTokens.shoppingHomeHeroEyebrow` | DM Sans 9px / 700 / 1.35 / 1.2px tracking | Shop Now eyebrow |
+| `KsTokens.shoppingHomeHeroTitle` | Fraunces 21px / 600 / 1.1 | Shop Now headline |
+| `KsTokens.shoppingHomeActionLabel` | DM Sans 13px / 600 / 1.35 / zero tracking | On-brand action label |
+| `KsTokens.shoppingHomeListTitle` | DM Sans 13px / 600 / 1.35 | Upcoming and suggestion titles |
+| `KsTokens.shoppingHomeListMetadata` | DM Sans 11px / 500 / 1.35 / zero tracking | Upcoming and suggestion metadata |
+
 ## 4. Spacing & Layout
 
 ### Base Unit
@@ -62,11 +76,27 @@ KitchenSync uses the existing `KsTokens` spacing scale. Most form and picker spa
 - Chips use 8px row and run gaps.
 - Keep fixed-format controls stable with minimum heights: chips at 44px, editor actions around 48px, grouped panels full-width.
 
+### Shopping Home Preservation Geometry
+
+These component-scoped geometry tokens preserve the existing Shopping home
+capture without expanding the general 4-point spacing scale.
+
+| Token | Value | Usage |
+|-------|------:|-------|
+| `KsTokens.shoppingHomeHeroPadding` | 18px all sides | Shop Now card inset |
+| `KsTokens.shoppingHomeHeroActionGap` | 13px | Copy-to-action gap |
+| `KsTokens.shoppingHomeActionPadding` | 18px horizontal / 11px vertical | On-brand action inset |
+| `KsTokens.shoppingHomeListTilePadding` | 14px horizontal / 12px vertical | Upcoming-list tile inset |
+| `KsTokens.shoppingHomeListLeadingSize` | 36px square | Upcoming and suggestion leading well |
+| `KsTokens.shoppingHomeListIconSize` | 18px | Shopping-list glyphs and chevron |
+
 ## 5. Components
 
 ### Select Chip
 
-- **Structure**: `KsSelectChip` wrapped in `Wrap`.
+- **Structure**: `KsSelectChip` in a responsive grid when weekday choices are
+  fixed (four columns on phones, seven on wide surfaces); use `Wrap` for
+  variable-length choice sets.
 - **Variants**: selected, unselected, disabled through null `onTap`, optional dot color.
 - **Spacing**: 12px horizontal, 10px vertical, 8px radius, 44px minimum height.
 - **States**: selected has tonal brand fill, stronger border, and check glyph; unselected uses raised fill and strong border.
@@ -101,6 +131,15 @@ KitchenSync uses the existing `KsTokens` spacing scale. Most form and picker spa
 - **States**: buttons use existing `FilledButton`/`OutlinedButton` themes.
 - **Accessibility**: labeled controls and focusable actions.
 - **Motion**: platform Material transition only.
+
+### Checklist Row
+
+- **Structure**: checkbox, item detail, quantity/state detail, and a visible
+  overflow action button when the list is editable.
+- **Accessibility**: the overflow button exposes the “More item actions”
+  tooltip; long press remains an optional shortcut, never the sole action path.
+- **States**: checked/substituted, unavailable, skipped, and editable action
+  affordance are all visible without relying on color alone.
 
 ## 6. Motion & Interaction
 

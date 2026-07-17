@@ -468,6 +468,52 @@ void main() {
     expect(find.text('day 2026-07-06'), findsOneWidget);
   });
 
+  testWidgets('CalendarScreen opens the shopping schedule from the header', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => CalendarScreen(
+            initialMonth: DateTime(2026, 7),
+            initialSelectedDate: DateTime(2026, 7, 6),
+          ),
+        ),
+        GoRoute(
+          path: '/calendar/shopping-schedule',
+          builder: (context, state) =>
+              const Scaffold(body: Text('shopping schedule sentinel')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _calendarOverrides(),
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Shopping schedule'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Shopping schedule'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('shopping schedule sentinel'), findsOneWidget);
+  });
+
   testWidgets('CalendarScreen saves active calendar defaults', (tester) async {
     tester.view.physicalSize = const Size(400, 1800);
     tester.view.devicePixelRatio = 1.0;

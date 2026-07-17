@@ -8,13 +8,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/core/utils/clock.dart';
+import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/entities/shopping_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
+import 'package:kitchensync/features/calendar/domain/repositories/shopping_schedule_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/shopping_schedule_providers.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/menu_sets/domain/entities/menu_set.dart';
 import 'package:kitchensync/features/menu_sets/domain/repositories/menu_set_repository.dart';
+import 'package:kitchensync/features/menu_sets/domain/services/menu_set_application_engine.dart';
 import 'package:kitchensync/features/menu_sets/presentation/providers/menu_set_repository_providers.dart';
 import 'package:kitchensync/features/menu_sets/presentation/screens/menu_set_editor_screen.dart';
 import 'package:kitchensync/features/menu_sets/presentation/screens/menu_sets_screen.dart';
@@ -26,8 +32,11 @@ import 'package:kitchensync/features/pantry/presentation/providers/pantry_provid
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
+import 'package:kitchensync/features/shopping/domain/entities/shopping_command.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
+import 'package:kitchensync/features/shopping/domain/repositories/shopping_command_repository.dart';
 import 'package:kitchensync/features/shopping/domain/repositories/shopping_repository.dart';
+import 'package:kitchensync/features/shopping/presentation/controllers/shopping_write_coordinator.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,6 +49,7 @@ Future<Widget> _wrap(
   ShoppingRepository? shoppingRepository,
   RecipeRepository? recipeRepository,
   PantryRepository? pantryRepository,
+  ShoppingScheduleRepository? shoppingScheduleRepository,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
@@ -53,11 +63,22 @@ Future<Widget> _wrap(
         menuSetRepositoryProvider.overrideWithValue(menuSetRepository),
       if (shoppingRepository != null)
         shoppingRepositoryProvider.overrideWithValue(shoppingRepository),
+      if (shoppingRepository is _FakeShoppingRepository)
+        shoppingCommandRepositoryProvider.overrideWithValue(
+          shoppingRepository.commands,
+        ),
+      if (shoppingRepository is _FakeShoppingRepository)
+        shoppingAllocationCommandRepositoryProvider.overrideWithValue(
+          shoppingRepository.commands,
+        ),
       recipeRepositoryProvider.overrideWithValue(
         recipeRepository ?? _FakeRecipeRepository(),
       ),
       pantryRepositoryProvider.overrideWithValue(
         pantryRepository ?? _FakePantryRepository(),
+      ),
+      shoppingScheduleRepositoryProvider.overrideWithValue(
+        shoppingScheduleRepository ?? const _FakeShoppingScheduleRepository(),
       ),
     ],
     child: MaterialApp(theme: theme ?? AppTheme.light(), home: home),
@@ -203,7 +224,7 @@ Recipe _recipe(String id) {
 
 class _FakeCalendarRepository implements CalendarRepository {
   _FakeCalendarRepository({List<MealScheduleEntry>? meals})
-    : meals = meals ?? const [];
+    : meals = [...?meals];
 
   final List<MealScheduleEntry> meals;
   final upserted = <MealScheduleEntry>[];
@@ -234,6 +255,7 @@ class _FakeCalendarRepository implements CalendarRepository {
     required String householdId,
     required MealScheduleEntry entry,
   }) async {
+    meals.add(entry);
     upserted.add(entry);
   }
 
@@ -254,60 +276,203 @@ class _FakeCalendarRepository implements CalendarRepository {
   Future<void> upsertDaySettings(CalendarDaySettings settings) async {}
 }
 
-class _FakeShoppingRepository implements ShoppingRepository {
-  final upserted = <ShoppingListRecord>[];
+class _FakeShoppingScheduleRepository implements ShoppingScheduleRepository {
+  const _FakeShoppingScheduleRepository([this.schedule]);
+
+  final ShoppingSchedule? schedule;
+
+  @override
+  Future<void> save(ShoppingSchedule schedule) async {}
+
+  @override
+  Stream<ShoppingSchedule?> watch(String householdId) => Stream.value(schedule);
+}
+
+class _FakeShoppingRepository extends ShoppingRepository {
+  _FakeShoppingRepository([
+    Iterable<ShoppingListRecord> initialLists = const [],
+  ]) : upserted = [...initialLists] {
+    commands = _FakeShoppingCommandRepository(this);
+  }
+
+  final List<ShoppingListRecord> upserted;
+  late final _FakeShoppingCommandRepository commands;
 
   @override
   Stream<List<ShoppingListRecord>> watchLists(String householdId) =>
-      Stream.value(upserted);
+      Stream.value(
+        List.unmodifiable(
+          upserted.where((list) => list.householdId == householdId),
+        ),
+      );
 
   @override
   Stream<ShoppingListRecord?> watchList({
     required String householdId,
     required String listId,
-  }) => Stream.value(_findList(listId));
+  }) => Stream.value(_findList(householdId: householdId, listId: listId));
 
-  @override
-  Future<void> upsertList(ShoppingListRecord list) async {
-    upserted.add(list);
+  void store(ShoppingListRecord list) {
+    upserted
+      ..removeWhere((existing) => existing.id == list.id)
+      ..add(list);
   }
 
-  @override
-  Future<void> updateItemStatus({
+  ShoppingListRecord? _findList({
     required String householdId,
     required String listId,
-    required String itemId,
-    required ShoppingListItemStatus status,
-    String? substituteIngredientId,
-    double? substituteQuantity,
-    UnitId? substituteUnit,
-  }) async {}
-
-  @override
-  Future<void> updateListStatus({
-    required String householdId,
-    required String listId,
-    required ShoppingListStatus status,
-  }) async {}
-
-  @override
-  Future<void> applyShopNowPurchasesToScheduledLists({
-    required String householdId,
-    required ShoppingListRecord shopNowList,
-  }) async {}
-
-  @override
-  Future<void> deleteList({
-    required String householdId,
-    required String listId,
-  }) async {}
-
-  ShoppingListRecord? _findList(String listId) {
+  }) {
     for (final list in upserted) {
-      if (list.id == listId) return list;
+      if (list.householdId == householdId && list.id == listId) return list;
     }
     return null;
   }
+}
+
+class _FakeShoppingCommandRepository
+    implements ShoppingAllocationCommandRepository {
+  _FakeShoppingCommandRepository(this.shopping);
+
+  final _FakeShoppingRepository shopping;
+
+  @override
+  Future<ShoppingCommandResult> createAndConsumeAllocation(
+    ConsumeShoppingAllocationIntent command,
+  ) async {
+    final intent = command.intent;
+    final (listId, type, shoppingDate) = switch (intent) {
+      ScheduledShoppingAllocationIntent() => (
+        ShoppingListRecord.weeklyOccurrenceListId(intent.occurrenceDate),
+        ShoppingListType.scheduled,
+        intent.occurrenceDate,
+      ),
+      SuggestedShoppingAllocationIntent() => (
+        'suggested_${intent.originId}',
+        ShoppingListType.suggested,
+        intent.startDate,
+      ),
+      ShopNowShoppingAllocationIntent() => (
+        'shop_now_${intent.startDate.toIso8601String()}',
+        ShoppingListType.shopNow,
+        intent.startDate,
+      ),
+      EmergencyShoppingAllocationIntent() => (
+        'emergency_${intent.startDate.toIso8601String()}',
+        ShoppingListType.emergency,
+        intent.startDate,
+      ),
+    };
+    final originId = switch (intent) {
+      ScheduledShoppingAllocationIntent() => intent.scheduleKey,
+      SuggestedShoppingAllocationIntent() => intent.originId,
+      ShopNowShoppingAllocationIntent() => null,
+      EmergencyShoppingAllocationIntent() => null,
+    };
+    shopping.store(
+      ShoppingListRecord(
+        id: listId,
+        householdId: intent.householdId,
+        type: type,
+        shoppingDate: shoppingDate,
+        generatedForRangeStart: intent.startDate,
+        generatedForRangeEnd: intent.endDate,
+        status: ShoppingListStatus.pending,
+        originId: originId,
+        createdAt: intent.startDate,
+        updatedAt: intent.startDate,
+        items: [
+          ShoppingListItemRecord(
+            id: 'server-item-$listId',
+            shoppingListId: listId,
+            ingredientId: 'server-ingredient',
+            quantityNeeded: 1,
+            unit: UnitId.piece,
+            status: ShoppingListItemStatus.unchecked,
+            sourceMealLinks: const [],
+          ),
+        ],
+      ),
+    );
+    return ShoppingCommandResult(
+      listId: listId,
+      status: ShoppingCommandStatus.pending,
+      alreadyApplied: false,
+      revision: 0,
+    );
+  }
+
+  @override
+  Future<ShoppingCommandResult> upsertList(
+    ShoppingListUpsertCommand command,
+  ) async {
+    final existing = shopping._findList(
+      householdId: command.householdId,
+      listId: command.listId,
+    );
+    final nextRevision = switch ((existing, command.expectedRevision)) {
+      (null, null) => 0,
+      (final list?, final expected?) when list.revision == expected =>
+        expected + 1,
+      _ => throw const ShoppingCommandFailure(
+        ShoppingCommandFailureKind.conflict,
+      ),
+    };
+    final stored = _recordWithRevision(command.list, nextRevision);
+    shopping.store(stored);
+    return ShoppingCommandResult(
+      listId: command.listId,
+      status: _shoppingCommandStatus(stored.status),
+      alreadyApplied: false,
+      revision: nextRevision,
+    );
+  }
+
+  @override
+  Future<ShoppingCommandResult> mutateItem(
+    ShoppingListItemMutationCommand command,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<ShoppingCommandResult> completeList(ShoppingCommandRequest request) =>
+      throw UnimplementedError();
+
+  @override
+  Future<ShoppingCommandResult> deleteList(ShoppingCommandRequest request) =>
+      throw UnimplementedError();
+}
+
+ShoppingCommandStatus _shoppingCommandStatus(ShoppingListStatus status) =>
+    switch (status) {
+      ShoppingListStatus.pending => ShoppingCommandStatus.pending,
+      ShoppingListStatus.cancelled => ShoppingCommandStatus.cancelled,
+      ShoppingListStatus.completed => ShoppingCommandStatus.completed,
+    };
+
+ShoppingListRecord _recordWithRevision(ShoppingListRecord list, int revision) =>
+    ShoppingListRecord(
+      id: list.id,
+      householdId: list.householdId,
+      type: list.type,
+      shoppingDate: list.shoppingDate,
+      generatedForRangeStart: list.generatedForRangeStart,
+      generatedForRangeEnd: list.generatedForRangeEnd,
+      status: list.status,
+      originId: list.originId,
+      completionId: list.completionId,
+      completedAt: list.completedAt,
+      completedByUserId: list.completedByUserId,
+      schemaVersion: list.schemaVersion,
+      revision: revision,
+      createdAt: list.createdAt,
+      updatedAt: list.updatedAt,
+      items: list.items,
+    );
+
+class _FakeCommandIdGenerator implements IdGenerator {
+  var _next = 0;
+
+  @override
+  String newId() => 'shopping-command-${++_next}';
 }
 
 class _FakeMenuSetRepository implements MenuSetRepository {
@@ -371,6 +536,14 @@ const _memberHousehold = ActiveHouseholdContext(
   hasPremium: true,
 );
 
+const _cookHousehold = ActiveHouseholdContext(
+  id: 'solo-household',
+  name: 'Test kitchen',
+  role: HouseholdRole.cook,
+  isJoint: true,
+  hasPremium: true,
+);
+
 MenuSet _menuSet() {
   return const MenuSet(
     id: 'set-1',
@@ -398,6 +571,127 @@ MenuSet _menuSet() {
 }
 
 void main() {
+  test('Admin 21-day Saturday apply creates three deterministic lists and '
+      'preserves history', () async {
+    final completed = ShoppingListRecord(
+      id: 'scheduled_weekly_20260711',
+      householdId: 'solo-household',
+      type: ShoppingListType.scheduled,
+      shoppingDate: DateTime(2026, 7, 11),
+      generatedForRangeStart: DateTime(2026, 7, 5),
+      generatedForRangeEnd: DateTime(2026, 7, 11),
+      status: ShoppingListStatus.completed,
+      createdAt: DateTime(2026, 7, 11, 8),
+      updatedAt: DateTime(2026, 7, 11, 20),
+      items: const [],
+    );
+    final calendar = _FakeCalendarRepository();
+    final shopping = _FakeShoppingRepository([completed]);
+    final schedule = ShoppingSchedule(
+      householdId: 'solo-household',
+      cadence: ShoppingScheduleCadence.weekly,
+      isoWeekday: DateTime.saturday,
+      effectiveFrom: DateTime(2026, 7, 6),
+      isActive: true,
+      createdAt: DateTime(2026, 7, 6),
+      updatedAt: DateTime(2026, 7, 6),
+      updatedByUserId: 'user-1',
+    );
+    final controller = MenuSetApplyPersistenceController(
+      calendarRepository: calendar,
+      shoppingRepository: shopping,
+      writeCoordinator: ShoppingWriteCoordinator(
+        repository: shopping.commands,
+        householdId: 'solo-household',
+        idGenerator: _FakeCommandIdGenerator(),
+      ),
+      recipeRepository: _FakeRecipeRepository(),
+      pantryRepository: _FakePantryRepository(),
+      shoppingScheduleRepository: _FakeShoppingScheduleRepository(schedule),
+      householdId: 'solo-household',
+      household: _activeHousehold,
+      idGenerator: FakeIdGenerator([
+        for (var index = 0; index < 6; index++) 'meal-$index',
+      ]),
+      clock: FakeClock(DateTime(2026, 7, 6, 9)),
+    );
+
+    await controller.applyPersistedMenuSet(
+      menuSet: _menuSet(),
+      startDate: DateTime(2026, 7, 5),
+      endDate: DateTime(2026, 7, 25),
+      mode: MenuSetApplyMode.fillEmpty,
+    );
+    await controller.applyPersistedMenuSet(
+      menuSet: _menuSet(),
+      startDate: DateTime(2026, 7, 5),
+      endDate: DateTime(2026, 7, 25),
+      mode: MenuSetApplyMode.fillEmpty,
+    );
+
+    expect(shopping.upserted.map((list) => list.id).toSet(), {
+      'scheduled_weekly_20260711',
+      'scheduled_weekly_20260718',
+      'scheduled_weekly_20260725',
+    });
+    expect(shopping.upserted, hasLength(3));
+    final preserved = shopping.upserted.singleWhere(
+      (list) => list.id == completed.id,
+    );
+    expect(preserved.status, ShoppingListStatus.completed);
+    expect(preserved.updatedAt, completed.updatedAt);
+    expect(preserved.items, same(completed.items));
+  });
+
+  test(
+    'Cook menu-set apply persists calendar with zero Shopping writes',
+    () async {
+      final calendar = _FakeCalendarRepository();
+      final shopping = _FakeShoppingRepository();
+      final controller = MenuSetApplyPersistenceController(
+        calendarRepository: calendar,
+        shoppingRepository: shopping,
+        writeCoordinator: ShoppingWriteCoordinator(
+          repository: shopping.commands,
+          householdId: 'solo-household',
+          idGenerator: _FakeCommandIdGenerator(),
+        ),
+        recipeRepository: _FakeRecipeRepository(),
+        pantryRepository: _FakePantryRepository(),
+        shoppingScheduleRepository: _FakeShoppingScheduleRepository(
+          ShoppingSchedule(
+            householdId: 'solo-household',
+            cadence: ShoppingScheduleCadence.weekly,
+            isoWeekday: DateTime.saturday,
+            effectiveFrom: DateTime(2026, 7, 6),
+            isActive: true,
+            createdAt: DateTime(2026, 7, 6),
+            updatedAt: DateTime(2026, 7, 6),
+            updatedByUserId: 'user-1',
+          ),
+        ),
+        householdId: 'solo-household',
+        household: _cookHousehold,
+        idGenerator: FakeIdGenerator(['cook-meal-1']),
+        clock: FakeClock(DateTime(2026, 7, 6, 9)),
+      );
+
+      await expectLater(
+        controller.applyPersistedMenuSet(
+          menuSet: _menuSet(),
+          startDate: DateTime(2026, 7, 6),
+          endDate: DateTime(2026, 7, 12),
+          mode: MenuSetApplyMode.fillEmpty,
+        ),
+        completes,
+      );
+
+      expect(calendar.upserted, hasLength(1));
+      expect(calendar.upserted.single.recipeId, 'braise');
+      expect(shopping.upserted, isEmpty);
+    },
+  );
+
   testWidgets('MenuSetsScreen shows the premium deck and save CTA', (
     tester,
   ) async {
@@ -456,12 +750,23 @@ void main() {
       final menuSets = _FakeMenuSetRepository()..upserted.add(_menuSet());
       final calendarRepo = _FakeCalendarRepository();
       final shoppingRepo = _FakeShoppingRepository();
+      final schedule = ShoppingSchedule(
+        householdId: 'solo-household',
+        cadence: ShoppingScheduleCadence.weekly,
+        isoWeekday: DateTime.sunday,
+        effectiveFrom: DateTime(2026, 7, 6),
+        isActive: true,
+        createdAt: DateTime(2026, 7, 6),
+        updatedAt: DateTime(2026, 7, 6),
+        updatedByUserId: 'user-1',
+      );
       await tester.pumpWidget(
         await _wrap(
           const MenuSetsScreen(),
           menuSetRepository: menuSets,
           calendarRepository: calendarRepo,
           shoppingRepository: shoppingRepo,
+          shoppingScheduleRepository: _FakeShoppingScheduleRepository(schedule),
         ),
       );
       await tester.pumpAndSettle();
@@ -471,7 +776,12 @@ void main() {
 
       expect(calendarRepo.upserted, isNotEmpty);
       expect(calendarRepo.upserted.first.recipeId, 'braise');
-      expect(shoppingRepo.upserted.single.type, ShoppingListType.scheduled);
+      expect(
+        shoppingRepo.upserted.where(
+          (list) => list.type == ShoppingListType.scheduled,
+        ),
+        hasLength(4),
+      );
       expect(
         find.text('Applied Persisted week to the calendar.'),
         findsOneWidget,
@@ -580,6 +890,16 @@ void main() {
     final calendarRepo = _FakeCalendarRepository();
     final shoppingRepo = _FakeShoppingRepository();
     final menuSets = _FakeMenuSetRepository()..upserted.add(_menuSet());
+    final schedule = ShoppingSchedule(
+      householdId: 'solo-household',
+      cadence: ShoppingScheduleCadence.weekly,
+      isoWeekday: DateTime.sunday,
+      effectiveFrom: DateTime(2026, 7, 6),
+      isActive: true,
+      createdAt: DateTime(2026, 7, 6),
+      updatedAt: DateTime(2026, 7, 6),
+      updatedByUserId: 'user-1',
+    );
     addTearDown(menuSets.dispose);
 
     await tester.pumpWidget(
@@ -588,6 +908,7 @@ void main() {
         menuSetRepository: menuSets,
         calendarRepository: calendarRepo,
         shoppingRepository: shoppingRepo,
+        shoppingScheduleRepository: _FakeShoppingScheduleRepository(schedule),
       ),
     );
     await tester.pumpAndSettle();
@@ -612,8 +933,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(calendarRepo.upserted, isNotEmpty);
-    expect(shoppingRepo.upserted.single.type, ShoppingListType.scheduled);
-    expect(shoppingRepo.upserted.single.items, isNotEmpty);
+    expect(
+      shoppingRepo.upserted.where(
+        (list) => list.type == ShoppingListType.scheduled,
+      ),
+      hasLength(4),
+    );
+    expect(shoppingRepo.upserted.first.items, isNotEmpty);
   });
 
   testWidgets('MenuSetEditorScreen persists save add and remove edits', (

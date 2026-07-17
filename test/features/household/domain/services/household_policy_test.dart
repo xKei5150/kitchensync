@@ -150,6 +150,37 @@ void main() {
       );
     });
 
+    test('only joint admins can manage shopping schedules', () {
+      expect(
+        policy.roleCan(
+          HouseholdRole.admin,
+          HouseholdCapability.manageShoppingSchedules,
+        ),
+        isTrue,
+      );
+      for (final role in [
+        HouseholdRole.cook,
+        HouseholdRole.shopper,
+        HouseholdRole.member,
+      ]) {
+        expect(
+          policy.roleCan(role, HouseholdCapability.manageShoppingSchedules),
+          isFalse,
+        );
+      }
+    });
+
+    test('solo members can manage shopping schedules', () {
+      expect(
+        policy.roleCan(
+          HouseholdRole.member,
+          HouseholdCapability.manageShoppingSchedules,
+          isSoloHousehold: true,
+        ),
+        isTrue,
+      );
+    });
+
     test('member is view-only', () {
       expect(
         policy.roleCan(HouseholdRole.member, HouseholdCapability.viewPantry),

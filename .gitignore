@@ -69,6 +69,7 @@ coverage/
 tools/seed_builder/food.csv
 
 # Node tooling dependencies (installed, not committed)
+/node_modules/
 tools/seed_uploader/node_modules/
 
 # Local agent / session tooling state (not project source)

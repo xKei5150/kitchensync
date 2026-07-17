@@ -2,17 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
-import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 
-/// Screen 10 · Waste & insights — wasting less, made to feel good.
-///
-/// A data-editorial spread where the charts *are* the typography: money saved
-/// as the headline, waste as a calm weekly almanac. The savings hero is
-/// presentational sample data; the weekly almanac is derived from the live
-/// waste-history stream.
+/// Screen 10 · Waste & insights, derived entirely from waste history.
 class WasteLogScreen extends ConsumerWidget {
   const WasteLogScreen({super.key});
 
@@ -21,7 +16,14 @@ class WasteLogScreen extends ConsumerWidget {
     final ks = context.ksColors;
     final wasteAsync = ref.watch(wasteHistoryStreamProvider);
     final events = wasteAsync.asData?.value ?? const <WasteEvent>[];
-    final week = _WeekWaste.fromEvents(events);
+    final now = ref.watch(clockProvider).now();
+    final week = _WeekWaste.fromEvents(events, now: now);
+    final monthCount = events
+        .where(
+          (event) =>
+              event.date.year == now.year && event.date.month == now.month,
+        )
+        .length;
 
     return Scaffold(
       backgroundColor: ks.surfaceBase,
@@ -43,7 +45,7 @@ class WasteLogScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: KsTokens.space12),
                 Text(
-                  'The Ledger · June'.toUpperCase(),
+                  'The Ledger · ${_months[now.month - 1]}'.toUpperCase(),
                   style: KsTokens.labelSmall.copyWith(
                     color: ks.brandPrimary,
                     fontWeight: FontWeight.w600,
@@ -54,11 +56,9 @@ class WasteLogScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: KsTokens.space16),
-            const _SavedHero(),
+            _WasteSummaryHero(eventCount: monthCount),
             Divider(height: KsTokens.space32, thickness: 1, color: ks.hairline),
             _WasteAlmanac(week: week),
-            const SizedBox(height: KsTokens.space16),
-            const _SavedFromBinBanner(),
           ],
         ),
       ),
@@ -66,33 +66,31 @@ class WasteLogScreen extends ConsumerWidget {
   }
 }
 
-/// The hero numeral — money saved this month — over a climbing-bars motif.
-class _SavedHero extends ConsumerWidget {
-  const _SavedHero();
+class _WasteSummaryHero extends StatelessWidget {
+  const _WasteSummaryHero({required this.eventCount});
 
-  /// Sample savings figure for the hero; formatted in the active currency.
-  static const _savedThisMonth = 42.0;
+  final int eventCount;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final ks = context.ksColors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currency = ref.watch(localeFormattersProvider).currency;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          currency.format(_savedThisMonth, decimals: false),
+          '$eventCount',
           style: KsTokens.displayLarge.copyWith(
             color: ks.textPrimary,
             fontSize: 64,
             height: 0.86,
-            letterSpacing: -2,
+            letterSpacing: 0,
           ),
         ),
         const SizedBox(height: KsTokens.space6),
         Text(
-          'saved this month by shopping what you had',
+          eventCount == 1
+              ? 'waste event recorded this month'
+              : 'waste events recorded this month',
           style: KsTokens.displaySmall.copyWith(
             color: ks.textSecondary,
             fontStyle: FontStyle.italic,
@@ -100,56 +98,7 @@ class _SavedHero extends ConsumerWidget {
             fontSize: 16,
           ),
         ),
-        const SizedBox(height: KsTokens.space16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            for (var i = 0; i < 4; i++) ...[
-              _ClimbBar(
-                height: const [16.0, 24.0, 32.0, 44.0][i],
-                color: i == 3
-                    ? (isDark ? KsTokens.brandAccent : ks.brandPrimary)
-                    : ks.brandPrimary.withValues(
-                        alpha: const [0.30, 0.45, 0.62, 1.0][i],
-                      ),
-              ),
-              const SizedBox(width: 5),
-            ],
-            const SizedBox(width: 1),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '4 months climbing',
-                style: KsTokens.displaySmall.copyWith(
-                  color: ks.textTertiary,
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w400,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-          ],
-        ),
       ],
-    );
-  }
-}
-
-class _ClimbBar extends StatelessWidget {
-  const _ClimbBar({required this.height, required this.color});
-
-  final double height;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 13,
-      height: height,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(3),
-      ),
     );
   }
 }
@@ -201,7 +150,7 @@ class _WasteAlmanac extends StatelessWidget {
                     ),
                   ),
                   TextSpan(
-                    text: week.total == 1 ? 'item' : 'items',
+                    text: week.total == 1 ? 'event' : 'events',
                     style: KsTokens.labelSmall.copyWith(
                       color: ks.textTertiary,
                       fontWeight: FontWeight.w600,
@@ -214,7 +163,7 @@ class _WasteAlmanac extends StatelessWidget {
         ),
         const SizedBox(height: KsTokens.space12),
         SizedBox(
-          height: 54,
+          height: 58,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -250,8 +199,9 @@ class _WasteAlmanac extends StatelessWidget {
         const SizedBox(height: KsTokens.space12),
         Text(
           week.total == 0
-              ? "Nothing's slipped past this week — the pantry's holding."
-              : 'A couple slipped past — keep an eye on the soft greens.',
+              ? 'No waste events recorded in the last seven days.'
+              : '${week.total} waste ${week.total == 1 ? 'event' : 'events'} '
+                    'recorded in the last seven days.',
           style: KsTokens.displaySmall.copyWith(
             color: ks.textSecondary,
             fontStyle: FontStyle.italic,
@@ -265,51 +215,16 @@ class _WasteAlmanac extends StatelessWidget {
   }
 }
 
-/// The reassuring brand-tinted close — what was saved from the bin.
-class _SavedFromBinBanner extends StatelessWidget {
-  const _SavedFromBinBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    final ks = context.ksColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-      decoration: BoxDecoration(
-        color: Color.alphaBlend(
-          ks.brandPrimary.withValues(alpha: 0.08),
-          ks.surfaceRaised,
-        ),
-        borderRadius: BorderRadius.circular(KsTokens.radius12),
-        border: Border.all(color: ks.brandPrimary.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.check_rounded, size: 18, color: ks.brandPrimary),
-          const SizedBox(width: KsTokens.space10),
-          Expanded(
-            child: Text(
-              'Three things saved from the bin this week.',
-              style: KsTokens.titleSmall.copyWith(
-                color: ks.textPrimary,
-                fontSize: 13,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// The week's waste, bucketed by weekday for the almanac. Counts only events
 /// from the trailing seven days so the strip reads as "this week".
 @immutable
 class _WeekWaste {
   const _WeekWaste({required this.binned, required this.total});
 
-  factory _WeekWaste.fromEvents(List<WasteEvent> events) {
-    final now = DateTime.now();
+  factory _WeekWaste.fromEvents(
+    List<WasteEvent> events, {
+    required DateTime now,
+  }) {
     final cutoff = now.subtract(const Duration(days: 7));
     final binned = List<bool>.filled(7, false);
     var total = 0;
@@ -325,3 +240,18 @@ class _WeekWaste {
   final List<bool> binned;
   final int total;
 }
+
+const _months = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];

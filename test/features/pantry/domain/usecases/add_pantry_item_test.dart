@@ -10,16 +10,22 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/i
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/add_pantry_item.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockPantry extends Mock implements PantryRepository {}
+class _MockPantry extends Mock
+    implements PantryRepository, InventoryQuantityRepository {}
 
 class _MockIngredients extends Mock implements IngredientRepository {}
 
 class _FakePantryItem extends Fake implements PantryItem {}
 
-Ingredient _ing({bool isNonFood = false, List<UnitId>? allowed}) {
+Ingredient _ing({
+  bool isNonFood = false,
+  List<UnitId>? allowed,
+  int? shelfLifeDays,
+}) {
   final units = allowed ?? [UnitId.piece, UnitId.g];
   return Ingredient(
     id: 'onion',
@@ -29,6 +35,7 @@ Ingredient _ing({bool isNonFood = false, List<UnitId>? allowed}) {
     defaultUnit: UnitId.piece,
     allowedUnits: units,
     isNonFood: isNonFood,
+    defaultShelfLifeDays: shelfLifeDays,
     scope: IngredientScope.global,
     createdAt: DateTime.utc(2026),
     updatedAt: DateTime.utc(2026),
@@ -55,6 +62,7 @@ void main() {
     registerFallbackValue(_FakePantryItem());
     registerFallbackValue(UnitId.piece);
     registerFallbackValue(PantrySection.food);
+    registerFallbackValue(DateTime.utc(2026));
   });
 
   late _MockPantry pantry;
@@ -80,13 +88,33 @@ void main() {
     ).thenAnswer((_) async => null);
     when(() => pantry.add(any())).thenAnswer((_) async {});
     when(
-      () => pantry.setQuantity(any(), any(), any()),
-    ).thenAnswer((_) async {});
+      () => pantry.restockAtomic(
+        householdId: any(named: 'householdId'),
+        pantryItemId: any(named: 'pantryItemId'),
+        quantityToAdd: any(named: 'quantityToAdd'),
+        eventId: any(named: 'eventId'),
+        occurredAt: any(named: 'occurredAt'),
+        incomingExpiryDate: any(named: 'incomingExpiryDate'),
+      ),
+    ).thenAnswer((invocation) async {
+      final existing = _item();
+      final added = invocation.namedArguments[#quantityToAdd] as double;
+      final occurredAt = invocation.namedArguments[#occurredAt] as DateTime;
+      final expiry =
+          invocation.namedArguments[#incomingExpiryDate] as DateTime?;
+      return existing.copyWith(
+        quantity: existing.quantity + added,
+        lastPurchaseDate: occurredAt,
+        expiryDate: expiry,
+        updatedAt: occurredAt,
+      );
+    });
   });
 
   AddPantryItem makeUc() => AddPantryItem(
     pantry,
     ingredients,
+    inventoryQuantityRepository: pantry,
     idGenerator: FakeIdGenerator(['new-id']),
     clock: clock,
   );
@@ -106,6 +134,47 @@ void main() {
     expect(item.id, 'new-id');
     expect(item.quantity, 2);
     verify(() => pantry.add(any())).called(1);
+  });
+
+  test('derives expiry from ingredient shelf life', () async {
+    when(
+      () => ingredients.getById('onion', householdId: 'h1'),
+    ).thenAnswer((_) async => _ing(shelfLifeDays: 10));
+
+    final result = await makeUc().call(
+      const AddPantryItemParams(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        quantity: 2,
+        unit: UnitId.piece,
+        section: PantrySection.food,
+      ),
+    );
+
+    expect(
+      (result as Success<PantryItem>).value.expiryDate,
+      DateTime.utc(2026, 6, 11),
+    );
+  });
+
+  test('preserves an explicit expiry date', () async {
+    when(
+      () => ingredients.getById('onion', householdId: 'h1'),
+    ).thenAnswer((_) async => _ing(shelfLifeDays: 10));
+    final explicit = DateTime.utc(2026, 6, 3);
+
+    final result = await makeUc().call(
+      AddPantryItemParams(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        quantity: 2,
+        unit: UnitId.piece,
+        section: PantrySection.food,
+        expiryDate: explicit,
+      ),
+    );
+
+    expect((result as Success<PantryItem>).value.expiryDate, explicit);
   });
 
   test('quantity <= 0 returns ValidationFailure', () async {
@@ -204,7 +273,7 @@ void main() {
   );
 
   test(
-    'existing same-unit+section item merges via setQuantity, no add called',
+    'existing same-unit+section item restocks atomically with fresh metadata',
     () async {
       when(
         () => pantry.findByIngredientUnit(
@@ -219,6 +288,7 @@ void main() {
           await AddPantryItem(
             pantry,
             ingredients,
+            inventoryQuantityRepository: pantry,
             idGenerator: FakeIdGenerator(['new-id']),
             clock: clock,
           ).call(
@@ -231,12 +301,24 @@ void main() {
             ),
           );
       expect(result, isA<Success<PantryItem>>());
-      verify(() => pantry.setQuantity('h1', 'p1', 5)).called(1);
+      final updated = (result as Success<PantryItem>).value;
+      expect(updated.quantity, 5);
+      expect(updated.lastPurchaseDate, clock.now());
+      verify(
+        () => pantry.restockAtomic(
+          householdId: 'h1',
+          pantryItemId: 'p1',
+          quantityToAdd: 2,
+          eventId: 'new-id',
+          occurredAt: clock.now(),
+          incomingExpiryDate: null,
+        ),
+      ).called(1);
       verifyNever(() => pantry.add(any()));
     },
   );
 
-  test('existing same local-unit item merges via setQuantity', () async {
+  test('existing same local-unit item restocks atomically', () async {
     final tin = UnitId('tin');
     when(
       () => ingredients.getById('onion', householdId: 'h1'),
@@ -261,7 +343,16 @@ void main() {
     );
 
     expect(result, isA<Success<PantryItem>>());
-    verify(() => pantry.setQuantity('h1', 'p1', 5)).called(1);
+    verify(
+      () => pantry.restockAtomic(
+        householdId: 'h1',
+        pantryItemId: 'p1',
+        quantityToAdd: 2,
+        eventId: 'new-id',
+        occurredAt: clock.now(),
+        incomingExpiryDate: null,
+      ),
+    ).called(1);
     verifyNever(() => pantry.add(any()));
   });
 
@@ -293,7 +384,31 @@ void main() {
     );
 
     expect(result, isA<Success<PantryItem>>());
-    verifyNever(() => pantry.setQuantity(any(), any(), any()));
+    verifyNever(
+      () => pantry.restockAtomic(
+        householdId: any(named: 'householdId'),
+        pantryItemId: any(named: 'pantryItemId'),
+        quantityToAdd: any(named: 'quantityToAdd'),
+        eventId: any(named: 'eventId'),
+        occurredAt: any(named: 'occurredAt'),
+        incomingExpiryDate: any(named: 'incomingExpiryDate'),
+      ),
+    );
     verify(() => pantry.add(any())).called(1);
+  });
+
+  test('normal add flow rejects the Leftover section', () async {
+    final result = await makeUc().call(
+      const AddPantryItemParams(
+        householdId: 'h1',
+        ingredientId: 'onion',
+        quantity: 2,
+        unit: UnitId.piece,
+        section: PantrySection.leftover,
+      ),
+    );
+
+    expect(result, isA<ResultFailure<PantryItem>>());
+    verifyNever(() => pantry.add(any()));
   });
 }

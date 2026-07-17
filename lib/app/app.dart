@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/app/router.dart';
 import 'package:kitchensync/app/theme.dart';
@@ -18,9 +20,28 @@ class KitchenSyncApp extends ConsumerWidget {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: themeMode,
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      supportedLocales: const [Locale('en'), Locale('zh')],
       routerConfig: router,
-      builder: (context, child) =>
-          ConnectivityBanner(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final colors = Theme.of(context).colorScheme;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: isDark
+                ? Brightness.light
+                : Brightness.dark,
+            statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+            systemNavigationBarColor: colors.surface,
+            systemNavigationBarIconBrightness: isDark
+                ? Brightness.light
+                : Brightness.dark,
+            systemNavigationBarDividerColor: colors.surface,
+          ),
+          child: ConnectivityBanner(child: child ?? const SizedBox.shrink()),
+        );
+      },
     );
   }
 }

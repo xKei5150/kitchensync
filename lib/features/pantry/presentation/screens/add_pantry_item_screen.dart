@@ -230,7 +230,9 @@ class _AddPantryItemScreenState extends ConsumerState<AddPantryItemScreen> {
                     spacing: KsTokens.space8,
                     runSpacing: KsTokens.space8,
                     children: [
-                      for (final section in PantrySection.values)
+                      for (final section in PantrySection.values.where(
+                        (value) => value != PantrySection.leftover,
+                      ))
                         KsSelectChip(
                           label: _labelFor(section),
                           color: section.color,

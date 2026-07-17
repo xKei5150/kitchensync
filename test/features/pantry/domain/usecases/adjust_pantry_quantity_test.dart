@@ -1,14 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kitchensync/core/errors/failure.dart';
+import 'package:kitchensync/core/utils/clock.dart';
+import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/adjust_pantry_quantity.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockRepo extends Mock implements PantryRepository {}
+class _MockRepo extends Mock implements InventoryQuantityRepository {}
 
 PantryItem _item(double qty) => PantryItem(
   id: 'p1',
@@ -23,19 +24,33 @@ PantryItem _item(double qty) => PantryItem(
 
 void main() {
   late _MockRepo repo;
+  final clock = FakeClock(DateTime.utc(2026, 7, 17));
+
+  setUpAll(() {
+    registerFallbackValue(QuantityDecreaseAudit.consumption);
+  });
 
   setUp(() {
     repo = _MockRepo();
-    when(() => repo.setQuantity(any(), any(), any())).thenAnswer((_) async {});
+    when(
+      () => repo.adjustQuantityAtomic(
+        householdId: any(named: 'householdId'),
+        pantryItemId: any(named: 'pantryItemId'),
+        delta: any(named: 'delta'),
+        eventId: any(named: 'eventId'),
+        occurredAt: any(named: 'occurredAt'),
+        decreaseAudit: any(named: 'decreaseAudit'),
+      ),
+    ).thenAnswer((_) async => _item(2));
   });
 
-  AdjustPantryQuantity makeUc() => AdjustPantryQuantity(repo);
+  AdjustPantryQuantity makeUc() => AdjustPantryQuantity(
+    repo,
+    idGenerator: FakeIdGenerator(['event-1']),
+    clock: clock,
+  );
 
-  test('delta -1 from qty 3 calls setQuantity with 2', () async {
-    when(
-      () => repo.watchById('h1', 'p1'),
-    ).thenAnswer((_) => Stream.value(_item(3)));
-
+  test('negative delta is committed atomically as consumption', () async {
     final result = await makeUc().call(
       const AdjustPantryQuantityParams(
         householdId: 'h1',
@@ -44,43 +59,40 @@ void main() {
       ),
     );
     expect(result, isA<Success<void>>());
-    verify(() => repo.setQuantity('h1', 'p1', 2)).called(1);
+    verify(
+      () => repo.adjustQuantityAtomic(
+        householdId: 'h1',
+        pantryItemId: 'p1',
+        delta: -1,
+        eventId: 'event-1',
+        occurredAt: clock.now(),
+        decreaseAudit: QuantityDecreaseAudit.consumption,
+      ),
+    ).called(1);
   });
 
   test(
-    'delta -3 from qty 3 calls setQuantity with 0 (zero-retention)',
+    'shopper correction keeps a decrease out of consumption history',
     () async {
-      when(
-        () => repo.watchById('h1', 'p1'),
-      ).thenAnswer((_) => Stream.value(_item(3)));
-
       final result = await makeUc().call(
         const AdjustPantryQuantityParams(
           householdId: 'h1',
           itemId: 'p1',
-          delta: -3,
+          delta: -1,
+          decreaseAudit: QuantityDecreaseAudit.correction,
         ),
       );
       expect(result, isA<Success<void>>());
-      verify(() => repo.setQuantity('h1', 'p1', 0)).called(1);
+      verify(
+        () => repo.adjustQuantityAtomic(
+          householdId: 'h1',
+          pantryItemId: 'p1',
+          delta: -1,
+          eventId: 'event-1',
+          occurredAt: clock.now(),
+          decreaseAudit: QuantityDecreaseAudit.correction,
+        ),
+      ).called(1);
     },
   );
-
-  test('delta -10 from qty 3 returns ValidationFailure', () async {
-    when(
-      () => repo.watchById('h1', 'p1'),
-    ).thenAnswer((_) => Stream.value(_item(3)));
-
-    final result = await makeUc().call(
-      const AdjustPantryQuantityParams(
-        householdId: 'h1',
-        itemId: 'p1',
-        delta: -10,
-      ),
-    );
-    expect(result, isA<ResultFailure<void>>());
-    final f = (result as ResultFailure<void>).failure;
-    expect(f, isA<ValidationFailure>());
-    expect((f as ValidationFailure).field, 'quantity');
-  });
 }

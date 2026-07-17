@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 
+part 'ks_nav_item.dart';
+
 /// One destination in the [KsBottomNav].
 ///
 /// [activeIcon] is the filled twin shown when the destination is selected;
@@ -121,16 +123,26 @@ class KsHeaderAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
-    final button = Material(
-      color: ks.neutralSubtle,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Icon(icon, size: size * 0.53, color: ks.textSecondary),
+    final button = SizedBox(
+      width: 44,
+      height: 44,
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Center(
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: ks.neutralSubtle,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: size * 0.53, color: ks.textSecondary),
+            ),
+          ),
         ),
       ),
     );
@@ -222,60 +234,6 @@ class KsBottomNav extends StatelessWidget {
               onTap: () => onSelect(i),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.destination,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final KsNavDestination destination;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ks = context.ksColors;
-    final color = selected ? ks.brandPrimary : ks.textTertiary;
-    final icon = selected
-        ? (destination.activeIcon ?? destination.icon)
-        : destination.icon;
-    return Expanded(
-      child: Semantics(
-        button: true,
-        selected: selected,
-        label: destination.label,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(KsTokens.radius12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: KsTokens.space4),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 20, color: color),
-                const SizedBox(height: KsTokens.space4),
-                Text(
-                  destination.label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: KsTokens.labelSmall.copyWith(
-                    color: color,
-                    fontSize: 9,
-                    letterSpacing: 0,
-                    height: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

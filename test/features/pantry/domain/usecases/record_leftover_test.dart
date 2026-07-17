@@ -83,4 +83,20 @@ void main() {
     final f = (result as ResultFailure<PantryItem>).failure;
     expect(f, isA<ValidationFailure>());
   });
+
+  test('missing related recipe is rejected', () async {
+    final result = await makeUc().call(
+      const RecordLeftoverParams(
+        householdId: 'h1',
+        recipeId: ' ',
+        ingredientId: 'onion',
+        servings: 2,
+        quantity: 1,
+        unit: UnitId.cup,
+      ),
+    );
+
+    expect(result, isA<ResultFailure<PantryItem>>());
+    verifyNever(() => repo.add(any()));
+  });
 }

@@ -7,17 +7,23 @@ import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/data/datasources/pantry_image_storage.dart';
+import 'package:kitchensync/features/pantry/data/datasources/consumption_history_remote_data_source.dart';
 import 'package:kitchensync/features/pantry/data/datasources/pantry_remote_data_source.dart';
 import 'package:kitchensync/features/pantry/data/datasources/purchase_history_remote_data_source.dart';
 import 'package:kitchensync/features/pantry/data/datasources/waste_remote_data_source.dart';
 import 'package:kitchensync/features/pantry/data/repositories/pantry_repository_impl.dart';
+import 'package:kitchensync/features/pantry/data/repositories/consumption_history_repository_impl.dart';
 import 'package:kitchensync/features/pantry/data/repositories/purchase_history_repository_impl.dart';
 import 'package:kitchensync/features/pantry/data/repositories/waste_repository_impl.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/inventory_consumption_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/consumption_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
@@ -27,6 +33,7 @@ import 'package:kitchensync/features/pantry/domain/usecases/adjust_pantry_quanti
 import 'package:kitchensync/features/pantry/domain/usecases/delete_pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/mark_as_waste.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/record_leftover.dart';
+import 'package:kitchensync/features/pantry/domain/usecases/record_consumption.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/update_pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/watch_pantry_section.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/watch_waste_history.dart';
@@ -55,6 +62,11 @@ WasteRemoteDataSource wasteRemoteDataSource(Ref ref) =>
 PurchaseHistoryRemoteDataSource purchaseHistoryRemoteDataSource(Ref ref) =>
     PurchaseHistoryRemoteDataSource(ref.watch(firestoreRefsProvider));
 
+@Riverpod(keepAlive: true)
+ConsumptionHistoryRemoteDataSource consumptionHistoryRemoteDataSource(
+  Ref ref,
+) => ConsumptionHistoryRemoteDataSource(ref.watch(firestoreRefsProvider));
+
 // ── Repositories ─────────────────────────────────────────
 
 @Riverpod(keepAlive: true)
@@ -73,19 +85,30 @@ PurchaseHistoryRepository purchaseHistoryRepository(Ref ref) =>
       ref.watch(purchaseHistoryRemoteDataSourceProvider),
     );
 
+@Riverpod(keepAlive: true)
+ConsumptionHistoryRepository consumptionHistoryRepository(Ref ref) =>
+    ConsumptionHistoryRepositoryImpl(
+      ref.watch(consumptionHistoryRemoteDataSourceProvider),
+    );
+
 // ── Use cases ─────────────────────────────────────────────
 
 @riverpod
 AddPantryItem addPantryItem(Ref ref) => AddPantryItem(
   ref.watch(pantryRepositoryProvider),
   ref.watch(ingredientRepositoryProvider),
+  inventoryQuantityRepository:
+      ref.watch(pantryRepositoryProvider) as InventoryQuantityRepository,
   idGenerator: ref.watch(idGeneratorProvider),
   clock: ref.watch(clockProvider),
 );
 
 @riverpod
-AdjustPantryQuantity adjustPantryQuantity(Ref ref) =>
-    AdjustPantryQuantity(ref.watch(pantryRepositoryProvider));
+AdjustPantryQuantity adjustPantryQuantity(Ref ref) => AdjustPantryQuantity(
+  ref.watch(pantryRepositoryProvider) as InventoryQuantityRepository,
+  idGenerator: ref.watch(idGeneratorProvider),
+  clock: ref.watch(clockProvider),
+);
 
 @riverpod
 MarkAsWaste markAsWaste(Ref ref) => MarkAsWaste(
@@ -106,6 +129,13 @@ RecordLeftover recordLeftover(Ref ref) => RecordLeftover(
 );
 
 @riverpod
+RecordConsumption recordConsumption(Ref ref) => RecordConsumption(
+  ref.watch(pantryRepositoryProvider) as InventoryConsumptionRepository,
+  idGenerator: ref.watch(idGeneratorProvider),
+  clock: ref.watch(clockProvider),
+);
+
+@riverpod
 DeletePantryItem deletePantryItem(Ref ref) =>
     DeletePantryItem(ref.watch(pantryRepositoryProvider));
 
@@ -113,6 +143,10 @@ DeletePantryItem deletePantryItem(Ref ref) =>
 UpdatePantryItem updatePantryItem(Ref ref) => UpdatePantryItem(
   ref.watch(pantryRepositoryProvider),
   ref.watch(ingredientRepositoryProvider),
+  inventoryQuantityRepository:
+      ref.watch(pantryRepositoryProvider) as InventoryQuantityRepository,
+  idGenerator: ref.watch(idGeneratorProvider),
+  clock: ref.watch(clockProvider),
 );
 
 @riverpod
@@ -153,6 +187,12 @@ Stream<List<WasteEvent>> wasteHistoryStream(Ref ref) {
 Stream<List<PurchaseRecord>> purchaseHistoryStream(Ref ref) {
   final hid = ref.watch(activeHouseholdIdProvider);
   return ref.watch(purchaseHistoryRepositoryProvider).watchByHousehold(hid);
+}
+
+@riverpod
+Stream<List<ConsumptionEvent>> consumptionHistoryStream(Ref ref) {
+  final hid = ref.watch(activeHouseholdIdProvider);
+  return ref.watch(consumptionHistoryRepositoryProvider).watchByHousehold(hid);
 }
 
 /// Every pantry item across all four sections, combined into one live list.
@@ -205,17 +245,17 @@ List<BulkPantryStatus> bulkPantryStatuses(Ref ref) {
   final items =
       ref.watch(pantryAllItemsStreamProvider).asData?.value ??
       const <PantryItem>[];
-  final waste =
-      ref.watch(wasteHistoryStreamProvider).asData?.value ??
-      const <WasteEvent>[];
+  final usage =
+      ref.watch(consumptionHistoryStreamProvider).asData?.value ??
+      const <ConsumptionEvent>[];
   final purchases =
       ref.watch(purchaseHistoryStreamProvider).asData?.value ??
       const <PurchaseRecord>[];
   return const BulkPredictionEngine().predict(
     pantryItems: items,
-    usageEvents: waste,
+    usageEvents: usage,
     purchaseHistory: purchases,
-    now: DateTime.now(),
+    now: ref.watch(clockProvider).now(),
   );
 }
 

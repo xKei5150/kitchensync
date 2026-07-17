@@ -18,6 +18,8 @@ class IngredientMapper {
         .map((unit) => unit.toJson())
         .toList(),
     'defaultShelfLifeDays': i.defaultShelfLifeDays,
+    'defaultPurchaseIntervalDays': i.defaultPurchaseIntervalDays,
+    'pricePerUnitHint': i.pricePerUnitHint,
     'isBulkCandidate': i.isBulkCandidate,
     'isNonFood': i.isNonFood,
     'imageUrl': i.imageUrl,
@@ -52,6 +54,8 @@ class IngredientMapper {
         .map((e) => _unitDefinitionFromMap(Map<String, dynamic>.from(e as Map)))
         .toList(),
     defaultShelfLifeDays: m['defaultShelfLifeDays'] as int?,
+    defaultPurchaseIntervalDays: m['defaultPurchaseIntervalDays'] as int?,
+    pricePerUnitHint: (m['pricePerUnitHint'] as num?)?.toDouble(),
     isBulkCandidate: (m['isBulkCandidate'] as bool?) ?? false,
     isNonFood: (m['isNonFood'] as bool?) ?? false,
     imageUrl: m['imageUrl'] as String?,

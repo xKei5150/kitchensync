@@ -103,6 +103,30 @@ class DayViewScreen extends ConsumerWidget {
           try {
             await ref.read(cookingLifecycleControllerProvider).markCooked(meal);
           } on MissingMealIngredientsException catch (error) {
+            if (!context.mounted) return;
+            final addMissing = await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('Missing pantry items'),
+                content: Text(
+                  '${error.missingIngredients.length} required '
+                  '${error.missingIngredients.length == 1 ? 'ingredient is' : 'ingredients are'} '
+                  'not available. Add the missing amount to an emergency shopping list?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('Not now'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    icon: const Icon(Icons.add_shopping_cart_rounded),
+                    label: const Text('Add missing items'),
+                  ),
+                ],
+              ),
+            );
+            if (addMissing != true || !context.mounted) return;
             final list = await ref
                 .read(shoppingPlanningControllerProvider)
                 .createEmergencyListFromMissing(

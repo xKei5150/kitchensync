@@ -1,1 +1,59 @@
-{"firestore":{"rules":"firestore.rules","indexes":"firestore.indexes.json"},"storage":{"rules":"storage.rules"},"emulators":{"auth":{"port":9099},"firestore":{"port":8080},"storage":{"port":9199},"ui":{"enabled":true,"port":4000},"singleProjectMode":true},"flutter":{"platforms":{"android":{"default":{"projectId":"kitchensync-dev-da503","appId":"1:733234753301:android:d390bfa8a5323514f7c31c","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"kitchensync-dev-da503","appId":"1:733234753301:ios:1f199b96cc47aca1f7c31c","uploadDebugSymbols":true,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"kitchensync-dev-da503","configurations":{"android":"1:733234753301:android:d390bfa8a5323514f7c31c","ios":"1:733234753301:ios:1f199b96cc47aca1f7c31c"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": {
+    "source": "functions"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "functions": {
+      "port": 5001
+    },
+    "storage": {
+      "port": 9199
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
+    "singleProjectMode": true
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "kitchensync-dev-da503",
+          "appId": "1:733234753301:android:d390bfa8a5323514f7c31c",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "kitchensync-dev-da503",
+          "appId": "1:733234753301:ios:1f199b96cc47aca1f7c31c",
+          "uploadDebugSymbols": true,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "kitchensync-dev-da503",
+          "configurations": {
+            "android": "1:733234753301:android:d390bfa8a5323514f7c31c",
+            "ios": "1:733234753301:ios:1f199b96cc47aca1f7c31c"
+          }
+        }
+      }
+    }
+  }
+}

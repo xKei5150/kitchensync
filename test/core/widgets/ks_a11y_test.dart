@@ -1,6 +1,9 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
@@ -81,6 +84,30 @@ void main() {
       );
       expect(find.text('Enter an amount greater than zero.'), findsOneWidget);
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
+    });
+  });
+
+  group('KsSelectChip', () {
+    testWidgets('disabled state is visible and exposed to semantics', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester, const KsSelectChip(label: 'Saturday', selected: true));
+
+      final semantics = tester
+          .getSemantics(find.byType(KsSelectChip))
+          .getSemanticsData();
+      expect(semantics.flagsCollection.isEnabled, Tristate.isFalse);
+      expect(semantics.hasAction(SemanticsAction.tap), isFalse);
+      expect(
+        tester.widget<Material>(find.byType(Material).last).color,
+        KsColors.light.disabledFill,
+      );
+      expect(
+        tester.widget<Text>(find.text('Saturday')).style?.color,
+        KsColors.light.disabledText,
+      );
+      handle.dispose();
     });
   });
 

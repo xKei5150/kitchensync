@@ -6,7 +6,9 @@ import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/entities/shopping_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
+import 'package:kitchensync/features/calendar/domain/repositories/shopping_schedule_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
@@ -21,8 +23,11 @@ import 'package:kitchensync/features/pantry/domain/usecases/mark_as_waste.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/record_leftover.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
+import 'package:kitchensync/features/shopping/domain/entities/shopping_command.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
+import 'package:kitchensync/features/shopping/domain/repositories/shopping_command_repository.dart';
 import 'package:kitchensync/features/shopping/domain/repositories/shopping_repository.dart';
+import 'package:kitchensync/features/shopping/presentation/controllers/shopping_write_coordinator.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
 void main() {
@@ -36,6 +41,28 @@ void main() {
     final purchaseRepository = _MemoryPurchaseHistoryRepository();
     final wasteRepository = _MemoryWasteRepository(pantryRepository);
     final shoppingRepository = _MemoryShoppingRepository();
+    final shoppingCommandRepository = _MemoryShoppingCommandRepository(
+      shoppingRepository: shoppingRepository,
+      pantryRepository: pantryRepository,
+      purchaseRepository: purchaseRepository,
+      calendarRepository: calendarRepository,
+      now: now,
+    );
+    final writeCoordinator = ShoppingWriteCoordinator(
+      repository: shoppingCommandRepository,
+      allocationRepository: shoppingCommandRepository,
+      householdId: household.id,
+      idGenerator: FakeIdGenerator([
+        'create-list-command',
+        'add-rice-command',
+        'edit-rice-command',
+        'buy-rice-command',
+        'purchased-rice-command',
+        'remove-rice-command',
+        'buy-beans-command',
+        'substitute-tomato-command',
+      ]),
+    );
 
     final recipe = _recipe(now);
     await recipeRepository.upsert(recipe);
@@ -64,6 +91,7 @@ void main() {
 
     final shoppingController = ShoppingPlanningController(
       repository: shoppingRepository,
+      writeCoordinator: writeCoordinator,
       calendarRepository: calendarRepository,
       pantryRepository: pantryRepository,
       purchaseHistoryRepository: purchaseRepository,
@@ -81,6 +109,7 @@ void main() {
         'pepper-purchase',
       ]),
       clock: FakeClock(now),
+      shoppingScheduleRepository: const _MemoryShoppingScheduleRepository(),
     );
 
     final shoppingList = await shoppingController.generateAdaptiveList(
@@ -107,24 +136,62 @@ void main() {
       scheduledMeal.id,
     );
 
+    await shoppingController.addItem(
+      listId: shoppingList.id,
+      expectedRevision: 0,
+      ingredientId: 'rice',
+      quantityNeeded: 2,
+      unit: UnitId.kg,
+      itemId: 'rice-line',
+    );
+    await shoppingController.setItemNeededQuantity(
+      listId: shoppingList.id,
+      itemId: 'rice-line',
+      expectedRevision: 1,
+      quantityNeeded: 3,
+    );
+    await shoppingController.updateItemStatus(
+      listId: shoppingList.id,
+      itemId: 'rice-line',
+      expectedRevision: 2,
+      status: ShoppingListItemStatus.bought,
+      purchasedQuantity: 4,
+    );
+    await shoppingController.setItemPurchasedQuantity(
+      listId: shoppingList.id,
+      itemId: 'rice-line',
+      expectedRevision: 3,
+      purchasedQuantity: 2.5,
+    );
+    await shoppingController.removeItem(
+      listId: shoppingList.id,
+      itemId: 'rice-line',
+      expectedRevision: 4,
+    );
+
     await shoppingController.updateItemStatus(
       listId: shoppingList.id,
       itemId: 'beans-line',
+      expectedRevision: 5,
       status: ShoppingListItemStatus.bought,
+      purchasedQuantity: 2,
     );
     await shoppingController.updateItemStatus(
       listId: shoppingList.id,
       itemId: 'tomato-line',
+      expectedRevision: 6,
       status: ShoppingListItemStatus.substituted,
       substituteIngredientId: 'pepper',
       substituteQuantity: 300,
       substituteUnit: UnitId.g,
     );
 
-    final readyList = await shoppingRepository
-        .watchList(householdId: household.id, listId: shoppingList.id)
-        .first;
-    await shoppingController.completeList(readyList!);
+    await ShoppingCommandController(
+      repository: shoppingCommandRepository,
+      householdId: household.id,
+      household: household,
+      idGenerator: FakeIdGenerator(['complete-command']),
+    ).completeList(shoppingList.id);
 
     expect(
       shoppingRepository.lists[shoppingList.id]?.status,
@@ -201,7 +268,7 @@ void main() {
     await cookingController.markLeftoverSpoiled(leftover);
     expect(pantryRepository.items[leftover.id]?.quantity, 0);
     expect(wasteRepository.events.single.reason, WasteReason.expired);
-    expect(wasteRepository.events.single.ingredientId, 'leftover-braise');
+    expect(wasteRepository.events.single.ingredientId, 'tomato');
 
     final wasteVisibleToInsights = await wasteRepository
         .watchByHousehold(household.id)
@@ -228,8 +295,6 @@ void main() {
     final calendarRepository = _MemoryCalendarRepository();
     final pantryRepository = _MemoryPantryRepository();
     final purchaseRepository = _MemoryPurchaseHistoryRepository();
-    final wasteRepository = _MemoryWasteRepository(pantryRepository);
-    final recipeRepository = _MemoryRecipeRepository();
     final shoppingRepository = _MemoryShoppingRepository();
     final tray = UnitId('tray');
     final list = ShoppingListRecord(
@@ -254,25 +319,20 @@ void main() {
         ),
       ],
     );
-    await shoppingRepository.upsertList(list);
+    shoppingRepository.store(list);
 
-    final shoppingController = ShoppingPlanningController(
-      repository: shoppingRepository,
-      calendarRepository: calendarRepository,
-      pantryRepository: pantryRepository,
-      purchaseHistoryRepository: purchaseRepository,
-      wasteRepository: wasteRepository,
-      recipeRepository: recipeRepository,
+    await ShoppingCommandController(
+      repository: _MemoryShoppingCommandRepository(
+        shoppingRepository: shoppingRepository,
+        pantryRepository: pantryRepository,
+        purchaseRepository: purchaseRepository,
+        calendarRepository: calendarRepository,
+        now: now,
+      ),
       householdId: household.id,
       household: household,
-      idGenerator: FakeIdGenerator(const [
-        'platter-pantry',
-        'platter-purchase',
-      ]),
-      clock: FakeClock(now),
-    );
-
-    await shoppingController.completeList(list);
+      idGenerator: FakeIdGenerator(['complete-command']),
+    ).completeList(list.id);
 
     expect(
       shoppingRepository.lists[list.id]?.status,
@@ -447,6 +507,253 @@ class _MemoryCalendarRepository implements CalendarRepository {
   }
 }
 
+class _MemoryShoppingScheduleRepository implements ShoppingScheduleRepository {
+  const _MemoryShoppingScheduleRepository();
+
+  @override
+  Future<void> save(ShoppingSchedule schedule) async {}
+
+  @override
+  Stream<ShoppingSchedule?> watch(String householdId) => Stream.value(null);
+}
+
+class _MemoryShoppingCommandRepository
+    implements ShoppingAllocationCommandRepository {
+  const _MemoryShoppingCommandRepository({
+    required this.shoppingRepository,
+    required this.pantryRepository,
+    required this.purchaseRepository,
+    required this.calendarRepository,
+    required this.now,
+  });
+
+  final _MemoryShoppingRepository shoppingRepository;
+  final _MemoryPantryRepository pantryRepository;
+  final _MemoryPurchaseHistoryRepository purchaseRepository;
+  final _MemoryCalendarRepository calendarRepository;
+  final DateTime now;
+
+  @override
+  Future<ShoppingCommandResult> createAndConsumeAllocation(
+    ConsumeShoppingAllocationIntent command,
+  ) async {
+    const listId = 'server-derived-list';
+    shoppingRepository.store(
+      ShoppingListRecord(
+        id: listId,
+        householdId: command.intent.householdId,
+        type: ShoppingListType.shopNow,
+        shoppingDate: command.intent.startDate,
+        generatedForRangeStart: command.intent.startDate,
+        generatedForRangeEnd: command.intent.endDate,
+        status: ShoppingListStatus.pending,
+        createdAt: now,
+        updatedAt: now,
+        items: [
+          const ShoppingListItemRecord(
+            id: 'beans-line',
+            shoppingListId: listId,
+            ingredientId: 'beans',
+            quantityNeeded: 2,
+            unit: UnitId.piece,
+            status: ShoppingListItemStatus.unchecked,
+            sourceMealLinks: [],
+          ),
+          ShoppingListItemRecord(
+            id: 'tomato-line',
+            shoppingListId: listId,
+            ingredientId: 'tomato',
+            quantityNeeded: 300,
+            unit: UnitId.g,
+            status: ShoppingListItemStatus.unchecked,
+            sourceMealLinks: [
+              MealSourceLink(
+                mealEntryId: 'meal-1',
+                recipeId: 'recipe-1',
+                date: DateTime(2026, 7, 6),
+                quantity: 300,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    return const ShoppingCommandResult(
+      listId: listId,
+      status: ShoppingCommandStatus.pending,
+      revision: 0,
+      alreadyApplied: false,
+    );
+  }
+
+  @override
+  Future<ShoppingCommandResult> upsertList(
+    ShoppingListUpsertCommand command,
+  ) async {
+    final current = shoppingRepository.lists[command.listId];
+    final revision = current == null ? 0 : current.revision + 1;
+    shoppingRepository.store(
+      _shoppingListWith(
+        command.list,
+        revision: revision,
+        items: command.list.items,
+      ),
+    );
+    return ShoppingCommandResult(
+      listId: command.listId,
+      status: _commandStatus(command.list.status),
+      revision: revision,
+      alreadyApplied: false,
+    );
+  }
+
+  @override
+  Future<ShoppingCommandResult> mutateItem(
+    ShoppingListItemMutationCommand command,
+  ) async {
+    final list = shoppingRepository.lists[command.listId]!;
+    final revision = list.revision + 1;
+    final items = switch (command.mutation) {
+      final AddShoppingListItemMutation mutation => [
+        ...list.items,
+        ShoppingListItemRecord(
+          id: command.itemId,
+          shoppingListId: command.listId,
+          ingredientId: mutation.ingredientId,
+          quantityNeeded: mutation.quantityNeeded,
+          purchasedQuantity: mutation.purchasedQuantity,
+          unit: mutation.unit,
+          status: mutation.status,
+          substituteIngredientId: mutation.substituteIngredientId,
+          substituteQuantity: mutation.substituteQuantity,
+          substituteUnit: mutation.substituteUnit,
+          sourceMealLinks: const [],
+        ),
+      ],
+      RemoveShoppingListItemMutation() => [
+        for (final item in list.items)
+          if (item.id != command.itemId) item,
+      ],
+      _ => [
+        for (final item in list.items)
+          if (item.id == command.itemId)
+            _mutatedItem(item, command.mutation)
+          else
+            item,
+      ],
+    };
+    shoppingRepository.store(
+      _shoppingListWith(list, revision: revision, items: items),
+    );
+    return ShoppingCommandResult(
+      listId: command.listId,
+      status: _commandStatus(list.status),
+      revision: revision,
+      alreadyApplied: false,
+    );
+  }
+
+  @override
+  Future<ShoppingCommandResult> completeList(ShoppingCommandRequest request) =>
+      _complete(request);
+
+  @override
+  Future<ShoppingCommandResult> deleteList(ShoppingCommandRequest request) {
+    throw UnimplementedError();
+  }
+
+  Future<ShoppingCommandResult> _complete(
+    ShoppingCommandRequest request,
+  ) async {
+    final listId = request.listId;
+    final list = shoppingRepository.lists[listId]!;
+    for (final item in list.items) {
+      if (item.status != ShoppingListItemStatus.bought &&
+          item.status != ShoppingListItemStatus.substituted) {
+        continue;
+      }
+      final ingredientId = item.substituteIngredientId ?? item.ingredientId;
+      final quantity = item.substituteQuantity ?? item.quantityNeeded;
+      final unit = item.substituteUnit ?? item.unit;
+      final existing = await pantryRepository.findByIngredientUnit(
+        householdId: list.householdId,
+        ingredientId: ingredientId,
+        unit: unit,
+        section: PantrySection.food,
+      );
+      if (existing == null) {
+        await pantryRepository.add(
+          PantryItem(
+            id: '$listId-${item.id}-pantry',
+            householdId: list.householdId,
+            ingredientId: ingredientId,
+            quantity: quantity,
+            unit: unit,
+            section: PantrySection.food,
+            lastPurchaseDate: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      } else {
+        await pantryRepository.update(
+          existing.copyWith(
+            quantity: existing.quantity + quantity,
+            lastPurchaseDate: now,
+            updatedAt: now,
+          ),
+        );
+      }
+      await purchaseRepository.record(
+        PurchaseRecord(
+          id: '$listId-${item.id}-purchase',
+          householdId: list.householdId,
+          ingredientId: ingredientId,
+          quantity: quantity,
+          unit: unit,
+          purchaseDate: now,
+          sourceShoppingListId: list.id,
+        ),
+      );
+      if (item.status == ShoppingListItemStatus.substituted) {
+        for (final link in item.sourceMealLinks) {
+          final meal = calendarRepository.meals[link.mealEntryId];
+          if (meal == null) continue;
+          await calendarRepository.upsertMeal(
+            householdId: list.householdId,
+            entry: meal.copyWith(
+              ingredientOverrides: [
+                MealIngredientOverride(
+                  originalIngredientId: item.ingredientId,
+                  originalUnit: item.unit,
+                  substituteIngredientId: item.substituteIngredientId!,
+                  substituteQuantity: item.substituteQuantity!,
+                  substituteUnit: item.substituteUnit!,
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    }
+    shoppingRepository.store(
+      _shoppingListWith(
+        list,
+        revision: list.revision,
+        items: list.items,
+        status: ShoppingListStatus.completed,
+        updatedAt: now,
+      ),
+    );
+    return ShoppingCommandResult(
+      listId: listId,
+      status: ShoppingCommandStatus.completed,
+      alreadyApplied: false,
+      completionId: request.commandId,
+    );
+  }
+}
+
 class _MemoryPantryRepository implements PantryRepository {
   final items = <String, PantryItem>{};
   final wasteEvents = <WasteEvent>[];
@@ -610,7 +917,7 @@ class _MemoryWasteRepository implements WasteRepository {
   }
 }
 
-class _MemoryShoppingRepository implements ShoppingRepository {
+class _MemoryShoppingRepository extends ShoppingRepository {
   final lists = <String, ShoppingListRecord>{};
 
   @override
@@ -629,91 +936,76 @@ class _MemoryShoppingRepository implements ShoppingRepository {
     lists[listId]?.householdId == householdId ? lists[listId] : null,
   );
 
-  @override
-  Future<void> upsertList(ShoppingListRecord list) async {
+  void store(ShoppingListRecord list) {
     lists[list.id] = list;
   }
-
-  @override
-  Future<void> updateItemStatus({
-    required String householdId,
-    required String listId,
-    required String itemId,
-    required ShoppingListItemStatus status,
-    String? substituteIngredientId,
-    double? substituteQuantity,
-    UnitId? substituteUnit,
-  }) async {
-    final list = lists[listId];
-    if (list == null || list.householdId != householdId) return;
-    lists[listId] = ShoppingListRecord(
-      id: list.id,
-      householdId: list.householdId,
-      type: list.type,
-      shoppingDate: list.shoppingDate,
-      generatedForRangeStart: list.generatedForRangeStart,
-      generatedForRangeEnd: list.generatedForRangeEnd,
-      status: list.status,
-      originId: list.originId,
-      createdAt: list.createdAt,
-      updatedAt: list.updatedAt,
-      items: [
-        for (final item in list.items)
-          if (item.id == itemId)
-            ShoppingListItemRecord(
-              id: item.id,
-              shoppingListId: item.shoppingListId,
-              ingredientId: item.ingredientId,
-              quantityNeeded: item.quantityNeeded,
-              unit: item.unit,
-              status: status,
-              sourceMealLinks: item.sourceMealLinks,
-              substituteIngredientId: substituteIngredientId,
-              substituteQuantity: substituteQuantity,
-              substituteUnit: substituteUnit,
-            )
-          else
-            item,
-      ],
-    );
-  }
-
-  @override
-  Future<void> updateListStatus({
-    required String householdId,
-    required String listId,
-    required ShoppingListStatus status,
-  }) async {
-    final list = lists[listId];
-    if (list == null || list.householdId != householdId) return;
-    lists[listId] = ShoppingListRecord(
-      id: list.id,
-      householdId: list.householdId,
-      type: list.type,
-      shoppingDate: list.shoppingDate,
-      generatedForRangeStart: list.generatedForRangeStart,
-      generatedForRangeEnd: list.generatedForRangeEnd,
-      status: status,
-      originId: list.originId,
-      createdAt: list.createdAt,
-      updatedAt: DateTime(2026, 7, 6, 9),
-      items: list.items,
-    );
-  }
-
-  @override
-  Future<void> applyShopNowPurchasesToScheduledLists({
-    required String householdId,
-    required ShoppingListRecord shopNowList,
-  }) async {}
-
-  @override
-  Future<void> deleteList({
-    required String householdId,
-    required String listId,
-  }) async {
-    if (lists[listId]?.householdId == householdId) {
-      lists.remove(listId);
-    }
-  }
 }
+
+ShoppingCommandStatus _commandStatus(ShoppingListStatus status) =>
+    switch (status) {
+      ShoppingListStatus.pending => ShoppingCommandStatus.pending,
+      ShoppingListStatus.cancelled => ShoppingCommandStatus.cancelled,
+      ShoppingListStatus.completed => ShoppingCommandStatus.completed,
+    };
+
+ShoppingListRecord _shoppingListWith(
+  ShoppingListRecord list, {
+  required int revision,
+  required List<ShoppingListItemRecord> items,
+  ShoppingListStatus? status,
+  DateTime? updatedAt,
+}) => ShoppingListRecord(
+  id: list.id,
+  householdId: list.householdId,
+  type: list.type,
+  shoppingDate: list.shoppingDate,
+  generatedForRangeStart: list.generatedForRangeStart,
+  generatedForRangeEnd: list.generatedForRangeEnd,
+  status: status ?? list.status,
+  originId: list.originId,
+  completionId: list.completionId,
+  completedAt: list.completedAt,
+  completedByUserId: list.completedByUserId,
+  schemaVersion: list.schemaVersion,
+  revision: revision,
+  createdAt: list.createdAt,
+  updatedAt: updatedAt ?? list.updatedAt,
+  items: List.unmodifiable(items),
+);
+
+ShoppingListItemRecord _mutatedItem(
+  ShoppingListItemRecord item,
+  ShoppingListItemMutation mutation,
+) => switch (mutation) {
+  AddShoppingListItemMutation() => item,
+  RemoveShoppingListItemMutation() => item,
+  SetShoppingListItemNeededQuantityMutation() => item.withQuantityNeeded(
+    mutation.quantityNeeded,
+  ),
+  SetShoppingListItemPurchasedQuantityMutation() => ShoppingListItemRecord(
+    id: item.id,
+    shoppingListId: item.shoppingListId,
+    ingredientId: item.ingredientId,
+    quantityNeeded: item.quantityNeeded,
+    purchasedQuantity: mutation.purchasedQuantity,
+    unit: item.unit,
+    status: item.status,
+    substituteIngredientId: item.substituteIngredientId,
+    substituteQuantity: item.substituteQuantity,
+    substituteUnit: item.substituteUnit,
+    sourceMealLinks: item.sourceMealLinks,
+  ),
+  SetShoppingListItemStatusMutation() => ShoppingListItemRecord(
+    id: item.id,
+    shoppingListId: item.shoppingListId,
+    ingredientId: item.ingredientId,
+    quantityNeeded: item.quantityNeeded,
+    purchasedQuantity: mutation.purchasedQuantity,
+    unit: item.unit,
+    status: mutation.status,
+    substituteIngredientId: mutation.substituteIngredientId,
+    substituteQuantity: mutation.substituteQuantity,
+    substituteUnit: mutation.substituteUnit,
+    sourceMealLinks: item.sourceMealLinks,
+  ),
+};

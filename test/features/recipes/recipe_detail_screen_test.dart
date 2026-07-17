@@ -113,11 +113,11 @@ class _FakeIngredientRepository implements IngredientRepository {
       Stream.value(const []);
 }
 
-const _activeHousehold = ActiveHouseholdContext(
-  id: 'solo-household',
-  name: 'Test kitchen',
-  role: HouseholdRole.admin,
-  isJoint: false,
+const _cookHousehold = ActiveHouseholdContext(
+  id: 'joint-household',
+  name: 'Shared kitchen',
+  role: HouseholdRole.cook,
+  isJoint: true,
   hasPremium: true,
 );
 
@@ -180,75 +180,76 @@ void main() {
     expect(find.text('Schedule'), findsOneWidget);
   });
 
-  testWidgets('RecipeDetailScreen schedule persists a dated meal', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(400, 1600);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'RecipeDetailScreen Cook schedule persists a meal without shopping',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final calendar = _FakeCalendarRepository();
-    final recipe = Recipe(
-      id: 'fried-chicken',
-      authorUserId: 'user-1',
-      householdId: 'solo-household',
-      name: 'Fried Chicken',
-      description: 'Crispy comfort food',
-      defaultServingSize: 4,
-      mealTimeTags: const ['Dinner'],
-      recipeTags: const ['Chicken'],
-      location: 'Home',
-      visibility: RecipeVisibility.private,
-      monetization: RecipeMonetization.free,
-      createdAt: DateTime(2026, 7, 5),
-      updatedAt: DateTime(2026, 7, 5),
-      ingredients: const [
-        RecipeIngredient(
-          id: 'ri-1',
-          recipeId: 'fried-chicken',
-          ingredientId: 'chicken-thighs',
-          quantity: 1,
-          unit: UnitId.kg,
-        ),
-      ],
-      instructions: const ['Fry until golden.'],
-    );
-
-    await tester.pumpWidget(
-      await _wrap(
-        const RecipeDetailScreen(recipeId: 'fried-chicken'),
-        overrides: [
-          activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
-          calendarRepositoryProvider.overrideWithValue(calendar),
-          clockProvider.overrideWithValue(FakeClock(DateTime(2026, 7, 5, 9))),
-          idGeneratorProvider.overrideWithValue(FakeIdGenerator(['meal-1'])),
-          recipeRecordProvider(
-            'fried-chicken',
-          ).overrideWith((ref) => Stream.value(recipe)),
+      final calendar = _FakeCalendarRepository();
+      final recipe = Recipe(
+        id: 'fried-chicken',
+        authorUserId: 'user-1',
+        householdId: 'solo-household',
+        name: 'Fried Chicken',
+        description: 'Crispy comfort food',
+        defaultServingSize: 4,
+        mealTimeTags: const ['Dinner'],
+        recipeTags: const ['Chicken'],
+        location: 'Home',
+        visibility: RecipeVisibility.private,
+        monetization: RecipeMonetization.free,
+        createdAt: DateTime(2026, 7, 5),
+        updatedAt: DateTime(2026, 7, 5),
+        ingredients: const [
+          RecipeIngredient(
+            id: 'ri-1',
+            recipeId: 'fried-chicken',
+            ingredientId: 'chicken-thighs',
+            quantity: 1,
+            unit: UnitId.kg,
+          ),
         ],
-      ),
-    );
-    await tester.pumpAndSettle();
+        instructions: const ['Fry until golden.'],
+      );
 
-    await tester.ensureVisible(find.text('Schedule'));
-    await tester.tap(find.text('Schedule'));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        await _wrap(
+          const RecipeDetailScreen(recipeId: 'fried-chicken'),
+          overrides: [
+            activeHouseholdContextProvider.overrideWithValue(_cookHousehold),
+            calendarRepositoryProvider.overrideWithValue(calendar),
+            clockProvider.overrideWithValue(FakeClock(DateTime(2026, 7, 5, 9))),
+            idGeneratorProvider.overrideWithValue(FakeIdGenerator(['meal-1'])),
+            recipeRecordProvider(
+              'fried-chicken',
+            ).overrideWith((ref) => Stream.value(recipe)),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(calendar.upserted, isNull);
-    expect(find.text('Schedule meal'), findsOneWidget);
-    expect(find.text('Tomorrow · 2026-07-06'), findsOneWidget);
-    expect(find.text('Serves 6'), findsOneWidget);
+      await tester.ensureVisible(find.text('Schedule'));
+      await tester.tap(find.text('Schedule'));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Add to calendar'));
-    await tester.pumpAndSettle();
+      expect(calendar.upserted, isNull);
+      expect(find.text('Schedule meal'), findsOneWidget);
+      expect(find.text('Tomorrow · 2026-07-06'), findsOneWidget);
+      expect(find.text('Serves 6'), findsOneWidget);
 
-    expect(calendar.upserted?.id, 'meal-1');
-    expect(calendar.upserted?.recipeId, 'fried-chicken');
-    expect(calendar.upserted?.date, DateTime(2026, 7, 6));
-    expect(calendar.upserted?.mealLabel, 'Dinner');
-    expect(calendar.upserted?.servingSize, 6);
-  });
+      await tester.tap(find.text('Add to calendar'));
+      await tester.pumpAndSettle();
+
+      expect(calendar.upserted?.id, 'meal-1');
+      expect(calendar.upserted?.recipeId, 'fried-chicken');
+      expect(calendar.upserted?.date, DateTime(2026, 7, 6));
+      expect(calendar.upserted?.mealLabel, 'Dinner');
+      expect(calendar.upserted?.servingSize, 6);
+    },
+  );
 
   testWidgets('RecipeDetailScreen renders a persisted recipe by id', (
     tester,

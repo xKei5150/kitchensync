@@ -1,4 +1,5 @@
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/exceptions/invalid_active_calendar_range_exception.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/unit_registry.dart';
 
@@ -56,30 +57,64 @@ class MealScheduleEntryMapper {
 class CalendarDaySettingsMapper {
   const CalendarDaySettingsMapper._();
 
-  static Map<String, dynamic> toMap(CalendarDaySettings settings) => {
-    'householdId': settings.householdId,
-    'dateRangeStart': _dateKey(settings.dateRangeStart),
-    'dateRangeEnd': _dateKey(settings.dateRangeEnd),
-    'defaultServingSize': settings.defaultServingSize,
-    'mealsPerDay': settings.mealsPerDay,
-    'dishesPerMeal': settings.dishesPerMeal,
-    'mealModeName': settings.mealModeName,
-    'isActive': settings.isActive,
-  };
+  static Map<String, dynamic> toMap(CalendarDaySettings settings) {
+    if (_activeRangeEndsBeforeStart(
+      start: settings.dateRangeStart,
+      end: settings.dateRangeEnd,
+      isActive: settings.isActive,
+    )) {
+      throw ArgumentError.value(
+        settings.dateRangeEnd,
+        'dateRangeEnd',
+        'Active calendar range end must be on or after start.',
+      );
+    }
+    return {
+      'householdId': settings.householdId,
+      'dateRangeStart': _dateKey(settings.dateRangeStart),
+      'dateRangeEnd': _dateKey(settings.dateRangeEnd),
+      'defaultServingSize': settings.defaultServingSize,
+      'mealsPerDay': settings.mealsPerDay,
+      'dishesPerMeal': settings.dishesPerMeal,
+      'mealModeName': settings.mealModeName,
+      'isActive': settings.isActive,
+    };
+  }
 
   static CalendarDaySettings fromMap(String id, Map<String, dynamic> map) {
+    final start = _dateFromKey(map['dateRangeStart'] as String);
+    final end = _dateFromKey(map['dateRangeEnd'] as String);
+    final isActive = map['isActive'] as bool;
+    if (_activeRangeEndsBeforeStart(
+      start: start,
+      end: end,
+      isActive: isActive,
+    )) {
+      throw InvalidActiveCalendarRangeException(start: start, end: end);
+    }
     return CalendarDaySettings(
       id: id,
       householdId: map['householdId'] as String,
-      dateRangeStart: _dateFromKey(map['dateRangeStart'] as String),
-      dateRangeEnd: _dateFromKey(map['dateRangeEnd'] as String),
+      dateRangeStart: start,
+      dateRangeEnd: end,
       defaultServingSize: map['defaultServingSize'] as int?,
       mealsPerDay: map['mealsPerDay'] as int,
       dishesPerMeal: map['dishesPerMeal'] as int,
       mealModeName: map['mealModeName'] as String,
-      isActive: map['isActive'] as bool,
+      isActive: isActive,
     );
   }
+}
+
+bool _activeRangeEndsBeforeStart({
+  required DateTime start,
+  required DateTime end,
+  required bool isActive,
+}) {
+  if (!isActive) return false;
+  final startDate = DateTime(start.year, start.month, start.day);
+  final endDate = DateTime(end.year, end.month, end.day);
+  return endDate.isBefore(startDate);
 }
 
 String _dateKey(DateTime date) {

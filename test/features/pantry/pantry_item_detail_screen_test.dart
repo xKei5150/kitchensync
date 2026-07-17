@@ -7,6 +7,7 @@ import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
+import 'package:kitchensync/core/widgets/ks_quantity_stepper.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
@@ -215,6 +216,7 @@ Future<void> _pumpDetail(
   required Ingredient cauliflower,
   required Recipe recipe,
   required MealScheduleEntry meal,
+  ActiveHouseholdContext household = _activeHousehold,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
@@ -238,7 +240,7 @@ Future<void> _pumpDetail(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
-        activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
+        activeHouseholdContextProvider.overrideWithValue(household),
         pantryItemStreamProvider(
           'solo-household',
           item.id,
@@ -370,4 +372,196 @@ void main() {
 
     expect(find.text('Recipe route garlic-rice'), findsOneWidget);
   });
+
+  testWidgets('member sees Pantry details without mutation controls', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpDetail(
+      tester,
+      item: _pantryItem(),
+      rice: _ingredient('rice', 'Rice'),
+      cauliflower: _ingredient('cauliflower-rice', 'Cauliflower Rice'),
+      recipe: _recipe(),
+      meal: _scheduledDinnerForDetail(),
+      household: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Joint kitchen',
+        role: HouseholdRole.member,
+        isJoint: true,
+        hasPremium: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ingredient details'), findsOneWidget);
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.widgetWithText(OutlinedButton, 'Edit item'),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.widgetWithText(OutlinedButton, 'Mark fully used'),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Mark as waste'),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, 'Delete item'))
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('shopper edit flow exposes only purchased quantity adjustment', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpDetail(
+      tester,
+      item: _pantryItem(),
+      rice: _ingredient('rice', 'Rice'),
+      cauliflower: _ingredient('cauliflower-rice', 'Cauliflower Rice'),
+      recipe: _recipe(),
+      meal: _scheduledDinnerForDetail(),
+      household: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Joint kitchen',
+        role: HouseholdRole.shopper,
+        isJoint: true,
+        hasPremium: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Edit item'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Quantity'), findsWidgets);
+    expect(find.text('Unit'), findsNothing);
+    final dialog = find.byType(AlertDialog);
+    expect(
+      find.descendant(of: dialog, matching: find.text('Section')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Notes')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Expiry date')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Opened date')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('cook can record partial use but cannot increase stock', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpDetail(
+      tester,
+      item: _pantryItem(),
+      rice: _ingredient('rice', 'Rice'),
+      cauliflower: _ingredient('cauliflower-rice', 'Cauliflower Rice'),
+      recipe: _recipe(),
+      meal: _scheduledDinnerForDetail(),
+      household: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Joint kitchen',
+        role: HouseholdRole.cook,
+        isJoint: true,
+        hasPremium: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final buttons = tester.widgetList<KsStepButton>(find.byType(KsStepButton));
+    expect(buttons.first.onTap, isNotNull);
+    expect(buttons.last.onTap, isNull);
+  });
+
+  testWidgets(
+    'leftovers cannot be restocked or edited through normal controls',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final leftover = _pantryItem().copyWith(
+        section: PantrySection.leftover,
+        unit: UnitId.serving,
+        relatedRecipeId: 'garlic-rice',
+        leftoverServings: 2,
+        expiryDate: DateTime(2026, 7, 8),
+      );
+
+      await _pumpDetail(
+        tester,
+        item: leftover,
+        rice: _ingredient(
+          'rice',
+          'Garlic Rice Leftovers',
+          defaultUnit: UnitId.serving,
+          allowedUnits: const [UnitId.serving],
+        ),
+        cauliflower: _ingredient('cauliflower-rice', 'Cauliflower Rice'),
+        recipe: _recipe(),
+        meal: _scheduledDinnerForDetail(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Edit item'),
+            )
+            .onPressed,
+        isNull,
+      );
+      final buttons = tester.widgetList<KsStepButton>(
+        find.byType(KsStepButton),
+      );
+      expect(buttons.first.onTap, isNotNull);
+      expect(buttons.last.onTap, isNull);
+      expect(find.textContaining('Leftover from Garlic Rice'), findsOneWidget);
+    },
+  );
 }
+
+MealScheduleEntry _scheduledDinnerForDetail() => MealScheduleEntry(
+  id: 'meal-detail',
+  recipeId: 'garlic-rice',
+  date: DateTime(2026, 7, 4),
+  mealLabel: 'Dinner',
+  servingSize: 4,
+);
