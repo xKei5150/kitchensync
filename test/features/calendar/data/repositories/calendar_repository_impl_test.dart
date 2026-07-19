@@ -174,6 +174,45 @@ void main() {
     expect(snap.exists, isFalse);
   });
 
+  test(
+    'replaceMeals atomically deletes and creates schedule entries',
+    () async {
+      final retained = MealScheduleEntry(
+        id: 'retained',
+        recipeId: 'recipe-retained',
+        date: DateTime(2026, 7, 7),
+        mealLabel: 'Breakfast',
+        servingSize: 2,
+      );
+      final created = MealScheduleEntry(
+        id: 'created',
+        recipeId: 'recipe-created',
+        date: DateTime(2026, 7, 8),
+        mealLabel: 'Dinner',
+        servingSize: 6,
+      );
+      await repo.upsertMeal(householdId: householdId, entry: entry);
+      await repo.upsertMeal(householdId: householdId, entry: retained);
+
+      await repo.replaceMeals(
+        householdId: householdId,
+        removedEntryIds: [entry.id],
+        createdEntries: [created],
+      );
+
+      final collection = db
+          .collection('households')
+          .doc(householdId)
+          .collection('mealScheduleEntries');
+      expect((await collection.doc(entry.id).get()).exists, isFalse);
+      expect((await collection.doc(retained.id).get()).exists, isTrue);
+      expect(
+        (await collection.doc(created.id).get()).data()!['servingSize'],
+        6,
+      );
+    },
+  );
+
   test('upsertDaySettings writes and watches active settings', () async {
     await repo.upsertDaySettings(settings);
     await repo.upsertDaySettings(

@@ -24,7 +24,6 @@ class _Repository implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    String? startAfterId,
   }) async => const [];
 
   @override
@@ -43,8 +42,6 @@ class _Repository implements IngredientRepository {
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       const Stream.empty();
 
-  @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) => const Stream.empty();
 }
 
 void main() {

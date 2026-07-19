@@ -111,13 +111,6 @@ class _FakeIngredientRepository implements IngredientRepository {
   final List<Ingredient> created;
 
   @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) => Stream.value(
-    created
-        .where((ingredient) => ids.contains(ingredient.id))
-        .toList(growable: false),
-  );
-
-  @override
   Future<Ingredient?> getById(String id, {String? householdId}) async {
     for (final ingredient in created) {
       if (ingredient.id == id) return ingredient;
@@ -130,7 +123,6 @@ class _FakeIngredientRepository implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    String? startAfterId,
   }) async {
     return created
         .where((ingredient) => ingredient.householdId == householdId)

@@ -123,14 +123,15 @@ void main() {
 
     await tester.tap(find.byTooltip('Notifications'));
     await tester.pumpAndSettle();
-    expect(find.text('Spinach is on its last day'), findsOneWidget);
+    expect(find.text('Notifications'), findsOneWidget);
+    expect(find.byTooltip('Notification preferences'), findsOneWidget);
 
     // Back out, then open Settings from the gear.
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
-    expect(find.text('Ana Holloway'), findsOneWidget);
+    expect(find.text('Account'), findsOneWidget);
   });
 
   testWidgets('Settings links reach Household, Notifications and Premium', (
@@ -174,11 +175,11 @@ void main() {
 
     unawaited(router.push('/onboarding'));
     await tester.pumpAndSettle();
-    expect(find.text('Continue with email'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Login'), findsOneWidget);
 
     await tester.tap(find.text('Continue with Google'));
     await tester.pumpAndSettle();
-    expect(find.text('Continue with email'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Login'), findsOneWidget);
     expect(find.text('Not configured'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });

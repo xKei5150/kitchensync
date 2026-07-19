@@ -21,7 +21,25 @@ import 'package:kitchensync/features/recipes/presentation/screens/recipe_detail_
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeCalendarRepository implements CalendarRepository {
+  _FakeCalendarRepository({List<CalendarDaySettings>? settings})
+    : settings =
+          settings ??
+          [
+            CalendarDaySettings(
+              id: 'default-week',
+              householdId: 'joint-household',
+              dateRangeStart: DateTime(2026, 7),
+              dateRangeEnd: DateTime(2026, 7, 31),
+              defaultServingSize: 6,
+              mealsPerDay: 3,
+              dishesPerMeal: 1,
+              mealModeName: 'standard',
+              isActive: true,
+            ),
+          ];
+
   MealScheduleEntry? upserted;
+  final List<CalendarDaySettings> settings;
 
   @override
   Stream<List<MealScheduleEntry>> watchMealsInRange({
@@ -40,19 +58,11 @@ class _FakeCalendarRepository implements CalendarRepository {
 
   @override
   Stream<List<CalendarDaySettings>> watchActiveDaySettings(String householdId) {
-    return Stream.value([
-      CalendarDaySettings(
-        id: 'default-week',
-        householdId: householdId,
-        dateRangeStart: DateTime(2026, 7),
-        dateRangeEnd: DateTime(2026, 7, 31),
-        defaultServingSize: 6,
-        mealsPerDay: 3,
-        dishesPerMeal: 1,
-        mealModeName: 'standard',
-        isActive: true,
-      ),
-    ]);
+    return Stream.value(
+      settings
+          .where((setting) => setting.householdId == householdId)
+          .toList(growable: false),
+    );
   }
 
   @override
@@ -71,13 +81,6 @@ class _FakeIngredientRepository implements IngredientRepository {
   final List<Ingredient> ingredients;
 
   @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) => Stream.value(
-    ingredients
-        .where((ingredient) => ids.contains(ingredient.id))
-        .toList(growable: false),
-  );
-
-  @override
   Future<Ingredient?> getById(String id, {String? householdId}) async {
     for (final ingredient in ingredients) {
       if (ingredient.id == id) return ingredient;
@@ -90,7 +93,6 @@ class _FakeIngredientRepository implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    String? startAfterId,
   }) async => ingredients
       .where((ingredient) => ingredient.name.contains(query))
       .take(limit)
@@ -117,6 +119,14 @@ const _cookHousehold = ActiveHouseholdContext(
   id: 'joint-household',
   name: 'Shared kitchen',
   role: HouseholdRole.cook,
+  isJoint: true,
+  hasPremium: true,
+);
+
+const _memberHousehold = ActiveHouseholdContext(
+  id: 'joint-household',
+  name: 'Shared kitchen',
+  role: HouseholdRole.member,
   isJoint: true,
   hasPremium: true,
 );
@@ -181,14 +191,39 @@ void main() {
   });
 
   testWidgets(
-    'RecipeDetailScreen Cook schedule persists a meal without shopping',
+    'RecipeDetailScreen schedule uses the later overlapping calendar default',
     (tester) async {
-      tester.view.physicalSize = const Size(400, 1600);
+      tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final calendar = _FakeCalendarRepository();
+      final calendar = _FakeCalendarRepository(
+        settings: [
+          CalendarDaySettings(
+            id: 'broad-default',
+            householdId: 'joint-household',
+            dateRangeStart: DateTime(2026, 7),
+            dateRangeEnd: DateTime(2026, 7, 31),
+            defaultServingSize: 6,
+            mealsPerDay: 3,
+            dishesPerMeal: 1,
+            mealModeName: 'standard',
+            isActive: true,
+          ),
+          CalendarDaySettings(
+            id: 'specific-default',
+            householdId: 'joint-household',
+            dateRangeStart: DateTime(2026, 7, 6),
+            dateRangeEnd: DateTime(2026, 7, 12),
+            defaultServingSize: 8,
+            mealsPerDay: 2,
+            dishesPerMeal: 2,
+            mealModeName: 'holiday',
+            isActive: true,
+          ),
+        ],
+      );
       final recipe = Recipe(
         id: 'fried-chicken',
         authorUserId: 'user-1',
@@ -238,8 +273,10 @@ void main() {
       expect(calendar.upserted, isNull);
       expect(find.text('Schedule meal'), findsOneWidget);
       expect(find.text('Tomorrow · 2026-07-06'), findsOneWidget);
-      expect(find.text('Serves 6'), findsOneWidget);
+      expect(find.text('Serves 8'), findsOneWidget);
+      expect(tester.takeException(), isNull);
 
+      await tester.ensureVisible(find.text('Add to calendar'));
       await tester.tap(find.text('Add to calendar'));
       await tester.pumpAndSettle();
 
@@ -247,7 +284,7 @@ void main() {
       expect(calendar.upserted?.recipeId, 'fried-chicken');
       expect(calendar.upserted?.date, DateTime(2026, 7, 6));
       expect(calendar.upserted?.mealLabel, 'Dinner');
-      expect(calendar.upserted?.servingSize, 6);
+      expect(calendar.upserted?.servingSize, 8);
     },
   );
 
@@ -304,6 +341,103 @@ void main() {
     expect(find.text('1. Coat chicken.'), findsOneWidget);
     expect(find.text('2. Fry until golden.'), findsOneWidget);
   });
+
+  testWidgets(
+    'public detail shows metadata and save/social but hides member mutations',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final recipe = Recipe(
+        id: 'public-soup',
+        authorUserId: 'author-1',
+        householdId: 'author-household',
+        name: 'Public Soup',
+        description: 'A public recipe.',
+        defaultServingSize: 4,
+        mealTimeTags: const ['Dinner'],
+        recipeTags: const ['Soup'],
+        priceEstimate: 120,
+        location: 'Manila',
+        youtubeEmbedUrl: Uri.parse('https://youtu.be/public-soup'),
+        visibility: RecipeVisibility.public,
+        monetization: RecipeMonetization.free,
+        createdAt: DateTime(2026, 7, 5),
+        updatedAt: DateTime(2026, 7, 5),
+        ingredients: const [],
+        instructions: const ['Simmer.'],
+      );
+
+      await tester.pumpWidget(
+        await _wrap(
+          const RecipeDetailScreen(recipeId: 'public-soup'),
+          overrides: [
+            activeHouseholdContextProvider.overrideWithValue(_memberHousehold),
+            recipeRecordProvider(
+              'public-soup',
+            ).overrideWith((ref) => Stream.value(recipe)),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('by author-1 · Manila'), findsOneWidget);
+      expect(find.text('https://youtu.be/public-soup'), findsOneWidget);
+      expect(find.byTooltip('Save recipe'), findsOneWidget);
+      expect(find.text('Community'), findsOneWidget);
+      expect(find.text('Edit'), findsNothing);
+      expect(find.byTooltip('Delete recipe'), findsNothing);
+      expect(find.text('Start cooking'), findsNothing);
+      expect(find.text('Schedule'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'cook detail exposes household edit delete and schedule actions',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final recipe = Recipe(
+        id: 'shared-soup',
+        authorUserId: 'author-1',
+        householdId: 'joint-household',
+        name: 'Shared Soup',
+        description: 'A household recipe.',
+        defaultServingSize: 4,
+        mealTimeTags: const ['Dinner'],
+        recipeTags: const ['Soup'],
+        location: 'Shared kitchen',
+        visibility: RecipeVisibility.private,
+        monetization: RecipeMonetization.free,
+        createdAt: DateTime(2026, 7, 5),
+        updatedAt: DateTime(2026, 7, 5),
+        ingredients: const [],
+        instructions: const ['Simmer.'],
+      );
+
+      await tester.pumpWidget(
+        await _wrap(
+          const RecipeDetailScreen(recipeId: 'shared-soup'),
+          overrides: [
+            activeHouseholdContextProvider.overrideWithValue(_cookHousehold),
+            recipeRecordProvider(
+              'shared-soup',
+            ).overrideWith((ref) => Stream.value(recipe)),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit'), findsOneWidget);
+      expect(find.byTooltip('Delete recipe'), findsOneWidget);
+      expect(find.text('Start cooking'), findsOneWidget);
+      expect(find.text('Schedule'), findsOneWidget);
+      expect(find.byTooltip('Save recipe'), findsNothing);
+    },
+  );
 
   testWidgets('RecipeDetailScreen renders linked local unit label plurals', (
     tester,

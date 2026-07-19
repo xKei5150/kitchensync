@@ -82,6 +82,38 @@ void main() {
     },
   );
 
+  test('upsert replaces removed nested days and entries', () async {
+    await repo.upsert(menuSet);
+    final replacement = MenuSet(
+      id: menuSet.id,
+      householdId: menuSet.householdId,
+      name: menuSet.name,
+      description: menuSet.description,
+      lengthInDays: 1,
+      createdByUserId: menuSet.createdByUserId,
+      createdAt: menuSet.createdAt,
+      updatedAt: now.add(const Duration(minutes: 1)),
+      days: const [
+        MenuSetDay(
+          id: 'day-0',
+          menuSetId: 'set-1',
+          dayIndex: 0,
+          label: 'Monday',
+          entries: [],
+        ),
+      ],
+    );
+
+    await repo.upsert(replacement);
+
+    final stored = await repo
+        .watchById(householdId: householdId, menuSetId: menuSet.id)
+        .first;
+    expect(stored, isNotNull);
+    expect(stored!.days.map((day) => day.id), ['day-0']);
+    expect(stored.days.single.entries, isEmpty);
+  });
+
   test('watchById returns null when missing', () async {
     final missing = await repo
         .watchById(householdId: householdId, menuSetId: 'missing')

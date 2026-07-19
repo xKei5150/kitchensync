@@ -78,7 +78,6 @@ void main() {
         query: any(named: 'query'),
         householdId: any(named: 'householdId'),
         limit: any(named: 'limit'),
-        startAfterId: any(named: 'startAfterId'),
       ),
     ).thenAnswer((_) async => <Ingredient>[]);
     when(() => repo.getById(any())).thenAnswer((_) async => null);
@@ -140,7 +139,6 @@ void main() {
         query: any(named: 'query'),
         householdId: any(named: 'householdId'),
         limit: any(named: 'limit'),
-        startAfterId: any(named: 'startAfterId'),
       ),
     ).thenAnswer(
       (_) async => [_parent().copyWith(name: 'mangosteen', id: 'existing')],
@@ -281,7 +279,6 @@ void main() {
           query: any(named: 'query'),
           householdId: any(named: 'householdId'),
           limit: any(named: 'limit'),
-          startAfterId: any(named: 'startAfterId'),
         ),
       ).thenThrow(StateError('search error'));
       final r = await useCase(

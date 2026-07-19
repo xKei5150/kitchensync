@@ -73,6 +73,7 @@ void main() {
           userIsPremium: false,
           householdIsJoint: true,
           householdHasPremium: true,
+          invitedRole: HouseholdRole.cook,
           currentMemberCount: 1,
           maxMembers: 6,
           existingJoinedPremiumHouseholds: 0,
@@ -81,7 +82,7 @@ void main() {
 
       expect(result, isA<Success<HouseholdJoinApproval>>());
       final approval = (result as Success<HouseholdJoinApproval>).value;
-      expect(approval.defaultRole, HouseholdRole.member);
+      expect(approval.defaultRole, HouseholdRole.cook);
     });
 
     test('free users cannot join a second premium household', () {
@@ -90,6 +91,7 @@ void main() {
           userIsPremium: false,
           householdIsJoint: true,
           householdHasPremium: true,
+          invitedRole: HouseholdRole.member,
           currentMemberCount: 1,
           maxMembers: 6,
           existingJoinedPremiumHouseholds: 1,
@@ -105,6 +107,7 @@ void main() {
           userIsPremium: true,
           householdIsJoint: false,
           householdHasPremium: false,
+          invitedRole: HouseholdRole.member,
           currentMemberCount: 1,
           maxMembers: 1,
           existingJoinedPremiumHouseholds: 0,
@@ -131,6 +134,26 @@ void main() {
         policy.roleCan(HouseholdRole.cook, HouseholdCapability.inviteMembers),
         isFalse,
       );
+    });
+
+    test('only joint admins can configure calendar defaults', () {
+      expect(
+        policy.roleCan(
+          HouseholdRole.admin,
+          HouseholdCapability.configureCalendarDefaults,
+        ),
+        isTrue,
+      );
+      for (final role in [
+        HouseholdRole.cook,
+        HouseholdRole.shopper,
+        HouseholdRole.member,
+      ]) {
+        expect(
+          policy.roleCan(role, HouseholdCapability.configureCalendarDefaults),
+          isFalse,
+        );
+      }
     });
 
     test('shopper can complete shopping but cannot schedule meals', () {
@@ -204,6 +227,97 @@ void main() {
         ),
         isTrue,
       );
+    });
+
+    // Spec 1.5.2-1.5.4 per-module capability matrix for the non-admin roles.
+    // Cook owns Recipes/Calendar/MenuSet authoring; Shopper owns Shopping;
+    // Member is view-only; neither non-owning role crosses into the other's.
+    test('cook owns recipe, calendar and menu-set authoring only', () {
+      const cook = HouseholdRole.cook;
+      for (final cap in [
+        HouseholdCapability.createRecipes,
+        HouseholdCapability.editRecipes,
+        HouseholdCapability.deleteRecipes,
+        HouseholdCapability.scheduleMeals,
+        HouseholdCapability.markMealsCooked,
+        HouseholdCapability.adjustMealServings,
+        HouseholdCapability.manageLeftovers,
+        HouseholdCapability.markCalendarWaste,
+        HouseholdCapability.createMenuSets,
+        HouseholdCapability.editMenuSets,
+        HouseholdCapability.applyMenuSets,
+      ]) {
+        expect(policy.roleCan(cook, cap), isTrue, reason: '$cap');
+      }
+      // Spec 1.5.2: Cook cannot manage membership or shopping/schedule/admin.
+      for (final cap in [
+        HouseholdCapability.inviteMembers,
+        HouseholdCapability.removeMembers,
+        HouseholdCapability.assignRoles,
+        HouseholdCapability.transferAdmin,
+        HouseholdCapability.manageShoppingSchedules,
+        HouseholdCapability.configureCalendarDefaults,
+        HouseholdCapability.generateShoppingLists,
+        HouseholdCapability.completeShopping,
+        HouseholdCapability.deleteMenuSets,
+      ]) {
+        expect(policy.roleCan(cook, cap), isFalse, reason: '$cap');
+      }
+    });
+
+    test('shopper owns shopping actions only', () {
+      const shopper = HouseholdRole.shopper;
+      for (final cap in [
+        HouseholdCapability.generateShoppingLists,
+        HouseholdCapability.editShoppingLists,
+        HouseholdCapability.finalizeShoppingLists,
+        HouseholdCapability.deleteShoppingLists,
+        HouseholdCapability.completeShopping,
+        HouseholdCapability.confirmSubstitutions,
+        HouseholdCapability.updatePurchasedQuantities,
+        HouseholdCapability.initiateShopNow,
+        HouseholdCapability.reviewBulkItems,
+      ]) {
+        expect(policy.roleCan(shopper, cap), isTrue, reason: '$cap');
+      }
+      // Spec 1.5.3: Shopper cannot schedule meals or author recipes/menu sets.
+      for (final cap in [
+        HouseholdCapability.scheduleMeals,
+        HouseholdCapability.markMealsCooked,
+        HouseholdCapability.createRecipes,
+        HouseholdCapability.editRecipes,
+        HouseholdCapability.createMenuSets,
+        HouseholdCapability.editMenuSets,
+        HouseholdCapability.inviteMembers,
+      ]) {
+        expect(policy.roleCan(shopper, cap), isFalse, reason: '$cap');
+      }
+    });
+
+    test('member cannot mutate any module', () {
+      const member = HouseholdRole.member;
+      for (final cap in [
+        HouseholdCapability.createRecipes,
+        HouseholdCapability.editRecipes,
+        HouseholdCapability.scheduleMeals,
+        HouseholdCapability.generateShoppingLists,
+        HouseholdCapability.completeShopping,
+        HouseholdCapability.createMenuSets,
+        HouseholdCapability.applyMenuSets,
+        HouseholdCapability.editPantryItems,
+        HouseholdCapability.inviteMembers,
+      ]) {
+        expect(policy.roleCan(member, cap), isFalse, reason: '$cap');
+      }
+      // Spec 1.5.4: Member retains view + social capabilities.
+      for (final cap in [
+        HouseholdCapability.viewRecipes,
+        HouseholdCapability.viewPantry,
+        HouseholdCapability.viewCalendar,
+        HouseholdCapability.viewShoppingList,
+      ]) {
+        expect(policy.roleCan(member, cap), isTrue, reason: '$cap');
+      }
     });
   });
 

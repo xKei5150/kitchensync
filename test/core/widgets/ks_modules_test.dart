@@ -212,9 +212,11 @@ void main() {
     ) async {
       await _pump(
         tester,
-        const KsRecipeCard.private(
+        KsRecipeCard.private(
           title: 'Sunday lentil dal',
           meta: '35 min · serves 4',
+          onEdit: () {},
+          onDelete: () {},
         ),
       );
       expect(find.text('Sunday lentil dal'), findsOneWidget);

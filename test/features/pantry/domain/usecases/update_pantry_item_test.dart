@@ -8,8 +8,8 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingre
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/usecases/update_pantry_item.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -199,9 +199,7 @@ void main() {
       () => pantry.watchById('h1', 'p1'),
     ).thenAnswer((_) => Stream.value(_item(section: PantrySection.leftover)));
 
-    final result = await makeUc().call(
-      UpdatePantryItemParams(item: _item(section: PantrySection.food)),
-    );
+    final result = await makeUc().call(UpdatePantryItemParams(item: _item()));
 
     expect(result, isA<ResultFailure<PantryItem>>());
   });

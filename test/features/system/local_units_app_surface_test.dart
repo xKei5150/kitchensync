@@ -449,7 +449,6 @@ class _IngredientRepositoryFake implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    String? startAfterId,
   }) async {
     final normalized = query.toLowerCase();
     return created
@@ -475,12 +474,6 @@ class _IngredientRepositoryFake implements IngredientRepository {
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       Stream.value(const []);
 
-  @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) => Stream.value(
-    created
-        .where((ingredient) => ids.contains(ingredient.id))
-        .toList(growable: false),
-  );
 }
 
 class _PantryRepositoryFake
