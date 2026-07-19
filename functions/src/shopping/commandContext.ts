@@ -19,6 +19,7 @@ export type AuthorizedCommandContext = {
   readonly householdRef: DocumentReference
   readonly listRef: DocumentReference
   readonly receiptRef: DocumentReference
+  readonly isJointHousehold: boolean
 }
 
 export type ShoppingCommandExecution = {
@@ -48,6 +49,7 @@ export async function authorizeHouseholdShoppingRole(input: {
   readonly householdId: string
   readonly listId: string
   readonly receiptId: string
+  readonly allowedJointRoles?: readonly ("admin" | "cook" | "shopper" | "member")[]
 }): Promise<AuthorizedCommandContext> {
   const householdRef = input.db.collection("households").doc(input.householdId)
   const memberRef = householdRef.collection("members").doc(input.authUid)
@@ -55,10 +57,11 @@ export async function authorizeHouseholdShoppingRole(input: {
   const memberSnapshot = await input.transaction.get(memberRef)
   const household = householdSnapshot.exists ? parseHousehold(householdSnapshot.data()) : undefined
   const member = memberSnapshot.exists ? parseMember(memberSnapshot.data()) : undefined
+  const allowedJointRoles = input.allowedJointRoles ?? ["admin", "shopper"]
   const authorized =
     household !== undefined &&
     member !== undefined &&
-    (!household.isJoint || member.role === "admin" || member.role === "shopper")
+    (!household.isJoint || allowedJointRoles.includes(member.role))
   if (!authorized) {
     throw new HttpsError("permission-denied", "Household shopping role is required")
   }
@@ -66,6 +69,7 @@ export async function authorizeHouseholdShoppingRole(input: {
     householdRef,
     listRef: householdRef.collection("shoppingLists").doc(input.listId),
     receiptRef: input.db.collection("shoppingCommandReceipts").doc(input.receiptId),
+    isJointHousehold: household.isJoint,
   }
 }
 
