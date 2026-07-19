@@ -589,13 +589,12 @@ Future<void> _seedAdminHousehold({
   required Timestamp now,
 }) async {
   await withTimeout(
-    'seed user active household',
+    'seed user profile',
     () => _patchDocument(
       'users/$uid',
       authToken: authToken,
       fields: {
-        'activeHouseholdId': _stringValue(householdId),
-        'isPremium': _booleanValue(true),
+        'isPremium': _booleanValue(false),
         'updatedAt': _timestampValue(now),
       },
     ),
@@ -608,9 +607,10 @@ Future<void> _seedAdminHousehold({
       fields: {
         'name': _stringValue('Integration kitchen'),
         'creatorUserId': _stringValue(uid),
-        'isJoint': _booleanValue(true),
-        'hasPremium': _booleanValue(true),
-        'maxMembers': _integerValue(6),
+        'isJoint': _booleanValue(false),
+        'hasPremium': _booleanValue(false),
+        'maxMembers': _integerValue(1),
+        'memberCount': _integerValue(1),
         'createdAt': _timestampValue(now),
         'updatedAt': _timestampValue(now),
       },
@@ -624,6 +624,19 @@ Future<void> _seedAdminHousehold({
       fields: {
         'role': _stringValue('admin'),
         'joinedAt': _timestampValue(now),
+        'updatedAt': _timestampValue(now),
+      },
+    ),
+  );
+  await withTimeout(
+    'select active household',
+    () => _patchDocument(
+      'users/$uid',
+      authToken: authToken,
+      fields: {
+        'activeHouseholdId': _stringValue(householdId),
+        'householdIds': _stringArrayValue([householdId]),
+        'isPremium': _booleanValue(false),
         'updatedAt': _timestampValue(now),
       },
     ),
@@ -670,6 +683,12 @@ Map<String, Object?> _stringValue(String value) => {'stringValue': value};
 Map<String, Object?> _booleanValue(bool value) => {'booleanValue': value};
 
 Map<String, Object?> _integerValue(int value) => {'integerValue': '$value'};
+
+Map<String, Object?> _stringArrayValue(List<String> values) => {
+  'arrayValue': {
+    'values': [for (final value in values) _stringValue(value)],
+  },
+};
 
 Map<String, Object?> _timestampValue(Timestamp value) => {
   'timestampValue': value.toDate().toUtc().toIso8601String(),

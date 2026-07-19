@@ -10,7 +10,7 @@ import '_helpers.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('debug emulator bootstraps an anonymous premium solo household', (
+  testWidgets('debug emulator bootstraps an anonymous free solo household', (
     tester,
   ) async {
     const initializer = FirebaseInitializer();
@@ -49,10 +49,10 @@ void main() {
     );
 
     expect(snapshots[0].data()?['activeHouseholdId'], householdId);
-    expect(snapshots[0].data()?['isPremium'], isTrue);
+    expect(snapshots[0].data()?['isPremium'], isFalse);
     expect(snapshots[1].data()?['creatorUserId'], user.uid);
     expect(snapshots[1].data()?['isJoint'], isFalse);
-    expect(snapshots[1].data()?['hasPremium'], isTrue);
+    expect(snapshots[1].data()?['hasPremium'], isFalse);
     expect(snapshots[2].data()?['role'], 'admin');
   });
 }

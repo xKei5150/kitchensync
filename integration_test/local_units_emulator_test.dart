@@ -31,6 +31,8 @@ import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '_helpers.dart';
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -55,7 +57,7 @@ void main() {
         () => _seedClientHousehold(
           uid: uid,
           householdId: householdId,
-          now: Timestamp.fromDate(now),
+          now: now,
         ),
       );
 
@@ -293,7 +295,7 @@ void main() {
       () => _seedClientHousehold(
         uid: uid,
         householdId: householdId,
-        now: Timestamp.fromDate(now),
+        now: now,
       ),
     );
 
@@ -379,20 +381,20 @@ Future<T> withTimeout<T>(
 Future<void> _seedClientHousehold({
   required String uid,
   required String householdId,
-  required Timestamp now,
+  required DateTime now,
 }) async {
-  final db = FirebaseFirestore.instance;
-  final batch = db.batch();
-  final userDoc = db.collection('users').doc(uid);
-  final household = db.collection('households').doc(householdId);
-  final memberDoc = household.collection('members').doc(uid);
-  batch
-    ..set(userDoc, {
+  // Premium and household administration entitlements are granted through the
+  // emulator's admin surface, matching the pattern used by the other emulator
+  // tests. Hardened rules deny a client self-granting `isPremium`/`hasPremium`
+  // (the FD-SYS-RULES-01 premium-escalation boundary), so a client-side batch
+  // write of these fixtures is correctly rejected.
+  await seedFirestoreDocumentsThroughEmulatorAdmin({
+    'users/$uid': {
       'activeHouseholdId': householdId,
       'isPremium': true,
       'updatedAt': now,
-    })
-    ..set(household, {
+    },
+    'households/$householdId': {
       'name': 'Local unit QA kitchen',
       'creatorUserId': uid,
       'isJoint': true,
@@ -400,9 +402,13 @@ Future<void> _seedClientHousehold({
       'maxMembers': 6,
       'createdAt': now,
       'updatedAt': now,
-    })
-    ..set(memberDoc, {'role': 'admin', 'joinedAt': now, 'updatedAt': now});
-  await batch.commit();
+    },
+    'households/$householdId/members/$uid': {
+      'role': 'admin',
+      'joinedAt': now,
+      'updatedAt': now,
+    },
+  });
 }
 
 Future<ActiveHouseholdContext> _waitForActiveHousehold(
@@ -410,12 +416,17 @@ Future<ActiveHouseholdContext> _waitForActiveHousehold(
   String householdId,
 ) async {
   final stopwatch = Stopwatch()..start();
-  while (stopwatch.elapsed < const Duration(seconds: 10)) {
+  String? lastSeen;
+  while (stopwatch.elapsed < const Duration(seconds: 25)) {
     final context = container.read(activeHouseholdContextProvider);
+    lastSeen = context?.id;
     if (context?.id == householdId) {
       return context!;
     }
     await Future<void>.delayed(const Duration(milliseconds: 100));
   }
-  throw StateError('Active household context did not resolve to $householdId.');
+  throw StateError(
+    'Active household context did not resolve to $householdId '
+    '(last seen: $lastSeen).',
+  );
 }

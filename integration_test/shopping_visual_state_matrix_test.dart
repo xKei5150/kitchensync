@@ -70,7 +70,6 @@ class _VisualIngredientRepository implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    String? startAfterId,
   }) async =>
       query.isEmpty ||
           ingredient.displayNames.values.any(
@@ -89,9 +88,6 @@ class _VisualIngredientRepository implements IngredientRepository {
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       Stream.value(ingredient.barcode == barcode ? [ingredient] : const []);
 
-  @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) =>
-      Stream.value(ids.contains(ingredient.id) ? [ingredient] : const []);
 }
 
 class _VisualScheduleRepository implements ShoppingScheduleRepository {

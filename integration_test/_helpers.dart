@@ -137,6 +137,91 @@ Future<void> seedGlobalDictionaryThroughEmulatorAdmin() async {
   }
 }
 
+/// Writes explicit Firestore fixture documents through the emulator's
+/// admin-only REST surface. This is reserved for trusted test arrangement such
+/// as granting a test identity Premium before exercising client-side rules.
+Future<void> seedFirestoreDocumentsThroughEmulatorAdmin(
+  Map<String, Map<String, Object?>> documents,
+) async {
+  const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+  if (!useEmulator) {
+    throw StateError('Admin fixture seeding is emulator-only.');
+  }
+  final writes = [
+    for (final entry in documents.entries)
+      {
+        'update': {
+          'name':
+              'projects/kitchensync-dev-da503/databases/(default)/documents/'
+              '${entry.key}',
+          'fields': _firestoreFields(entry.value),
+        },
+      },
+  ];
+  final settings = firebaseEmulatorSettingsForTarget(defaultTargetPlatform);
+  final client = HttpClient();
+  try {
+    final request = await client.postUrl(
+      Uri(
+        scheme: 'http',
+        host: settings.firestoreHost,
+        port: settings.firestorePort,
+        path:
+            '/v1/projects/kitchensync-dev-da503/databases/(default)/'
+            'documents:batchWrite',
+      ),
+    );
+    request.headers
+      ..contentType = ContentType.json
+      ..set(HttpHeaders.authorizationHeader, 'Bearer owner');
+    request.write(jsonEncode({'writes': writes}));
+    final response = await request.close();
+    final body = await utf8.decoder.bind(response).join();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        'Emulator admin fixture failed (${response.statusCode}): $body',
+      );
+    }
+  } finally {
+    client.close(force: true);
+  }
+}
+
+/// Checks a fixture document through the emulator-only owner surface without
+/// weakening application read rules for another user's private data.
+Future<bool> firestoreDocumentExistsThroughEmulatorAdmin(
+  String documentPath,
+) async {
+  const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+  if (!useEmulator) {
+    throw StateError('Admin fixture inspection is emulator-only.');
+  }
+  final settings = firebaseEmulatorSettingsForTarget(defaultTargetPlatform);
+  final client = HttpClient();
+  try {
+    final request = await client.getUrl(
+      Uri(
+        scheme: 'http',
+        host: settings.firestoreHost,
+        port: settings.firestorePort,
+        path:
+            '/v1/projects/kitchensync-dev-da503/databases/(default)/documents/'
+            '$documentPath',
+      ),
+    );
+    request.headers.set(HttpHeaders.authorizationHeader, 'Bearer owner');
+    final response = await request.close();
+    await response.drain<void>();
+    if (response.statusCode == HttpStatus.ok) return true;
+    if (response.statusCode == HttpStatus.notFound) return false;
+    throw StateError(
+      'Emulator admin fixture read failed (${response.statusCode}).',
+    );
+  } finally {
+    client.close(force: true);
+  }
+}
+
 Map<String, dynamic> _firestoreFields(Map<String, Object?> value) => {
   for (final entry in value.entries) entry.key: _firestoreValue(entry.value),
 };
