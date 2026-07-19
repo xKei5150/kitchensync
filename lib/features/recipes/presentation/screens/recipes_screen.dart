@@ -6,12 +6,39 @@ import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
+import 'package:kitchensync/features/recipes/domain/entities/recipe_social_models.dart';
 import 'package:kitchensync/features/recipes/domain/services/recipe_import_parser.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
+
+/// Result of the recipe editor sheet. [fromPaste] is true when the drafts came
+/// from the Premium Paste & Parse bulk-import surface (Feature Design 2.4.2),
+/// so the caller can route them through the Premium-gated import path.
+class RecipeEditorResult {
+  const RecipeEditorResult({required this.drafts, required this.fromPaste});
+
+  final List<RecipeDraft> drafts;
+  final bool fromPaste;
+}
+
+Future<RecipeEditorResult?> showRecipeEditorSheet(
+  BuildContext context, {
+  Recipe? existingRecipe,
+}) {
+  return showModalBottomSheet<RecipeEditorResult>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => _RecipeImportSheet(
+      existingRecipe: existingRecipe,
+      routeContext: context,
+    ),
+  );
+}
 
 /// Screen 07 · Recipes home — My Recipes & Discover.
 ///
@@ -28,19 +55,21 @@ class RecipesScreen extends ConsumerStatefulWidget {
 enum _RecipesTab { mine, discover }
 
 class _RecipesScreenState extends ConsumerState<RecipesScreen> {
+  static const _policy = HouseholdPolicy();
   _RecipesTab _tab = _RecipesTab.discover;
 
   Future<void> _openAddRecipeSheet() async {
-    final drafts = await showModalBottomSheet<List<RecipeDraft>>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => _RecipeImportSheet(routeContext: context),
-    );
-    if (drafts == null || drafts.isEmpty || !mounted) {
+    final result = await showRecipeEditorSheet(context);
+    if (result == null || result.drafts.isEmpty || !mounted) {
       return;
     }
     try {
-      await ref.read(recipeImportControllerProvider).importDrafts(drafts);
+      final controller = ref.read(recipeImportControllerProvider);
+      if (result.fromPaste) {
+        await controller.importParsedDrafts(result.drafts);
+      } else {
+        await controller.importDrafts(result.drafts);
+      }
       if (!mounted) {
         return;
       }
@@ -57,15 +86,24 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final household = ref.watch(activeHouseholdContextProvider);
+    final canCreate =
+        household != null &&
+        _policy.roleCan(
+          household.role,
+          HouseholdCapability.createRecipes,
+          isSoloHousehold: household.isSolo,
+        );
     final header = KsFolioHeader(
       eyebrow: 'The Cookbook',
       title: 'Recipes',
       actions: [
-        KsHeaderAction(
-          icon: Icons.add_rounded,
-          tooltip: 'Add recipe',
-          onTap: _openAddRecipeSheet,
-        ),
+        if (canCreate)
+          KsHeaderAction(
+            icon: Icons.add_rounded,
+            tooltip: 'Add recipe',
+            onTap: _openAddRecipeSheet,
+          ),
         const KsHeaderAction(icon: Icons.search_rounded),
       ],
     );
@@ -94,7 +132,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
           Expanded(
             child: switch (_tab) {
               _RecipesTab.discover => const _DiscoverTab(),
-              _RecipesTab.mine => _MyRecipesTab(onAdd: _openAddRecipeSheet),
+              _RecipesTab.mine => _MyRecipesTab(
+                onAdd: canCreate ? _openAddRecipeSheet : null,
+              ),
             },
           ),
         ],
@@ -248,7 +288,6 @@ class _DiscoverTab extends ConsumerWidget {
             recipes: recipes,
             filter: filter,
             formatPrice: currency.format,
-            onSave: (recipe) => _saveRecipe(context, ref, recipe),
           ),
           loading: () => const Padding(
             padding: EdgeInsets.only(top: KsTokens.space24),
@@ -259,32 +298,6 @@ class _DiscoverTab extends ConsumerWidget {
         ),
       ],
     );
-  }
-
-  Future<void> _saveRecipe(
-    BuildContext context,
-    WidgetRef ref,
-    Recipe recipe,
-  ) async {
-    try {
-      await ref
-          .read(recipeDiscoveryControllerProvider)
-          .savePublicRecipe(recipe);
-      ref.invalidate(activeHouseholdRecipesProvider);
-      if (!context.mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${recipe.name} saved to My Recipes')),
-      );
-    } catch (error) {
-      if (!context.mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not save recipe: $error')));
-    }
   }
 }
 
@@ -334,13 +347,11 @@ class _PublicRecipeGrid extends StatelessWidget {
     required this.recipes,
     required this.filter,
     required this.formatPrice,
-    required this.onSave,
   });
 
   final List<Recipe> recipes;
   final RecipeSearchFilter filter;
   final String Function(double value, {bool decimals}) formatPrice;
-  final ValueChanged<Recipe> onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -363,24 +374,16 @@ class _PublicRecipeGrid extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: KsTokens.space10,
         mainAxisSpacing: KsTokens.space10,
-        childAspectRatio: 0.74,
+        childAspectRatio: 0.63,
       ),
       itemBuilder: (context, index) {
         final recipe = recipes[index];
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => context.push('/recipe/${recipe.id}'),
-          child: KsRecipeCard.public(
-            key: ValueKey('public-recipe-${recipe.id}'),
-            title: recipe.name,
-            author: recipe.authorUserId,
-            price: _priceLabel(recipe),
-            priceUnit: filter.targetServings == null
-                ? '/recipe'
-                : 'for ${filter.targetServings}',
-            coverColors: _MyRecipe._colorsForTags(recipe.recipeTags),
-            onSave: () => onSave(recipe),
-          ),
+        return _PublicRecipeTile(
+          recipe: recipe,
+          price: _priceLabel(recipe),
+          priceUnit: filter.targetServings == null
+              ? '/recipe'
+              : 'for ${filter.targetServings}',
         );
       },
     );
@@ -395,6 +398,125 @@ class _PublicRecipeGrid extends StatelessWidget {
       return 'N/A';
     }
     return formatPrice(price);
+  }
+}
+
+class _PublicRecipeTile extends ConsumerWidget {
+  const _PublicRecipeTile({
+    required this.recipe,
+    required this.price,
+    required this.priceUnit,
+  });
+
+  final Recipe recipe;
+  final String price;
+  final String priceUnit;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final socialAsync = ref.watch(recipeSocialStateProvider(recipe.id));
+    final social = socialAsync.valueOrNull ?? RecipeSocialState.empty;
+    final savedRecipe = ref.watch(savedRecipeForSourceProvider(recipe.id));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => context.push('/recipe/${recipe.id}'),
+            child: KsRecipeCard.public(
+              key: ValueKey('public-recipe-${recipe.id}'),
+              title: recipe.name,
+              author: recipe.authorUserId,
+              price: price,
+              priceUnit: priceUnit,
+              saved: savedRecipe != null,
+              coverColors: _MyRecipe._colorsForTags(recipe.recipeTags),
+              onSave: () => _toggleSaved(context, ref, savedRecipe),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 38,
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: socialAsync.hasError
+                    ? null
+                    : () => _setLiked(context, ref, !social.likedByViewer),
+                tooltip: social.likedByViewer ? 'Unlike recipe' : 'Like recipe',
+                icon: Icon(
+                  social.likedByViewer
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  size: 18,
+                ),
+              ),
+              Text('${social.likeCount}'),
+              const Spacer(),
+              IconButton(
+                onPressed: () => context.push('/recipe/${recipe.id}'),
+                tooltip: 'View comments',
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+              ),
+              Text('${social.commentCount}'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _setLiked(
+    BuildContext context,
+    WidgetRef ref,
+    bool liked,
+  ) async {
+    try {
+      await ref
+          .read(recipeSocialControllerProvider)
+          .setLiked(recipeId: recipe.id, liked: liked);
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update like: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleSaved(
+    BuildContext context,
+    WidgetRef ref,
+    SavedRecipe? savedRecipe,
+  ) async {
+    try {
+      if (savedRecipe == null) {
+        await ref
+            .read(recipeDiscoveryControllerProvider)
+            .savePublicRecipe(recipe);
+      } else {
+        await ref
+            .read(recipeDiscoveryControllerProvider)
+            .unsavePublicRecipe(savedRecipe);
+      }
+      ref.invalidate(activeHouseholdRecipesProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            savedRecipe == null
+                ? '${recipe.name} saved to My Recipes'
+                : '${recipe.name} removed from My Recipes',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update saved recipe: $error')),
+      );
+    }
   }
 }
 
@@ -436,15 +558,28 @@ class _SearchPill extends StatelessWidget {
 class _MyRecipesTab extends ConsumerWidget {
   const _MyRecipesTab({required this.onAdd});
 
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final recipesAsync = ref.watch(activeHouseholdRecipesProvider);
+    final savedRecipes =
+        ref.watch(activeSavedRecipesProvider).valueOrNull ?? const [];
+    final household = ref.watch(activeHouseholdContextProvider);
+    const policy = HouseholdPolicy();
+    final canManage =
+        household != null &&
+        policy.roleCan(
+          household.role,
+          HouseholdCapability.editRecipes,
+          isSoloHousehold: household.isSolo,
+        );
     return recipesAsync.when(
       data: (recipes) => _MyRecipeGrid(
         recipes: recipes.map(_MyRecipe.fromRecipe).toList(growable: false),
         onAdd: onAdd,
+        canManage: canManage,
+        savedRecipes: savedRecipes,
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Padding(
@@ -456,10 +591,17 @@ class _MyRecipesTab extends ConsumerWidget {
 }
 
 class _MyRecipeGrid extends ConsumerWidget {
-  const _MyRecipeGrid({required this.recipes, required this.onAdd});
+  const _MyRecipeGrid({
+    required this.recipes,
+    required this.onAdd,
+    required this.canManage,
+    required this.savedRecipes,
+  });
 
   final List<_MyRecipe> recipes;
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
+  final bool canManage;
+  final List<SavedRecipe> savedRecipes;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -470,10 +612,12 @@ class _MyRecipeGrid extends ConsumerWidget {
           title: 'Your shelf of recipes is bare',
           subtitle:
               'Save one from Discover, or paste a recipe you already love.',
-          action: FilledButton(
-            onPressed: onAdd,
-            child: const Text('Add a recipe'),
-          ),
+          action: onAdd == null
+              ? null
+              : FilledButton(
+                  onPressed: onAdd,
+                  child: const Text('Add a recipe'),
+                ),
         ),
       );
     }
@@ -486,15 +630,17 @@ class _MyRecipeGrid extends ConsumerWidget {
         KsTokens.space24,
       ),
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded, size: 17),
-            label: const Text('Add a recipe'),
+        if (onAdd != null) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded, size: 17),
+              label: const Text('Add a recipe'),
+            ),
           ),
-        ),
-        const SizedBox(height: KsTokens.space12),
+          const SizedBox(height: KsTokens.space12),
+        ],
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -507,6 +653,7 @@ class _MyRecipeGrid extends ConsumerWidget {
           ),
           itemBuilder: (context, index) {
             final recipe = recipes[index];
+            final savedRecipe = _savedRecipeForLocalCopy(recipe.record);
             return GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => context.push('/recipe/${recipe.id}'),
@@ -514,8 +661,23 @@ class _MyRecipeGrid extends ConsumerWidget {
                 title: recipe.title,
                 meta: recipe.meta,
                 coverColors: recipe.colors,
-                onEdit: () => _editRecipe(context, ref, recipe.record),
-                onDelete: () => _deleteRecipe(context, ref, recipe.record),
+                onEdit: canManage
+                    ? () => _editRecipe(context, ref, recipe.record)
+                    : null,
+                onDelete: savedRecipe != null
+                    ? () => _unsaveRecipe(
+                        context,
+                        ref,
+                        recipe.record,
+                        savedRecipe,
+                      )
+                    : canManage
+                    ? () => _deleteRecipe(context, ref, recipe.record)
+                    : null,
+                deleteIcon: savedRecipe == null
+                    ? Icons.delete_outline
+                    : Icons.bookmark_remove_outlined,
+                deleteTooltip: savedRecipe == null ? 'Delete' : 'Unsave',
               ),
             );
           },
@@ -524,24 +686,53 @@ class _MyRecipeGrid extends ConsumerWidget {
     );
   }
 
+  SavedRecipe? _savedRecipeForLocalCopy(Recipe recipe) {
+    if (recipe.sourceRecipeId == null) return null;
+    for (final saved in savedRecipes) {
+      if (saved.localRecipeId == recipe.id &&
+          saved.sourceRecipeId == recipe.sourceRecipeId) {
+        return saved;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _unsaveRecipe(
+    BuildContext context,
+    WidgetRef ref,
+    Recipe recipe,
+    SavedRecipe savedRecipe,
+  ) async {
+    try {
+      await ref
+          .read(recipeDiscoveryControllerProvider)
+          .unsavePublicRecipe(savedRecipe);
+      ref.invalidate(activeHouseholdRecipesProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${recipe.name} removed from My Recipes')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not unsave recipe: $error')),
+      );
+    }
+  }
+
   Future<void> _editRecipe(
     BuildContext context,
     WidgetRef ref,
     Recipe recipe,
   ) async {
-    final drafts = await showModalBottomSheet<List<RecipeDraft>>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) =>
-          _RecipeImportSheet(existingRecipe: recipe, routeContext: context),
-    );
-    if (drafts == null || drafts.isEmpty) {
+    final result = await showRecipeEditorSheet(context, existingRecipe: recipe);
+    if (result == null || result.drafts.isEmpty) {
       return;
     }
     try {
       final updated = await ref
           .read(recipeLibraryControllerProvider)
-          .updateLocalRecipe(recipe: recipe, draft: drafts.single);
+          .updateLocalRecipe(recipe: recipe, draft: result.drafts.single);
       ref.invalidate(activeHouseholdRecipesProvider);
       if (!context.mounted) {
         return;
@@ -696,7 +887,9 @@ Access: Private
       setState(() => _error = result.errors.join('\n'));
       return;
     }
-    Navigator.of(context).pop(result.drafts);
+    Navigator.of(
+      context,
+    ).pop(RecipeEditorResult(drafts: result.drafts, fromPaste: true));
   }
 
   void _saveManual() {
@@ -788,7 +981,9 @@ Access: Private
       priceEstimate: price,
       youtubeUrl: youtube.isEmpty ? null : Uri.tryParse(youtube),
     );
-    Navigator.of(context).pop([draft]);
+    Navigator.of(
+      context,
+    ).pop(RecipeEditorResult(drafts: [draft], fromPaste: false));
   }
 
   _ManualIngredientInput _createIngredientRow({RecipeIngredient? ingredient}) {

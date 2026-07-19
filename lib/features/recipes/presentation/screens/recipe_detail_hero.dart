@@ -4,11 +4,19 @@ part of 'recipe_detail_screen.dart';
 /// bookmark in the safe area, and the eyebrow + serif title riding a bottom
 /// scrim.
 class _Hero extends StatelessWidget {
-  const _Hero({required this.title, required this.tags, required this.onBack});
+  const _Hero({
+    required this.title,
+    required this.tags,
+    required this.saved,
+    required this.onBack,
+    this.onToggleSaved,
+  });
 
   final String title;
   final List<String> tags;
+  final bool saved;
   final VoidCallback onBack;
+  final VoidCallback? onToggleSaved;
 
   @override
   Widget build(BuildContext context) {
@@ -67,10 +75,14 @@ class _Hero extends StatelessWidget {
                         tooltip: 'Back',
                         onTap: onBack,
                       ),
-                      const _ScrimButton(
-                        icon: Icons.bookmark_border_rounded,
-                        tooltip: 'Save recipe',
-                      ),
+                      if (onToggleSaved != null)
+                        _ScrimButton(
+                          icon: saved
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_border_rounded,
+                          tooltip: saved ? 'Unsave recipe' : 'Save recipe',
+                          onTap: onToggleSaved,
+                        ),
                     ],
                   ),
                   const Spacer(),

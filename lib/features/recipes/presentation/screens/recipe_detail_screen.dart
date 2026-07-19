@@ -7,6 +7,7 @@ import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/services/calendar_day_settings_resolver.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
@@ -15,7 +16,9 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingre
 import 'package:kitchensync/features/ingredient_dictionary/domain/services/ingredient_price_estimator.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
+import 'package:kitchensync/features/recipes/domain/entities/recipe_social_models.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
+import 'package:kitchensync/features/recipes/presentation/screens/recipes_screen.dart';
 import 'package:kitchensync/features/shopping/domain/services/scheduled_shopping_list_planner.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
@@ -25,6 +28,7 @@ part 'recipe_detail_schedule.dart';
 part 'recipe_detail_schedule_helpers.dart';
 part 'recipe_detail_schedule_primitives.dart';
 part 'recipe_detail_intro.dart';
+part 'recipe_detail_social.dart';
 
 /// Screen 06 · Recipe detail · "Closer Look" — a cookbook spread that scales
 /// live.
@@ -68,6 +72,33 @@ class RecipeDetailScreen extends ConsumerWidget {
               ),
             );
           }
+          final household = ref.watch(activeHouseholdContextProvider);
+          const policy = HouseholdPolicy();
+          final belongsToActiveHousehold = household?.id == recipe.householdId;
+          final canEdit =
+              belongsToActiveHousehold &&
+              policy.roleCan(
+                household!.role,
+                HouseholdCapability.editRecipes,
+                isSoloHousehold: household.isSolo,
+              );
+          final canDelete =
+              belongsToActiveHousehold &&
+              policy.roleCan(
+                household!.role,
+                HouseholdCapability.deleteRecipes,
+                isSoloHousehold: household.isSolo,
+              );
+          final canSchedule =
+              household != null &&
+              policy.roleCan(
+                household.role,
+                HouseholdCapability.scheduleMeals,
+                isSoloHousehold: household.isSolo,
+              );
+          final savedRecipe = recipe.visibility == RecipeVisibility.public
+              ? ref.watch(savedRecipeForSourceProvider(recipe.id))
+              : ref.watch(savedRecipeForLocalCopyProvider(recipe.id));
           return FutureBuilder<Map<String, Ingredient>>(
             future: _ingredientsById(ref, recipe),
             builder: (context, snapshot) {
@@ -76,6 +107,8 @@ class RecipeDetailScreen extends ConsumerWidget {
               return _RecipeDetailBody(
                 recipeId: recipe.id,
                 title: recipe.name,
+                author: recipe.authorUserId,
+                location: recipe.location,
                 intro: recipe.description.isEmpty
                     ? recipe.name
                     : recipe.description,
@@ -96,6 +129,21 @@ class RecipeDetailScreen extends ConsumerWidget {
                   ingredientsById,
                 ),
                 instructions: recipe.instructions,
+                isPublic: recipe.visibility == RecipeVisibility.public,
+                youtubeUrl: recipe.youtubeEmbedUrl,
+                saved: savedRecipe != null,
+                canSchedule: canSchedule,
+                onEdit: canEdit
+                    ? () => _editRecipe(context, ref, recipe)
+                    : null,
+                onDelete: canDelete && savedRecipe == null
+                    ? () => _deleteRecipe(context, ref, recipe)
+                    : null,
+                onToggleSaved:
+                    recipe.visibility == RecipeVisibility.public ||
+                        savedRecipe != null
+                    ? () => _toggleSaved(context, ref, recipe, savedRecipe)
+                    : null,
                 onBack: () => context.pop(),
               );
             },
@@ -116,13 +164,97 @@ class RecipeDetailScreen extends ConsumerWidget {
     return _RecipeDetailBody(
       recipeId: 'braise',
       title: _title,
+      author: 'KitchenSync',
+      location: '',
       intro: _intro,
       baseServings: 4,
       ingredients: _ingredients,
       tags: const ['Vegetarian'],
       instructions: const [],
+      isPublic: false,
+      saved: false,
+      canSchedule: true,
       onBack: () => context.pop(),
     );
+  }
+
+  static Future<void> _toggleSaved(
+    BuildContext context,
+    WidgetRef ref,
+    Recipe recipe,
+    SavedRecipe? savedRecipe,
+  ) async {
+    try {
+      if (savedRecipe == null) {
+        await ref
+            .read(recipeDiscoveryControllerProvider)
+            .savePublicRecipe(recipe);
+      } else {
+        await ref
+            .read(recipeDiscoveryControllerProvider)
+            .unsavePublicRecipe(savedRecipe);
+      }
+      ref.invalidate(activeHouseholdRecipesProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            savedRecipe == null
+                ? '${recipe.name} saved to My Recipes'
+                : '${recipe.name} removed from My Recipes',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update saved recipe: $error')),
+      );
+    }
+  }
+
+  static Future<void> _editRecipe(
+    BuildContext context,
+    WidgetRef ref,
+    Recipe recipe,
+  ) async {
+    final result = await showRecipeEditorSheet(context, existingRecipe: recipe);
+    if (result == null || result.drafts.isEmpty) return;
+    try {
+      final updated = await ref
+          .read(recipeLibraryControllerProvider)
+          .updateLocalRecipe(recipe: recipe, draft: result.drafts.single);
+      ref
+        ..invalidate(recipeRecordProvider(recipe.id))
+        ..invalidate(activeHouseholdRecipesProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${updated.name} updated')));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update recipe: $error')),
+      );
+    }
+  }
+
+  static Future<void> _deleteRecipe(
+    BuildContext context,
+    WidgetRef ref,
+    Recipe recipe,
+  ) async {
+    try {
+      await ref.read(recipeLibraryControllerProvider).deleteLocalRecipe(recipe);
+      ref.invalidate(activeHouseholdRecipesProvider);
+      if (!context.mounted) return;
+      context.pop();
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete recipe: $error')),
+      );
+    }
   }
 
   static Future<Map<String, Ingredient>> _ingredientsById(

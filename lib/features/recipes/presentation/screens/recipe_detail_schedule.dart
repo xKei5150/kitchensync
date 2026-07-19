@@ -31,6 +31,7 @@ class _RecipeScheduleFlow {
     await showModalBottomSheet<void>(
       context: pageContext,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (sheetContext) {
         final ks = sheetContext.ksColors;
         final today = this.today(ref);
@@ -59,7 +60,7 @@ class _RecipeScheduleFlow {
             }
 
             return SafeArea(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(
                   KsTokens.space20,
                   KsTokens.space4,

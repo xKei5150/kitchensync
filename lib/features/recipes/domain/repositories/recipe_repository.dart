@@ -36,3 +36,12 @@ abstract class IngredientRewriteRecipeRepository {
     required Map<String, String> ingredientIdRewrites,
   });
 }
+
+abstract class SavedRecipeRepository {
+  Stream<List<SavedRecipe>> watchSavedRecipes({
+    required String householdId,
+    required String userId,
+  });
+
+  Future<void> unsavePublicRecipe(SavedRecipe savedRecipe);
+}

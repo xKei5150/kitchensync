@@ -28,6 +28,21 @@ class RecipeRemoteDataSource {
     });
   }
 
+  Stream<List<SavedRecipe>> watchSavedRecipes({
+    required String householdId,
+    required String userId,
+  }) {
+    return _refs
+        .savedRecipes(householdId)
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => SavedRecipeMapper.fromMap(doc.id, doc.data()))
+              .toList(growable: false),
+        );
+  }
+
   Future<void> upsert(Recipe recipe) async {
     await _validateIngredientReferences(recipe);
     final recipeRef = _refs.recipe(recipe.id);
@@ -168,6 +183,34 @@ class RecipeRemoteDataSource {
     }
     await batch.commit();
     return saved;
+  }
+
+  Future<void> unsavePublicRecipe(SavedRecipe savedRecipe) async {
+    final localRecipe = await _refs.recipe(savedRecipe.localRecipeId).get();
+    if (!localRecipe.exists) {
+      throw StateError(
+        'Cannot unsave missing local recipe ${savedRecipe.localRecipeId}.',
+      );
+    }
+    final localData = localRecipe.data()!;
+    if (localData['householdId'] != savedRecipe.householdId ||
+        localData['authorUserId'] != savedRecipe.userId ||
+        localData['sourceRecipeId'] != savedRecipe.sourceRecipeId) {
+      throw StateError('Saved recipe link does not match its local copy.');
+    }
+
+    final ingredients = await _refs
+        .recipeIngredients(savedRecipe.localRecipeId)
+        .get();
+    final db = _refs.recipes().firestore;
+    final batch = db.batch();
+    for (final ingredient in ingredients.docs) {
+      batch.delete(ingredient.reference);
+    }
+    batch
+      ..delete(_refs.recipe(savedRecipe.localRecipeId))
+      ..delete(_refs.savedRecipes(savedRecipe.householdId).doc(savedRecipe.id));
+    await batch.commit();
   }
 
   Future<Recipe> _hydrateRecipe(
