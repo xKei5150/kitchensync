@@ -23,6 +23,72 @@ service cloud.firestore {
     function isHouseholdCook(hid) {
       return hasHouseholdRole(hid, ['admin', 'cook']);
     }
+    function canManageMenuSets(hid) {
+      return isHouseholdCook(hid)
+        && get(/databases/$(database)/documents/households/$(hid)).data.hasPremium == true;
+    }
+    function isValidMenuSet(hid) {
+      return request.resource.data.keys().hasOnly([
+          'householdId',
+          'name',
+          'description',
+          'lengthInDays',
+          'createdByUserId',
+          'createdAt',
+          'updatedAt',
+          'isPublicTemplate',
+        ])
+        && request.resource.data.householdId == hid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && (
+          request.resource.data.description == null || (
+            request.resource.data.description is string
+            && request.resource.data.description.size() <= 1000
+          )
+        )
+        && request.resource.data.lengthInDays is int
+        && request.resource.data.lengthInDays >= 1
+        && request.resource.data.lengthInDays <= 365
+        && request.resource.data.createdByUserId is string
+        && request.resource.data.createdByUserId.size() > 0
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.isPublicTemplate is bool;
+    }
+    function isValidMenuSetDay(menuSetId) {
+      return request.resource.data.keys().hasOnly([
+          'menuSetId',
+          'dayIndex',
+          'label',
+        ])
+        && request.resource.data.menuSetId == menuSetId
+        && request.resource.data.dayIndex is int
+        && request.resource.data.dayIndex >= 0
+        && (
+          request.resource.data.label == null || (
+            request.resource.data.label is string
+            && request.resource.data.label.size() <= 80
+          )
+        );
+    }
+    function isValidMenuSetEntry(dayId) {
+      return request.resource.data.keys().hasOnly([
+          'menuSetDayId',
+          'mealSlot',
+          'recipeId',
+          'orderInSlot',
+        ])
+        && request.resource.data.menuSetDayId == dayId
+        && request.resource.data.mealSlot is string
+        && request.resource.data.mealSlot.size() > 0
+        && request.resource.data.mealSlot.size() <= 80
+        && request.resource.data.recipeId is string
+        && request.resource.data.recipeId.size() > 0
+        && request.resource.data.orderInSlot is int
+        && request.resource.data.orderInSlot >= 0;
+    }
     function isSoloHousehold(hid) {
       return isHouseholdMember(hid)
         && get(/databases/$(database)/documents/households/$(hid)).data.isJoint == false;
@@ -39,6 +105,15 @@ service cloud.firestore {
         ])
         && request.resource.data.quantity is number
         && request.resource.data.quantity >= 0;
+    }
+    function isCookQuantityDecrease(hid) {
+      return hasHouseholdRole(hid, ['cook'])
+        && isConstrainedQuantityUpdate(hid)
+        && request.resource.data.quantity <= resource.data.quantity;
+    }
+    function isShopperQuantityCorrection(hid) {
+      return hasHouseholdRole(hid, ['shopper'])
+        && isConstrainedQuantityUpdate(hid);
     }
     function isValidLeftoverCreate(hid) {
       return request.resource.data.householdId == hid
@@ -71,6 +146,24 @@ service cloud.firestore {
     function hasHouseholdId(hid) {
       return request.resource.data.householdId == hid;
     }
+    function isValidMealMerge(hid) {
+      let count = request.resource.data.get('mergedMealCount', 1);
+      let recipeId = request.resource.data.recipeId;
+      let recipePath = /databases/$(database)/documents/recipes/$(recipeId);
+      return count is int
+        && count >= 1
+        && (
+          count == 1
+          || (
+            recipeId is string
+            && get(householdRef(hid)).data.hasPremium == true
+            && exists(recipePath)
+            && get(recipePath).data.defaultServingSize is int
+            && get(recipePath).data.defaultServingSize > 0
+            && request.resource.data.servingSize == get(recipePath).data.defaultServingSize * count
+          )
+        );
+    }
     function isDateKey(value) {
       return value is string
         && value.matches('^((\\d{4}-(01|03|05|07|08|10|12)-(0[1-9]|[12]\\d|3[01]))|(\\d{4}-(04|06|09|11)-(0[1-9]|[12]\\d|30))|(\\d{4}-02-(0[1-9]|1\\d|2[0-8]))|((\\d{2}(0[48]|[2468][048]|[13579][26])|([02468][048]00|[13579][26]00))-02-29))$');
@@ -83,6 +176,130 @@ service cloud.firestore {
     }
     function recipeHouseholdId() {
       return request.resource.data.householdId;
+    }
+    function recipeRef(recipeId) {
+      return /databases/$(database)/documents/recipes/$(recipeId);
+    }
+    function recipeIngredientRef(recipeId, ingredientLineId) {
+      return /databases/$(database)/documents/recipes/$(recipeId)/ingredients/$(ingredientLineId);
+    }
+    function savedRecipeRef(hid, savedRecipeId) {
+      return /databases/$(database)/documents/households/$(hid)/savedRecipes/$(savedRecipeId);
+    }
+    function isPublicRecipe(recipeId) {
+      return recipeId is string
+        && exists(recipeRef(recipeId))
+        && get(recipeRef(recipeId)).data.visibility == 'public';
+    }
+    function isExactSavedRecipeCopy(recipeId) {
+      let copy = request.resource.data;
+      let sourceId = copy.sourceRecipeId;
+      let source = get(recipeRef(sourceId)).data;
+      return isHouseholdMember(copy.householdId)
+        && isPublicRecipe(sourceId)
+        && copy.keys().hasOnly([
+          'authorUserId',
+          'householdId',
+          'name',
+          'description',
+          'dishImageUrl',
+          'defaultServingSize',
+          'mealTimeTags',
+          'recipeTags',
+          'priceEstimate',
+          'location',
+          'youtubeEmbedUrl',
+          'visibility',
+          'monetization',
+          'createdAt',
+          'updatedAt',
+          'instructions',
+          'sourceRecipeId',
+        ])
+        && copy.authorUserId == request.auth.uid
+        && copy.visibility == 'private'
+        && copy.monetization == 'free'
+        && copy.createdAt is timestamp
+        && copy.updatedAt == copy.createdAt
+        && copy.name == source.name
+        && copy.description == source.description
+        && copy.dishImageUrl == source.dishImageUrl
+        && copy.defaultServingSize == source.defaultServingSize
+        && copy.mealTimeTags == source.mealTimeTags
+        && copy.recipeTags == source.recipeTags
+        && copy.priceEstimate == source.priceEstimate
+        && copy.location == source.location
+        && copy.youtubeEmbedUrl == source.youtubeEmbedUrl
+        && copy.instructions == source.instructions
+        && getAfter(savedRecipeRef(copy.householdId, recipeId)).data.userId == request.auth.uid
+        && getAfter(savedRecipeRef(copy.householdId, recipeId)).data.householdId == copy.householdId
+        && getAfter(savedRecipeRef(copy.householdId, recipeId)).data.sourceRecipeId == sourceId
+        && getAfter(savedRecipeRef(copy.householdId, recipeId)).data.localRecipeId == recipeId;
+    }
+    function isExactSavedRecipeIngredient(recipeId, ingredientLineId) {
+      let copy = getAfter(recipeRef(recipeId)).data;
+      let sourceLine = get(recipeIngredientRef(copy.sourceRecipeId, ingredientLineId)).data;
+      return copy.authorUserId == request.auth.uid
+        && isHouseholdMember(copy.householdId)
+        && exists(recipeIngredientRef(copy.sourceRecipeId, ingredientLineId))
+        && request.resource.data.keys().hasOnly([
+          'recipeId',
+          'ingredientId',
+          'quantity',
+          'unit',
+          'description',
+          'preparationNote',
+          'shelfLifeDays',
+        ])
+        && request.resource.data.recipeId == recipeId
+        && request.resource.data.quantity == sourceLine.quantity
+        && request.resource.data.unit == sourceLine.unit
+        && request.resource.data.description == sourceLine.description
+        && request.resource.data.preparationNote == sourceLine.preparationNote
+        && request.resource.data.shelfLifeDays == sourceLine.shelfLifeDays
+        && isValidIngredientReference(
+          copy.householdId,
+          request.resource.data.ingredientId,
+          request.resource.data.unit
+        );
+    }
+    function isSavedLocalRecipeOwner(recipeId) {
+      let copy = resource.data;
+      let saved = get(savedRecipeRef(copy.householdId, recipeId)).data;
+      return copy.sourceRecipeId is string
+        && copy.authorUserId == request.auth.uid
+        && isHouseholdMember(copy.householdId)
+        && saved.userId == request.auth.uid
+        && saved.localRecipeId == recipeId
+        && saved.sourceRecipeId == copy.sourceRecipeId
+        && !existsAfter(savedRecipeRef(copy.householdId, recipeId));
+    }
+    function canDeleteSavedRecipeIngredient(recipeId) {
+      let copy = get(recipeRef(recipeId)).data;
+      return copy.sourceRecipeId is string
+        && copy.authorUserId == request.auth.uid
+        && isHouseholdMember(copy.householdId)
+        && !existsAfter(recipeRef(recipeId))
+        && !existsAfter(savedRecipeRef(copy.householdId, recipeId));
+    }
+    function isValidSavedRecipeLink(hid, savedRecipeId) {
+      let saved = request.resource.data;
+      let copy = getAfter(recipeRef(saved.localRecipeId)).data;
+      return isHouseholdMember(hid)
+        && savedRecipeId == saved.localRecipeId
+        && saved.keys().hasOnly([
+          'userId',
+          'householdId',
+          'sourceRecipeId',
+          'localRecipeId',
+        ])
+        && saved.userId == request.auth.uid
+        && saved.householdId == hid
+        && isPublicRecipe(saved.sourceRecipeId)
+        && copy.authorUserId == request.auth.uid
+        && copy.householdId == hid
+        && copy.sourceRecipeId == saved.sourceRecipeId
+        && copy.visibility == 'private';
     }
     function globalIngredientRef(ingredientId) {
       return /databases/$(database)/documents/ingredients/$(ingredientId);
@@ -151,6 +368,78 @@ service cloud.firestore {
     function inviteDoc(code) {
       return get(/databases/$(database)/documents/householdInvites/$(code));
     }
+    function userRef(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+    function householdRef(hid) {
+      return /databases/$(database)/documents/households/$(hid);
+    }
+    function householdMemberRef(hid, uid) {
+      return /databases/$(database)/documents/households/$(hid)/members/$(uid);
+    }
+    function canUserJoinPremiumHousehold(uid, hid) {
+      let userBefore = get(userRef(uid)).data;
+      let userAfter = getAfter(userRef(uid)).data;
+      let joinedBefore = userBefore.get('joinedPremiumHouseholdIds', []);
+      return userAfter.activeHouseholdId == hid
+        && userAfter.get('householdIds', []).hasAny([hid])
+        && userAfter.get('joinedPremiumHouseholdIds', []).hasAny([hid])
+        && (userBefore.isPremium == true || joinedBefore.size() == 0);
+    }
+    function isValidInviteJoin(hid, uid) {
+      let code = request.resource.data.inviteCode;
+      let invite = inviteDoc(code).data;
+      let household = get(householdRef(hid)).data;
+      return request.auth.uid == uid
+        && code is string
+        && invite.active == true
+        && invite.householdId == hid
+        && invite.role == request.resource.data.role
+        && request.resource.data.role in ['member', 'shopper', 'cook']
+        && household.isJoint == true
+        && household.hasPremium == true
+        && household.memberCount is int
+        && getAfter(householdRef(hid)).data.memberCount == household.memberCount + 1
+        && getAfter(householdRef(hid)).data.memberCount <= household.maxMembers
+        && canUserJoinPremiumHousehold(uid, hid);
+    }
+    function isValidJoinCapacityUpdate(hid) {
+      let memberAfter = getAfter(householdMemberRef(hid, request.auth.uid)).data;
+      let code = memberAfter.inviteCode;
+      let invite = inviteDoc(code).data;
+      return isSignedIn()
+        && !exists(householdMemberRef(hid, request.auth.uid))
+        && existsAfter(householdMemberRef(hid, request.auth.uid))
+        && resource.data.isJoint == true
+        && resource.data.hasPremium == true
+        && resource.data.memberCount is int
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'memberCount',
+          'updatedAt',
+        ])
+        && request.resource.data.memberCount == resource.data.memberCount + 1
+        && request.resource.data.memberCount <= resource.data.maxMembers
+        && code is string
+        && invite.active == true
+        && invite.householdId == hid
+        && invite.role == memberAfter.role
+        && canUserJoinPremiumHousehold(request.auth.uid, hid);
+    }
+    function isValidMemberRoleUpdate(hid, uid) {
+      let nextRole = request.resource.data.role;
+      return isHouseholdAdmin(hid)
+        && uid != request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'role',
+          'updatedAt',
+        ])
+        && nextRole in ['admin', 'cook', 'shopper', 'member']
+        && request.resource.data.updatedAt is timestamp
+        && (
+          nextRole != 'admin' ||
+          get(userRef(uid)).data.isPremium == true
+        );
+    }
     function canManageWeeklyShoppingSchedule(hid) {
       return isHouseholdAdmin(hid) || (
         isHouseholdMember(hid) &&
@@ -183,14 +472,115 @@ service cloud.firestore {
         && request.resource.data.updatedByUserId.size() > 0
         && request.resource.data.updatedByUserId == request.auth.uid;
     }
+    function isValidNotificationPreferences(hid) {
+      return request.resource.data.keys().hasOnly([
+          'householdId',
+          'emergencyShopping',
+          'pantryExpiry',
+          'bulkReminders',
+          'householdActivity',
+          'updatedAt',
+        ])
+        && request.resource.data.householdId == hid
+        && request.resource.data.emergencyShopping is bool
+        && request.resource.data.pantryExpiry is bool
+        && request.resource.data.bulkReminders is bool
+        && request.resource.data.householdActivity is bool
+        && request.resource.data.updatedAt is timestamp;
+    }
+    function isNotificationReadUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'readAt',
+          'updatedAt',
+        ])
+        && request.resource.data.readAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+    function userUpdateDoesNotChangePremium() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'isPremium',
+        'premiumPlan',
+        'premiumTrialStartedAt',
+        'premiumTrialEndsAt',
+      ]);
+    }
+    function userHouseholdContextIsValid(uid) {
+      let contextChanged = request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'activeHouseholdId',
+        'householdIds',
+        'joinedPremiumHouseholdIds',
+      ]);
+      let activeHouseholdId = request.resource.data.get('activeHouseholdId', null);
+      return !contextChanged || (
+        activeHouseholdId is string
+        && activeHouseholdId.size() > 0
+        && request.resource.data.get('householdIds', []).hasAny([activeHouseholdId])
+        && existsAfter(householdMemberRef(activeHouseholdId, uid))
+      );
+    }
+    function householdUpdateDoesNotChangePremium() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'hasPremium',
+        'premiumPlan',
+        'premiumOwnerUserId',
+        'premiumTrialStartedAt',
+        'premiumTrialEndsAt',
+      ]);
+    }
+    function isValidUserCreate(uid) {
+      return isSelf(uid)
+        && request.resource.data.isPremium == false
+        && !request.resource.data.keys().hasAny([
+          'premiumPlan',
+          'premiumTrialStartedAt',
+          'premiumTrialEndsAt',
+        ]);
+    }
+    function isValidHouseholdCreate() {
+      return isSignedIn()
+        && request.resource.data.creatorUserId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.isJoint is bool
+        && request.resource.data.hasPremium is bool
+        && request.resource.data.maxMembers in [1, 6]
+        && request.resource.data.memberCount == 1
+        && (
+          (
+            request.resource.data.isJoint == false
+            && request.resource.data.hasPremium == false
+            && request.resource.data.maxMembers == 1
+          ) || (
+            request.resource.data.isJoint == true
+            && request.resource.data.hasPremium == true
+            && request.resource.data.maxMembers == 6
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPremium == true
+          )
+        );
+    }
 
     match /shoppingCommandReceipts/{commandId} {
       allow read, write: if false;
     }
 
+    match /householdCommandReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
     match /users/{uid} {
-      allow read, create, update: if isSelf(uid);
+      allow read: if isSelf(uid);
+      allow create: if isValidUserCreate(uid);
+      allow update: if isSelf(uid)
+        && userUpdateDoesNotChangePremium()
+        && userHouseholdContextIsValid(uid);
       allow delete: if false;
+
+      match /notificationPreferences/{hid} {
+        allow read: if isSelf(uid) && isHouseholdMember(hid);
+        allow create, update: if isSelf(uid)
+          && isHouseholdMember(hid)
+          && isValidNotificationPreferences(hid);
+        allow delete: if isSelf(uid) && isHouseholdMember(hid);
+      }
     }
 
     match /ingredients/{ingredientId} {
@@ -216,16 +606,15 @@ service cloud.firestore {
 
     match /households/{hid} {
       allow read: if isHouseholdMember(hid);
-      allow create: if isSignedIn()
-        && request.resource.data.creatorUserId == request.auth.uid
-        && request.resource.data.name is string
-        && request.resource.data.isJoint is bool
-        && request.resource.data.hasPremium is bool
-        && request.resource.data.maxMembers in [1, 6];
-      allow update, delete: if isHouseholdAdmin(hid);
+      allow create: if isValidHouseholdCreate();
+      allow update: if (
+          isHouseholdAdmin(hid)
+          && householdUpdateDoesNotChangePremium()
+        ) || isValidJoinCapacityUpdate(hid);
+      allow delete: if isHouseholdAdmin(hid);
 
       match /members/{uid} {
-        allow read: if isHouseholdMember(hid);
+        allow read: if isHouseholdMember(hid) || isSelf(uid);
         allow create: if isSignedIn()
           && (
             isHouseholdAdmin(hid) ||
@@ -234,24 +623,17 @@ service cloud.firestore {
               getAfter(/databases/$(database)/documents/households/$(hid)).data.creatorUserId == request.auth.uid &&
               request.resource.data.role == 'admin'
             ) ||
-            (
-              request.auth.uid == uid &&
-              request.resource.data.inviteCode is string &&
-              inviteDoc(request.resource.data.inviteCode).data.active == true &&
-              inviteDoc(request.resource.data.inviteCode).data.householdId == hid &&
-              inviteDoc(request.resource.data.inviteCode).data.role == request.resource.data.role
-            )
+            isValidInviteJoin(hid, uid)
           );
-        allow update, delete: if isHouseholdAdmin(hid);
+        allow update: if isValidMemberRoleUpdate(hid, uid);
+        // Membership removal is a trusted callable-only operation because it
+        // must also update the household count and the removed user's context.
+        allow delete: if false;
       }
 
       match /subscriptions/{subscriptionId} {
         allow read: if isHouseholdMember(hid);
-        allow create, update: if isHouseholdAdmin(hid)
-          && request.resource.data.ownerUserId == request.auth.uid
-          && request.resource.data.status in ['trialing', 'active', 'cancelled', 'expired']
-          && request.resource.data.plan in ['annual', 'monthly'];
-        allow delete: if false;
+        allow write: if false;
       }
 
       match /shoppingSchedules/{scheduleId} {
@@ -271,28 +653,96 @@ service cloud.firestore {
         resource.data.visibility == 'public' ||
         isHouseholdMember(resource.data.householdId)
       );
-      allow create, update: if isSignedIn()
+      allow create: if isSignedIn()
+        && (
+          isHouseholdCook(recipeHouseholdId()) ||
+          isExactSavedRecipeCopy(recipeId)
+        )
+        && request.resource.data.visibility in ['private', 'public']
+        && request.resource.data.householdId is string;
+      allow update: if isSignedIn()
         && isHouseholdCook(recipeHouseholdId())
         && request.resource.data.visibility in ['private', 'public']
         && request.resource.data.householdId is string;
       allow delete: if isSignedIn()
-        && isHouseholdCook(resource.data.householdId);
+        && (
+          isHouseholdCook(resource.data.householdId) ||
+          isSavedLocalRecipeOwner(recipeId)
+        );
 
       match /ingredients/{ingredientLineId} {
         allow read: if isSignedIn() && (
           get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public' ||
           isHouseholdMember(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId)
         );
-        allow create, update: if isSignedIn()
-          && isHouseholdCook(getAfter(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId)
+        allow create: if isSignedIn()
+          && (
+            isHouseholdCook(getAfter(recipeRef(recipeId)).data.householdId) ||
+            isExactSavedRecipeIngredient(recipeId, ingredientLineId)
+          )
           && request.resource.data.recipeId == recipeId
           && isValidIngredientReference(
-            getAfter(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId,
+            getAfter(recipeRef(recipeId)).data.householdId,
+            request.resource.data.ingredientId,
+            request.resource.data.unit
+          );
+        allow update: if isSignedIn()
+          && isHouseholdCook(getAfter(recipeRef(recipeId)).data.householdId)
+          && request.resource.data.recipeId == recipeId
+          && isValidIngredientReference(
+            getAfter(recipeRef(recipeId)).data.householdId,
             request.resource.data.ingredientId,
             request.resource.data.unit
           );
         allow delete: if isSignedIn()
-          && isHouseholdCook(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId);
+          && (
+            isHouseholdCook(get(recipeRef(recipeId)).data.householdId) ||
+            canDeleteSavedRecipeIngredient(recipeId)
+          );
+      }
+
+      match /likes/{userId} {
+        allow read: if isSignedIn()
+          && get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public';
+        allow create, update: if isSignedIn()
+          && userId == request.auth.uid
+          && get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public'
+          && request.resource.data.keys().hasOnly(['userId', 'createdAt'])
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.createdAt is timestamp;
+        allow delete: if isSignedIn() && userId == request.auth.uid;
+      }
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn()
+          && get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public';
+        allow create: if isSignedIn()
+          && get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public'
+          && request.resource.data.keys().hasOnly([
+            'recipeId',
+            'authorUserId',
+            'body',
+            'createdAt',
+            'updatedAt',
+          ])
+          && request.resource.data.recipeId == recipeId
+          && request.resource.data.authorUserId == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 1000
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.updatedAt == request.resource.data.createdAt;
+        allow update: if isSignedIn()
+          && resource.data.authorUserId == request.auth.uid
+          && request.resource.data.recipeId == resource.data.recipeId
+          && request.resource.data.authorUserId == resource.data.authorUserId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 1000
+          && request.resource.data.updatedAt is timestamp;
+        allow delete: if isSignedIn()
+          && resource.data.authorUserId == request.auth.uid;
       }
     }
 
@@ -320,7 +770,8 @@ service cloud.firestore {
         : request.resource.data.section != 'leftover'
           && (
             hasFullPantryAccess(hid) ||
-            (hasHouseholdRole(hid, ['cook', 'shopper']) && isConstrainedQuantityUpdate(hid))
+            isCookQuantityDecrease(hid) ||
+            isShopperQuantityCorrection(hid)
           );
       allow delete: if hasFullPantryAccess(hid);
     }
@@ -374,15 +825,22 @@ service cloud.firestore {
 
     match /households/{hid}/savedRecipes/{id} {
       allow read: if isHouseholdMember(hid);
-      allow create, update: if isHouseholdCook(hid)
-        && hasHouseholdId(hid);
-      allow delete: if isHouseholdCook(hid);
+      allow create: if isValidSavedRecipeLink(hid, id);
+      allow update: if false;
+      allow delete: if isHouseholdCook(hid) || (
+        isHouseholdMember(hid)
+        && resource.data.userId == request.auth.uid
+        && resource.data.householdId == hid
+        && resource.data.localRecipeId == id
+        && !existsAfter(recipeRef(resource.data.localRecipeId))
+      );
     }
 
     match /households/{hid}/mealScheduleEntries/{id} {
       allow read: if isHouseholdMember(hid);
       allow create, update: if isHouseholdCook(hid)
-        && hasHouseholdId(hid);
+        && hasHouseholdId(hid)
+        && isValidMealMerge(hid);
       allow delete: if isHouseholdCook(hid);
     }
 
@@ -404,6 +862,16 @@ service cloud.firestore {
       }
     }
 
+    match /households/{hid}/notifications/{notificationId} {
+      allow read: if isHouseholdMember(hid)
+        && resource.data.recipientUserId == request.auth.uid;
+      allow update: if isHouseholdMember(hid)
+        && resource.data.recipientUserId == request.auth.uid
+        && request.resource.data.recipientUserId == request.auth.uid
+        && isNotificationReadUpdate();
+      allow create, delete: if false;
+    }
+
     // Planner drafts are server-owned command inputs and must never be exposed
     // to Firebase clients. Admin SDK and Cloud Functions bypass Rules.
     match /households/{hid}/shoppingAllocationDrafts/{draftId} {
@@ -412,21 +880,32 @@ service cloud.firestore {
 
     match /households/{hid}/menuSets/{menuSetId} {
       allow read: if isHouseholdMember(hid);
-      allow create, update: if isHouseholdAdmin(hid)
-        && hasHouseholdId(hid);
+      allow create: if canManageMenuSets(hid)
+        && isValidMenuSet(hid)
+        && request.resource.data.createdByUserId == request.auth.uid;
+      allow update: if canManageMenuSets(hid)
+        && isValidMenuSet(hid)
+        && request.resource.data.createdByUserId == resource.data.get(
+          'createdByUserId',
+          request.auth.uid
+        )
+        && request.resource.data.createdAt == resource.data.get(
+          'createdAt',
+          request.resource.data.createdAt
+        );
       allow delete: if isHouseholdAdmin(hid);
 
       match /days/{dayId} {
         allow read: if isHouseholdMember(hid);
-        allow create, update: if isHouseholdAdmin(hid)
-          && request.resource.data.menuSetId == menuSetId;
-        allow delete: if isHouseholdAdmin(hid);
+        allow create, update: if canManageMenuSets(hid)
+          && isValidMenuSetDay(menuSetId);
+        allow delete: if canManageMenuSets(hid);
 
         match /entries/{entryId} {
           allow read: if isHouseholdMember(hid);
-          allow create, update: if isHouseholdAdmin(hid)
-            && request.resource.data.menuSetDayId == dayId;
-          allow delete: if isHouseholdAdmin(hid);
+          allow create, update: if canManageMenuSets(hid)
+            && isValidMenuSetEntry(dayId);
+          allow delete: if canManageMenuSets(hid);
         }
       }
     }
