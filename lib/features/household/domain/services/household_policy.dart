@@ -75,8 +75,8 @@ class HouseholdPolicy {
       }
     }
 
-    return const Result.success(
-      HouseholdJoinApproval(defaultRole: HouseholdRole.member),
+    return Result.success(
+      HouseholdJoinApproval(defaultRole: request.invitedRole),
     );
   }
 
@@ -122,7 +122,6 @@ const Set<HouseholdCapability> _cookCapabilities = {
   HouseholdCapability.createRecipes,
   HouseholdCapability.editRecipes,
   HouseholdCapability.deleteRecipes,
-  HouseholdCapability.configureCalendarDefaults,
   HouseholdCapability.scheduleMeals,
   HouseholdCapability.removeScheduledMeals,
   HouseholdCapability.markMealsCooked,

@@ -91,6 +91,7 @@ class HouseholdJoinRequest {
     required this.userIsPremium,
     required this.householdIsJoint,
     required this.householdHasPremium,
+    required this.invitedRole,
     required this.currentMemberCount,
     required this.maxMembers,
     required this.existingJoinedPremiumHouseholds,
@@ -99,6 +100,7 @@ class HouseholdJoinRequest {
   final bool userIsPremium;
   final bool householdIsJoint;
   final bool householdHasPremium;
+  final HouseholdRole invitedRole;
   final int currentMemberCount;
   final int maxMembers;
   final int existingJoinedPremiumHouseholds;

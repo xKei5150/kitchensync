@@ -1,9 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/features/onboarding/presentation/screens/household_setup_screen.dart';
 
 /// Screen 13 · Onboarding — a warm front door.
 ///
@@ -17,12 +19,15 @@ class SignInScreen extends ConsumerStatefulWidget {
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
 }
 
+enum _EmailAuthMode { signIn, register }
+
 class _SignInScreenState extends ConsumerState<SignInScreen> {
   static const _appleAuthEnabled = bool.fromEnvironment('ENABLE_APPLE_AUTH');
   static const _googleAuthEnabled = bool.fromEnvironment('ENABLE_GOOGLE_AUTH');
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  _EmailAuthMode _emailMode = _EmailAuthMode.signIn;
   bool _saving = false;
 
   @override
@@ -32,11 +37,23 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.dispose();
   }
 
-  Future<void> _continueWithProvider(String provider) async {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$provider sign-in is not configured yet.')),
-    );
+  Future<void> _continueWithProvider(AuthProvider provider) async {
+    setState(() => _saving = true);
+    final auth = ref.read(firebaseAuthProvider);
+    try {
+      if (auth == null) {
+        throw StateError('Firebase Authentication is unavailable.');
+      }
+      final credential = kIsWeb
+          ? await auth.signInWithPopup(provider)
+          : await auth.signInWithProvider(provider);
+      await _finishAuthentication(
+        credential,
+        createSoloHousehold: credential.additionalUserInfo?.isNewUser ?? false,
+      );
+    } catch (error) {
+      _showAuthenticationError(error);
+    }
   }
 
   Future<void> _continueWithEmail() async {
@@ -60,35 +77,55 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     setState(() => _saving = true);
     final auth = ref.read(firebaseAuthProvider);
     try {
-      if (auth != null && auth.currentUser == null) {
-        try {
-          await auth.signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
-        } on FirebaseAuthException catch (error) {
-          if (error.code != 'user-not-found' &&
-              error.code != 'invalid-credential' &&
-              error.code != 'wrong-password') {
-            rethrow;
-          }
-          await auth.createUserWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
-        }
+      if (auth == null) {
+        throw StateError('Firebase Authentication is unavailable.');
       }
+      final UserCredential credential;
+      switch (_emailMode) {
+        case _EmailAuthMode.signIn:
+          credential = await auth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+        case _EmailAuthMode.register:
+          credential = await auth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+      }
+      await _finishAuthentication(
+        credential,
+        createSoloHousehold: _emailMode == _EmailAuthMode.register,
+      );
     } catch (error) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not sign in: $error')));
-      return;
+      _showAuthenticationError(error);
+    }
+  }
+
+  Future<void> _finishAuthentication(
+    UserCredential credential, {
+    required bool createSoloHousehold,
+  }) async {
+    if (createSoloHousehold) {
+      try {
+        await ref
+            .read(householdOnboardingControllerProvider)
+            .createHousehold(kind: KitchenKind.solo);
+      } catch (_) {
+        await credential.user?.delete().catchError((_) {});
+        rethrow;
+      }
     }
     if (!mounted) return;
-    await context.push('/onboarding/household');
-    if (mounted) setState(() => _saving = false);
+    context.go('/today');
+  }
+
+  void _showAuthenticationError(Object error) {
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(_authenticationErrorMessage(error))));
   }
 
   @override
@@ -116,7 +153,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     background: ks.textPrimary,
                     foreground: ks.surfaceBase,
                     onTap: _appleAuthEnabled
-                        ? () => _continueWithProvider('Apple')
+                        ? () => _continueWithProvider(AppleAuthProvider())
                         : null,
                   ),
                   const SizedBox(height: KsTokens.space10),
@@ -127,12 +164,33 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     foreground: ks.textPrimary,
                     border: ks.borderStrong,
                     onTap: _googleAuthEnabled
-                        ? () => _continueWithProvider('Google')
+                        ? () => _continueWithProvider(GoogleAuthProvider())
                         : null,
                   ),
                   const SizedBox(height: KsTokens.space16),
                   const _OrRule(),
                   const SizedBox(height: KsTokens.space16),
+                  SegmentedButton<_EmailAuthMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: _EmailAuthMode.signIn,
+                        icon: Icon(Icons.login_rounded),
+                        label: Text('Login'),
+                      ),
+                      ButtonSegment(
+                        value: _EmailAuthMode.register,
+                        icon: Icon(Icons.person_add_alt_1_rounded),
+                        label: Text('Register'),
+                      ),
+                    ],
+                    selected: {_emailMode},
+                    showSelectedIcon: false,
+                    onSelectionChanged: _saving
+                        ? null
+                        : (selection) =>
+                              setState(() => _emailMode = selection.single),
+                  ),
+                  const SizedBox(height: KsTokens.space12),
                   _EmailField(controller: _emailController),
                   const SizedBox(height: KsTokens.space10),
                   _PasswordField(controller: _passwordController),
@@ -140,7 +198,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   FilledButton(
                     onPressed: _saving ? null : _continueWithEmail,
                     child: Text(
-                      _saving ? 'Continuing...' : 'Continue with email',
+                      _saving
+                          ? 'Continuing...'
+                          : switch (_emailMode) {
+                              _EmailAuthMode.signIn => 'Login',
+                              _EmailAuthMode.register => 'Create account',
+                            },
                     ),
                   ),
                 ],
@@ -151,6 +214,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       ),
     );
   }
+}
+
+String _authenticationErrorMessage(Object error) {
+  if (error is FirebaseAuthException) {
+    return switch (error.code) {
+      'invalid-email' => 'Enter a valid email address.',
+      'invalid-credential' ||
+      'wrong-password' ||
+      'user-not-found' => 'Email or password is incorrect.',
+      'email-already-in-use' =>
+        'An account already uses this email. Choose Login.',
+      'weak-password' => 'Choose a stronger password.',
+      'network-request-failed' =>
+        'Could not reach authentication. Check your connection and retry.',
+      _ => 'Could not authenticate: ${error.message ?? error.code}',
+    };
+  }
+  return 'Could not authenticate: $error';
 }
 
 /// The produce → grain → accent gradient hero carrying the wordmark and the
