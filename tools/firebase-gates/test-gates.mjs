@@ -32,7 +32,11 @@ function run(command, args, options = {}) {
 
 const requiredFunctions = [
   "shoppingSmoke",
+  "startPremiumTrial",
+  "removeHouseholdMember",
+  "transferHouseholdAdmin",
   "completeShoppingList",
+  "cancelShoppingList",
   "deleteShoppingList",
   "planShoppingAllocation",
   "mutateShoppingListItem",

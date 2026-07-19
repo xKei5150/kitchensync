@@ -105,5 +105,30 @@ for (const [profile, rulesFile] of [
         }),
       )
     })
+
+    test("household command receipts remain server-owned", async () => {
+      const receiptPath = "householdCommandReceipts/household-command-1"
+      const db = env.authenticatedContext("admin").firestore()
+
+      await assertFails(getDoc(doc(db, receiptPath)))
+      await assertFails(
+        setDoc(doc(db, receiptPath), {
+          householdId: "household-1",
+          targetUserId: "member-1",
+          commandType: "removeHouseholdMember",
+        }),
+      )
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), receiptPath), {
+          householdId: "household-1",
+          targetUserId: "member-1",
+          commandType: "removeHouseholdMember",
+        })
+      })
+      await assertFails(
+        updateDoc(doc(db, receiptPath), { targetUserId: "member-2" }),
+      )
+      await assertFails(deleteDoc(doc(db, receiptPath)))
+    })
   })
 }

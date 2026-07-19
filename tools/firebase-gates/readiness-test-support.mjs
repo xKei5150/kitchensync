@@ -28,7 +28,9 @@ case "$*" in
         --arg value "\${FUNCTION_VARIANT_VALUE:-}" \
         --arg status "\${FUNCTIONS_STATUS:-success}" \
         --arg duplicate "\${DUPLICATE_FUNCTION:-}" '
-          ["shoppingSmoke", "completeShoppingList", "deleteShoppingList",
+          ["shoppingSmoke", "startPremiumTrial", "removeHouseholdMember",
+            "transferHouseholdAdmin", "completeShoppingList",
+            "cancelShoppingList", "deleteShoppingList",
             "planShoppingAllocation", "mutateShoppingListItem"] |
           map(select(. != $missing) | {
             id: ., region: "us-central1", platform: "gcfv2",
