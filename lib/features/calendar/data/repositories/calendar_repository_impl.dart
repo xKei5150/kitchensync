@@ -2,7 +2,8 @@ import 'package:kitchensync/features/calendar/data/datasources/calendar_remote_d
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 
-class CalendarRepositoryImpl implements CalendarRepository {
+class CalendarRepositoryImpl
+    implements CalendarRepository, CalendarMealBatchRepository {
   CalendarRepositoryImpl(this._remote);
 
   final CalendarRemoteDataSource _remote;
@@ -29,6 +30,17 @@ class CalendarRepositoryImpl implements CalendarRepository {
     required String householdId,
     required String entryId,
   }) => _remote.deleteMeal(householdId: householdId, entryId: entryId);
+
+  @override
+  Future<void> replaceMeals({
+    required String householdId,
+    required Iterable<String> removedEntryIds,
+    required Iterable<MealScheduleEntry> createdEntries,
+  }) => _remote.replaceMeals(
+    householdId: householdId,
+    removedEntryIds: removedEntryIds,
+    createdEntries: createdEntries,
+  );
 
   @override
   Stream<List<CalendarDaySettings>> watchActiveDaySettings(

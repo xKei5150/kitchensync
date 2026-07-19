@@ -42,6 +42,31 @@ String _monthTitle(DateTime month) {
   return '${_months[month.month - 1]} ${month.year}';
 }
 
+DateTime _startOfWeek(DateTime date) {
+  final day = _dateKey(date);
+  return day.subtract(Duration(days: day.weekday - DateTime.monday));
+}
+
+DateTime _dateInWeek(DateTime start, int dayNumber) {
+  for (var offset = 0; offset < 7; offset++) {
+    final date = start.add(Duration(days: offset));
+    if (date.day == dayNumber) return date;
+  }
+  throw ArgumentError.value(dayNumber, 'dayNumber', 'Not in visible week');
+}
+
+String _weekTitle(DateTime start, DateTime end) {
+  if (start.year == end.year && start.month == end.month) {
+    return '${start.day}-${end.day} ${_months[start.month - 1]} ${start.year}';
+  }
+  if (start.year == end.year) {
+    return '${start.day} ${_months[start.month - 1]}-'
+        '${end.day} ${_months[end.month - 1]} ${start.year}';
+  }
+  return '${start.day} ${_months[start.month - 1]} ${start.year}-'
+      '${end.day} ${_months[end.month - 1]} ${end.year}';
+}
+
 String _weekday(DateTime date) {
   return _weekdays[date.weekday - 1];
 }

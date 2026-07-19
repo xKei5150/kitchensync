@@ -1,5 +1,13 @@
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 
+abstract interface class CalendarMealBatchRepository {
+  Future<void> replaceMeals({
+    required String householdId,
+    required Iterable<String> removedEntryIds,
+    required Iterable<MealScheduleEntry> createdEntries,
+  });
+}
+
 abstract class CalendarRepository {
   Stream<List<MealScheduleEntry>> watchMealsInRange({
     required String householdId,
