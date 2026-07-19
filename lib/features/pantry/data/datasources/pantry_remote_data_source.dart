@@ -1,12 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
-import 'package:kitchensync/features/pantry/data/dtos/pantry_item_dto.dart';
 import 'package:kitchensync/features/pantry/data/dtos/consumption_event_dto.dart';
 import 'package:kitchensync/features/pantry/data/dtos/inventory_adjustment_event_dto.dart';
+import 'package:kitchensync/features/pantry/data/dtos/pantry_item_dto.dart';
 import 'package:kitchensync/features/pantry/data/dtos/waste_event_dto.dart';
-import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
+import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/inventory_adjustment_event.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
@@ -104,16 +104,17 @@ class PantryRemoteDataSource {
           .clamp(0, current.quantity)
           .toDouble();
       if (actualRemoved <= 0) throw StateError('Pantry item is already empty.');
-      transaction.update(itemRef, {
-        'quantity': current.quantity - actualRemoved,
-        if (current.section == PantrySection.leftover)
-          'leftoverServings': (current.quantity - actualRemoved).round(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      transaction.set(
-        _refs.wasteEvents(householdId).doc(wasteEvent.id),
-        WasteEventMapper.toMap(wasteEvent.copyWith(quantity: actualRemoved)),
-      );
+      transaction
+        ..update(itemRef, {
+          'quantity': current.quantity - actualRemoved,
+          if (current.section == PantrySection.leftover)
+            'leftoverServings': (current.quantity - actualRemoved).round(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        })
+        ..set(
+          _refs.wasteEvents(householdId).doc(wasteEvent.id),
+          WasteEventMapper.toMap(wasteEvent.copyWith(quantity: actualRemoved)),
+        );
     });
   }
 
@@ -134,18 +135,19 @@ class PantryRemoteDataSource {
           .toDouble();
       if (actualRemoved <= 0) throw StateError('Pantry item is already empty.');
       final remaining = current.quantity - actualRemoved;
-      transaction.update(itemRef, {
-        'quantity': remaining,
-        if (current.section == PantrySection.leftover)
-          'leftoverServings': remaining.round(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      transaction.set(
-        _refs.consumptionEvents(householdId).doc(consumptionEvent.id),
-        ConsumptionEventMapper.toMap(
-          consumptionEvent.copyWith(quantity: actualRemoved),
-        ),
-      );
+      transaction
+        ..update(itemRef, {
+          'quantity': remaining,
+          if (current.section == PantrySection.leftover)
+            'leftoverServings': remaining.round(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        })
+        ..set(
+          _refs.consumptionEvents(householdId).doc(consumptionEvent.id),
+          ConsumptionEventMapper.toMap(
+            consumptionEvent.copyWith(quantity: actualRemoved),
+          ),
+        );
     });
   }
 
@@ -247,31 +249,32 @@ class PantryRemoteDataSource {
         ),
         updatedAt: occurredAt,
       );
-      transaction.update(itemRef, {
-        'quantity': updated.quantity,
-        'lastPurchaseDate': Timestamp.fromDate(occurredAt),
-        'expiryDate': updated.expiryDate == null
-            ? null
-            : Timestamp.fromDate(updated.expiryDate!),
-        'updatedAt': Timestamp.fromDate(occurredAt),
-      });
-      transaction.set(
-        _refs.inventoryAdjustmentEvents(householdId).doc(eventId),
-        InventoryAdjustmentEventMapper.toMap(
-          InventoryAdjustmentEvent(
-            id: eventId,
-            householdId: householdId,
-            pantryItemId: pantryItemId,
-            ingredientId: current.ingredientId,
-            quantityDelta: quantityToAdd,
-            previousQuantity: current.quantity,
-            newQuantity: updated.quantity,
-            unit: current.unit,
-            reason: InventoryAdjustmentReason.manualRestock,
-            date: occurredAt,
+      transaction
+        ..update(itemRef, {
+          'quantity': updated.quantity,
+          'lastPurchaseDate': Timestamp.fromDate(occurredAt),
+          'expiryDate': updated.expiryDate == null
+              ? null
+              : Timestamp.fromDate(updated.expiryDate!),
+          'updatedAt': Timestamp.fromDate(occurredAt),
+        })
+        ..set(
+          _refs.inventoryAdjustmentEvents(householdId).doc(eventId),
+          InventoryAdjustmentEventMapper.toMap(
+            InventoryAdjustmentEvent(
+              id: eventId,
+              householdId: householdId,
+              pantryItemId: pantryItemId,
+              ingredientId: current.ingredientId,
+              quantityDelta: quantityToAdd,
+              previousQuantity: current.quantity,
+              newQuantity: updated.quantity,
+              unit: current.unit,
+              reason: InventoryAdjustmentReason.manualRestock,
+              date: occurredAt,
+            ),
           ),
-        ),
-      );
+        );
       return updated;
     });
   }

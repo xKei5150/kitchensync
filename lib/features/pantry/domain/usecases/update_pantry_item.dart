@@ -7,8 +7,8 @@ import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 
 class UpdatePantryItemParams {
   const UpdatePantryItemParams({

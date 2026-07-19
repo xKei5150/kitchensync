@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/freshness_helper.dart';
 import 'package:kitchensync/core/utils/result.dart';
-import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
-import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 
@@ -60,7 +60,7 @@ class PantryItemTile extends ConsumerWidget {
     final isBulkLike =
         item.section == PantrySection.bulk ||
         item.section == PantrySection.nonFood;
-    final prediction = household?.hasPremium == true && isBulkLike
+    final prediction = (household?.hasPremium ?? false) && isBulkLike
         ? _statusFor(ref.watch(bulkPantryStatusesProvider), item.id)
         : null;
 
@@ -127,7 +127,8 @@ class PantryItemTile extends ConsumerWidget {
                             const SizedBox(height: KsTokens.space6),
                             _LastPurchased(date: item.lastPurchaseDate!),
                           ],
-                          if (household?.hasPremium == true && isBulkLike) ...[
+                          if ((household?.hasPremium ?? false) &&
+                              isBulkLike) ...[
                             const SizedBox(height: KsTokens.space6),
                             _BulkMetadata(status: prediction),
                           ],
@@ -171,9 +172,10 @@ class _BulkMetadata extends ConsumerWidget {
     final interval = status?.recommendedPurchaseIntervalDays;
     return Text(
       [
-        days == null
-            ? 'Estimated days remaining unavailable'
-            : '$days estimated days remaining',
+        if (days == null)
+          'Estimated days remaining unavailable'
+        else
+          '$days estimated days remaining',
         if (interval != null) 'Buy every $interval days',
       ].join(' · '),
       style: KsTokens.bodySmall.copyWith(color: context.ksColors.textSecondary),
