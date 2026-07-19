@@ -1,5 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,7 +11,10 @@ import 'package:kitchensync/core/locale/unit_system.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+part 'settings_profile.dart';
 
 /// Screen 15 · Settings — the quiet, useful corners.
 ///
@@ -40,6 +43,7 @@ class SettingsScreen extends ConsumerWidget {
     final ks = context.ksColors;
     final themeMode = ref.watch(themeModeControllerProvider);
     final locale = ref.watch(localePreferencesControllerProvider);
+    final profile = ref.watch(settingsProfileProvider);
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -76,7 +80,17 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: KsTokens.space12),
-            const _ProfileRow(),
+            profile.when(
+              loading: () => const _ProfileLoadingRow(),
+              error: (error, _) =>
+                  KsErrorAlert(message: 'Could not load profile: $error'),
+              data: (value) => _ProfileRow(
+                profile: value,
+                onTap: value.isEditable
+                    ? () => _showProfileEditor(context, ref, value)
+                    : null,
+              ),
+            ),
             const SizedBox(height: KsTokens.space16),
             _PremiumBanner(onTap: () => context.push('/settings/premium')),
             const SizedBox(height: KsTokens.space16),
@@ -88,9 +102,14 @@ class SettingsScreen extends ConsumerWidget {
                   onTap: () => context.push('/household'),
                 ),
                 _SettingsRow(
+                  icon: Icons.swap_horiz_rounded,
+                  label: 'Switch kitchen',
+                  onTap: () => context.push('/onboarding/household'),
+                ),
+                _SettingsRow(
                   icon: Icons.notifications_none_rounded,
                   label: 'Notifications',
-                  onTap: () => context.push('/notifications'),
+                  onTap: () => context.push('/settings/notifications'),
                 ),
                 _SettingsRow(
                   icon: Icons.brightness_6_outlined,
@@ -146,47 +165,7 @@ class SettingsSignOutController {
 
   Future<void> signOut() async {
     await preferences.remove(skipHouseholdSetupPrefKey);
-    if (kDebugMode) return;
     await auth?.signOut();
-  }
-}
-
-class _ProfileRow extends StatelessWidget {
-  const _ProfileRow();
-
-  @override
-  Widget build(BuildContext context) {
-    final ks = context.ksColors;
-    return Row(
-      children: [
-        const KsMemberAvatar(initial: 'A', seat: 0, size: 48),
-        const SizedBox(width: KsTokens.space12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Ana Holloway',
-              style: KsTokens.headlineLarge.copyWith(
-                color: ks.textPrimary,
-                fontWeight: FontWeight.w600,
-                fontSize: 19,
-                height: 1,
-              ),
-            ),
-            const SizedBox(height: KsTokens.space2),
-            Text(
-              'ana@home · Admin',
-              style: KsTokens.labelSmall.copyWith(
-                color: ks.textTertiary,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
   }
 }
 

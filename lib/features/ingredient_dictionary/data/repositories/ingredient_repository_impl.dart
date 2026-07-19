@@ -19,9 +19,6 @@ class IngredientRepositoryImpl implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    // TODO(plan-3): implement cursor pagination. startAfterId is accepted to
-    // keep the interface stable but is not yet applied to the Firestore query.
-    String? startAfterId,
   }) async {
     final futures = <Future<List<Ingredient>>>[
       _remote.searchGlobal(query: query, limit: limit),
@@ -77,9 +74,4 @@ class IngredientRepositoryImpl implements IngredientRepository {
   @override
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       _remote.watchByBarcode(barcode);
-
-  @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) {
-    throw UnimplementedError('watchByIds is not used in Plan 2 scope.');
-  }
 }

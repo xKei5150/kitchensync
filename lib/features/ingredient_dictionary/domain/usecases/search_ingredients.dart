@@ -9,13 +9,11 @@ class SearchIngredientsParams {
     required this.query,
     this.householdId,
     this.limit = 30,
-    this.startAfterId,
   });
 
   final String query;
   final String? householdId;
   final int limit;
-  final String? startAfterId;
 }
 
 class SearchIngredients
@@ -34,7 +32,6 @@ class SearchIngredients
         query: params.query.trim(),
         householdId: params.householdId,
         limit: params.limit,
-        startAfterId: params.startAfterId,
       );
       return Result.success(results);
     } catch (e) {

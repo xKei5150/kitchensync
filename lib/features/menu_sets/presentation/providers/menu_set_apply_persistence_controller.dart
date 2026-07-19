@@ -4,6 +4,7 @@ import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/shopping_schedule_repository.dart';
+import 'package:kitchensync/features/calendar/domain/services/calendar_day_settings_resolver.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/menu_sets/domain/entities/menu_set.dart';
@@ -81,6 +82,9 @@ class MenuSetApplyPersistenceController {
       recipesById[recipe.id] = _plannedRecipe(recipe);
     }
 
+    final daySettings = await calendarRepository
+        .watchActiveDaySettings(householdId)
+        .first;
     final result = _applicationEngine.apply(
       menuSet: menuSet,
       startDate: startDate,
@@ -88,7 +92,13 @@ class MenuSetApplyPersistenceController {
       mode: mode,
       existingSchedule: existingSchedule,
       recipesById: recipesById,
-      defaults: const CalendarDefaults(defaultServingSize: 4),
+      defaults: const CalendarDefaults(),
+      defaultsForDate: (date) => CalendarDefaults(
+        defaultServingSize: CalendarDaySettingsResolver.servingSizeForDate(
+          date,
+          daySettings,
+        ),
+      ),
       newMealId: idGenerator.newId,
     );
     await persistApplication(result: result);
@@ -106,18 +116,17 @@ class MenuSetApplyPersistenceController {
   }) async {
     _require(HouseholdCapability.applyMenuSets);
     _requirePremium(HouseholdCapability.applyMenuSets);
-    for (final entry in result.removedEntries) {
-      await calendarRepository.deleteMeal(
-        householdId: householdId,
-        entryId: entry.id,
+    if (calendarRepository is! CalendarMealBatchRepository) {
+      throw StateError(
+        'Calendar repository does not support atomic menu set application.',
       );
     }
-    for (final entry in result.createdEntries) {
-      await calendarRepository.upsertMeal(
-        householdId: householdId,
-        entry: entry,
-      );
-    }
+    final batchRepository = calendarRepository as CalendarMealBatchRepository;
+    await batchRepository.replaceMeals(
+      householdId: householdId,
+      removedEntryIds: result.removedEntries.map((entry) => entry.id),
+      createdEntries: result.createdEntries,
+    );
   }
 
   PlannedRecipe _plannedRecipe(Recipe recipe) {
