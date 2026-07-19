@@ -65,6 +65,13 @@ List<RouteBase> _fullscreenRoutes() => [
     pageBuilder: (context, state) => _page(state, const NotificationsScreen()),
   ),
   GoRoute(
+    path: '/settings/notifications',
+    name: 'notificationPreferences',
+    parentNavigatorKey: _rootNavigatorKey,
+    pageBuilder: (context, state) =>
+        _page(state, const NotificationPreferencesScreen()),
+  ),
+  GoRoute(
     path: '/onboarding',
     name: 'onboarding',
     parentNavigatorKey: _rootNavigatorKey,

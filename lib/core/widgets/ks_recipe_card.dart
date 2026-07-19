@@ -24,6 +24,8 @@ class KsRecipeCard extends StatelessWidget {
     this.coverColors,
     this.onEdit,
     this.onDelete,
+    this.deleteIcon = Icons.delete_outline,
+    this.deleteTooltip = 'Delete',
     this.onSave,
     super.key,
   });
@@ -35,6 +37,8 @@ class KsRecipeCard extends StatelessWidget {
     List<Color>? coverColors,
     VoidCallback? onEdit,
     VoidCallback? onDelete,
+    IconData deleteIcon = Icons.delete_outline,
+    String deleteTooltip = 'Delete',
     Key? key,
   }) : this._(
          variant: KsRecipeVariant.private,
@@ -43,6 +47,8 @@ class KsRecipeCard extends StatelessWidget {
          coverColors: coverColors,
          onEdit: onEdit,
          onDelete: onDelete,
+         deleteIcon: deleteIcon,
+         deleteTooltip: deleteTooltip,
          key: key,
        );
 
@@ -87,6 +93,8 @@ class KsRecipeCard extends StatelessWidget {
   final List<Color>? coverColors;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final IconData deleteIcon;
+  final String deleteTooltip;
   final VoidCallback? onSave;
 
   @override
@@ -266,25 +274,30 @@ class KsRecipeCard extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: KsTokens.space12),
-        Row(
-          children: [
-            Expanded(
-              child: _CardButton(
-                label: 'Edit',
-                icon: Icons.edit_outlined,
-                onTap: onEdit,
-              ),
-            ),
-            const SizedBox(width: KsTokens.space8),
-            _CardButton(
-              icon: Icons.delete_outline,
-              tooltip: 'Delete',
-              danger: true,
-              onTap: onDelete,
-            ),
-          ],
-        ),
+        if (onEdit != null || onDelete != null) ...[
+          const SizedBox(height: KsTokens.space12),
+          Row(
+            children: [
+              if (onEdit != null)
+                Expanded(
+                  child: _CardButton(
+                    label: 'Edit',
+                    icon: Icons.edit_outlined,
+                    onTap: onEdit,
+                  ),
+                ),
+              if (onEdit != null && onDelete != null)
+                const SizedBox(width: KsTokens.space8),
+              if (onDelete != null)
+                _CardButton(
+                  icon: deleteIcon,
+                  tooltip: deleteTooltip,
+                  danger: deleteTooltip == 'Delete',
+                  onTap: onDelete,
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

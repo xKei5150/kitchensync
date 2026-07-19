@@ -11,6 +11,8 @@ import 'package:kitchensync/core/widgets/ks_dashed.dart';
 /// (on a dashed edge), leftover = dome. [empty] is an un-planned future day.
 enum CalendarDayStatus { planned, problem, shopping, missed, leftover, empty }
 
+enum CalendarDayMarker { leftover, spoilage, waste }
+
 /// Resolved visual treatment for a [CalendarDayStatus] under the active theme.
 @immutable
 class _DayStyle {
@@ -146,10 +148,10 @@ class KsCalendarDayCell extends StatelessWidget {
         ? ks.textSecondary
         : ks.textPrimary;
 
-    // Today always wears a planned-style accent bar + brand ring.
-    final barColor = isToday ? ks.calPlanned : style.barColor;
-    final glyph = isToday ? Icons.check_rounded : style.glyph;
-    final glyphColor = isToday ? ks.calPlanned : style.accent;
+    // Today receives a brand ring without replacing its real status.
+    final barColor = style.barColor;
+    final glyph = style.glyph;
+    final glyphColor = style.accent;
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,10 +237,19 @@ class KsCalendarDayCell extends StatelessWidget {
 /// trailing pad cell (no numeral).
 @immutable
 class KsAlmanacDay {
-  const KsAlmanacDay(this.status, {this.isToday = false});
+  const KsAlmanacDay(
+    this.status, {
+    this.markers = const {},
+    this.dayNumber,
+    this.isToday = false,
+  });
 
   /// Null = a blank pad cell that carries no day number.
   final CalendarDayStatus? status;
+  final Set<CalendarDayMarker> markers;
+
+  /// Optional explicit numeral for ranges that cross month boundaries.
+  final int? dayNumber;
   final bool isToday;
 
   /// A blank leading/trailing pad cell.
@@ -287,10 +298,11 @@ class KsAlmanacGrid extends StatelessWidget {
           week.add(const Expanded(child: AspectRatio(aspectRatio: 1)));
         } else {
           dayNum++;
-          final cellDay = dayNum;
+          final cellDay = day.dayNumber ?? dayNum;
           final cell = _AlmanacCell(
             day: cellDay,
             status: day.status!,
+            markers: day.markers,
             isToday: day.isToday,
           );
           week.add(
@@ -354,6 +366,18 @@ class KsAlmanacGrid extends StatelessWidget {
               _LegendSwatch(color: ks.calProblem, label: 'Problem'),
               _LegendSwatch(color: ks.calShopping, label: 'Shop'),
               _LegendSwatch(color: ks.calMissed, label: 'Missed', dashed: true),
+              const _LegendMarker(
+                icon: Icons.room_service_outlined,
+                label: 'Leftover',
+              ),
+              const _LegendMarker(
+                icon: Icons.event_busy_outlined,
+                label: 'Spoilage',
+              ),
+              const _LegendMarker(
+                icon: Icons.delete_outline_rounded,
+                label: 'Waste',
+              ),
             ],
           ),
         ],
@@ -366,18 +390,24 @@ class _AlmanacCell extends StatelessWidget {
   const _AlmanacCell({
     required this.day,
     required this.status,
+    required this.markers,
     required this.isToday,
   });
 
   final int day;
   final CalendarDayStatus status;
+  final Set<CalendarDayMarker> markers;
   final bool isToday;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
     final style = _resolveDayStyle(context, status);
-    final glyph = isToday ? Icons.check_rounded : style.glyph;
+    final glyphs = <({IconData icon, Color color, String label})>[
+      if (style.glyph case final icon?)
+        (icon: icon, color: style.accent, label: _statusLabel(status)),
+      for (final marker in markers) _markerGlyph(marker, ks),
+    ];
 
     final inner = Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -390,9 +420,21 @@ class _AlmanacCell extends StatelessWidget {
             height: 1,
           ),
         ),
-        if (glyph != null) ...[
+        if (glyphs.isNotEmpty) ...[
           const SizedBox(height: 1),
-          Icon(glyph, size: 11, color: style.accent),
+          Semantics(
+            label: glyphs.map((glyph) => glyph.label).join(', '),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final glyph in glyphs)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 0.5),
+                    child: Icon(glyph.icon, size: 9, color: glyph.color),
+                  ),
+              ],
+            ),
+          ),
         ],
       ],
     );
@@ -431,6 +473,36 @@ class _AlmanacCell extends StatelessWidget {
   }
 }
 
+String _statusLabel(CalendarDayStatus status) => switch (status) {
+  CalendarDayStatus.planned => 'Planned',
+  CalendarDayStatus.problem => 'Problem',
+  CalendarDayStatus.shopping => 'Shopping day',
+  CalendarDayStatus.missed => 'Missed shopping',
+  CalendarDayStatus.leftover => 'Leftover',
+  CalendarDayStatus.empty => 'Unplanned',
+};
+
+({IconData icon, Color color, String label}) _markerGlyph(
+  CalendarDayMarker marker,
+  KsColors ks,
+) => switch (marker) {
+  CalendarDayMarker.leftover => (
+    icon: Icons.room_service_outlined,
+    color: KsTokens.sectionLeftover,
+    label: 'Leftover scheduled',
+  ),
+  CalendarDayMarker.spoilage => (
+    icon: Icons.event_busy_outlined,
+    color: ks.calMissed,
+    label: 'Spoilage',
+  ),
+  CalendarDayMarker.waste => (
+    icon: Icons.delete_outline_rounded,
+    color: ks.calProblem,
+    label: 'Waste',
+  ),
+};
+
 class _LegendSwatch extends StatelessWidget {
   const _LegendSwatch({
     required this.color,
@@ -457,6 +529,34 @@ class _LegendSwatch extends StatelessWidget {
             border: dashed ? Border.all(color: color, width: 1.5) : null,
           ),
         ),
+        const SizedBox(width: KsTokens.space4),
+        Text(
+          label,
+          style: KsTokens.labelSmall.copyWith(
+            color: ks.textSecondary,
+            fontSize: 10,
+            letterSpacing: 0,
+            height: 1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendMarker extends StatelessWidget {
+  const _LegendMarker({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: ks.textSecondary),
         const SizedBox(width: KsTokens.space4),
         Text(
           label,

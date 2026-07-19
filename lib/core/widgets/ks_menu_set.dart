@@ -30,6 +30,7 @@ class KsMenuSetCard extends StatelessWidget {
     this.premium = true,
     this.onApply,
     this.onDuplicate,
+    this.onEdit,
     super.key,
   });
 
@@ -41,6 +42,7 @@ class KsMenuSetCard extends StatelessWidget {
   final bool premium;
   final VoidCallback? onApply;
   final VoidCallback? onDuplicate;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +91,15 @@ class KsMenuSetCard extends StatelessWidget {
               if (premium) ...[
                 const SizedBox(width: KsTokens.space8),
                 const KsBadge.premium(),
+              ],
+              if (onEdit != null) ...[
+                const SizedBox(width: KsTokens.space4),
+                IconButton(
+                  onPressed: onEdit,
+                  tooltip: 'View or edit',
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  visualDensity: VisualDensity.compact,
+                ),
               ],
             ],
           ),

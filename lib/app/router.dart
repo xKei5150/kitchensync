@@ -21,6 +21,7 @@ import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/
 import 'package:kitchensync/features/ingredient_dictionary/presentation/screens/ingredient_picker_screen.dart';
 import 'package:kitchensync/features/menu_sets/presentation/screens/menu_set_editor_screen.dart';
 import 'package:kitchensync/features/menu_sets/presentation/screens/menu_sets_screen.dart';
+import 'package:kitchensync/features/notifications/presentation/screens/notification_preferences_screen.dart';
 import 'package:kitchensync/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:kitchensync/features/onboarding/presentation/screens/household_setup_screen.dart';
 import 'package:kitchensync/features/onboarding/presentation/screens/sign_in_screen.dart';
