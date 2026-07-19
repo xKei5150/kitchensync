@@ -95,6 +95,15 @@ RouteBase _shellRoute() => StatefulShellRoute.indexedStack(
               pageBuilder: (context, state) =>
                   _page(state, const WasteLogScreen()),
             ),
+            // Declared before ':itemId' so the dynamic item-detail route does
+            // not capture 'bulk-purchases' as a pantry item id.
+            GoRoute(
+              path: 'bulk-purchases',
+              name: 'bulkPurchases',
+              parentNavigatorKey: _rootNavigatorKey,
+              pageBuilder: (context, state) =>
+                  _page(state, const BulkPurchaseScreen()),
+            ),
             GoRoute(
               path: ':itemId',
               name: 'pantryItemDetail',

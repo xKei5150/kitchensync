@@ -53,12 +53,6 @@ List<RouteBase> _fullscreenRoutes() => [
     pageBuilder: (context, state) => _page(state, const InsightsScreen()),
   ),
   GoRoute(
-    path: '/pantry/bulk-purchases',
-    name: 'bulkPurchases',
-    parentNavigatorKey: _rootNavigatorKey,
-    pageBuilder: (context, state) => _page(state, const BulkPurchaseScreen()),
-  ),
-  GoRoute(
     path: '/notifications',
     name: 'notifications',
     parentNavigatorKey: _rootNavigatorKey,

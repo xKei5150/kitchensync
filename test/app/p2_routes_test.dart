@@ -118,6 +118,29 @@ void main() {
     expect(router.routerDelegate.currentConfiguration.uri.path, '/shop/list');
   });
 
+  testWidgets('bulk-purchases route opens the bulk screen, not item detail', (
+    tester,
+  ) async {
+    final router = await _pumpApp(
+      tester,
+      overrideActiveHousehold: true,
+      activeHousehold: const ActiveHouseholdContext(
+        id: 'solo-household',
+        name: 'Solo kitchen',
+        role: HouseholdRole.admin,
+        isJoint: false,
+        hasPremium: true,
+      ),
+    );
+
+    router.go('/pantry/bulk-purchases');
+    await tester.pumpAndSettle();
+
+    // The dynamic '/pantry/:itemId' route must not shadow this path.
+    expect(find.text('Item not found.'), findsNothing);
+    expect(find.text('Bulk Foods to Purchase'), findsOneWidget);
+  });
+
   testWidgets('Today header opens Notifications then Settings', (tester) async {
     await _pumpApp(tester);
 
