@@ -45,6 +45,34 @@ class CalendarRemoteDataSource {
     return _refs.mealScheduleEntries(householdId).doc(entryId).delete();
   }
 
+  Future<void> replaceMeals({
+    required String householdId,
+    required Iterable<String> removedEntryIds,
+    required Iterable<MealScheduleEntry> createdEntries,
+  }) async {
+    final removedIds = removedEntryIds.toList(growable: false);
+    final created = createdEntries.toList(growable: false);
+    final operationCount = removedIds.length + created.length;
+    if (operationCount > 500) {
+      throw StateError(
+        'Calendar replacement needs $operationCount writes; '
+        'Firestore allows 500.',
+      );
+    }
+    final collection = _refs.mealScheduleEntries(householdId);
+    final batch = collection.firestore.batch();
+    for (final entryId in removedIds) {
+      batch.delete(collection.doc(entryId));
+    }
+    for (final entry in created) {
+      batch.set(
+        collection.doc(entry.id),
+        MealScheduleEntryMapper.toMap(householdId: householdId, entry: entry),
+      );
+    }
+    await batch.commit();
+  }
+
   Stream<List<CalendarDaySettings>> watchActiveDaySettings(String householdId) {
     return _refs
         .daySettings(householdId)

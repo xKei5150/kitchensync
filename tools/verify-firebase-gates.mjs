@@ -121,7 +121,11 @@ check("required Functions use Node 22 and us-central1", () => {
   const functionsSource = source("functions/src/index.ts")
   const required = [
     "shoppingSmoke",
+    "startPremiumTrial",
+    "removeHouseholdMember",
+    "transferHouseholdAdmin",
     "completeShoppingList",
+    "cancelShoppingList",
     "deleteShoppingList",
     "planShoppingAllocation",
     "mutateShoppingListItem",

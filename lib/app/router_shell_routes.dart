@@ -119,8 +119,12 @@ RouteBase _shellRoute() => StatefulShellRoute.indexedStack(
               path: 'edit',
               name: 'menuSetEditor',
               parentNavigatorKey: _rootNavigatorKey,
-              pageBuilder: (context, state) =>
-                  _page(state, const MenuSetEditorScreen()),
+              pageBuilder: (context, state) => _page(
+                state,
+                MenuSetEditorScreen(
+                  menuSetId: state.uri.queryParameters['menuSetId'],
+                ),
+              ),
             ),
           ],
         ),

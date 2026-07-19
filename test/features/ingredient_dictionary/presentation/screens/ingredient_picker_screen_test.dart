@@ -59,7 +59,6 @@ class _UnusedIngredientRepository implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    String? startAfterId,
   }) {
     throw UnimplementedError();
   }
@@ -79,10 +78,6 @@ class _UnusedIngredientRepository implements IngredientRepository {
     throw UnimplementedError();
   }
 
-  @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) {
-    throw UnimplementedError();
-  }
 }
 
 Future<void> _pump(WidgetTester tester, Result<List<Ingredient>> result) async {

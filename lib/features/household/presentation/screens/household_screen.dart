@@ -5,27 +5,25 @@ import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
+import 'package:kitchensync/features/household/presentation/controllers/household_membership_command_controller.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
 /// Screen 14 · Household & roles — who's in the kitchen.
 ///
-/// Members with their roles + a shareable invite code. Tapping a member opens
-/// the role-assignment sheet. Presentational P2 with representative members.
+/// Members with their roles plus Admin-only invite and role controls.
 class HouseholdScreen extends ConsumerWidget {
   const HouseholdScreen({super.key});
 
-  static const _previewMembers = [
-    _Member(name: 'Ana', handle: 'you', role: HouseholdRole.admin, seat: 0),
-    _Member(name: 'Ben', handle: 'ben@home', role: HouseholdRole.cook, seat: 1),
-    _Member(
-      name: 'Eli',
-      handle: 'eli@home',
-      role: HouseholdRole.shopper,
-      seat: 4,
-    ),
-  ];
-
-  void _assignRole(BuildContext context, WidgetRef ref, _Member member) {
+  void _manageMember(
+    BuildContext context,
+    WidgetRef ref,
+    HouseholdMemberSummary member, {
+    required bool canAssignRoles,
+    required bool canRemoveMembers,
+    required bool canTransferAdmin,
+  }) {
     final ks = context.ksColors;
     showModalBottomSheet<void>(
       context: context,
@@ -34,40 +32,128 @@ class HouseholdScreen extends ConsumerWidget {
       barrierColor: ks.scrim,
       builder: (_) => _RoleSheet(
         member: member,
-        onSave: (role) => _saveRole(ref, member, role),
+        onSave: canAssignRoles ? (role) => _saveRole(ref, member, role) : null,
+        onRemove: canRemoveMembers ? () => _removeMember(ref, member) : null,
+        onTransferAdmin: canTransferAdmin
+            ? () => _transferAdmin(ref, member)
+            : null,
       ),
     );
   }
 
   Future<void> _saveRole(
     WidgetRef ref,
-    _Member member,
+    HouseholdMemberSummary member,
     HouseholdRole role,
   ) async {
-    final auth = ref.read(firebaseAuthProvider);
-    if (auth == null || member.userId == null) return;
-    final household = ref.read(activeHouseholdContextProvider);
-    if (household == null) return;
+    final details = _requireCapability(ref, HouseholdCapability.assignRoles);
+    if (member.isCurrentUser) {
+      throw StateError('Use the transfer-admin flow to change your own role.');
+    }
     await ref
         .read(firestoreProvider)
         .collection('households')
-        .doc(household.id)
+        .doc(details.id)
         .collection('members')
         .doc(member.userId)
-        .set({
-          'role': role.name,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        .update({'role': role.name, 'updatedAt': FieldValue.serverTimestamp()});
+  }
+
+  Future<void> _removeMember(
+    WidgetRef ref,
+    HouseholdMemberSummary member,
+  ) async {
+    final details = _requireCapability(ref, HouseholdCapability.removeMembers);
+    if (member.isCurrentUser) {
+      throw StateError('You cannot remove your own household membership.');
+    }
+    await ref
+        .read(householdMembershipCommandControllerProvider)
+        .removeMember(householdId: details.id, targetUserId: member.userId);
+  }
+
+  Future<void> _transferAdmin(
+    WidgetRef ref,
+    HouseholdMemberSummary member,
+  ) async {
+    final details = _requireCapability(ref, HouseholdCapability.transferAdmin);
+    if (member.isCurrentUser) {
+      throw StateError('Choose another Premium household member.');
+    }
+    await ref
+        .read(householdMembershipCommandControllerProvider)
+        .transferAdmin(householdId: details.id, targetUserId: member.userId);
+  }
+
+  HouseholdDetails _requireCapability(
+    WidgetRef ref,
+    HouseholdCapability capability,
+  ) {
+    final details = ref.read(householdDetailsProvider).valueOrNull;
+    if (details == null) {
+      throw StateError('Wait for household membership to finish loading.');
+    }
+    final currentMember = _currentMember(details.members);
+    if (currentMember == null) {
+      throw StateError('Your household membership is unavailable.');
+    }
+    if (!const HouseholdPolicy().roleCan(
+      currentMember.role,
+      capability,
+      isSoloHousehold: !details.isJoint,
+    )) {
+      throw StateError(
+        '${currentMember.role.label} cannot ${capability.name}.',
+      );
+    }
+    return details;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
     final snapshot = ref.watch(householdDetailsProvider);
-    final details = snapshot.valueOrNull ?? _HouseholdDetails.preview();
-    final members = details.members;
-    final headerEyebrow =
-        '${details.name} · ${members.length} of ${details.maxMembers}';
+    final details = snapshot.asData?.value;
+    const policy = HouseholdPolicy();
+    final currentMember = details == null
+        ? null
+        : _currentMember(details.members);
+    final canAssignRoles =
+        details != null &&
+        currentMember != null &&
+        policy.roleCan(
+          currentMember.role,
+          HouseholdCapability.assignRoles,
+          isSoloHousehold: !details.isJoint,
+        );
+    final canInviteMembers =
+        details != null &&
+        currentMember != null &&
+        policy.roleCan(
+          currentMember.role,
+          HouseholdCapability.inviteMembers,
+          isSoloHousehold: !details.isJoint,
+        );
+    final canRemoveMembers =
+        details != null &&
+        currentMember != null &&
+        policy.roleCan(
+          currentMember.role,
+          HouseholdCapability.removeMembers,
+          isSoloHousehold: !details.isJoint,
+        );
+    final canTransferAdmin =
+        details != null &&
+        currentMember != null &&
+        policy.roleCan(
+          currentMember.role,
+          HouseholdCapability.transferAdmin,
+          isSoloHousehold: !details.isJoint,
+        );
+    final headerEyebrow = details == null
+        ? 'Household'
+        : '${details.name} · ${details.members.length} '
+              'of ${details.maxMembers}';
     return Scaffold(
       backgroundColor: ks.surfaceBase,
       body: SafeArea(
@@ -97,17 +183,45 @@ class HouseholdScreen extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(vertical: KsTokens.space8),
                 child: LinearProgressIndicator(minHeight: 2),
               ),
-            for (var i = 0; i < members.length; i++) ...[
-              if (i > 0) const SizedBox(height: KsTokens.space10),
-              _MemberTile(
-                member: members[i],
-                onTap: members[i].isCurrentUser
-                    ? null
-                    : () => _assignRole(context, ref, members[i]),
+            if (snapshot.hasError && details == null)
+              KsErrorAlert(
+                message: 'Could not load household: ${snapshot.error}',
               ),
+            if (details != null && details.members.isEmpty)
+              const KsEmptyState(
+                icon: Icons.group_off_outlined,
+                title: 'No household members',
+                subtitle:
+                    'No membership records are available for this kitchen.',
+              ),
+            if (details != null)
+              for (var i = 0; i < details.members.length; i++) ...[
+                if (i > 0) const SizedBox(height: KsTokens.space10),
+                _MemberTile(
+                  member: details.members[i],
+                  onTap:
+                      (canAssignRoles ||
+                              canRemoveMembers ||
+                              canTransferAdmin) &&
+                          !details.members[i].isCurrentUser
+                      ? () => _manageMember(
+                          context,
+                          ref,
+                          details.members[i],
+                          canAssignRoles: canAssignRoles,
+                          canRemoveMembers: canRemoveMembers,
+                          canTransferAdmin: canTransferAdmin,
+                        )
+                      : null,
+                ),
+              ],
+            if (details != null &&
+                canInviteMembers &&
+                details.inviteCode != null &&
+                details.inviteCode!.isNotEmpty) ...[
+              const SizedBox(height: KsTokens.space20),
+              KsInviteCode(code: details.inviteCode!, label: 'Invite code'),
             ],
-            const SizedBox(height: KsTokens.space20),
-            KsInviteCode(code: details.inviteCode, label: 'Invite code'),
           ],
         ),
       ),
@@ -115,42 +229,58 @@ class HouseholdScreen extends ConsumerWidget {
   }
 }
 
-final householdDetailsProvider = StreamProvider<_HouseholdDetails>((ref) {
+final householdDetailsProvider = StreamProvider<HouseholdDetails>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
-  if (auth == null) return Stream.value(_HouseholdDetails.preview());
-  final household = ref.watch(activeHouseholdContextProvider);
-  if (household == null) return Stream.value(_HouseholdDetails.preview());
-  final uid = auth.currentUser?.uid ?? '';
+  final user = ref.watch(activeFirebaseUserProvider).valueOrNull;
+  if (auth == null || user == null) {
+    return Stream.error(StateError('Firebase authentication is unavailable.'));
+  }
+  final uid = user.uid;
   final db = ref.watch(firestoreProvider);
-  final householdDoc = db.collection('households').doc(household.id);
-  return householdDoc.snapshots().asyncExpand((householdSnapshot) {
-    final data = householdSnapshot.data() ?? const <String, dynamic>{};
-    final inviteCode = data['inviteCode'] as String? ?? 'SOLO';
-    final maxMembers =
-        data['maxMembers'] as int? ?? (household.isJoint ? 6 : 1);
-    final name = data['name'] as String? ?? household.name;
-    return householdDoc.collection('members').snapshots().map((snapshot) {
-      final members =
-          [
-            for (var i = 0; i < snapshot.docs.length; i++)
-              _memberFromDoc(snapshot.docs[i], index: i, currentUserId: uid),
-          ]..sort((a, b) {
-            if (a.isCurrentUser != b.isCurrentUser) {
-              return a.isCurrentUser ? -1 : 1;
-            }
-            return a.name.compareTo(b.name);
-          });
-      return _HouseholdDetails(
-        name: name,
-        maxMembers: maxMembers,
-        inviteCode: inviteCode,
-        members: members.isEmpty ? HouseholdScreen._previewMembers : members,
-      );
+  return db.collection('users').doc(uid).snapshots().asyncExpand((
+    userSnapshot,
+  ) {
+    final householdId = userSnapshot.data()?['activeHouseholdId'] as String?;
+    if (householdId == null || householdId.isEmpty) {
+      return Stream.error(StateError('No active household selected.'));
+    }
+    final householdDoc = db.collection('households').doc(householdId);
+    return householdDoc.snapshots().asyncExpand((householdSnapshot) {
+      if (!householdSnapshot.exists) {
+        return Stream.error(
+          StateError('The selected household no longer exists.'),
+        );
+      }
+      final data = householdSnapshot.data() ?? const <String, dynamic>{};
+      final isJoint = data['isJoint'] as bool? ?? false;
+      final inviteCode = data['inviteCode'] as String?;
+      final maxMembers = data['maxMembers'] as int? ?? (isJoint ? 6 : 1);
+      final name = data['name'] as String? ?? 'My kitchen';
+      return householdDoc.collection('members').snapshots().map((snapshot) {
+        final members =
+            [
+              for (var i = 0; i < snapshot.docs.length; i++)
+                _memberFromDoc(snapshot.docs[i], index: i, currentUserId: uid),
+            ]..sort((a, b) {
+              if (a.isCurrentUser != b.isCurrentUser) {
+                return a.isCurrentUser ? -1 : 1;
+              }
+              return a.name.compareTo(b.name);
+            });
+        return HouseholdDetails(
+          id: householdId,
+          name: name,
+          isJoint: isJoint,
+          maxMembers: maxMembers,
+          inviteCode: inviteCode,
+          members: members,
+        );
+      });
     });
   });
 });
 
-_Member _memberFromDoc(
+HouseholdMemberSummary _memberFromDoc(
   QueryDocumentSnapshot<Map<String, dynamic>> doc, {
   required int index,
   required String currentUserId,
@@ -161,7 +291,7 @@ _Member _memberFromDoc(
       data['displayName'] as String? ??
       (doc.id == currentUserId ? 'You' : 'Member ${index + 1}');
   final handle = data['email'] as String? ?? doc.id;
-  return _Member(
+  return HouseholdMemberSummary(
     userId: doc.id,
     name: name,
     handle: doc.id == currentUserId ? 'you' : handle,
@@ -174,38 +304,42 @@ _Member _memberFromDoc(
   );
 }
 
-class _HouseholdDetails {
-  const _HouseholdDetails({
+class HouseholdDetails {
+  const HouseholdDetails({
+    required this.id,
     required this.name,
+    required this.isJoint,
     required this.maxMembers,
     required this.inviteCode,
     required this.members,
   });
 
-  factory _HouseholdDetails.preview() => const _HouseholdDetails(
-    name: 'The Holloway kitchen',
-    maxMembers: 6,
-    inviteCode: 'SAGE-417',
-    members: HouseholdScreen._previewMembers,
-  );
-
+  final String id;
   final String name;
+  final bool isJoint;
   final int maxMembers;
-  final String inviteCode;
-  final List<_Member> members;
+  final String? inviteCode;
+  final List<HouseholdMemberSummary> members;
 }
 
-class _Member {
-  const _Member({
+HouseholdMemberSummary? _currentMember(List<HouseholdMemberSummary> members) {
+  for (final member in members) {
+    if (member.isCurrentUser) return member;
+  }
+  return null;
+}
+
+class HouseholdMemberSummary {
+  const HouseholdMemberSummary({
+    required this.userId,
     required this.name,
     required this.handle,
     required this.role,
     required this.seat,
-    this.userId,
     this.isCurrentUser = false,
   });
 
-  final String? userId;
+  final String userId;
   final String name;
   final String handle;
   final HouseholdRole role;
@@ -218,7 +352,7 @@ class _Member {
 class _MemberTile extends StatelessWidget {
   const _MemberTile({required this.member, required this.onTap});
 
-  final _Member member;
+  final HouseholdMemberSummary member;
   final VoidCallback? onTap;
 
   @override
@@ -245,10 +379,17 @@ class _MemberTile extends StatelessWidget {
 
 /// The role-assignment bottom sheet — a radio list of the four roles.
 class _RoleSheet extends StatefulWidget {
-  const _RoleSheet({required this.member, required this.onSave});
+  const _RoleSheet({
+    required this.member,
+    required this.onSave,
+    required this.onRemove,
+    required this.onTransferAdmin,
+  });
 
-  final _Member member;
-  final Future<void> Function(HouseholdRole role) onSave;
+  final HouseholdMemberSummary member;
+  final Future<void> Function(HouseholdRole role)? onSave;
+  final Future<void> Function()? onRemove;
+  final Future<void> Function()? onTransferAdmin;
 
   @override
   State<_RoleSheet> createState() => _RoleSheetState();
@@ -316,39 +457,123 @@ class _RoleSheetState extends State<_RoleSheet> {
             ],
           ),
           const SizedBox(height: KsTokens.space16),
-          for (final role in HouseholdRole.values) ...[
-            _RoleChoice(
-              role: role,
-              description: _descriptions[role]!,
-              selected: _role == role,
-              onTap: () => setState(() => _role = role),
+          if (widget.onSave != null) ...[
+            for (final role in HouseholdRole.values) ...[
+              _RoleChoice(
+                role: role,
+                description: _descriptions[role]!,
+                selected: _role == role,
+                onTap: () => setState(() => _role = role),
+              ),
+              if (role != HouseholdRole.values.last)
+                const SizedBox(height: KsTokens.space8),
+            ],
+            const SizedBox(height: KsTokens.space16),
+            FilledButton(
+              onPressed: _saving
+                  ? null
+                  : () => _runAction(
+                      errorPrefix: 'Could not save role',
+                      action: () => widget.onSave!(_role),
+                    ),
+              child: Text(_saving ? 'Saving...' : 'Save role'),
             ),
-            if (role != HouseholdRole.values.last)
-              const SizedBox(height: KsTokens.space8),
           ],
-          const SizedBox(height: KsTokens.space16),
+          if (widget.onTransferAdmin != null || widget.onRemove != null) ...[
+            const SizedBox(height: KsTokens.space12),
+            Divider(color: ks.border),
+            const SizedBox(height: KsTokens.space8),
+          ],
+          if (widget.onTransferAdmin != null)
+            OutlinedButton.icon(
+              onPressed: _saving ? null : _confirmTransfer,
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              label: const Text('Transfer Admin'),
+            ),
+          if (widget.onRemove != null) ...[
+            const SizedBox(height: KsTokens.space8),
+            TextButton.icon(
+              onPressed: _saving ? null : _confirmRemoval,
+              icon: const Icon(Icons.person_remove_outlined),
+              label: const Text('Remove member'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmTransfer() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Transfer Admin?'),
+        content: Text(
+          '${widget.member.name} must have Premium. '
+          'You will become a Member after the transfer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            onPressed: _saving
-                ? null
-                : () async {
-                    setState(() => _saving = true);
-                    try {
-                      await widget.onSave(_role);
-                    } catch (error) {
-                      if (!context.mounted) return;
-                      setState(() => _saving = false);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Could not save role: $error')),
-                      );
-                      return;
-                    }
-                    if (context.mounted) Navigator.of(context).pop();
-                  },
-            child: Text(_saving ? 'Saving...' : 'Save role'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Transfer'),
           ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+    await _runAction(
+      errorPrefix: 'Could not transfer Admin',
+      action: widget.onTransferAdmin!,
+    );
+  }
+
+  Future<void> _confirmRemoval() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove member?'),
+        content: Text(
+          '${widget.member.name} will lose access to this household.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runAction(
+      errorPrefix: 'Could not remove member',
+      action: widget.onRemove!,
+    );
+  }
+
+  Future<void> _runAction({
+    required String errorPrefix,
+    required Future<void> Function() action,
+  }) async {
+    setState(() => _saving = true);
+    try {
+      await action();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$errorPrefix: $error')));
+      return;
+    }
+    if (mounted) Navigator.of(context).pop();
   }
 }
 

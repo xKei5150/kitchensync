@@ -253,7 +253,6 @@ void main() {
       'detergent-stock',
       'detergent',
       section: PantrySection.nonFood,
-      quantity: 2,
       unit: UnitId.piece,
       lastPurchaseDate: DateTime(2026, 7, 5),
     );

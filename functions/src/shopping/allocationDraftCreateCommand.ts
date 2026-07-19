@@ -66,6 +66,7 @@ async function authorizePlanning(
       householdId: input.command.householdId,
       listId: input.command.commandId,
       receiptId: input.command.commandId,
+      allowedJointRoles: planningRoles(input.command.intent.kind),
     }),
   )
 }
@@ -111,16 +112,25 @@ async function consumeReadyDraft(
         item.unit,
       )
     }
-    const writes = writePlan({
-      authUid: input.authUid,
-      householdId: input.command.householdId,
-      commandId: input.command.commandId,
-      payloadHash: input.payloadHash,
-      planned: input.planned,
-      listRef: context.listRef,
-      receiptRef: context.receiptRef,
-      draftRef,
+    const notificationWrites = await emergencyNotificationWrites({
+      transaction,
+      input,
+      householdRef: context.householdRef,
+      isJointHousehold: context.isJointHousehold,
     })
+    const writes = [
+      ...writePlan({
+        authUid: input.authUid,
+        householdId: input.command.householdId,
+        commandId: input.command.commandId,
+        payloadHash: input.payloadHash,
+        planned: input.planned,
+        listRef: context.listRef,
+        receiptRef: context.receiptRef,
+        draftRef,
+      }),
+      ...notificationWrites,
+    ]
     if (writes.length > maxTransactionWrites) {
       throw new HttpsError("resource-exhausted", "Shopping allocation has too many items")
     }
@@ -137,7 +147,63 @@ async function contextFor(transaction: Transaction, input: DraftOperationInput) 
     householdId: input.command.householdId,
     listId: input.planned.listId,
     receiptId: input.command.commandId,
+    allowedJointRoles: planningRoles(input.command.intent.kind),
   })
+}
+
+function planningRoles(intentKind: string) {
+  return intentKind === "emergency"
+    ? (["admin", "cook", "shopper"] as const)
+    : (["admin", "shopper"] as const)
+}
+
+async function emergencyNotificationWrites(input: {
+  readonly transaction: Transaction
+  readonly input: DraftOperationInput
+  readonly householdRef: DocumentReference
+  readonly isJointHousehold: boolean
+}): Promise<readonly FirestoreWrite[]> {
+  if (input.input.command.intent.kind !== "emergency") return []
+
+  const shopperSnapshot = await input.transaction.get(
+    input.householdRef.collection("members").where("role", "==", "shopper"),
+  )
+  const recipientIds = new Set(shopperSnapshot.docs.map((document) => document.id))
+  if (!input.isJointHousehold && recipientIds.size === 0) {
+    recipientIds.add(input.input.authUid)
+  }
+  if (recipientIds.size === 0) return []
+
+  const recipients = [...recipientIds]
+  const preferenceRefs = recipients.map((uid) =>
+    input.input.db.doc(`users/${uid}/notificationPreferences/${input.input.command.householdId}`),
+  )
+  const preferenceSnapshots = await input.transaction.getAll(...preferenceRefs)
+  const now = FieldValue.serverTimestamp()
+  const demandCount = input.input.command.intent.demands.length
+  const date = input.input.command.intent.startDate
+  const enabledRecipients = recipients.filter(
+    (_, index) => preferenceSnapshots[index]?.get("emergencyShopping") !== false,
+  )
+
+  return enabledRecipients.map((uid) => ({
+    kind: "create" as const,
+    ref: input.householdRef
+      .collection("notifications")
+      .doc(`emergency_${input.input.planned.listId}_${uid}`),
+    data: {
+      householdId: input.input.command.householdId,
+      recipientUserId: uid,
+      type: "emergencyShopping",
+      title: "A meal needs an emergency shop",
+      body: `${demandCount} missing ${demandCount === 1 ? "ingredient" : "ingredients"} for ${date}.`,
+      route: `/shop/list/${input.input.planned.listId}`,
+      sourceType: "shoppingList",
+      sourceId: input.input.planned.listId,
+      createdAt: now,
+      updatedAt: now,
+    },
+  }))
 }
 
 function replayResponse(

@@ -54,7 +54,6 @@ class _Repository implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    String? startAfterId,
   }) async => records.values
       .where(
         (ingredient) =>
@@ -92,10 +91,6 @@ class _Repository implements IngredientRepository {
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       const Stream.empty();
 
-  @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) => Stream.value(
-    records.values.where((ingredient) => ids.contains(ingredient.id)).toList(),
-  );
 }
 
 void main() {

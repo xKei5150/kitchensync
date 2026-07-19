@@ -17,13 +17,13 @@ import 'package:kitchensync/features/calendar/presentation/providers/shopping_sc
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
-import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/consumption_event.dart';
+import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/consumption_history_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
@@ -89,6 +89,31 @@ final _scheduledDinner = MealScheduleEntry(
   servingSize: 4,
 );
 
+final _cookedDinner = _scheduledDinner.copyWith(
+  state: ScheduledMealState.cooked,
+);
+
+final _leftoverDinner = _scheduledDinner.copyWith(
+  servingSize: 3,
+  state: ScheduledMealState.leftover,
+  marking: ScheduledMealMarking.leftoverScheduled,
+  linkedLeftoverId: 'leftover-1',
+);
+
+final _leftoverPantryItem = PantryItem(
+  id: 'leftover-1',
+  householdId: 'solo-household',
+  ingredientId: 'tomato',
+  quantity: 3,
+  unit: UnitId.serving,
+  section: PantrySection.leftover,
+  relatedRecipeId: 'braise',
+  leftoverServings: 3,
+  expiryDate: DateTime(2026, 7, 9),
+  createdAt: DateTime(2026, 7, 6),
+  updatedAt: DateTime(2026, 7, 6),
+);
+
 const _activeHousehold = ActiveHouseholdContext(
   id: 'solo-household',
   name: 'Test kitchen',
@@ -98,11 +123,17 @@ const _activeHousehold = ActiveHouseholdContext(
 );
 
 class _FakePantryRepository implements PantryRepository {
-  _FakePantryRepository({this.stockTomato = true});
+  _FakePantryRepository({
+    this.stockTomato = true,
+    List<PantryItem> items = const [],
+  }) : addedItems = [...items];
 
   final bool stockTomato;
-  final addedItems = <PantryItem>[];
+  final List<PantryItem> addedItems;
   final quantities = <String, double>{};
+  PantryItem? updatedItem;
+  WasteEvent? wasteEvent;
+  double? wasteRemainingQuantity;
 
   @override
   Stream<List<PantryItem>> watchBySection(
@@ -112,7 +143,7 @@ class _FakePantryRepository implements PantryRepository {
 
   @override
   Stream<PantryItem?> watchById(String householdId, String itemId) =>
-      const Stream.empty();
+      Stream.value(addedItems.where((item) => item.id == itemId).firstOrNull);
 
   @override
   Future<PantryItem?> findByIngredient(
@@ -148,7 +179,9 @@ class _FakePantryRepository implements PantryRepository {
   }
 
   @override
-  Future<void> update(PantryItem item) async {}
+  Future<void> update(PantryItem item) async {
+    updatedItem = item;
+  }
 
   @override
   Future<void> setQuantity(
@@ -173,7 +206,10 @@ class _FakePantryRepository implements PantryRepository {
     required String pantryItemId,
     required double newPantryQuantity,
     required WasteEvent wasteEvent,
-  }) async {}
+  }) async {
+    this.wasteEvent = wasteEvent;
+    wasteRemainingQuantity = newPantryQuantity;
+  }
 }
 
 class _FakeShoppingRepository extends ShoppingRepository {
@@ -339,42 +375,46 @@ class _FakeConsumptionHistoryRepository
 class _FakeRecipeRepository implements RecipeRepository {
   @override
   Stream<List<Recipe>> watchHouseholdRecipes(String householdId) =>
-      const Stream.empty();
+      Stream.value([_recipe('braise'), _recipe('pad-thai')]);
 
   @override
   Stream<Recipe?> watchById(String recipeId) {
+    return Stream.value(_recipe(recipeId));
+  }
+
+  Recipe _recipe(String recipeId) {
     final now = DateTime(2026, 7);
     final name = switch (recipeId) {
       'oats' => 'Overnight oats',
       'salad' => 'Chickpea salad',
+      'pad-thai' => 'Pad Thai',
       _ => 'Tomato & white bean braise',
     };
-    return Stream.value(
-      Recipe(
-        id: recipeId,
-        authorUserId: 'user-1',
-        householdId: 'solo-household',
-        name: name,
-        description: '',
-        defaultServingSize: 2,
-        mealTimeTags: const ['Dinner'],
-        recipeTags: const [],
-        location: '',
-        visibility: RecipeVisibility.private,
-        monetization: RecipeMonetization.free,
-        createdAt: now,
-        updatedAt: now,
-        ingredients: const [
-          RecipeIngredient(
-            id: 'tomato-line',
-            recipeId: 'braise',
-            ingredientId: 'tomato',
-            quantity: 400,
-            unit: UnitId.g,
-          ),
-        ],
-        instructions: const [],
-      ),
+    return Recipe(
+      id: recipeId,
+      authorUserId: 'user-1',
+      householdId: 'solo-household',
+      name: name,
+      description: '',
+      defaultServingSize: 2,
+      mealTimeTags: const ['Dinner'],
+      recipeTags: const ['Comfort'],
+      priceEstimate: 120,
+      location: '',
+      visibility: RecipeVisibility.private,
+      monetization: RecipeMonetization.free,
+      createdAt: now,
+      updatedAt: now,
+      ingredients: const [
+        RecipeIngredient(
+          id: 'tomato-line',
+          recipeId: 'braise',
+          ingredientId: 'tomato',
+          quantity: 400,
+          unit: UnitId.g,
+        ),
+      ],
+      instructions: const [],
     );
   }
 
@@ -464,10 +504,14 @@ void main() {
     expect(find.text('Mark cooked'), findsOneWidget);
     expect(find.text('Servings'), findsOneWidget);
     expect(find.text('Merge 2 meals'), findsOneWidget);
-    expect(find.text('Leftovers'), findsOneWidget);
+    expect(find.text('Save leftovers'), findsNothing);
+    expect(find.text('Schedule leftover'), findsNothing);
+    expect(find.text('Mark eaten'), findsNothing);
+    expect(find.text('Mark waste'), findsNothing);
     expect(find.text('Swap'), findsOneWidget);
     expect(find.text('Cook next'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Dinner · Comfort · Price 240.00'), findsOneWidget);
   });
 
   testWidgets(
@@ -583,10 +627,42 @@ void main() {
     },
   );
 
+  testWidgets(
+    'DayViewScreen keeps the problem state when emergency shopping is declined',
+    (tester) async {
+      final calendar = _FakeCalendarRepository();
+      final shopping = _FakeShoppingRepository();
+      await tester.pumpWidget(
+        _wrap(
+          const DayViewScreen(),
+          calendarRepository: calendar,
+          pantryRepository: _FakePantryRepository(stockTomato: false),
+          shoppingRepository: shopping,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Mark cooked'));
+      await tester.pumpAndSettle();
+
+      expect(calendar.upserted?.marking, ScheduledMealMarking.problem);
+      expect(shopping.upserted, isNull);
+      expect(find.text('Not now'), findsOneWidget);
+
+      await tester.tap(find.text('Not now'));
+      await tester.pumpAndSettle();
+
+      expect(calendar.upserted?.marking, ScheduledMealMarking.problem);
+      expect(shopping.upserted, isNull);
+      expect(find.text('Missing pantry items'), findsNothing);
+      expect(find.text('Emergency shopping list created.'), findsNothing);
+    },
+  );
+
   testWidgets('DayViewScreen saves leftovers and links them to the meal', (
     tester,
   ) async {
-    final calendar = _FakeCalendarRepository();
+    final calendar = _FakeCalendarRepository(meals: [_cookedDinner]);
     final pantry = _FakePantryRepository();
     await tester.pumpWidget(
       _wrap(
@@ -597,15 +673,135 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Leftovers'));
+    expect(find.text('Mark cooked'), findsNothing);
+    expect(find.text('Servings'), findsNothing);
+    expect(find.text('Merge 2 meals'), findsNothing);
+    expect(find.text('Swap'), findsNothing);
+    expect(find.text('Cook next'), findsNothing);
+    expect(find.text('Cancel'), findsNothing);
+    expect(find.text('Save leftovers'), findsOneWidget);
+
+    await tester.tap(find.text('Save leftovers'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Leftover servings'),
+      '3',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
 
     expect(pantry.addedItems.single.section, PantrySection.leftover);
     expect(pantry.addedItems.single.relatedRecipeId, 'braise');
-    expect(pantry.addedItems.single.leftoverServings, 2);
+    expect(pantry.addedItems.single.leftoverServings, 3);
     expect(calendar.upserted?.state, ScheduledMealState.leftover);
     expect(calendar.upserted?.marking, ScheduledMealMarking.leftoverScheduled);
     expect(calendar.upserted?.linkedLeftoverId, 'leftover-1');
+  });
+
+  testWidgets('DayViewScreen schedules a linked leftover for a future date', (
+    tester,
+  ) async {
+    final calendar = _FakeCalendarRepository(meals: [_leftoverDinner]);
+    final pantry = _FakePantryRepository(items: [_leftoverPantryItem]);
+    await tester.pumpWidget(
+      _wrap(
+        const DayViewScreen(),
+        calendarRepository: calendar,
+        pantryRepository: pantry,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Save leftovers'), findsNothing);
+    expect(find.text('Schedule leftover'), findsOneWidget);
+    expect(find.text('Mark eaten'), findsOneWidget);
+    expect(find.text('Mark waste'), findsOneWidget);
+
+    await tester.tap(find.text('Schedule leftover'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    expect(calendar.upserted?.id, 'leftover-meal-leftover-1');
+    expect(calendar.upserted?.date, DateTime(2026, 7, 7));
+    expect(calendar.upserted?.servingSize, 3);
+    expect(calendar.upserted?.state, ScheduledMealState.leftover);
+    expect(calendar.upserted?.marking, ScheduledMealMarking.leftoverScheduled);
+  });
+
+  testWidgets('DayViewScreen consumes a scheduled leftover', (tester) async {
+    final calendar = _FakeCalendarRepository(meals: [_leftoverDinner]);
+    final pantry = _FakePantryRepository(items: [_leftoverPantryItem]);
+    await tester.pumpWidget(
+      _wrap(
+        const DayViewScreen(),
+        calendarRepository: calendar,
+        pantryRepository: pantry,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Mark eaten'));
+    await tester.pumpAndSettle();
+
+    expect(pantry.updatedItem?.quantity, 0);
+    expect(pantry.updatedItem?.leftoverServings, 0);
+    expect(calendar.upserted?.state, ScheduledMealState.cooked);
+  });
+
+  testWidgets('DayViewScreen records a linked leftover as waste', (
+    tester,
+  ) async {
+    final calendar = _FakeCalendarRepository(meals: [_leftoverDinner]);
+    final pantry = _FakePantryRepository(items: [_leftoverPantryItem]);
+    await tester.pumpWidget(
+      _wrap(
+        const DayViewScreen(),
+        calendarRepository: calendar,
+        pantryRepository: pantry,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Mark waste'));
+    await tester.pumpAndSettle();
+
+    expect(pantry.wasteEvent?.pantryItemId, 'leftover-1');
+    expect(pantry.wasteEvent?.quantity, 3);
+    expect(pantry.wasteEvent?.reason, WasteReason.expired);
+    expect(pantry.wasteRemainingQuantity, 0);
+  });
+
+  testWidgets('DayViewScreen hides lifecycle mutations for terminal meals', (
+    tester,
+  ) async {
+    final cancelled = _scheduledDinner.copyWith(
+      state: ScheduledMealState.cancelled,
+    );
+    final wasted = _leftoverDinner.copyWith(
+      marking: ScheduledMealMarking.waste,
+    );
+    await tester.pumpWidget(
+      _wrap(
+        const DayViewScreen(),
+        calendarRepository: _FakeCalendarRepository(meals: [cancelled, wasted]),
+        pantryRepository: _FakePantryRepository(items: [_leftoverPantryItem]),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('CANCELLED'), findsOneWidget);
+    expect(find.textContaining('WASTE'), findsOneWidget);
+    expect(find.text('Mark cooked'), findsNothing);
+    expect(find.text('Servings'), findsNothing);
+    expect(find.text('Merge 2 meals'), findsNothing);
+    expect(find.text('Save leftovers'), findsNothing);
+    expect(find.text('Schedule leftover'), findsNothing);
+    expect(find.text('Mark eaten'), findsNothing);
+    expect(find.text('Mark waste'), findsNothing);
+    expect(find.text('Swap'), findsNothing);
+    expect(find.text('Cook next'), findsNothing);
+    expect(find.text('Cancel'), findsNothing);
   });
 
   testWidgets('DayViewScreen serving action persists an override', (
@@ -622,6 +818,9 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Servings'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Servings'), '6');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
 
     expect(calendar.upserted?.servingSize, 6);
@@ -649,6 +848,26 @@ void main() {
     expect(calendar.upserted?.state, ScheduledMealState.scheduled);
   });
 
+  testWidgets('DayViewScreen shows persisted merged meal ratio after reload', (
+    tester,
+  ) async {
+    final merged = _scheduledDinner.copyWith(
+      servingSize: 4,
+      mergedMealCount: 2,
+    );
+    await tester.pumpWidget(
+      _wrap(
+        const DayViewScreen(),
+        calendarRepository: _FakeCalendarRepository(meals: [merged]),
+        pantryRepository: _FakePantryRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Merged 2:1'), findsOneWidget);
+    expect(find.text('serves 4'), findsOneWidget);
+  });
+
   testWidgets('DayViewScreen swap action replaces the scheduled recipe', (
     tester,
   ) async {
@@ -663,6 +882,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Swap'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pad Thai'));
     await tester.pumpAndSettle();
 
     expect(calendar.upserted?.recipeId, 'pad-thai');

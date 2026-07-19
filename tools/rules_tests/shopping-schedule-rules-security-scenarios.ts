@@ -8,6 +8,7 @@ import {
   creatorHouseholdPath,
   creatorInvitePath,
   creatorMemberPath,
+  creatorUserPath,
   creatorWeeklySchedulePath,
   daySettings,
   forgedInvitePath,
@@ -110,6 +111,12 @@ export const securityScenarios: readonly SecurityScenario[] = [
   {
     name: "creator batch and subsequent weekly schedule remain authorized",
     run: async (env) => {
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), creatorUserPath), {
+          isPremium: true,
+          premiumPlan: "annual",
+        });
+      });
       const db = env.authenticatedContext("debug-creator").firestore();
       const batch = writeBatch(db);
       batch.set(doc(db, creatorHouseholdPath), {
@@ -118,6 +125,7 @@ export const securityScenarios: readonly SecurityScenario[] = [
         isJoint: true,
         hasPremium: true,
         maxMembers: 6,
+        memberCount: 1,
         inviteCode: "DEBUG-CREATOR",
       });
       batch.set(doc(db, creatorMemberPath), { role: "admin" });

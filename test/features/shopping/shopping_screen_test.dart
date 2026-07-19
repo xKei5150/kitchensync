@@ -24,8 +24,8 @@ import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/purchase_record.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/consumption_history_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/purchase_history_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
@@ -1427,4 +1427,46 @@ void main() {
     expect(find.text('Nothing to buy'), findsOneWidget);
     expect(find.textContaining('0 items'), findsNothing);
   });
+
+  testWidgets('ShoppingScreen shows honest empty state with no lists', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repo = _FakeShoppingRepository();
+    addTearDown(repo.dispose);
+
+    await tester.pumpWidget(
+      await _wrap(const ShoppingScreen(), shoppingRepository: repo),
+    );
+    await tester.pumpAndSettle();
+
+    // With no persisted lists the Upcoming and History empty states show.
+    expect(find.text('No shopping lists yet'), findsOneWidget);
+    expect(find.text('No completed shops yet.'), findsOneWidget);
+    expect(find.text('SUGGESTIONS'), findsNothing);
+  });
+
+  testWidgets('ShoppingScreen surfaces a lists load error', (tester) async {
+    final repo = _ErroringShoppingRepository();
+    addTearDown(repo.dispose);
+
+    await tester.pumpWidget(
+      await _wrap(const ShoppingScreen(), shoppingRepository: repo),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Could not load shopping'), findsOneWidget);
+  });
+}
+
+/// A shopping repository whose list stream fails, to exercise the home
+/// surface's honest error branch (`Could not load shopping`).
+class _ErroringShoppingRepository extends _FakeShoppingRepository {
+  @override
+  Stream<List<ShoppingListRecord>> watchLists(String householdId) =>
+      Stream.error(StateError('transient shopping read failure'));
 }

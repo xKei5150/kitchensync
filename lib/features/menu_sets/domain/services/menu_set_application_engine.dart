@@ -32,6 +32,7 @@ class MenuSetApplicationEngine {
     required Iterable<MealScheduleEntry> existingSchedule,
     required Map<String, PlannedRecipe> recipesById,
     required CalendarDefaults defaults,
+    CalendarDefaults Function(DateTime date)? defaultsForDate,
     required String Function() newMealId,
   }) {
     if (menuSet.lengthInDays <= 0) {
@@ -102,7 +103,7 @@ class MenuSetApplicationEngine {
               recipe: recipe,
               date: date,
               mealLabel: entry.mealSlot,
-              defaults: defaults,
+              defaults: defaultsForDate?.call(date) ?? defaults,
             ),
           );
         }

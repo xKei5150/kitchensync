@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:intl/intl.dart';
 import 'package:kitchensync/app/theme.dart';
@@ -74,8 +75,8 @@ void main() {
               id: householdId,
               name: 'Shopping MVP kitchen',
               role: HouseholdRole.admin,
-              isJoint: true,
-              hasPremium: true,
+              isJoint: false,
+              hasPremium: false,
             ),
           ),
         ],
@@ -344,13 +345,12 @@ void main() {
       );
       expect(suggested!.type, ShoppingListType.suggested);
       expect(suggested.originId, 'recovery:core:v1');
-      await _capture(
+      await _exerciseSuggestionHome(
         tester,
         binding,
-        'suggestion',
         container,
-        ShoppingListScreen(listId: suggestedListId),
-        find.text('Suggested shop'),
+        householdId: householdId,
+        suggestedListId: suggestedListId,
       );
       await _capture(
         tester,
@@ -476,6 +476,79 @@ Future<void> _capture(
   await _flushRenderedFrame(tester);
 }
 
+Future<void> _exerciseSuggestionHome(
+  WidgetTester tester,
+  IntegrationTestWidgetsFlutterBinding binding,
+  ProviderContainer container, {
+  required String householdId,
+  required String suggestedListId,
+}) async {
+  final platform = defaultTargetPlatform == TargetPlatform.android
+      ? 'android'
+      : 'ios';
+  final router = GoRouter(
+    initialLocation: '/shop',
+    routes: [
+      GoRoute(
+        path: '/shop',
+        builder: (context, state) => const Scaffold(body: ShoppingScreen()),
+      ),
+      GoRoute(
+        path: '/shop/list/:listId',
+        builder: (context, state) => Scaffold(
+          body: ShoppingListScreen(listId: state.pathParameters['listId']),
+        ),
+      ),
+    ],
+  );
+  addTearDown(router.dispose);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp.router(
+        key: const ValueKey('suggestion-home-flow'),
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        routerConfig: router,
+      ),
+    ),
+  );
+  await _waitForSettledState(tester, find.byTooltip('Open suggestion'));
+  expect(find.text('SUGGESTIONS'), findsOneWidget);
+  expect(find.text('Suggested list'), findsOneWidget);
+  expect(find.byTooltip('Ignore suggestion'), findsOneWidget);
+  await _prepareMvpScreenshot(tester);
+  await binding.takeScreenshot('$platform-suggestion-home');
+
+  await tester.tap(find.byTooltip('Open suggestion'));
+  await _waitForSettledState(tester, find.text('Suggested shop'));
+  expect(find.text('Suggested shop'), findsOneWidget);
+  expect(find.text('Done shopping'), findsOneWidget);
+  await _prepareMvpScreenshot(tester);
+  await binding.takeScreenshot('$platform-suggestion-accepted');
+
+  router.pop();
+  await tester.pumpAndSettle();
+  final ignoreSuggestion = find.byTooltip('Ignore suggestion');
+  await _waitForSettledState(tester, ignoreSuggestion);
+  await tester.ensureVisible(ignoreSuggestion);
+  await tester.pumpAndSettle();
+  await tester.tap(ignoreSuggestion);
+  await _waitForSettledState(tester, find.text('Suggested list ignored'));
+  expect(find.text('Suggested list ignored'), findsOneWidget);
+  final cancelled = await withTimeout(
+    'observe ignored recovery suggestion tombstone',
+    () => container
+        .read(shoppingRepositoryProvider)
+        .watchList(householdId: householdId, listId: suggestedListId)
+        .firstWhere((list) => list?.status == ShoppingListStatus.cancelled),
+  );
+  expect(cancelled, isNotNull);
+  expect(cancelled?.items, isEmpty);
+  await _prepareMvpScreenshot(tester);
+  await binding.takeScreenshot('$platform-suggestion-ignored');
+}
+
 Future<void> _waitForSettledState(
   WidgetTester tester,
   Finder settledState,
@@ -562,15 +635,16 @@ Future<void> _seedHousehold({
   required DateTime now,
 }) async {
   await _patch('users/$uid', token, {
+    'isPremium': _boolean(false),
     'activeHouseholdId': _string(householdId),
     'updatedAt': _timestamp(now),
   });
   await _patch('households/$householdId', token, {
     'name': _string('Shopping MVP kitchen'),
     'creatorUserId': _string(uid),
-    'isJoint': _boolean(true),
-    'hasPremium': _boolean(true),
-    'maxMembers': _integer(6),
+    'isJoint': _boolean(false),
+    'hasPremium': _boolean(false),
+    'maxMembers': _integer(1),
     'createdAt': _timestamp(now),
     'updatedAt': _timestamp(now),
   });

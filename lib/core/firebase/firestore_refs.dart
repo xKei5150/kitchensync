@@ -13,6 +13,15 @@ class FirestoreRefs {
   DocumentReference<Map<String, dynamic>> user(String uid) =>
       _db.collection('users').doc(uid);
 
+  CollectionReference<Map<String, dynamic>> notificationPreferences(
+    String uid,
+  ) => user(uid).collection('notificationPreferences');
+
+  DocumentReference<Map<String, dynamic>> notificationPreference(
+    String uid,
+    String householdId,
+  ) => notificationPreferences(uid).doc(householdId);
+
   CollectionReference<Map<String, dynamic>> recipes() =>
       _db.collection('recipes');
 
@@ -22,6 +31,12 @@ class FirestoreRefs {
   CollectionReference<Map<String, dynamic>> recipeIngredients(
     String recipeId,
   ) => recipe(recipeId).collection('ingredients');
+
+  CollectionReference<Map<String, dynamic>> recipeLikes(String recipeId) =>
+      recipe(recipeId).collection('likes');
+
+  CollectionReference<Map<String, dynamic>> recipeComments(String recipeId) =>
+      recipe(recipeId).collection('comments');
 
   DocumentReference<Map<String, dynamic>> household(String hid) =>
       _db.collection('households').doc(hid);
@@ -64,6 +79,9 @@ class FirestoreRefs {
 
   CollectionReference<Map<String, dynamic>> shoppingLists(String hid) =>
       household(hid).collection('shoppingLists');
+
+  CollectionReference<Map<String, dynamic>> notifications(String hid) =>
+      household(hid).collection('notifications');
 
   CollectionReference<Map<String, dynamic>> shoppingSchedules(String hid) =>
       household(hid).collection('shoppingSchedules');

@@ -114,6 +114,21 @@ describe("controlled emulator allocation planner", () => {
     expect(selectPlanner).toThrow(PlannerConfigurationError)
   })
 
+  it("uses the controlled planner by default in the Functions emulator", () => {
+    // Given: a standard local Functions emulator process without private
+    // Cloud Run planner credentials.
+    const environment: NodeJS.ProcessEnv = {
+      FUNCTIONS_EMULATOR: "true",
+      GCLOUD_PROJECT: "kitchensync-dev-da503",
+    }
+
+    // When: the callable selects its planner.
+    const planner = plannerForEnvironment(environment)
+
+    // Then: local product flows remain deterministic and self-contained.
+    expect(planner).toBeInstanceOf(ControlledEmulatorAllocationPlannerClient)
+  })
+
   it("rejects local planner mode outside the Functions emulator", () => {
     // Given: a deployed process with the local-planner flag set.
     const environment: NodeJS.ProcessEnv = {

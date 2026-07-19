@@ -76,6 +76,11 @@ tools/seed_uploader/node_modules/
 .entire/
 .omo/
 .superpowers/
+package.json
+bun.lock
+
+# Nested Flutter build output (service package)
+services/shopping_allocation_planner/build/
 
 # Local visual-verification screenshots (flutter drive gallery)
 screenshots/

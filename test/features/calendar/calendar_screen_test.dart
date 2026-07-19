@@ -9,18 +9,23 @@ import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/domain/entities/shopping_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/shopping_schedule_providers.dart';
 import 'package:kitchensync/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
+import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/waste_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
+import 'package:kitchensync/features/shopping/domain/entities/shopping_plan.dart';
+import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
 const _activeHousehold = ActiveHouseholdContext(
   id: 'solo-household',
@@ -31,11 +36,15 @@ const _activeHousehold = ActiveHouseholdContext(
 );
 
 class _FakeCalendarRepository implements CalendarRepository {
-  _FakeCalendarRepository(this.meals, {List<CalendarDaySettings>? settings})
-    : settings = settings ?? [];
+  _FakeCalendarRepository(
+    this.meals, {
+    List<CalendarDaySettings>? settings,
+    this.settingsDelay = Duration.zero,
+  }) : settings = settings ?? [];
 
   final List<MealScheduleEntry> meals;
   final List<CalendarDaySettings> settings;
+  final Duration settingsDelay;
   final watchedRanges = <({DateTime start, DateTime end})>[];
 
   @override
@@ -68,14 +77,14 @@ class _FakeCalendarRepository implements CalendarRepository {
   }) async {}
 
   @override
-  Stream<List<CalendarDaySettings>> watchActiveDaySettings(
-    String householdId,
-  ) => Stream.value(
-    settings
+  Stream<List<CalendarDaySettings>> watchActiveDaySettings(String householdId) {
+    final active = settings
         .where((setting) => setting.householdId == householdId)
         .where((setting) => setting.isActive)
-        .toList(growable: false),
-  );
+        .toList(growable: false);
+    if (settingsDelay == Duration.zero) return Stream.value(active);
+    return Stream.fromFuture(Future.delayed(settingsDelay, () => active));
+  }
 
   @override
   Future<void> upsertDaySettings(CalendarDaySettings next) async {
@@ -195,6 +204,10 @@ List<Override> _calendarOverrides({
   CalendarRepository? calendarRepository,
   RecipeRepository? recipeRepository,
   WasteRepository wasteRepository = const _FakeWasteRepository([]),
+  List<PantryItem> pantryItems = const [],
+  ShoppingSchedule? shoppingSchedule,
+  List<ShoppingListRecord> shoppingLists = const [],
+  Clock? clock,
 }) {
   return [
     activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
@@ -204,6 +217,18 @@ List<Override> _calendarOverrides({
     wasteRepositoryProvider.overrideWithValue(wasteRepository),
     recipeRepositoryProvider.overrideWithValue(
       recipeRepository ?? _FakeRecipeRepository([_recipe()]),
+    ),
+    pantryAllItemsStreamProvider.overrideWith(
+      (ref) => Stream.value(pantryItems),
+    ),
+    activeShoppingScheduleProvider.overrideWith(
+      (ref) => Stream.value(shoppingSchedule),
+    ),
+    activeShoppingListsProvider.overrideWith(
+      (ref) => Stream.value(shoppingLists),
+    ),
+    clockProvider.overrideWithValue(
+      clock ?? FakeClock(DateTime(2026, 7, 6, 9)),
     ),
   ];
 }
@@ -373,6 +398,75 @@ void main() {
     expect(find.text('Dinner · serves 3'), findsOneWidget);
   });
 
+  testWidgets('CalendarScreen toggles to cross-month weeks and advances', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final calendarRepository = _FakeCalendarRepository([
+      MealScheduleEntry(
+        id: 'july-meal',
+        recipeId: 'persisted-recipe',
+        date: DateTime(2026, 7),
+        mealLabel: 'Dinner',
+        servingSize: 3,
+      ),
+      MealScheduleEntry(
+        id: 'next-week-meal',
+        recipeId: 'persisted-recipe',
+        date: DateTime(2026, 7, 8),
+        mealLabel: 'Lunch',
+        servingSize: 2,
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _calendarOverrides(calendarRepository: calendarRepository),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: CalendarScreen(initialSelectedDate: DateTime(2026, 7)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('July 2026'), findsOneWidget);
+    expect(find.byTooltip('Next month'), findsOneWidget);
+
+    await tester.tap(find.text('Week'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('29 June-5 July 2026'), findsOneWidget);
+    expect(find.byTooltip('Next week'), findsOneWidget);
+    expect(
+      calendarRepository.watchedRanges,
+      contains((start: DateTime(2026, 6, 29), end: DateTime(2026, 7, 5))),
+    );
+    final firstWeek = tester.widget<KsAlmanacGrid>(find.byType(KsAlmanacGrid));
+    expect(
+      firstWeek.days.map((day) => day.dayNumber),
+      orderedEquals([29, 30, 1, 2, 3, 4, 5]),
+    );
+    expect(find.text('Dinner · serves 3'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Next week'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('6-12 July 2026'), findsOneWidget);
+    expect(
+      calendarRepository.watchedRanges,
+      contains((start: DateTime(2026, 7, 6), end: DateTime(2026, 7, 12))),
+    );
+    expect(find.text('Lunch · serves 2'), findsOneWidget);
+    expect(find.text('Dinner · serves 3'), findsNothing);
+  });
+
   testWidgets('CalendarScreen marks household waste dates as problem days', (
     tester,
   ) async {
@@ -415,7 +509,87 @@ void main() {
     final leadingPad = DateTime(2026, 7).weekday - DateTime.monday;
 
     expect(grid.days[leadingPad + 8].status, CalendarDayStatus.problem);
-    expect(grid.days[leadingPad + 9].status, CalendarDayStatus.empty);
+    expect(
+      grid.days[leadingPad + 8].markers,
+      contains(CalendarDayMarker.waste),
+    );
+    expect(grid.days[leadingPad + 9].status, CalendarDayStatus.problem);
+    expect(grid.days[leadingPad + 9].markers, isEmpty);
+  });
+
+  testWidgets('CalendarScreen renders pantry and shopping status precedence', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime(2026, 7, 10, 9);
+    final created = DateTime(2026, 7);
+    final calendarRepository = _FakeCalendarRepository([
+      MealScheduleEntry(
+        id: 'covered-meal',
+        recipeId: 'persisted-recipe',
+        date: DateTime(2026, 7, 6),
+        mealLabel: 'Dinner',
+        servingSize: 3,
+      ),
+      MealScheduleEntry(
+        id: 'depleted-meal',
+        recipeId: 'persisted-recipe',
+        date: DateTime(2026, 7, 7),
+        mealLabel: 'Dinner',
+        servingSize: 3,
+      ),
+    ]);
+    final pantry = PantryItem(
+      id: 'aubergine-stock',
+      householdId: 'solo-household',
+      ingredientId: 'aubergine',
+      quantity: 3,
+      unit: UnitId.piece,
+      section: PantrySection.food,
+      createdAt: created,
+      updatedAt: created,
+    );
+    final shoppingSchedule = ShoppingSchedule(
+      householdId: 'solo-household',
+      cadence: ShoppingScheduleCadence.weekly,
+      isoWeekday: DateTime.wednesday,
+      effectiveFrom: DateTime(2026, 7),
+      isActive: true,
+      createdAt: created,
+      updatedAt: created,
+      updatedByUserId: 'user-1',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _calendarOverrides(
+          calendarRepository: calendarRepository,
+          pantryItems: [pantry],
+          shoppingSchedule: shoppingSchedule,
+          clock: FakeClock(now),
+        ),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: CalendarScreen(initialSelectedDate: DateTime(2026, 7, 6)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final grid = tester.widget<KsAlmanacGrid>(find.byType(KsAlmanacGrid));
+    final leadingPad = DateTime(2026, 7).weekday - DateTime.monday;
+    CalendarDayStatus statusFor(int day) =>
+        grid.days[leadingPad + day - 1].status!;
+
+    expect(statusFor(6), CalendarDayStatus.planned);
+    expect(statusFor(7), CalendarDayStatus.problem);
+    expect(statusFor(8), CalendarDayStatus.missed);
+    expect(statusFor(15), CalendarDayStatus.shopping);
   });
 
   testWidgets('CalendarScreen date cell tap opens the selected day route', (
@@ -586,33 +760,246 @@ void main() {
     expect(calendarRepository.settings.single.mealModeName, 'Batch');
   });
 
-  test('CalendarSettingsController rejects member default edits', () async {
-    final repository = _FakeCalendarRepository(const []);
-    final controller = CalendarSettingsController(
-      repository: repository,
-      householdId: 'solo-household',
-      household: const ActiveHouseholdContext(
-        id: 'solo-household',
-        name: 'Test kitchen',
-        role: HouseholdRole.member,
-        isJoint: true,
-        hasPremium: true,
-      ),
-      idGenerator: FakeIdGenerator(['settings-1']),
-      clock: FakeClock(DateTime(2026, 7, 5, 9)),
-    );
+  testWidgets(
+    'CalendarScreen creates a new default when selected date matches no range',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final unrelated = CalendarDaySettings(
+        id: 'august-defaults',
+        householdId: 'solo-household',
+        dateRangeStart: DateTime(2026, 8),
+        dateRangeEnd: DateTime(2026, 8, 31),
+        defaultServingSize: 9,
+        mealsPerDay: 2,
+        dishesPerMeal: 3,
+        mealModeName: 'August batch',
+        isActive: true,
+      );
+      final calendarRepository = _FakeCalendarRepository(
+        const [],
+        settings: [unrelated],
+      );
 
-    expect(
-      controller.saveDefaults(
-        dateRangeStart: DateTime(2026, 7),
-        dateRangeEnd: DateTime(2026, 7, 31),
-        defaultServingSize: 4,
-        mealsPerDay: 3,
-        dishesPerMeal: 1,
-        mealModeName: 'Standard',
-      ),
-      throwsStateError,
-    );
-    expect(repository.settings, isEmpty);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activeHouseholdContextProvider.overrideWithValue(_activeHousehold),
+            calendarRepositoryProvider.overrideWithValue(calendarRepository),
+            wasteRepositoryProvider.overrideWithValue(
+              const _FakeWasteRepository([]),
+            ),
+            idGeneratorProvider.overrideWithValue(
+              FakeIdGenerator(['july-defaults']),
+            ),
+            clockProvider.overrideWithValue(FakeClock(DateTime(2026, 7, 5, 9))),
+            recipeRepositoryProvider.overrideWithValue(
+              const _FakeRecipeRepository([]),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: Scaffold(
+              body: CalendarScreen(initialSelectedDate: DateTime(2026, 7, 6)),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Calendar defaults'));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextField>(find.widgetWithText(TextField, 'Start date'))
+            .controller
+            ?.text,
+        '2026-07-01',
+      );
+      expect(
+        tester
+            .widget<TextField>(find.widgetWithText(TextField, 'End date'))
+            .controller
+            ?.text,
+        '2026-07-31',
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.widgetWithText(TextField, 'Default serving size'),
+            )
+            .controller
+            ?.text,
+        '4',
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Default serving size'),
+        '5',
+      );
+      await tester.tap(find.text('Save defaults'));
+      await tester.pumpAndSettle();
+
+      expect(calendarRepository.settings, hasLength(2));
+      expect(
+        calendarRepository.settings.singleWhere(
+          (setting) => setting.id == unrelated.id,
+        ),
+        same(unrelated),
+      );
+      final created = calendarRepository.settings.singleWhere(
+        (setting) => setting.id == 'july-defaults',
+      );
+      expect(created.dateRangeStart, DateTime(2026, 7));
+      expect(created.dateRangeEnd, DateTime(2026, 7, 31));
+      expect(created.defaultServingSize, 5);
+    },
+  );
+
+  testWidgets(
+    'CalendarScreen awaits persisted defaults during initial reload',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final calendarRepository = _FakeCalendarRepository(
+        const [],
+        settings: [
+          CalendarDaySettings(
+            id: 'specific-defaults',
+            householdId: 'solo-household',
+            dateRangeStart: DateTime(2026, 7, 6),
+            dateRangeEnd: DateTime(2026, 7, 6),
+            defaultServingSize: 8,
+            mealsPerDay: 2,
+            dishesPerMeal: 2,
+            mealModeName: 'Specific day',
+            isActive: true,
+          ),
+        ],
+        settingsDelay: const Duration(milliseconds: 200),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _calendarOverrides(calendarRepository: calendarRepository),
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: Scaffold(
+              body: CalendarScreen(initialSelectedDate: DateTime(2026, 7, 6)),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Calendar defaults'));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextField>(find.widgetWithText(TextField, 'Start date'))
+            .controller
+            ?.text,
+        '2026-07-06',
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.widgetWithText(TextField, 'Default serving size'),
+            )
+            .controller
+            ?.text,
+        '8',
+      );
+    },
+  );
+
+  testWidgets('joint non-admin roles do not see Calendar defaults', (
+    tester,
+  ) async {
+    for (final role in [
+      HouseholdRole.cook,
+      HouseholdRole.shopper,
+      HouseholdRole.member,
+    ]) {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activeHouseholdContextProvider.overrideWithValue(
+              ActiveHouseholdContext(
+                id: 'joint-household',
+                name: 'Joint kitchen',
+                role: role,
+                isJoint: true,
+                hasPremium: true,
+              ),
+            ),
+            calendarRepositoryProvider.overrideWithValue(
+              _FakeCalendarRepository(const []),
+            ),
+            wasteRepositoryProvider.overrideWithValue(
+              const _FakeWasteRepository([]),
+            ),
+            recipeRepositoryProvider.overrideWithValue(
+              const _FakeRecipeRepository([]),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const Scaffold(body: CalendarScreen()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('calendar-defaults-action')),
+        findsNothing,
+        reason: '${role.label} must not receive an Admin-only control.',
+      );
+    }
+  });
+
+  test('CalendarSettingsController rejects joint non-admin default edits', () {
+    for (final role in [
+      HouseholdRole.cook,
+      HouseholdRole.shopper,
+      HouseholdRole.member,
+    ]) {
+      final repository = _FakeCalendarRepository(const []);
+      final controller = CalendarSettingsController(
+        repository: repository,
+        householdId: 'joint-household',
+        household: ActiveHouseholdContext(
+          id: 'joint-household',
+          name: 'Joint kitchen',
+          role: role,
+          isJoint: true,
+          hasPremium: true,
+        ),
+        idGenerator: FakeIdGenerator(['settings-${role.name}']),
+        clock: FakeClock(DateTime(2026, 7, 5, 9)),
+      );
+
+      expect(
+        controller.saveDefaults(
+          dateRangeStart: DateTime(2026, 7),
+          dateRangeEnd: DateTime(2026, 7, 31),
+          defaultServingSize: 4,
+          mealsPerDay: 3,
+          dishesPerMeal: 1,
+          mealModeName: 'Standard',
+        ),
+        throwsStateError,
+        reason: '${role.label} must not persist Admin-only defaults.',
+      );
+      expect(repository.settings, isEmpty);
+    }
   });
 }

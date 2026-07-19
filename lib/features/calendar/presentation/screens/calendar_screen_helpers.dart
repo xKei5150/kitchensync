@@ -30,35 +30,13 @@ Map<String, PlannedRecipe> _recipesById(List<Recipe>? recipes) {
   };
 }
 
-CalendarDaySettings? _settingsForDate(
-  DateTime date,
-  List<CalendarDaySettings> settings,
-) {
-  final key = _dateKey(date);
-  for (final setting in settings) {
-    if (!setting.isActive) continue;
-    if (!key.isBefore(_dateKey(setting.dateRangeStart)) &&
-        !key.isAfter(_dateKey(setting.dateRangeEnd))) {
-      return setting;
-    }
-  }
-  for (final setting in settings) {
-    if (setting.isActive) {
-      return setting;
-    }
-  }
-  return null;
-}
-
 Set<DateTime> _wasteDays(Iterable<WasteEvent> wasteEvents) {
   return {for (final event in wasteEvents) _dateKey(event.date)};
 }
 
 List<KsAlmanacDay> _monthDays({
   required DateTime month,
-  required Map<DateTime, List<MealScheduleEntry>> mealsByDay,
-  required Set<DateTime> wasteDays,
-  required DateTime? shoppingDate,
+  required Map<DateTime, ResolvedCalendarDay> dayStatuses,
   required DateTime selectedDate,
 }) {
   final first = DateTime(month.year, month.month);
@@ -68,11 +46,9 @@ List<KsAlmanacDay> _monthDays({
     for (var i = 0; i < leadingPad; i++) KsAlmanacDay.blank,
     for (var day = 1; day <= daysInMonth; day++)
       KsAlmanacDay(
-        _statusForDay(
-          DateTime(month.year, month.month, day),
-          mealsByDay,
-          wasteDays,
-          shoppingDate,
+        _calendarStatus(dayStatuses[DateTime(month.year, month.month, day)]),
+        markers: _calendarMarkers(
+          dayStatuses[DateTime(month.year, month.month, day)],
         ),
         isToday:
             _dateKey(DateTime(month.year, month.month, day)) ==
@@ -81,27 +57,38 @@ List<KsAlmanacDay> _monthDays({
   ];
 }
 
-CalendarDayStatus _statusForDay(
-  DateTime date,
-  Map<DateTime, List<MealScheduleEntry>> mealsByDay,
-  Set<DateTime> wasteDays,
-  DateTime? shoppingDate,
-) {
-  if (shoppingDate != null && _dateKey(shoppingDate) == _dateKey(date)) {
-    return CalendarDayStatus.shopping;
-  }
-  final meals = mealsByDay[_dateKey(date)] ?? const [];
-  if (meals.any((meal) => meal.state == ScheduledMealState.cancelled)) {
-    return CalendarDayStatus.problem;
-  }
-  if (wasteDays.contains(_dateKey(date))) {
-    return CalendarDayStatus.problem;
-  }
-  if (meals.isEmpty) {
-    return CalendarDayStatus.empty;
-  }
-  if (meals.any((meal) => meal.state == ScheduledMealState.leftover)) {
-    return CalendarDayStatus.leftover;
-  }
-  return CalendarDayStatus.planned;
+List<KsAlmanacDay> _weekDays({
+  required DateTime start,
+  required Map<DateTime, ResolvedCalendarDay> dayStatuses,
+  required DateTime selectedDate,
+}) {
+  return [
+    for (var offset = 0; offset < 7; offset++)
+      () {
+        final date = start.add(Duration(days: offset));
+        return KsAlmanacDay(
+          _calendarStatus(dayStatuses[_dateKey(date)]),
+          markers: _calendarMarkers(dayStatuses[_dateKey(date)]),
+          dayNumber: date.day,
+          isToday: _dateKey(date) == _dateKey(selectedDate),
+        );
+      }(),
+  ];
 }
+
+CalendarDayStatus _calendarStatus(ResolvedCalendarDay? day) =>
+    switch (day?.status ?? CalendarDateStatus.problem) {
+      CalendarDateStatus.planned => CalendarDayStatus.planned,
+      CalendarDateStatus.problem => CalendarDayStatus.problem,
+      CalendarDateStatus.shopping => CalendarDayStatus.shopping,
+      CalendarDateStatus.missed => CalendarDayStatus.missed,
+    };
+
+Set<CalendarDayMarker> _calendarMarkers(ResolvedCalendarDay? day) => {
+  for (final marker in day?.markers ?? const <CalendarDateMarker>{})
+    switch (marker) {
+      CalendarDateMarker.leftover => CalendarDayMarker.leftover,
+      CalendarDateMarker.spoilage => CalendarDayMarker.spoilage,
+      CalendarDateMarker.waste => CalendarDayMarker.waste,
+    },
+};

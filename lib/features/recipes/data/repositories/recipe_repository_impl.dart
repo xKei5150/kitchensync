@@ -3,7 +3,10 @@ import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart'
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
 
 class RecipeRepositoryImpl
-    implements RecipeRepository, IngredientRewriteRecipeRepository {
+    implements
+        RecipeRepository,
+        IngredientRewriteRecipeRepository,
+        SavedRecipeRepository {
   RecipeRepositoryImpl(this._remote);
 
   final RecipeRemoteDataSource _remote;
@@ -14,6 +17,12 @@ class RecipeRepositoryImpl
 
   @override
   Stream<Recipe?> watchById(String recipeId) => _remote.watchById(recipeId);
+
+  @override
+  Stream<List<SavedRecipe>> watchSavedRecipes({
+    required String householdId,
+    required String userId,
+  }) => _remote.watchSavedRecipes(householdId: householdId, userId: userId);
 
   @override
   Future<void> upsert(Recipe recipe) => _remote.upsert(recipe);
@@ -67,4 +76,8 @@ class RecipeRepositoryImpl
     now: now,
     ingredientIdRewrites: ingredientIdRewrites,
   );
+
+  @override
+  Future<void> unsavePublicRecipe(SavedRecipe savedRecipe) =>
+      _remote.unsavePublicRecipe(savedRecipe);
 }

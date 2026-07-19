@@ -35,17 +35,55 @@ class MenuSetRemoteDataSource {
   }
 
   Future<void> upsert(MenuSet menuSet) async {
-    final db = _refs.menuSets(menuSet.householdId).firestore;
+    final dayCollection = _refs.menuSetDays(menuSet.householdId, menuSet.id);
+    final existingDays = await dayCollection.get();
+    final existingEntries = await Future.wait([
+      for (final day in existingDays.docs)
+        _refs.menuSetEntries(menuSet.householdId, menuSet.id, day.id).get(),
+    ]);
+    final desiredDayIds = menuSet.days.map((day) => day.id).toSet();
+    final desiredEntryIdsByDay = {
+      for (final day in menuSet.days)
+        day.id: day.entries.map((entry) => entry.id).toSet(),
+    };
+    final staleEntryRefs = [
+      for (var index = 0; index < existingDays.docs.length; index++)
+        for (final entry in existingEntries[index].docs)
+          if (!(desiredEntryIdsByDay[existingDays.docs[index].id] ?? const {})
+              .contains(entry.id))
+            entry.reference,
+    ];
+    final staleDayRefs = [
+      for (final day in existingDays.docs)
+        if (!desiredDayIds.contains(day.id)) day.reference,
+    ];
+    final operationCount =
+        1 +
+        staleEntryRefs.length +
+        staleDayRefs.length +
+        menuSet.days.length +
+        menuSet.days.fold<int>(0, (total, day) => total + day.entries.length);
+    if (operationCount > 500) {
+      throw StateError(
+        'Menu set replacement needs $operationCount writes; '
+        'Firestore allows 500.',
+      );
+    }
+
+    final db = dayCollection.firestore;
     final batch = db.batch()
       ..set(
         _refs.menuSets(menuSet.householdId).doc(menuSet.id),
         MenuSetMapper.toMap(menuSet),
       );
+    for (final entry in staleEntryRefs) {
+      batch.delete(entry);
+    }
+    for (final day in staleDayRefs) {
+      batch.delete(day);
+    }
     for (final day in menuSet.days) {
-      batch.set(
-        _refs.menuSetDays(menuSet.householdId, menuSet.id).doc(day.id),
-        MenuSetDayMapper.toMap(day),
-      );
+      batch.set(dayCollection.doc(day.id), MenuSetDayMapper.toMap(day));
       for (final entry in day.entries) {
         batch.set(
           _refs

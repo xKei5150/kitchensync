@@ -79,9 +79,12 @@ final activeHouseholdContextProvider = Provider<ActiveHouseholdContext?>((ref) {
 
   final auth = ref.watch(firebaseAuthProvider);
   if (auth == null) return previewHouseholdContext;
-  final household = ref.watch(activeHouseholdContextStreamProvider).valueOrNull;
-  if (kDebugMode) return household ?? previewHouseholdContext;
-  return household;
+  final household = ref.watch(activeHouseholdContextStreamProvider);
+  return switch (household) {
+    AsyncData(value: final value) => value,
+    AsyncError() => null,
+    _ => kDebugMode ? previewHouseholdContext : null,
+  };
 });
 
 final activeHouseholdContextStreamProvider =
@@ -91,13 +94,13 @@ final activeHouseholdContextStreamProvider =
       final refs = ref.watch(firestoreRefsProvider);
       return auth.authStateChanges().asyncExpand((user) {
         if (user == null) {
-          return Stream.value(kDebugMode ? previewHouseholdContext : null);
+          return Stream.value(null);
         }
         return refs.user(user.uid).snapshots().asyncExpand((userDoc) {
           final activeHouseholdId =
               userDoc.data()?['activeHouseholdId'] as String?;
           if (activeHouseholdId == null || activeHouseholdId.isEmpty) {
-            return Stream.value(kDebugMode ? previewHouseholdContext : null);
+            return Stream.value(null);
           }
           return _watchHouseholdContext(
             refs: refs,
@@ -115,11 +118,11 @@ Stream<ActiveHouseholdContext?> _watchHouseholdContext({
 }) {
   return refs.household(householdId).snapshots().asyncExpand((householdDoc) {
     if (!householdDoc.exists) {
-      return Stream.value(kDebugMode ? previewHouseholdContext : null);
+      return Stream.value(null);
     }
     return refs.householdMember(householdId, uid).snapshots().map((memberDoc) {
       if (!memberDoc.exists) {
-        return kDebugMode ? previewHouseholdContext : null;
+        return null;
       }
       return _contextFromDocs(
         householdId: householdId,

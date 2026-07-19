@@ -151,4 +151,51 @@ class MenuSetDraftFactory {
   DateTime _dateOnly(DateTime value) {
     return DateTime(value.year, value.month, value.day);
   }
+
+  /// Produces an independent persisted copy of [source] authored by the acting
+  /// user (Feature Design 6.2, 6.5). Every nested day/entry id is regenerated
+  /// with the `-copy-<suffix>` scheme so the copy shares no document paths with
+  /// its source and can be edited or deleted without touching the original.
+  MenuSet duplicate({
+    required MenuSet source,
+    required int suffix,
+    String? createdByUserId,
+    required DateTime now,
+  }) {
+    final copyId = '${source.id}-copy-$suffix';
+    return MenuSet(
+      id: copyId,
+      householdId: source.householdId,
+      name: '${source.name} copy',
+      description: source.description,
+      lengthInDays: source.lengthInDays,
+      createdByUserId: createdByUserId,
+      createdAt: now,
+      updatedAt: now,
+      isPublicTemplate: source.isPublicTemplate,
+      days: [
+        for (final day in source.days) _duplicateDay(day, copyId, suffix),
+      ],
+    );
+  }
+
+  MenuSetDay _duplicateDay(MenuSetDay day, String menuSetId, int suffix) {
+    final dayId = '${day.id}-copy-$suffix';
+    return MenuSetDay(
+      id: dayId,
+      menuSetId: menuSetId,
+      dayIndex: day.dayIndex,
+      label: day.label,
+      entries: [
+        for (final entry in day.entries)
+          MenuSetEntry(
+            id: '${entry.id}-copy-$suffix',
+            menuSetDayId: dayId,
+            mealSlot: entry.mealSlot,
+            recipeId: entry.recipeId,
+            orderInSlot: entry.orderInSlot,
+          ),
+      ],
+    );
+  }
 }

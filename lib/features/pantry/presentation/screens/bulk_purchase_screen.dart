@@ -6,9 +6,9 @@ import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
-import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/pantry/domain/services/bulk_prediction_engine.dart';
 import 'package:kitchensync/features/pantry/domain/services/bulk_suggestion_dismissal_policy.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
@@ -156,7 +156,10 @@ class _BulkPurchaseCard extends ConsumerWidget {
           const SizedBox(height: KsTokens.space6),
           Text(
             [
-              days == null ? 'Days left unknown' : '$days estimated days left',
+              if (days == null)
+                'Days left unknown'
+              else
+                '$days estimated days left',
               if (status.item.lastPurchaseDate != null)
                 'Last purchased ${_date(status.item.lastPurchaseDate!)}',
               if (status.recommendedPurchaseIntervalDays != null)

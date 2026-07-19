@@ -21,6 +21,7 @@ const fs = require('node:fs');
 const config = JSON.parse(fs.readFileSync('$ROOT_DIR/firebase.json', 'utf8'));
 config.emulators = config.emulators || {};
 config.emulators.firestore = { ...(config.emulators.firestore || {}), host: '$EMULATOR_HOSTNAME', port: Number('$EMULATOR_PORT') };
+config.emulators.ui = { enabled: false };
 fs.writeFileSync('$TMP_CONFIG', JSON.stringify(config));
 "
 

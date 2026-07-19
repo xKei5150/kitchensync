@@ -6,9 +6,9 @@ import 'package:kitchensync/core/firebase/firestore_refs.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/data/datasources/pantry_image_storage.dart';
 import 'package:kitchensync/features/pantry/data/datasources/pantry_remote_data_source.dart';
-import 'package:kitchensync/features/pantry/data/dtos/pantry_item_dto.dart';
 import 'package:kitchensync/features/pantry/data/dtos/consumption_event_dto.dart';
 import 'package:kitchensync/features/pantry/data/dtos/inventory_adjustment_event_dto.dart';
+import 'package:kitchensync/features/pantry/data/dtos/pantry_item_dto.dart';
 import 'package:kitchensync/features/pantry/data/dtos/waste_event_dto.dart';
 import 'package:kitchensync/features/pantry/data/repositories/pantry_repository_impl.dart';
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
@@ -375,7 +375,7 @@ void main() {
 
     test('restocking an empty item replaces its stale expiry', () async {
       await repo.add(
-        testItem.copyWith(quantity: 0, expiryDate: DateTime(2026, 7, 1)),
+        testItem.copyWith(quantity: 0, expiryDate: DateTime(2026, 7)),
       );
       final incomingExpiry = DateTime(2026, 7, 27);
 

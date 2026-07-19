@@ -110,6 +110,57 @@ for (const profile of shoppingRuleProfiles) {
       );
     });
 
+    test("cook can deplete ordinary stock but cannot restock or edit metadata", async () => {
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), ordinaryPath), ordinary);
+      });
+      const db = env.authenticatedContext("cook").firestore();
+      await assertSucceeds(
+        updateDoc(doc(db, ordinaryPath), {
+          quantity: 4,
+          updatedAt: new Date("2026-07-18T00:00:00.000Z"),
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(db, ordinaryPath), {
+          quantity: 6,
+          updatedAt: new Date("2026-07-18T00:01:00.000Z"),
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(db, ordinaryPath), {
+          note: "forged metadata edit",
+          updatedAt: new Date("2026-07-18T00:02:00.000Z"),
+        }),
+      );
+    });
+
+    test("shopper can correct quantity but member and metadata writes stay denied", async () => {
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), ordinaryPath), ordinary);
+      });
+      const shopperDb = env.authenticatedContext("shopper").firestore();
+      await assertSucceeds(
+        updateDoc(doc(shopperDb, ordinaryPath), {
+          quantity: 6,
+          updatedAt: new Date("2026-07-18T00:00:00.000Z"),
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(shopperDb, ordinaryPath), {
+          note: "forged metadata edit",
+          updatedAt: new Date("2026-07-18T00:01:00.000Z"),
+        }),
+      );
+      const memberDb = env.authenticatedContext("member").firestore();
+      await assertFails(
+        updateDoc(doc(memberDb, ordinaryPath), {
+          quantity: 7,
+          updatedAt: new Date("2026-07-18T00:02:00.000Z"),
+        }),
+      );
+    });
+
     test("shopper correction audits are append-only and cook/member cannot forge them", async () => {
       const shopperDb = env.authenticatedContext("shopper").firestore();
       await assertSucceeds(setDoc(doc(shopperDb, adjustmentPath), correction));

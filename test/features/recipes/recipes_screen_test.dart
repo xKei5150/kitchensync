@@ -26,6 +26,7 @@ Future<Widget> _wrap(
   ThemeData? theme,
   IngredientRepository? ingredientRepository,
   RecipeRepository? recipeRepository,
+  ActiveHouseholdContext? household,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
@@ -35,6 +36,8 @@ Future<Widget> _wrap(
       ingredientRepositoryProvider.overrideWithValue(ingredientRepository),
     if (recipeRepository != null)
       recipeRepositoryProvider.overrideWithValue(recipeRepository),
+    if (household != null)
+      activeHouseholdContextProvider.overrideWithValue(household),
   ];
   return ProviderScope(
     overrides: overrides,
@@ -46,17 +49,24 @@ Future<Widget> _wrap(
 }
 
 class _FakeRecipeRepository
-    implements RecipeRepository, IngredientRewriteRecipeRepository {
+    implements
+        RecipeRepository,
+        IngredientRewriteRecipeRepository,
+        SavedRecipeRepository {
   _FakeRecipeRepository([List<Recipe> initial = const []])
     : _recipes = List.of(initial);
 
   final List<Recipe> _recipes;
   final List<SavedRecipe> savedRecipes = [];
   final _controller = StreamController<List<Recipe>>.broadcast();
+  final _savedController = StreamController<List<SavedRecipe>>.broadcast();
 
   List<Recipe> get recipes => List.unmodifiable(_recipes);
 
-  void dispose() => _controller.close();
+  void dispose() {
+    _controller.close();
+    _savedController.close();
+  }
 
   @override
   Stream<List<Recipe>> watchHouseholdRecipes(String householdId) async* {
@@ -80,6 +90,20 @@ class _FakeRecipeRepository
 
     yield byId();
     yield* _controller.stream.map((_) => byId());
+  }
+
+  @override
+  Stream<List<SavedRecipe>> watchSavedRecipes({
+    required String householdId,
+    required String userId,
+  }) async* {
+    List<SavedRecipe> scoped() => savedRecipes
+        .where(
+          (saved) => saved.householdId == householdId && saved.userId == userId,
+        )
+        .toList(growable: false);
+    yield scoped();
+    yield* _savedController.stream.map((_) => scoped());
   }
 
   @override
@@ -190,7 +214,16 @@ class _FakeRecipeRepository
     );
     savedRecipes.add(saved);
     _controller.add(List.unmodifiable(_recipes));
+    _savedController.add(List.unmodifiable(savedRecipes));
     return saved;
+  }
+
+  @override
+  Future<void> unsavePublicRecipe(SavedRecipe savedRecipe) async {
+    savedRecipes.removeWhere((saved) => saved.id == savedRecipe.id);
+    _recipes.removeWhere((recipe) => recipe.id == savedRecipe.localRecipeId);
+    _controller.add(List.unmodifiable(_recipes));
+    _savedController.add(List.unmodifiable(savedRecipes));
   }
 }
 
@@ -199,13 +232,6 @@ class _FakeIngredientRepository implements IngredientRepository {
     : created = List.of(initial);
 
   final List<Ingredient> created;
-
-  @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) => Stream.value(
-    created
-        .where((ingredient) => ids.contains(ingredient.id))
-        .toList(growable: false),
-  );
 
   @override
   Future<Ingredient?> getById(String id, {String? householdId}) async {
@@ -220,7 +246,6 @@ class _FakeIngredientRepository implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    String? startAfterId,
   }) async {
     final normalized = query.trim().toLowerCase();
     return created
@@ -471,7 +496,7 @@ void main() {
   );
 
   testWidgets(
-    'RecipesScreen deletes a local copy without deleting its source',
+    'RecipesScreen unsaves a local copy without deleting its source',
     (tester) async {
       tester.view.physicalSize = const Size(400, 1600);
       tester.view.devicePixelRatio = 1.0;
@@ -494,13 +519,90 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('My Recipes'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.delete_outline));
+      expect(find.byTooltip('Unsave'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.bookmark_remove_outlined));
       await tester.pumpAndSettle();
 
       expect(
         repo.recipes.any((recipe) => recipe.id == 'public-chicken'),
         isTrue,
       );
+      expect(
+        repo.recipes.any((recipe) => recipe.sourceRecipeId != null),
+        isFalse,
+      );
+      expect(repo.savedRecipes, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'member hides recipe mutations but can save and unsave public recipes',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final now = DateTime(2026, 7, 5);
+      final householdRecipe = Recipe(
+        id: 'shared-private',
+        authorUserId: 'cook',
+        householdId: 'joint-household',
+        name: 'Shared soup',
+        description: 'Household recipe',
+        defaultServingSize: 4,
+        mealTimeTags: const ['Dinner'],
+        recipeTags: const ['Soup'],
+        location: 'Shared kitchen',
+        visibility: RecipeVisibility.private,
+        monetization: RecipeMonetization.free,
+        createdAt: now,
+        updatedAt: now,
+        ingredients: const [],
+        instructions: const ['Simmer.'],
+      );
+      final repo = _FakeRecipeRepository([
+        householdRecipe,
+        ..._publicRecipes(),
+      ]);
+      final ingredients = _FakeIngredientRepository();
+      addTearDown(repo.dispose);
+
+      await tester.pumpWidget(
+        await _wrap(
+          const RecipesScreen(),
+          recipeRepository: repo,
+          ingredientRepository: ingredients,
+          household: const ActiveHouseholdContext(
+            id: 'joint-household',
+            name: 'Shared kitchen',
+            role: HouseholdRole.member,
+            isJoint: true,
+            hasPremium: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Add recipe'), findsNothing);
+      await tester.tap(find.text('My Recipes'));
+      await tester.pumpAndSettle();
+      expect(find.text('Shared soup'), findsOneWidget);
+      expect(find.text('Edit'), findsNothing);
+      expect(find.byTooltip('Delete'), findsNothing);
+
+      await tester.tap(find.text('Discover'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.bookmark_border).first);
+      await tester.pumpAndSettle();
+      expect(repo.savedRecipes, hasLength(1));
+      expect(find.byIcon(Icons.bookmark), findsWidgets);
+
+      await tester.tap(find.text('My Recipes'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Unsave'), findsOneWidget);
+      await tester.tap(find.byTooltip('Unsave'));
+      await tester.pumpAndSettle();
+      expect(repo.savedRecipes, isEmpty);
       expect(
         repo.recipes.any((recipe) => recipe.sourceRecipeId != null),
         isFalse,
@@ -912,6 +1014,98 @@ void main() {
     expect(ingredients.created, isEmpty);
   });
 
+  test(
+    'importParsedDrafts denies free households (Paste & Parse is Premium)',
+    () async {
+      final repo = _FakeRecipeRepository();
+      final ingredients = _FakeIngredientRepository();
+      addTearDown(repo.dispose);
+      final controller = RecipeImportController(
+        repository: repo,
+        householdId: 'household-1',
+        household: const ActiveHouseholdContext(
+          id: 'household-1',
+          name: 'Free kitchen',
+          role: HouseholdRole.admin,
+          isJoint: false,
+          hasPremium: false,
+        ),
+        userId: 'demo-user',
+        idGenerator: FakeIdGenerator(['recipe-1', 'recipe-2']),
+        clock: FakeClock(DateTime(2026, 7, 5, 9)),
+        resolveOrCreateIngredient: _resolver(ingredients, DateTime(2026, 7, 5)),
+      );
+
+      await expectLater(
+        controller.importParsedDrafts(const [
+          RecipeDraft(
+            name: 'Parsed One',
+            defaultServingSize: 2,
+            timeTags: ['Dinner'],
+            recipeTags: ['Test'],
+            description: '',
+            ingredients: [],
+            instructions: ['Cook.'],
+            visibility: RecipeVisibility.private,
+          ),
+        ]),
+        throwsStateError,
+      );
+      expect(repo.recipes, isEmpty);
+    },
+  );
+
+  test('importParsedDrafts persists every parsed recipe for Premium', () async {
+    final repo = _FakeRecipeRepository();
+    final ingredients = _FakeIngredientRepository();
+    addTearDown(repo.dispose);
+    final controller = RecipeImportController(
+      repository: repo,
+      householdId: 'household-1',
+      household: const ActiveHouseholdContext(
+        id: 'household-1',
+        name: 'Premium kitchen',
+        role: HouseholdRole.admin,
+        isJoint: true,
+        hasPremium: true,
+      ),
+      userId: 'demo-user',
+      idGenerator: FakeIdGenerator(['recipe-1', 'recipe-2']),
+      clock: FakeClock(DateTime(2026, 7, 5, 9)),
+      resolveOrCreateIngredient: _resolver(ingredients, DateTime(2026, 7, 5)),
+    );
+
+    final imported = await controller.importParsedDrafts(const [
+      RecipeDraft(
+        name: 'Parsed One',
+        defaultServingSize: 2,
+        timeTags: ['Dinner'],
+        recipeTags: ['Test'],
+        description: '',
+        ingredients: [],
+        instructions: ['Cook one.'],
+        visibility: RecipeVisibility.private,
+      ),
+      RecipeDraft(
+        name: 'Parsed Two',
+        defaultServingSize: 4,
+        timeTags: ['Lunch'],
+        recipeTags: ['Test'],
+        description: '',
+        ingredients: [],
+        instructions: ['Cook two.'],
+        visibility: RecipeVisibility.private,
+      ),
+    ]);
+
+    expect(imported, hasLength(2));
+    expect(imported.map((r) => r.name), ['Parsed One', 'Parsed Two']);
+    expect(
+      repo.recipes.map((r) => r.name).toSet(),
+      {'Parsed One', 'Parsed Two'},
+    );
+  });
+
   test('RecipeLibraryController rejects member recipe edits', () async {
     final repo = _FakeRecipeRepository();
     final ingredients = _FakeIngredientRepository();
@@ -1044,7 +1238,7 @@ void main() {
         repository: recipes,
         householdId: 'destination',
         userId: 'user',
-        idGenerator: FakeIdGenerator(['local-copy', 'saved-link']),
+        idGenerator: FakeIdGenerator(['local-copy']),
         clock: FakeClock(now),
         resolveOrCreateIngredient: _resolver(ingredients, now),
       );
@@ -1055,6 +1249,7 @@ void main() {
       );
       final destinationIngredient = ingredients.created.single;
       expect(saved.localRecipeId, 'local-copy');
+      expect(saved.id, 'local-copy');
       expect(destinationIngredient.householdId, 'destination');
       expect(copied.ingredients.single.ingredientId, destinationIngredient.id);
       expect(

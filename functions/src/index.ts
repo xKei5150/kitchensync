@@ -1,6 +1,12 @@
 import { onCall } from "firebase-functions/v2/https"
 import { firestore } from "./firebase.js"
 import {
+  type HouseholdCommandCallableRequest,
+  removeHouseholdMemberHandler,
+  transferHouseholdAdminHandler,
+} from "./household.js"
+import { startPremiumTrialHandler } from "./premium.js"
+import {
   cancelShoppingListHandler,
   completeShoppingListHandler,
   deleteShoppingListHandler,
@@ -14,6 +20,18 @@ import { type ShoppingSmokeCallableRequest, shoppingSmokeHandler } from "./shopp
 
 export const shoppingSmoke = onCall({ region: "us-central1" }, (request) =>
   shoppingSmokeHandler(smokeRequest(request.auth?.uid, request.data)),
+)
+
+export const startPremiumTrial = onCall({ region: "us-central1" }, (request) =>
+  startPremiumTrialHandler(commandRequest(request.auth?.uid, request.data), firestore),
+)
+
+export const removeHouseholdMember = onCall({ region: "us-central1" }, (request) =>
+  removeHouseholdMemberHandler(householdRequest(request.auth?.uid, request.data), firestore),
+)
+
+export const transferHouseholdAdmin = onCall({ region: "us-central1" }, (request) =>
+  transferHouseholdAdminHandler(householdRequest(request.auth?.uid, request.data), firestore),
 )
 
 export const completeShoppingList = onCall({ region: "us-central1" }, (request) =>
@@ -55,17 +73,26 @@ function commandRequest(
   return { authUid, data }
 }
 
+function householdRequest(
+  authUid: string | undefined,
+  data: unknown,
+): HouseholdCommandCallableRequest {
+  if (authUid === undefined) {
+    return { data }
+  }
+  return { authUid, data }
+}
+
 export function plannerForEnvironment(environment: NodeJS.ProcessEnv) {
   const {
-    USE_CONTROLLED_EMULATOR_PLANNER: controlledEmulatorPlanner,
     FUNCTIONS_EMULATOR: functionsEmulator,
     LOCAL_PLANNER_INTEGRATION_TEST: localPlannerIntegration,
   } = environment
-  if (controlledEmulatorPlanner === "true" && functionsEmulator === "true") {
-    return new ControlledEmulatorAllocationPlannerClient()
-  }
   if (localPlannerIntegration === "true") {
     return CloudRunAllocationPlannerClient.forLocalIntegration(environment)
+  }
+  if (functionsEmulator === "true") {
+    return new ControlledEmulatorAllocationPlannerClient()
   }
   return CloudRunAllocationPlannerClient.fromEnvironment(environment)
 }

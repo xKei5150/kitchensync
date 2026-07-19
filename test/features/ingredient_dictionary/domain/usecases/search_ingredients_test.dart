@@ -36,7 +36,6 @@ void main() {
         query: any(named: 'query'),
         householdId: any(named: 'householdId'),
         limit: any(named: 'limit'),
-        startAfterId: any(named: 'startAfterId'),
       ),
     ).thenAnswer((_) async => [_ing('1', 'onion')]);
     final result = await useCase(const SearchIngredientsParams(query: 'onion'));
@@ -53,7 +52,6 @@ void main() {
         query: any(named: 'query'),
         householdId: any(named: 'householdId'),
         limit: any(named: 'limit'),
-        startAfterId: any(named: 'startAfterId'),
       ),
     );
   });
@@ -64,7 +62,6 @@ void main() {
         query: any(named: 'query'),
         householdId: any(named: 'householdId'),
         limit: any(named: 'limit'),
-        startAfterId: any(named: 'startAfterId'),
       ),
     ).thenThrow(StateError('boom'));
     final result = await useCase(const SearchIngredientsParams(query: 'onion'));

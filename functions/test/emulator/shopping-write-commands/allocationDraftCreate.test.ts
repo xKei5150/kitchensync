@@ -61,6 +61,96 @@ describe("server-owned shopping allocations", () => {
     )
   })
 
+  it("allows a cook to create an emergency list and notifies household shoppers", async () => {
+    const current = await createShoppingWriteHarness()
+    harness = current
+    const householdId = randomId("household")
+    const listId = randomId("emergency-list")
+    const shopperUid = randomId("shopper")
+    const intent = emergencyIntent()
+    await current.seedMembership(householdId, "cook")
+    await current.db.doc(`households/${householdId}/members/${shopperUid}`).set({ role: "shopper" })
+
+    await planShoppingAllocationHandler(
+      {
+        authUid: current.uid,
+        data: { householdId, commandId: randomId("command"), intent },
+      },
+      current.db,
+      () => ({ plan: async () => plannerDraft({ householdId, listId, intent }) }),
+    )
+
+    expect(
+      (
+        await current.db
+          .doc(`households/${householdId}/notifications/emergency_${listId}_${shopperUid}`)
+          .get()
+      ).data(),
+    ).toEqual(
+      expect.objectContaining({
+        householdId,
+        recipientUserId: shopperUid,
+        type: "emergencyShopping",
+        route: `/shop/list/${listId}`,
+        sourceId: listId,
+      }),
+    )
+  })
+
+  it("does not create emergency notifications for shoppers who opted out", async () => {
+    const current = await createShoppingWriteHarness()
+    harness = current
+    const householdId = randomId("household")
+    const listId = randomId("emergency-list")
+    const shopperUid = randomId("shopper")
+    const intent = emergencyIntent()
+    await current.seedMembership(householdId, "cook")
+    await current.db.doc(`households/${householdId}/members/${shopperUid}`).set({ role: "shopper" })
+    await current.db.doc(`users/${shopperUid}/notificationPreferences/${householdId}`).set({
+      householdId,
+      emergencyShopping: false,
+    })
+
+    await planShoppingAllocationHandler(
+      {
+        authUid: current.uid,
+        data: { householdId, commandId: randomId("command"), intent },
+      },
+      current.db,
+      () => ({ plan: async () => plannerDraft({ householdId, listId, intent }) }),
+    )
+
+    expect(
+      (await current.db.collection(`households/${householdId}/notifications`).get()).empty,
+    ).toBe(true)
+  })
+
+  it("notifies the solo user when an emergency list has no separate shopper", async () => {
+    const current = await createShoppingWriteHarness()
+    harness = current
+    const householdId = randomId("household")
+    const listId = randomId("emergency-list")
+    const intent = emergencyIntent()
+    await current.seedMembership(householdId, "admin", false)
+
+    await planShoppingAllocationHandler(
+      {
+        authUid: current.uid,
+        data: { householdId, commandId: randomId("command"), intent },
+      },
+      current.db,
+      () => ({ plan: async () => plannerDraft({ householdId, listId, intent }) }),
+    )
+
+    expect(
+      (
+        await current.db
+          .doc(`households/${householdId}/notifications/emergency_${listId}_${current.uid}`)
+          .get()
+      ).get("recipientUserId"),
+    ).toBe(current.uid)
+  })
+
   it("rejects a planner draft bound to another household without a write", async () => {
     const current = await createShoppingWriteHarness()
     harness = current
@@ -167,7 +257,14 @@ describe("server-owned shopping allocations", () => {
 function plannerDraft(input: {
   readonly householdId: string
   readonly listId: string
+  readonly intent?: PlannerDraft["intent"]
 }): PlannerDraft {
+  const intent = input.intent ?? {
+    kind: "shop_now",
+    startDate: "2026-07-13",
+    endDate: "2026-07-14",
+  }
+  const emergency = intent.kind === "emergency"
   return {
     draftId: "planner-draft",
     householdId: input.householdId,
@@ -176,29 +273,40 @@ function plannerDraft(input: {
     expiresAt: "2999-07-13T00:00:00.000Z",
     state: "ready",
     contentHash: "a".repeat(64),
-    intent: { kind: "shop_now", startDate: "2026-07-13", endDate: "2026-07-14" },
+    intent,
     list: {
-      type: "shop_now",
-      shoppingDate: "2026-07-13",
-      generatedForRangeStart: "2026-07-13",
-      generatedForRangeEnd: "2026-07-14",
+      type: emergency ? "emergency" : "shop_now",
+      shoppingDate: intent.startDate,
+      generatedForRangeStart: intent.startDate,
+      generatedForRangeEnd: intent.endDate,
       originId: null,
       items: [
         {
           itemId: "server-item",
-          ingredientId: "server-ingredient",
-          quantityNeeded: 2,
-          unit: "piece",
-          sourceMealLinks: [
-            {
-              mealEntryId: "server-meal",
-              recipeId: "server-recipe",
-              date: "2026-07-13",
-              quantity: 2,
-            },
-          ],
+          ingredientId: emergency ? "tomato" : "server-ingredient",
+          quantityNeeded: emergency ? 300 : 2,
+          unit: emergency ? "g" : "piece",
+          sourceMealLinks: emergency
+            ? []
+            : [
+                {
+                  mealEntryId: "server-meal",
+                  recipeId: "server-recipe",
+                  date: "2026-07-13",
+                  quantity: 2,
+                },
+              ],
         },
       ],
     },
+  }
+}
+
+function emergencyIntent() {
+  return {
+    kind: "emergency" as const,
+    startDate: "2026-07-13",
+    endDate: "2026-07-13",
+    demands: [{ ingredientId: "tomato", quantityNeeded: 300, unit: "g" }],
   }
 }

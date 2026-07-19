@@ -194,11 +194,15 @@ class FirebaseInitializer {
     final userDoc = db.collection('users').doc(user.uid);
     final householdDoc = db.collection('households').doc(householdId);
     final memberDoc = householdDoc.collection('members').doc(user.uid);
+    final userSnapshot = await userDoc.get();
+    final userExists = userSnapshot.exists;
+    final householdExists =
+        userSnapshot.data()?['createdSoloHouseholdId'] == householdId;
 
     final batch = db.batch()
       ..set(userDoc, {
         'activeHouseholdId': householdId,
-        'isPremium': true,
+        if (!userExists) 'isPremium': false,
         'createdSoloHouseholdId': householdId,
         'updatedAt': now,
       }, SetOptions(merge: true))
@@ -206,8 +210,9 @@ class FirebaseInitializer {
         'name': debugHouseholdName,
         'creatorUserId': user.uid,
         'isJoint': false,
-        'hasPremium': true,
+        if (!householdExists) 'hasPremium': false,
         'maxMembers': 1,
+        'memberCount': 1,
         'updatedAt': now,
       }, SetOptions(merge: true))
       ..set(memberDoc, {

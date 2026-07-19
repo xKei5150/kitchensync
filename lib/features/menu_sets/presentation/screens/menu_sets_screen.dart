@@ -5,11 +5,14 @@ import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
+import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
+import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/menu_sets/domain/entities/menu_set.dart';
-import 'package:kitchensync/features/menu_sets/domain/services/menu_set_application_engine.dart';
 import 'package:kitchensync/features/menu_sets/presentation/providers/menu_set_repository_providers.dart';
+import 'package:kitchensync/features/menu_sets/presentation/screens/menu_set_editor_screen.dart';
 
 /// Screen 11 · Menu Sets home — a deck of weeks you can re-live.
 ///
@@ -36,55 +39,40 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
 
   Future<void> _createFromPastCalendar(bool allowed) async {
     if (!allowed) return _showAccessRequired();
-    final today = DateTime.now();
-    final end = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).subtract(const Duration(days: 1));
-    final start = end.subtract(const Duration(days: 6));
-    try {
-      await ref
-          .read(menuSetEditorControllerProvider)
-          .createFromPastCalendar(
-            startDate: start,
-            endDate: end,
-            name: 'Last week',
-          );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not create menu set: $error')),
-      );
-      return;
-    }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Created a menu set from last week.')),
+    final created = await showModalBottomSheet<MenuSet>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: context.ksColors.scrim,
+      builder: (_) => const _PastCalendarSheet(),
     );
+    if (!mounted || created == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Created “${created.name}” — review and edit any day.',
+        ),
+      ),
+    );
+    ref.invalidate(activeHouseholdMenuSetsProvider);
+    if (GoRouter.maybeOf(context) != null) {
+      await context.pushNamed(
+        'menuSetEditor',
+        queryParameters: {'menuSetId': created.id},
+      );
+    }
   }
 
   Future<void> _apply(MenuSet set, bool allowed) async {
     if (!allowed) return _showAccessRequired();
-    final start = DateTime(2026, 7, 6);
-    final end = DateTime(2026, 8, 2);
-    try {
-      await ref
-          .read(menuSetApplyPersistenceControllerProvider)
-          .applyPersistedMenuSet(
-            menuSet: set,
-            startDate: start,
-            endDate: end,
-            mode: MenuSetApplyMode.fillEmpty,
-          );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not apply menu set: $error')),
-      );
-      return;
-    }
-    if (!mounted) return;
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: context.ksColors.scrim,
+      builder: (_) => MenuSetApplySheet(menuSet: set),
+    );
+    if (!mounted || applied != true) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Applied ${set.name} to the calendar.')),
     );
@@ -93,21 +81,11 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
   Future<void> _duplicate(MenuSet set, bool allowed) async {
     if (!allowed) return _showAccessRequired();
     final now = DateTime.now();
-    final duplicateId = '${set.id}-copy-${now.microsecondsSinceEpoch}';
-    final duplicate = MenuSet(
-      id: duplicateId,
-      householdId: set.householdId,
-      name: '${set.name} copy',
-      description: set.description,
-      lengthInDays: set.lengthInDays,
-      createdByUserId: set.createdByUserId,
-      createdAt: now,
-      updatedAt: now,
-      isPublicTemplate: set.isPublicTemplate,
-      days: [
-        for (final day in set.days)
-          _duplicateDay(day, duplicateId, now.microsecondsSinceEpoch),
-      ],
+    final duplicate = const MenuSetDraftFactory().duplicate(
+      source: set,
+      suffix: now.microsecondsSinceEpoch,
+      createdByUserId: ref.read(activeUserIdProvider),
+      now: now,
     );
     await ref.read(menuSetRepositoryProvider).upsert(duplicate);
   }
@@ -174,6 +152,21 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
               padding: EdgeInsets.fromLTRB(20, KsTokens.space12, 20, 0),
               child: _Subhead('Reuse a week you loved.'),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                KsTokens.space16,
+                KsTokens.space12,
+                KsTokens.space16,
+                0,
+              ),
+              child: OutlinedButton.icon(
+                onPressed: canEdit
+                    ? () => context.push('/menu-sets/edit')
+                    : null,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Create Menu Set'),
+              ),
+            ),
             const SizedBox(height: KsTokens.space16),
             Expanded(
               child: sets.when(
@@ -220,6 +213,12 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
                             onApply: canApply ? () => _apply(set, true) : null,
                             onDuplicate: canEdit
                                 ? () => _duplicate(set, true)
+                                : null,
+                            onEdit: canEdit
+                                ? () => context.pushNamed(
+                                    'menuSetEditor',
+                                    queryParameters: {'menuSetId': set.id},
+                                  )
                                 : null,
                           ),
                         ),
@@ -290,25 +289,6 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
   }
 }
 
-MenuSetDay _duplicateDay(MenuSetDay day, String menuSetId, int suffix) {
-  final dayId = '${day.id}-copy-$suffix';
-  return MenuSetDay(
-    id: dayId,
-    menuSetId: menuSetId,
-    dayIndex: day.dayIndex,
-    label: day.label,
-    entries: [
-      for (final entry in day.entries)
-        MenuSetEntry(
-          id: '${entry.id}-copy-$suffix',
-          menuSetDayId: dayId,
-          mealSlot: entry.mealSlot,
-          recipeId: entry.recipeId,
-          orderInSlot: entry.orderInSlot,
-        ),
-    ],
-  );
-}
 
 class _Subhead extends StatelessWidget {
   const _Subhead(this.text);
@@ -418,6 +398,299 @@ class _DeleteButton extends StatelessWidget {
         onPressed: enabled ? onTap : null,
         icon: const Icon(Icons.delete_outline_rounded, size: 16),
         label: const Text('Delete selected set'),
+      ),
+    );
+  }
+}
+
+enum _PastRangePreset { lastWeek, thisMonth, custom }
+
+/// Spec 6.4.2 — "Create from Past Calendar": pick a preset or manual range,
+/// name the set, review the normalized day/meal structure, then save and open
+/// the editor to edit any day before committing further changes.
+class _PastCalendarSheet extends ConsumerStatefulWidget {
+  const _PastCalendarSheet();
+
+  @override
+  ConsumerState<_PastCalendarSheet> createState() => _PastCalendarSheetState();
+}
+
+class _PastCalendarSheetState extends ConsumerState<_PastCalendarSheet> {
+  final _nameController = TextEditingController(text: 'Last week');
+  _PastRangePreset _preset = _PastRangePreset.lastWeek;
+  late DateTime _start;
+  late DateTime _end;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _applyPreset(_PastRangePreset.lastWeek);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  DateTime _yesterday() {
+    final now = ref.read(clockProvider).now();
+    return DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 1));
+  }
+
+  void _applyPreset(_PastRangePreset preset) {
+    final end = _yesterday();
+    setState(() {
+      _preset = preset;
+      switch (preset) {
+        case _PastRangePreset.lastWeek:
+          _end = end;
+          _start = end.subtract(const Duration(days: 6));
+        case _PastRangePreset.thisMonth:
+          _end = end;
+          _start = DateTime(end.year, end.month);
+        case _PastRangePreset.custom:
+          break;
+      }
+    });
+  }
+
+  Future<void> _pickCustomRange() async {
+    final now = ref.read(clockProvider).now();
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year, now.month, now.day),
+      initialDateRange: DateTimeRange(start: _start, end: _end),
+    );
+    if (range == null || !mounted) return;
+    setState(() {
+      _preset = _PastRangePreset.custom;
+      _start = DateTime(range.start.year, range.start.month, range.start.day);
+      _end = DateTime(range.end.year, range.end.month, range.end.day);
+    });
+  }
+
+  Future<void> _save() async {
+    if (_isSaving) return;
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a name for the menu set.')),
+      );
+      return;
+    }
+    setState(() => _isSaving = true);
+    MenuSet? created;
+    try {
+      created = await ref
+          .read(menuSetEditorControllerProvider)
+          .createFromPastCalendar(
+            startDate: _start,
+            endDate: _end,
+            name: name,
+          );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create menu set: $error')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop(created);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    final mealsAsync = ref.watch(
+      activeCalendarMealsProvider((start: _start, end: _end)),
+    );
+    final dayCount = _end.difference(_start).inDays + 1;
+    return Container(
+      key: const Key('past-calendar-sheet'),
+      decoration: BoxDecoration(
+        color: ks.surfaceRaised,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(KsTokens.radius20),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            KsTokens.space20,
+            KsTokens.space12,
+            KsTokens.space20,
+            KsTokens.space24 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ks.borderStrong,
+                    borderRadius: BorderRadius.circular(KsTokens.radiusFull),
+                  ),
+                ),
+              ),
+              const SizedBox(height: KsTokens.space16),
+              Text(
+                'Create from past calendar',
+                style: KsTokens.headlineLarge.copyWith(
+                  color: ks.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: KsTokens.space16),
+              Wrap(
+                spacing: KsTokens.space8,
+                children: [
+                  _PresetChip(
+                    label: 'Last week',
+                    selected: _preset == _PastRangePreset.lastWeek,
+                    onTap: () => _applyPreset(_PastRangePreset.lastWeek),
+                  ),
+                  _PresetChip(
+                    label: 'This month',
+                    selected: _preset == _PastRangePreset.thisMonth,
+                    onTap: () => _applyPreset(_PastRangePreset.thisMonth),
+                  ),
+                  _PresetChip(
+                    label: 'Custom range',
+                    selected: _preset == _PastRangePreset.custom,
+                    onTap: _pickCustomRange,
+                  ),
+                ],
+              ),
+              const SizedBox(height: KsTokens.space8),
+              Text(
+                '${_shortDate(_start)} – ${_shortDate(_end)} · $dayCount days',
+                style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
+              ),
+              const SizedBox(height: KsTokens.space16),
+              TextField(
+                key: const Key('past-calendar-name-field'),
+                controller: _nameController,
+                maxLength: 120,
+                decoration: const InputDecoration(labelText: 'Menu set name'),
+              ),
+              const SizedBox(height: KsTokens.space8),
+              _ReviewPanel(mealsAsync: mealsAsync, dayCount: dayCount),
+              const SizedBox(height: KsTokens.space16),
+              FilledButton(
+                key: const Key('past-calendar-save'),
+                onPressed: _isSaving ? null : _save,
+                child: Text(_isSaving ? 'Saving…' : 'Save & review'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _shortDate(DateTime date) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${date.day} ${months[date.month - 1]}';
+  }
+}
+
+class _PresetChip extends StatelessWidget {
+  const _PresetChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+    );
+  }
+}
+
+class _ReviewPanel extends StatelessWidget {
+  const _ReviewPanel({required this.mealsAsync, required this.dayCount});
+
+  final AsyncValue<List<MealScheduleEntry>> mealsAsync;
+  final int dayCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final ks = context.ksColors;
+    return Container(
+      key: const Key('past-calendar-review'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(KsTokens.space12),
+      decoration: BoxDecoration(
+        color: ks.surfaceSunken,
+        borderRadius: BorderRadius.circular(KsTokens.radius12),
+        border: Border.all(color: ks.border),
+      ),
+      child: mealsAsync.when(
+        loading: () => const Text('Analyzing your calendar…'),
+        error: (error, _) => Text('Could not read calendar: $error'),
+        data: (meals) {
+          final active = meals
+              .where((m) => m.state != ScheduledMealState.cancelled)
+              .toList();
+          if (active.isEmpty) {
+            return Text(
+              'No meals in this range yet — pick a range you actually cooked.',
+              style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
+            );
+          }
+          final days = <DateTime>{
+            for (final m in active)
+              DateTime(m.date.year, m.date.month, m.date.day),
+          };
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Review',
+                style: KsTokens.labelSmall.copyWith(
+                  color: ks.textTertiary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 9,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(height: KsTokens.space8),
+              Text(
+                '$dayCount-day template · ${active.length} meals across '
+                '${days.length} planned days',
+                style: KsTokens.titleSmall.copyWith(color: ks.textPrimary),
+              ),
+              const SizedBox(height: KsTokens.space4),
+              Text(
+                'Cancelled meals are excluded. You can edit any day next.',
+                style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

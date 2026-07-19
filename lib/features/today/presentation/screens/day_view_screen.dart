@@ -4,10 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
+import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
+import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
+import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 import 'package:kitchensync/features/shopping/presentation/providers/shopping_repository_providers.dart';
 
@@ -90,140 +95,391 @@ class DayViewScreen extends ConsumerWidget {
     required bool isLast,
   }) {
     final recipe = ref.watch(recipeRecordProvider(meal.recipeId)).valueOrNull;
+    final household = ref.watch(activeHouseholdContextProvider);
+    const policy = HouseholdPolicy();
+    final canCook =
+        household == null ||
+        policy.roleCan(
+          household.role,
+          HouseholdCapability.markMealsCooked,
+          isSoloHousehold: household.isSolo,
+        );
+    final canAdjust =
+        household == null ||
+        policy.roleCan(
+          household.role,
+          HouseholdCapability.adjustMealServings,
+          isSoloHousehold: household.isSolo,
+        );
+    final canSchedule =
+        household == null ||
+        policy.roleCan(
+          household.role,
+          HouseholdCapability.scheduleMeals,
+          isSoloHousehold: household.isSolo,
+        );
+    final canRemove =
+        household == null ||
+        policy.roleCan(
+          household.role,
+          HouseholdCapability.removeScheduledMeals,
+          isSoloHousehold: household.isSolo,
+        );
+    final canManageLeftovers =
+        household == null ||
+        policy.roleCan(
+          household.role,
+          HouseholdCapability.manageLeftovers,
+          isSoloHousehold: household.isSolo,
+        );
+    final isScheduled = meal.state == ScheduledMealState.scheduled;
+    final isCooked = meal.state == ScheduledMealState.cooked;
+    final isActiveLeftover =
+        meal.state == ScheduledMealState.leftover &&
+        meal.marking != ScheduledMealMarking.waste;
+    final metadata = [
+      if (meal.mergedMealCount > 1) 'Merged ${meal.mergedMealCount}:1',
+      if (recipe != null) ...[
+        if (recipe.mealTimeTags.isNotEmpty) recipe.mealTimeTags.join(', '),
+        if (recipe.recipeTags.isNotEmpty) recipe.recipeTags.join(', '),
+        if (recipe.priceForServings(meal.servingSize) case final price?)
+          'Price ${price.toStringAsFixed(2)}',
+      ],
+    ];
     return _TimelineEntry(
       time: _timeForMeal(meal.mealLabel),
       node: _nodeForState(meal.state),
       isLast: isLast,
       child: _TonightExpanded(
         mealLabel: meal.mealLabel,
-        stateLabel: _stateLabel(meal.state),
+        stateLabel: _stateLabel(meal.state, meal.marking),
         title: recipe?.name ?? meal.recipeId,
         servingSize: meal.servingSize,
-        onMarkCooked: () async {
-          try {
-            await ref.read(cookingLifecycleControllerProvider).markCooked(meal);
-          } on MissingMealIngredientsException catch (error) {
-            if (!context.mounted) return;
-            final addMissing = await showDialog<bool>(
-              context: context,
-              builder: (dialogContext) => AlertDialog(
-                title: const Text('Missing pantry items'),
-                content: Text(
-                  '${error.missingIngredients.length} required '
-                  '${error.missingIngredients.length == 1 ? 'ingredient is' : 'ingredients are'} '
-                  'not available. Add the missing amount to an emergency shopping list?',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext, false),
-                    child: const Text('Not now'),
-                  ),
-                  FilledButton.icon(
-                    onPressed: () => Navigator.pop(dialogContext, true),
-                    icon: const Icon(Icons.add_shopping_cart_rounded),
-                    label: const Text('Add missing items'),
-                  ),
-                ],
-              ),
-            );
-            if (addMissing != true || !context.mounted) return;
-            final list = await ref
-                .read(shoppingPlanningControllerProvider)
-                .createEmergencyListFromMissing(
-                  date: error.meal.date,
-                  missingIngredients: error.missingIngredients,
+        metadata: metadata,
+        onMarkCooked: !canCook || !isScheduled
+            ? null
+            : () async {
+                try {
+                  await ref
+                      .read(cookingLifecycleControllerProvider)
+                      .markCooked(meal);
+                } on MissingMealIngredientsException catch (error) {
+                  if (!context.mounted) return;
+                  final missingIngredientVerb =
+                      error.missingIngredients.length == 1
+                      ? 'ingredient is'
+                      : 'ingredients are';
+                  final addMissing = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('Missing pantry items'),
+                      content: Text(
+                        '${error.missingIngredients.length} required '
+                        '$missingIngredientVerb '
+                        'not available. Add the missing amount to an emergency '
+                        'shopping list?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          child: const Text('Not now'),
+                        ),
+                        FilledButton.icon(
+                          onPressed: () => Navigator.pop(dialogContext, true),
+                          icon: const Icon(Icons.add_shopping_cart_rounded),
+                          label: const Text('Add missing items'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (addMissing != true || !context.mounted) return;
+                  final list = await ref
+                      .read(shoppingPlanningControllerProvider)
+                      .createEmergencyListFromMissing(
+                        date: error.meal.date,
+                        missingIngredients: error.missingIngredients,
+                      );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Emergency shopping list created.'),
+                    ),
+                  );
+                  final router = GoRouter.maybeOf(context);
+                  if (router != null) {
+                    unawaited(router.push('/shop/list/${list.id}'));
+                  }
+                  return;
+                } catch (error) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not mark cooked: $error')),
+                  );
+                  return;
+                }
+                if (!context.mounted) return;
+                final router = GoRouter.maybeOf(context);
+                if (router?.canPop() ?? false) {
+                  router!.pop();
+                } else {
+                  await Navigator.of(context).maybePop();
+                }
+              },
+        onChangeServings: !canAdjust || !isScheduled
+            ? null
+            : () async {
+                final next = await _numberDialog(
+                  context,
+                  title: 'Change serving size',
+                  label: 'Servings',
+                  initial: meal.servingSize,
                 );
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Emergency shopping list created.')),
-            );
-            final router = GoRouter.maybeOf(context);
-            if (router != null) {
-              unawaited(router.push('/shop/list/${list.id}'));
-            }
-            return;
-          } catch (error) {
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Could not mark cooked: $error')),
-            );
-            return;
-          }
-          if (!context.mounted) return;
-          final router = GoRouter.maybeOf(context);
-          if (router?.canPop() ?? false) {
-            router!.pop();
-          } else {
-            await Navigator.of(context).maybePop();
-          }
-        },
-        onChangeServings: () async {
-          await _runMealAction(
-            context,
-            () => ref
-                .read(cookingLifecycleControllerProvider)
-                .changeServingSize(meal, 6),
-            failureLabel: 'Could not change servings',
-          );
-        },
-        onMergeMeals: () async {
-          await _runMealAction(
-            context,
-            () => ref
-                .read(cookingLifecycleControllerProvider)
-                .mergeMeals(meal: meal, mealCount: 2),
-            failureLabel: 'Could not merge meals',
-          );
-        },
-        onSaveLeftovers: () async {
-          try {
-            await ref
-                .read(cookingLifecycleControllerProvider)
-                .saveLeftovers(meal: meal, servings: 2);
-          } catch (error) {
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Could not save leftovers: $error')),
-            );
-            return;
-          }
-          if (!context.mounted) return;
-          final router = GoRouter.maybeOf(context);
-          if (router?.canPop() ?? false) {
-            router!.pop();
-          } else {
-            await Navigator.of(context).maybePop();
-          }
-        },
-        onSwap: () async {
-          await _runMealAction(
-            context,
-            () => ref
-                .read(cookingLifecycleControllerProvider)
-                .swapRecipe(meal: meal, recipeId: 'pad-thai', servingSize: 4),
-            failureLabel: 'Could not swap recipe',
-          );
-        },
-        onCookNext: () async {
-          await _runMealAction(
-            context,
-            () => ref
-                .read(cookingLifecycleControllerProvider)
-                .rescheduleCookNext(meal),
-            failureLabel: 'Could not reschedule',
-          );
-        },
-        onCancel: () async {
-          await _runMealAction(
-            context,
-            () => ref.read(cookingLifecycleControllerProvider).cancelMeal(meal),
-            failureLabel: 'Could not cancel meal',
-          );
-        },
+                if (next == null || !context.mounted) return;
+                await _runMealAction(
+                  context,
+                  () => ref
+                      .read(cookingLifecycleControllerProvider)
+                      .changeServingSize(meal, next),
+                  failureLabel: 'Could not change servings',
+                );
+              },
+        onMergeMeals:
+            !canAdjust || household?.hasPremium == false || !isScheduled
+            ? null
+            : () async {
+                await _runMealAction(
+                  context,
+                  () => ref
+                      .read(cookingLifecycleControllerProvider)
+                      .mergeMeals(meal: meal, mealCount: 2),
+                  failureLabel: 'Could not merge meals',
+                );
+              },
+        onSaveLeftovers: !canManageLeftovers || !isCooked
+            ? null
+            : () async {
+                final servings = await _numberDialog(
+                  context,
+                  title: 'Save leftovers',
+                  label: 'Leftover servings',
+                  initial: 2,
+                );
+                if (servings == null || !context.mounted) return;
+                await _runMealAction(
+                  context,
+                  () => ref
+                      .read(cookingLifecycleControllerProvider)
+                      .saveLeftovers(meal: meal, servings: servings),
+                  failureLabel: 'Could not save leftovers',
+                );
+              },
+        onScheduleLeftover:
+            !isActiveLeftover ||
+                meal.linkedLeftoverId == null ||
+                !canManageLeftovers ||
+                !canSchedule
+            ? null
+            : () async {
+                final hid = ref.read(activeHouseholdIdProvider);
+                final leftover = await ref.read(
+                  pantryItemStreamProvider(hid, meal.linkedLeftoverId!).future,
+                );
+                if (leftover == null || !context.mounted) return;
+                final date = await showDatePicker(
+                  context: context,
+                  firstDate: meal.date.add(const Duration(days: 1)),
+                  lastDate: meal.date.add(const Duration(days: 30)),
+                  initialDate: meal.date.add(const Duration(days: 1)),
+                );
+                if (date == null || !context.mounted) return;
+                await _runMealAction(
+                  context,
+                  () => ref
+                      .read(cookingLifecycleControllerProvider)
+                      .scheduleLeftoverMeal(
+                        leftover: leftover,
+                        date: date,
+                        mealLabel: meal.mealLabel,
+                      ),
+                  failureLabel: 'Could not schedule leftover',
+                );
+              },
+        onConsumeLeftover:
+            !isActiveLeftover ||
+                meal.linkedLeftoverId == null ||
+                !canManageLeftovers ||
+                !canCook
+            ? null
+            : () async {
+                await _runMealAction(
+                  context,
+                  () => ref
+                      .read(cookingLifecycleControllerProvider)
+                      .consumeLeftoverMeal(meal),
+                  failureLabel: 'Could not consume leftover',
+                );
+              },
+        onWasteLeftover:
+            !isActiveLeftover ||
+                meal.linkedLeftoverId == null ||
+                !canManageLeftovers
+            ? null
+            : () async {
+                final hid = ref.read(activeHouseholdIdProvider);
+                final leftover = await ref.read(
+                  pantryItemStreamProvider(hid, meal.linkedLeftoverId!).future,
+                );
+                if (leftover == null || !context.mounted) return;
+                await _runMealAction(
+                  context,
+                  () => ref
+                      .read(cookingLifecycleControllerProvider)
+                      .markLeftoverSpoiled(leftover),
+                  failureLabel: 'Could not mark leftover as waste',
+                );
+              },
+        onSwap: !canSchedule || !isScheduled
+            ? null
+            : () async {
+                final recipes = await _recipesForSwap(ref, meal.recipeId);
+                if (!context.mounted) return;
+                final selection = await _recipeDialog(context, recipes);
+                if (selection == null || !context.mounted) return;
+                await _runMealAction(
+                  context,
+                  () => ref
+                      .read(cookingLifecycleControllerProvider)
+                      .swapRecipe(
+                        meal: meal,
+                        recipeId: selection.id,
+                        servingSize: selection.defaultServingSize,
+                      ),
+                  failureLabel: 'Could not swap recipe',
+                );
+              },
+        onCookNext: !canSchedule || !isScheduled
+            ? null
+            : () async {
+                await _runMealAction(
+                  context,
+                  () => ref
+                      .read(cookingLifecycleControllerProvider)
+                      .rescheduleCookNext(meal),
+                  failureLabel: 'Could not reschedule',
+                );
+              },
+        onCancel: !canRemove || !isScheduled
+            ? null
+            : () async {
+                await _runMealAction(
+                  context,
+                  () => ref
+                      .read(cookingLifecycleControllerProvider)
+                      .cancelMeal(meal),
+                  failureLabel: 'Could not cancel meal',
+                );
+              },
         onRecipe: () => context.push('/recipe/${meal.recipeId}'),
       ),
     );
   }
+
+  Future<List<Recipe>> _recipesForSwap(
+    WidgetRef ref,
+    String currentRecipeId,
+  ) async {
+    List<Recipe> alternatives(Iterable<Recipe> recipes) => recipes
+        .where((recipe) => recipe.id != currentRecipeId)
+        .toList(growable: false);
+
+    final cached = alternatives(
+      ref.read(activeHouseholdRecipesProvider).valueOrNull ?? const <Recipe>[],
+    );
+    if (cached.isNotEmpty) return cached;
+
+    try {
+      final householdId = ref.read(activeHouseholdIdProvider);
+      final recipes = await ref
+          .read(recipeRepositoryProvider)
+          .watchHouseholdRecipes(householdId)
+          .firstWhere(
+            (items) => items.any((recipe) => recipe.id != currentRecipeId),
+          )
+          .timeout(const Duration(seconds: 3));
+      return alternatives(recipes);
+    } on TimeoutException {
+      return alternatives(
+        ref.read(activeHouseholdRecipesProvider).valueOrNull ??
+            const <Recipe>[],
+      );
+    }
+  }
+
+  Future<int?> _numberDialog(
+    BuildContext context, {
+    required String title,
+    required String label,
+    required int initial,
+  }) {
+    var entered = '$initial';
+    return showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: TextFormField(
+          initialValue: entered,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(labelText: label),
+          onChanged: (value) => entered = value,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = int.tryParse(entered.trim());
+              if (parsed == null || parsed <= 0) return;
+              Navigator.pop(dialogContext, parsed);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<Recipe?> _recipeDialog(BuildContext context, List<Recipe> recipes) =>
+      showDialog<Recipe>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Change scheduled dish'),
+          content: recipes.isEmpty
+              ? const Text('No household recipes are available.')
+              : SizedBox(
+                  width: double.maxFinite,
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final recipe in recipes)
+                        ListTile(
+                          title: Text(recipe.name),
+                          subtitle: Text('Serves ${recipe.defaultServingSize}'),
+                          onTap: () => Navigator.pop(dialogContext, recipe),
+                        ),
+                    ],
+                  ),
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
 
   Future<void> _runMealAction(
     BuildContext context,
@@ -284,7 +540,8 @@ _NodeKind _nodeForState(ScheduledMealState state) {
   };
 }
 
-String _stateLabel(ScheduledMealState state) {
+String _stateLabel(ScheduledMealState state, ScheduledMealMarking marking) {
+  if (marking == ScheduledMealMarking.waste) return 'Waste';
   return switch (state) {
     ScheduledMealState.scheduled => 'Scheduled',
     ScheduledMealState.cooked => 'Cooked',
@@ -401,10 +658,14 @@ class _TonightExpanded extends StatelessWidget {
     required this.stateLabel,
     required this.title,
     required this.servingSize,
+    required this.metadata,
     required this.onMarkCooked,
     required this.onChangeServings,
     required this.onMergeMeals,
     required this.onSaveLeftovers,
+    required this.onScheduleLeftover,
+    required this.onConsumeLeftover,
+    required this.onWasteLeftover,
     required this.onSwap,
     required this.onCookNext,
     required this.onCancel,
@@ -415,13 +676,17 @@ class _TonightExpanded extends StatelessWidget {
   final String stateLabel;
   final String title;
   final int servingSize;
-  final VoidCallback onMarkCooked;
-  final VoidCallback onChangeServings;
-  final VoidCallback onMergeMeals;
-  final VoidCallback onSaveLeftovers;
-  final VoidCallback onSwap;
-  final VoidCallback onCookNext;
-  final VoidCallback onCancel;
+  final List<String> metadata;
+  final VoidCallback? onMarkCooked;
+  final VoidCallback? onChangeServings;
+  final VoidCallback? onMergeMeals;
+  final VoidCallback? onSaveLeftovers;
+  final VoidCallback? onScheduleLeftover;
+  final VoidCallback? onConsumeLeftover;
+  final VoidCallback? onWasteLeftover;
+  final VoidCallback? onSwap;
+  final VoidCallback? onCookNext;
+  final VoidCallback? onCancel;
   final VoidCallback onRecipe;
 
   @override
@@ -487,17 +752,25 @@ class _TonightExpanded extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
+          if (metadata.isNotEmpty) ...[
+            const SizedBox(height: KsTokens.space6),
+            Text(
+              metadata.join(' · '),
+              style: KsTokens.bodySmall.copyWith(color: ks.textTertiary),
+            ),
+          ],
           const SizedBox(height: KsTokens.space12),
           Row(
             children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: onMarkCooked,
-                  icon: const Icon(Icons.check_rounded, size: 16),
-                  label: const Text('Mark cooked'),
+              if (onMarkCooked != null)
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: onMarkCooked,
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: const Text('Mark cooked'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: KsTokens.space8),
+              if (onMarkCooked != null) const SizedBox(width: KsTokens.space8),
               OutlinedButton(onPressed: onRecipe, child: const Text('Recipe')),
             ],
           ),
@@ -506,36 +779,60 @@ class _TonightExpanded extends StatelessWidget {
             spacing: KsTokens.space16,
             runSpacing: KsTokens.space8,
             children: [
-              _MiniAction(
-                icon: Icons.tune_rounded,
-                label: 'Servings',
-                onTap: onChangeServings,
-              ),
-              _MiniAction(
-                icon: Icons.call_merge_rounded,
-                label: 'Merge 2 meals',
-                onTap: onMergeMeals,
-              ),
-              _MiniAction(
-                icon: Icons.room_service_outlined,
-                label: 'Leftovers',
-                onTap: onSaveLeftovers,
-              ),
-              _MiniAction(
-                icon: Icons.swap_horiz_rounded,
-                label: 'Swap',
-                onTap: onSwap,
-              ),
-              _MiniAction(
-                icon: Icons.skip_next_rounded,
-                label: 'Cook next',
-                onTap: onCookNext,
-              ),
-              _MiniAction(
-                icon: Icons.close_rounded,
-                label: 'Cancel',
-                onTap: onCancel,
-              ),
+              if (onChangeServings != null)
+                _MiniAction(
+                  icon: Icons.tune_rounded,
+                  label: 'Servings',
+                  onTap: onChangeServings,
+                ),
+              if (onMergeMeals != null)
+                _MiniAction(
+                  icon: Icons.call_merge_rounded,
+                  label: 'Merge 2 meals',
+                  onTap: onMergeMeals,
+                ),
+              if (onSaveLeftovers != null)
+                _MiniAction(
+                  icon: Icons.room_service_outlined,
+                  label: 'Save leftovers',
+                  onTap: onSaveLeftovers,
+                ),
+              if (onScheduleLeftover != null)
+                _MiniAction(
+                  icon: Icons.event_repeat_rounded,
+                  label: 'Schedule leftover',
+                  onTap: onScheduleLeftover,
+                ),
+              if (onConsumeLeftover != null)
+                _MiniAction(
+                  icon: Icons.restaurant_rounded,
+                  label: 'Mark eaten',
+                  onTap: onConsumeLeftover,
+                ),
+              if (onWasteLeftover != null)
+                _MiniAction(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Mark waste',
+                  onTap: onWasteLeftover,
+                ),
+              if (onSwap != null)
+                _MiniAction(
+                  icon: Icons.swap_horiz_rounded,
+                  label: 'Swap',
+                  onTap: onSwap,
+                ),
+              if (onCookNext != null)
+                _MiniAction(
+                  icon: Icons.skip_next_rounded,
+                  label: 'Cook next',
+                  onTap: onCookNext,
+                ),
+              if (onCancel != null)
+                _MiniAction(
+                  icon: Icons.close_rounded,
+                  label: 'Cancel',
+                  onTap: onCancel,
+                ),
             ],
           ),
         ],

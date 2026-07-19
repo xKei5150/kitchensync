@@ -1,4 +1,5 @@
 // SIZE_OK: recipe repository providers centralize existing demo/data wiring.
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
@@ -12,8 +13,11 @@ import 'package:kitchensync/features/ingredient_dictionary/domain/usecases/resol
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/data/datasources/recipe_remote_data_source.dart';
 import 'package:kitchensync/features/recipes/data/repositories/recipe_repository_impl.dart';
+import 'package:kitchensync/features/recipes/data/repositories/recipe_social_repository_impl.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
+import 'package:kitchensync/features/recipes/domain/entities/recipe_social_models.dart';
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
+import 'package:kitchensync/features/recipes/domain/repositories/recipe_social_repository.dart';
 
 final recipeRemoteDataSourceProvider = Provider<RecipeRemoteDataSource>(
   (ref) => RecipeRemoteDataSource(ref.watch(firestoreRefsProvider)),
@@ -23,9 +27,116 @@ final recipeRepositoryProvider = Provider<RecipeRepository>(
   (ref) => RecipeRepositoryImpl(ref.watch(recipeRemoteDataSourceProvider)),
 );
 
+final recipeSocialRepositoryProvider = Provider<RecipeSocialRepository?>((ref) {
+  if (Firebase.apps.isEmpty) return null;
+  return RecipeSocialRepositoryImpl(ref.watch(firestoreRefsProvider));
+});
+
+final recipeSocialStateProvider =
+    StreamProvider.family<RecipeSocialState, String>((ref, recipeId) {
+      final repository = ref.watch(recipeSocialRepositoryProvider);
+      if (repository == null) return Stream.value(RecipeSocialState.empty);
+      return repository.watchSocial(
+        recipeId: recipeId,
+        viewerUserId: ref.watch(activeUserIdProvider),
+      );
+    });
+
+final recipeSocialControllerProvider = Provider<RecipeSocialController>((ref) {
+  final repository = ref.watch(recipeSocialRepositoryProvider);
+  if (repository == null) {
+    throw StateError('Recipe social actions require initialized Firebase.');
+  }
+  return RecipeSocialController(
+    repository: repository,
+    userId: ref.watch(activeUserIdProvider),
+    idGenerator: ref.watch(idGeneratorProvider),
+    clock: ref.watch(clockProvider),
+  );
+});
+
+class RecipeSocialController {
+  const RecipeSocialController({
+    required this.repository,
+    required this.userId,
+    required this.idGenerator,
+    required this.clock,
+  });
+
+  final RecipeSocialRepository repository;
+  final String userId;
+  final IdGenerator idGenerator;
+  final Clock clock;
+
+  Future<void> setLiked({required String recipeId, required bool liked}) =>
+      repository.setLiked(
+        recipeId: recipeId,
+        userId: userId,
+        liked: liked,
+        now: clock.now(),
+      );
+
+  Future<void> addComment({required String recipeId, required String body}) {
+    final now = clock.now();
+    return repository.addComment(
+      RecipeComment(
+        id: idGenerator.newId(),
+        recipeId: recipeId,
+        authorUserId: userId,
+        body: body,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  Future<void> deleteComment({
+    required String recipeId,
+    required String commentId,
+  }) => repository.deleteComment(recipeId: recipeId, commentId: commentId);
+}
+
 final activeHouseholdRecipesProvider = StreamProvider<List<Recipe>>((ref) {
   final householdId = ref.watch(activeHouseholdIdProvider);
   return ref.watch(recipeRepositoryProvider).watchHouseholdRecipes(householdId);
+});
+
+final activeSavedRecipesProvider = StreamProvider<List<SavedRecipe>>((ref) {
+  final repository = ref.watch(recipeRepositoryProvider);
+  final savedRepository = repository is SavedRecipeRepository
+      ? repository as SavedRecipeRepository
+      : null;
+  if (savedRepository == null) {
+    return Stream.value(const []);
+  }
+  return savedRepository.watchSavedRecipes(
+    householdId: ref.watch(activeHouseholdIdProvider),
+    userId: ref.watch(activeUserIdProvider),
+  );
+});
+
+final savedRecipeForSourceProvider = Provider.family<SavedRecipe?, String>((
+  ref,
+  sourceRecipeId,
+) {
+  final savedRecipes = ref.watch(activeSavedRecipesProvider).valueOrNull;
+  if (savedRecipes == null) return null;
+  for (final saved in savedRecipes) {
+    if (saved.sourceRecipeId == sourceRecipeId) return saved;
+  }
+  return null;
+});
+
+final savedRecipeForLocalCopyProvider = Provider.family<SavedRecipe?, String>((
+  ref,
+  localRecipeId,
+) {
+  final savedRecipes = ref.watch(activeSavedRecipesProvider).valueOrNull;
+  if (savedRecipes == null) return null;
+  for (final saved in savedRecipes) {
+    if (saved.localRecipeId == localRecipeId) return saved;
+  }
+  return null;
 });
 
 final recipeRecordProvider = StreamProvider.family<Recipe?, String>((
@@ -157,6 +268,18 @@ class RecipeImportController {
       imported.add(recipe);
     }
     return List.unmodifiable(imported);
+  }
+
+  /// Bulk paste-and-parse import (Feature Design 2.4.2). This surface is
+  /// Premium-only: the household must have Premium in addition to holding the
+  /// ordinary create-recipes capability. Manual single-recipe creation stays
+  /// on [importDrafts] and remains available to every eligible role.
+  Future<List<Recipe>> importParsedDrafts(List<RecipeDraft> drafts) async {
+    final household = this.household;
+    if (household != null && !household.hasPremium) {
+      throw StateError('Paste & Parse import requires Premium.');
+    }
+    return importDrafts(drafts);
   }
 
   Future<Recipe> _toRecipe(RecipeDraft draft) async {
@@ -305,7 +428,7 @@ class RecipeDiscoveryController {
       }
     }
     final localRecipeId = idGenerator.newId();
-    final savedRecipeId = idGenerator.newId();
+    final savedRecipeId = localRecipeId;
     final rewriteRepository = repository is IngredientRewriteRecipeRepository
         ? repository as IngredientRewriteRecipeRepository
         : null;
@@ -335,6 +458,21 @@ class RecipeDiscoveryController {
       savedRecipeId: savedRecipeId,
       now: clock.now(),
     );
+  }
+
+  Future<void> unsavePublicRecipe(SavedRecipe savedRecipe) {
+    _require(HouseholdCapability.savePublicRecipes);
+    if (savedRecipe.householdId != householdId ||
+        savedRecipe.userId != userId) {
+      throw StateError('Cannot unsave another user or household recipe.');
+    }
+    final savedRepository = repository is SavedRecipeRepository
+        ? repository as SavedRecipeRepository
+        : null;
+    if (savedRepository == null) {
+      throw StateError('Recipe repository does not support unsaving.');
+    }
+    return savedRepository.unsavePublicRecipe(savedRecipe);
   }
 
   IngredientCategory _categoryFor(String name) =>

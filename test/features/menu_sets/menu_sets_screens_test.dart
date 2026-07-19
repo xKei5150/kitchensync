@@ -222,13 +222,19 @@ Recipe _recipe(String id) {
   );
 }
 
-class _FakeCalendarRepository implements CalendarRepository {
-  _FakeCalendarRepository({List<MealScheduleEntry>? meals})
-    : meals = [...?meals];
+class _FakeCalendarRepository
+    implements CalendarRepository, CalendarMealBatchRepository {
+  _FakeCalendarRepository({
+    List<MealScheduleEntry>? meals,
+    List<CalendarDaySettings>? settings,
+  }) : meals = [...?meals],
+       settings = [...?settings];
 
   final List<MealScheduleEntry> meals;
+  final List<CalendarDaySettings> settings;
   final upserted = <MealScheduleEntry>[];
   final deleted = <String>[];
+  int replacementCalls = 0;
 
   @override
   Stream<List<MealScheduleEntry>> watchMealsInRange({
@@ -268,9 +274,20 @@ class _FakeCalendarRepository implements CalendarRepository {
   }
 
   @override
+  Future<void> replaceMeals({
+    required String householdId,
+    required Iterable<String> removedEntryIds,
+    required Iterable<MealScheduleEntry> createdEntries,
+  }) async {
+    replacementCalls++;
+    deleted.addAll(removedEntryIds);
+    upserted.addAll(createdEntries);
+  }
+
+  @override
   Stream<List<CalendarDaySettings>> watchActiveDaySettings(
     String householdId,
-  ) => const Stream.empty();
+  ) => Stream.value(List.unmodifiable(settings));
 
   @override
   Future<void> upsertDaySettings(CalendarDaySettings settings) async {}
@@ -544,6 +561,27 @@ const _cookHousehold = ActiveHouseholdContext(
   hasPremium: true,
 );
 
+MenuSetDay _dayWithEntry(
+  String dayId,
+  int dayIndex,
+  String entryId,
+  String recipeId,
+) => MenuSetDay(
+  id: dayId,
+  menuSetId: 'scoped-set',
+  dayIndex: dayIndex,
+  label: 'Day ${dayIndex + 1}',
+  entries: [
+    MenuSetEntry(
+      id: entryId,
+      menuSetDayId: dayId,
+      mealSlot: 'Dinner',
+      recipeId: recipeId,
+      orderInSlot: 0,
+    ),
+  ],
+);
+
 MenuSet _menuSet() {
   return const MenuSet(
     id: 'set-1',
@@ -643,6 +681,360 @@ void main() {
     expect(preserved.items, same(completed.items));
   });
 
+  test('Menu-set apply uses persisted calendar serving defaults', () async {
+    final calendar = _FakeCalendarRepository(
+      settings: [
+        CalendarDaySettings(
+          id: 'eight-servings',
+          householdId: 'solo-household',
+          dateRangeStart: DateTime(2026, 7, 6),
+          dateRangeEnd: DateTime(2026, 7, 12),
+          defaultServingSize: 8,
+          mealsPerDay: 3,
+          dishesPerMeal: 1,
+          mealModeName: 'Family week',
+          isActive: true,
+        ),
+      ],
+    );
+    final shopping = _FakeShoppingRepository();
+    final controller = MenuSetApplyPersistenceController(
+      calendarRepository: calendar,
+      shoppingRepository: shopping,
+      writeCoordinator: ShoppingWriteCoordinator(
+        repository: shopping.commands,
+        householdId: 'solo-household',
+        idGenerator: _FakeCommandIdGenerator(),
+      ),
+      recipeRepository: _FakeRecipeRepository(),
+      pantryRepository: _FakePantryRepository(),
+      shoppingScheduleRepository: const _FakeShoppingScheduleRepository(),
+      householdId: 'solo-household',
+      household: _activeHousehold,
+      idGenerator: FakeIdGenerator(['meal-with-default']),
+      clock: FakeClock(DateTime(2026, 7, 6, 9)),
+    );
+
+    await controller.applyPersistedMenuSet(
+      menuSet: _menuSet(),
+      startDate: DateTime(2026, 7, 6),
+      endDate: DateTime(2026, 7, 12),
+      mode: MenuSetApplyMode.fillEmpty,
+    );
+
+    expect(calendar.upserted.single.servingSize, 8);
+  });
+
+  test('scratch-created menu sets persist their author identity', () async {
+    final menuSets = _FakeMenuSetRepository();
+    final controller = MenuSetEditorController(
+      calendarRepository: _FakeCalendarRepository(),
+      menuSetRepository: menuSets,
+      householdId: 'solo-household',
+      household: _activeHousehold,
+      userId: 'author-1',
+      idGenerator: FakeIdGenerator([
+        'set-authored',
+        for (var index = 0; index < 7; index++) 'day-$index',
+      ]),
+      clock: FakeClock(DateTime(2026, 7, 6, 9)),
+    );
+
+    final saved = await controller.saveDraft();
+
+    expect(saved.createdByUserId, 'author-1');
+    expect(menuSets.upserted.single.createdByUserId, 'author-1');
+  });
+
+  test('scratch-created menu sets use the requested name and length', () async {
+    final menuSets = _FakeMenuSetRepository();
+    final controller = MenuSetEditorController(
+      calendarRepository: _FakeCalendarRepository(),
+      menuSetRepository: menuSets,
+      householdId: 'solo-household',
+      household: _activeHousehold,
+      userId: 'author-1',
+      idGenerator: FakeIdGenerator([
+        'set-custom',
+        for (var index = 0; index < 3; index++) 'custom-day-$index',
+      ]),
+      clock: FakeClock(DateTime(2026, 7, 6, 9)),
+    );
+
+    final saved = await controller.saveDraft(
+      name: '  Workweek light  ',
+      lengthInDays: 3,
+    );
+
+    expect(saved.name, 'Workweek light');
+    expect(saved.lengthInDays, 3);
+    expect(saved.days, hasLength(3));
+    expect(saved.days.map((day) => day.label), ['Day 1', 'Day 2', 'Day 3']);
+  });
+
+  test('menu set editor supports day and entry structure mutations', () async {
+    final menuSets = _FakeMenuSetRepository();
+    final controller = MenuSetEditorController(
+      calendarRepository: _FakeCalendarRepository(),
+      menuSetRepository: menuSets,
+      householdId: 'solo-household',
+      household: _activeHousehold,
+      userId: 'author-1',
+      idGenerator: FakeIdGenerator(['duplicated-day', 'duplicated-entry']),
+      clock: FakeClock(DateTime(2026, 7, 6, 9)),
+    );
+    const secondEntry = MenuSetEntry(
+      id: 'second-entry',
+      menuSetDayId: 'set-1-day-0',
+      mealSlot: 'Dinner',
+      recipeId: 'soup',
+      orderInSlot: 1,
+    );
+    final draft = MenuSet(
+      id: 'set-1',
+      householdId: 'solo-household',
+      name: 'Structure test',
+      lengthInDays: 2,
+      days: [
+        MenuSetDay(
+          id: 'set-1-day-0',
+          menuSetId: 'set-1',
+          dayIndex: 0,
+          label: 'Day 1',
+          entries: [..._menuSet().days.first.entries, secondEntry],
+        ),
+        const MenuSetDay(
+          id: 'set-1-day-1',
+          menuSetId: 'set-1',
+          dayIndex: 1,
+          label: 'Day 2',
+          entries: [],
+        ),
+      ],
+    );
+
+    final renamed = await controller.renameDay(
+      draft: draft,
+      dayIndex: 0,
+      label: 'Workout day',
+    );
+    expect(renamed.dayAt(0)!.label, 'Workout day');
+
+    final moved = await controller.moveEntry(
+      draft: renamed,
+      sourceDayId: renamed.dayAt(0)!.id,
+      entryId: renamed.dayAt(0)!.entries.first.id,
+      targetDayIndex: 1,
+      targetMealSlot: 'Lunch',
+      targetOrder: 0,
+    );
+    expect(moved.dayAt(0)!.entries, hasLength(1));
+    expect(moved.dayAt(1)!.entries.single.mealSlot, 'Lunch');
+    expect(moved.dayAt(1)!.entries.single.orderInSlot, 0);
+
+    final duplicated = await controller.duplicateDay(draft: moved, dayIndex: 1);
+    expect(duplicated.lengthInDays, 3);
+    expect(duplicated.days, hasLength(3));
+    expect(duplicated.dayAt(2)!.entries.single.id, 'duplicated-entry');
+
+    final cleared = await controller.clearDay(draft: duplicated, dayIndex: 2);
+    expect(cleared.dayAt(2)!.entries, isEmpty);
+  });
+
+  test('move entry uses day-scoped entry identity', () async {
+    final menuSets = _FakeMenuSetRepository();
+    final controller = MenuSetEditorController(
+      calendarRepository: _FakeCalendarRepository(),
+      menuSetRepository: menuSets,
+      householdId: 'solo-household',
+      household: _activeHousehold,
+      userId: 'author-1',
+      idGenerator: FakeIdGenerator([]),
+      clock: FakeClock(DateTime(2026, 7, 6, 9)),
+    );
+    const sharedEntryId = 'day-scoped-entry';
+    final draft = MenuSet(
+      id: 'scoped-set',
+      householdId: 'solo-household',
+      name: 'Scoped entries',
+      lengthInDays: 2,
+      days: [
+        _dayWithEntry('source-day', 0, sharedEntryId, 'source-recipe'),
+        _dayWithEntry('other-day', 1, sharedEntryId, 'other-recipe'),
+      ],
+    );
+
+    final moved = await controller.moveEntry(
+      draft: draft,
+      sourceDayId: 'source-day',
+      entryId: sharedEntryId,
+      targetDayIndex: 1,
+      targetMealSlot: 'Lunch',
+      targetOrder: 1,
+    );
+
+    expect(moved.dayAt(0)!.entries, isEmpty);
+    expect(moved.dayAt(1)!.entries, hasLength(2));
+    expect(moved.dayAt(1)!.entries.first.recipeId, 'other-recipe');
+    expect(moved.dayAt(1)!.entries.last.recipeId, 'source-recipe');
+  });
+
+  test('duplicate day preserves sparse cycle and Rules field limits', () async {
+    final menuSets = _FakeMenuSetRepository();
+    final controller = MenuSetEditorController(
+      calendarRepository: _FakeCalendarRepository(),
+      menuSetRepository: menuSets,
+      householdId: 'solo-household',
+      household: _activeHousehold,
+      userId: 'author-1',
+      idGenerator: FakeIdGenerator(['duplicate-day', 'duplicate-entry']),
+      clock: FakeClock(DateTime(2026, 7, 6, 9)),
+    );
+    final longLabel = List.filled(80, 'A').join();
+    final draft = MenuSet(
+      id: 'sparse-set',
+      householdId: 'solo-household',
+      name: 'Sparse week',
+      lengthInDays: 7,
+      days: [
+        MenuSetDay(
+          id: 'day-0',
+          menuSetId: 'sparse-set',
+          dayIndex: 0,
+          label: longLabel,
+          entries: const [
+            MenuSetEntry(
+              id: 'entry-0',
+              menuSetDayId: 'day-0',
+              mealSlot: 'Dinner',
+              recipeId: 'braise',
+              orderInSlot: 0,
+            ),
+          ],
+        ),
+        const MenuSetDay(
+          id: 'day-6',
+          menuSetId: 'sparse-set',
+          dayIndex: 6,
+          label: 'Day 7',
+          entries: [],
+        ),
+      ],
+    );
+
+    final duplicated = await controller.duplicateDay(draft: draft, dayIndex: 0);
+
+    expect(duplicated.lengthInDays, 8);
+    expect(duplicated.days.map((day) => day.dayIndex), [0, 1, 7]);
+    expect(duplicated.dayAt(1)!.label, hasLength(80));
+    expect(duplicated.dayAt(1)!.entries.single.id, 'duplicate-entry');
+  });
+
+  test(
+    'menu set edits validate persisted field bounds before writing',
+    () async {
+      final menuSets = _FakeMenuSetRepository();
+      final controller = MenuSetEditorController(
+        calendarRepository: _FakeCalendarRepository(),
+        menuSetRepository: menuSets,
+        householdId: 'solo-household',
+        household: _activeHousehold,
+        userId: 'author-1',
+        idGenerator: FakeIdGenerator([]),
+        clock: FakeClock(DateTime(2026, 7, 6, 9)),
+      );
+
+      await expectLater(
+        controller.saveDraft(description: List.filled(1001, 'x').join()),
+        throwsArgumentError,
+      );
+      await expectLater(
+        controller.moveEntry(
+          draft: _menuSet(),
+          sourceDayId: 'day-1',
+          entryId: 'entry-1',
+          targetDayIndex: 0,
+          targetMealSlot: List.filled(81, 'x').join(),
+          targetOrder: 0,
+        ),
+        throwsArgumentError,
+      );
+      expect(menuSets.upserted, isEmpty);
+    },
+  );
+
+  test(
+    'scratch-created menu sets defensively freeze supplied structure',
+    () async {
+      final menuSets = _FakeMenuSetRepository();
+      final entries = <MenuSetEntry>[];
+      final days = <MenuSetDay>[
+        MenuSetDay(
+          id: 'provided-day',
+          menuSetId: 'provided-set',
+          dayIndex: 0,
+          entries: entries,
+        ),
+      ];
+      final controller = MenuSetEditorController(
+        calendarRepository: _FakeCalendarRepository(),
+        menuSetRepository: menuSets,
+        householdId: 'solo-household',
+        household: _activeHousehold,
+        userId: 'author-1',
+        idGenerator: FakeIdGenerator(['provided-set']),
+        clock: FakeClock(DateTime(2026, 7, 6, 9)),
+      );
+
+      final saved = await controller.saveDraft(name: 'Frozen', days: days);
+      days.clear();
+      entries.add(
+        const MenuSetEntry(
+          id: 'late-entry',
+          menuSetDayId: 'provided-day',
+          mealSlot: 'Dinner',
+          recipeId: 'braise',
+          orderInSlot: 0,
+        ),
+      );
+
+      expect(saved.days, hasLength(1));
+      expect(saved.days.single.entries, isEmpty);
+      expect(() => saved.days.add(saved.days.single), throwsUnsupportedError);
+      expect(
+        () => saved.days.single.entries.add(entries.single),
+        throwsUnsupportedError,
+      );
+    },
+  );
+
+  test('scratch-created menu sets reject invalid setup values', () async {
+    final menuSets = _FakeMenuSetRepository();
+    final controller = MenuSetEditorController(
+      calendarRepository: _FakeCalendarRepository(),
+      menuSetRepository: menuSets,
+      householdId: 'solo-household',
+      household: _activeHousehold,
+      userId: 'author-1',
+      idGenerator: FakeIdGenerator(['unused']),
+      clock: FakeClock(DateTime(2026, 7, 6, 9)),
+    );
+
+    await expectLater(
+      controller.saveDraft(name: '   ', lengthInDays: 3),
+      throwsArgumentError,
+    );
+    await expectLater(
+      controller.saveDraft(name: 'Valid', lengthInDays: 0),
+      throwsArgumentError,
+    );
+    await expectLater(
+      controller.saveDraft(name: 'Valid', lengthInDays: 366),
+      throwsArgumentError,
+    );
+    expect(menuSets.upserted, isEmpty);
+  });
+
   test(
     'Cook menu-set apply persists calendar with zero Shopping writes',
     () async {
@@ -688,6 +1080,7 @@ void main() {
 
       expect(calendar.upserted, hasLength(1));
       expect(calendar.upserted.single.recipeId, 'braise');
+      expect(calendar.replacementCalls, 1);
       expect(shopping.upserted, isEmpty);
     },
   );
@@ -709,7 +1102,9 @@ void main() {
     expect(find.text('A deck of weeks'), findsOneWidget);
     expect(find.text('Persisted week'), findsOneWidget);
     expect(find.byType(KsMenuSetCard), findsOneWidget);
+    expect(find.text('Create Menu Set'), findsOneWidget);
     expect(find.text('Save this week as a set'), findsOneWidget);
+    expect(find.byTooltip('View or edit'), findsOneWidget);
   });
 
   testWidgets('MenuSetsScreen duplicates and deletes persisted sets', (
@@ -772,6 +1167,12 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Apply to calendar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Apply to the calendar'), findsOneWidget);
+      expect(calendarRepo.upserted, isEmpty);
+      await tester.tap(find.text('Replace'));
+      await tester.tap(find.text('Apply · 4 meals'));
       await tester.pumpAndSettle();
 
       expect(calendarRepo.upserted, isNotEmpty);
@@ -865,9 +1266,23 @@ void main() {
     await tester.tap(find.text('Save this week as a set'));
     await tester.pumpAndSettle();
 
+    // The sheet opens with preset ranges, a name field, and a live review.
+    expect(find.byKey(const Key('past-calendar-sheet')), findsOneWidget);
+    expect(find.text('Last week'), findsWidgets);
+    expect(find.text('This month'), findsWidgets);
+    // Review reflects the normalized structure (cancelled meals excluded).
+    expect(find.byKey(const Key('past-calendar-review')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('past-calendar-name-field')),
+      'Promoted week',
+    );
+    await tester.tap(find.byKey(const Key('past-calendar-save')));
+    await tester.pumpAndSettle();
+
     expect(menuSets.upserted, hasLength(1));
     final saved = menuSets.upserted.single;
-    expect(saved.name, 'Last week');
+    expect(saved.name, 'Promoted week');
     expect(saved.lengthInDays, 7);
     expect(saved.createdByUserId, 'demo-user');
     final recipeIds = [
@@ -876,7 +1291,72 @@ void main() {
     ];
     expect(recipeIds, contains('braise'));
     expect(recipeIds, isNot(contains('soup')));
-    expect(find.text('Created a menu set from last week.'), findsOneWidget);
+    expect(
+      find.text('Created “Promoted week” — review and edit any day.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('MenuSet apply action stays reachable on a compact viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final menuSets = _FakeMenuSetRepository()..upserted.add(_menuSet());
+    addTearDown(menuSets.dispose);
+    await tester.pumpWidget(
+      await _wrap(
+        const MenuSetEditorScreen(menuSetId: 'set-1'),
+        menuSetRepository: menuSets,
+        calendarRepository: _FakeCalendarRepository(),
+        shoppingRepository: _FakeShoppingRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final openApplyButton = find.widgetWithText(
+      FilledButton,
+      'Apply to calendar',
+    );
+    await tester.ensureVisible(openApplyButton);
+    await tester.tap(openApplyButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Apply · 4 meals').hitTestable(), findsOneWidget);
+  });
+
+  testWidgets('MenuSetEditorScreen selects the requested persisted set', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const requested = MenuSet(
+      id: 'set-requested',
+      householdId: 'solo-household',
+      name: 'Requested rotation',
+      lengthInDays: 3,
+      days: [],
+    );
+    final menuSets = _FakeMenuSetRepository()
+      ..upserted.add(_menuSet())
+      ..upserted.add(requested);
+    addTearDown(menuSets.dispose);
+    await tester.pumpWidget(
+      await _wrap(
+        const MenuSetEditorScreen(menuSetId: 'set-requested'),
+        menuSetRepository: menuSets,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Requested rotation'), findsOneWidget);
+    expect(find.byKey(const Key('menu-set-name-field')), findsNothing);
   });
 
   testWidgets('MenuSetEditorScreen opens the Apply sheet and toggles mode', (
@@ -904,7 +1384,7 @@ void main() {
 
     await tester.pumpWidget(
       await _wrap(
-        const MenuSetEditorScreen(),
+        const MenuSetEditorScreen(menuSetId: 'set-1'),
         menuSetRepository: menuSets,
         calendarRepository: calendarRepo,
         shoppingRepository: shoppingRepo,
@@ -923,13 +1403,19 @@ void main() {
 
     expect(find.text('Apply to the calendar'), findsOneWidget);
     expect(find.text('Fill empty'), findsOneWidget);
-    expect(find.text('Apply · 28 meals'), findsOneWidget);
+    expect(find.text('Apply · 4 meals'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('menu-set-date-range-start')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DateRangePickerDialog), findsOneWidget);
+    Navigator.of(tester.element(find.byType(DateRangePickerDialog))).pop();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Replace'));
     await tester.pump();
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Apply · 28 meals'));
+    await tester.tap(find.text('Apply · 4 meals'));
     await tester.pumpAndSettle();
 
     expect(calendarRepo.upserted, isNotEmpty);
@@ -940,6 +1426,38 @@ void main() {
       hasLength(4),
     );
     expect(shoppingRepo.upserted.first.items, isNotEmpty);
+  });
+
+  testWidgets('MenuSetEditorScreen saves requested name and day count', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final menuSets = _FakeMenuSetRepository();
+    addTearDown(menuSets.dispose);
+    await tester.pumpWidget(
+      await _wrap(
+        const MenuSetEditorScreen(),
+        menuSetRepository: menuSets,
+        calendarRepository: _FakeCalendarRepository(),
+        shoppingRepository: _FakeShoppingRepository(),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('menu-set-name-field')),
+      'Workweek light',
+    );
+    await tester.enterText(find.byKey(const Key('menu-set-length-field')), '3');
+    await tester.tap(find.text('Save draft'));
+    await tester.pumpAndSettle();
+
+    expect(menuSets.upserted.single.name, 'Workweek light');
+    expect(menuSets.upserted.single.days, hasLength(3));
+    expect(find.text('Workweek light'), findsOneWidget);
   });
 
   testWidgets('MenuSetEditorScreen persists save add and remove edits', (
@@ -979,6 +1497,90 @@ void main() {
         for (final entry in day.entries) entry.id,
     ];
     expect(remainingIds, isEmpty);
+  });
+
+  testWidgets('MenuSetEditorScreen edits day structure via controls', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(500, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final menuSets = _FakeMenuSetRepository();
+    addTearDown(menuSets.dispose);
+    await menuSets.upsert(
+      const MenuSet(
+        id: 'editable-set',
+        householdId: 'solo-household',
+        name: 'Editable week',
+        lengthInDays: 2,
+        days: [
+          MenuSetDay(
+            id: 'edit-day-0',
+            menuSetId: 'editable-set',
+            dayIndex: 0,
+            label: 'Day 1',
+            entries: [
+              MenuSetEntry(
+                id: 'edit-entry-0',
+                menuSetDayId: 'edit-day-0',
+                mealSlot: 'Dinner',
+                recipeId: 'braise',
+                orderInSlot: 0,
+              ),
+            ],
+          ),
+          MenuSetDay(
+            id: 'edit-day-1',
+            menuSetId: 'editable-set',
+            dayIndex: 1,
+            label: 'Day 2',
+            entries: [],
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      await _wrap(
+        const MenuSetEditorScreen(menuSetId: 'editable-set'),
+        menuSetRepository: menuSets,
+        calendarRepository: _FakeCalendarRepository(),
+        shoppingRepository: _FakeShoppingRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Move the only recipe from Day 1 to Day 2, preserving slot.
+    await tester.tap(find.byKey(const Key('menu-set-move-day-0')));
+    await tester.pumpAndSettle();
+    var latest = menuSets.upserted.last;
+    expect(latest.dayAt(0)!.entries, isEmpty);
+    expect(latest.dayAt(1)!.entries.single.recipeId, 'braise');
+
+    // Duplicate Day 2 (now holding the moved recipe).
+    await tester.tap(find.byKey(const Key('menu-set-duplicate-day-1')));
+    await tester.pumpAndSettle();
+    latest = menuSets.upserted.last;
+    expect(latest.days, hasLength(3));
+    expect(latest.dayAt(2)!.entries.single.recipeId, 'braise');
+
+    // Clear the duplicated day.
+    await tester.tap(find.byKey(const Key('menu-set-clear-day-2')));
+    await tester.pumpAndSettle();
+    expect(menuSets.upserted.last.dayAt(2)!.entries, isEmpty);
+
+    // Rename Day 1 through the dialog.
+    await tester.tap(find.byKey(const Key('menu-set-rename-day-0')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('menu-set-rename-field')),
+      'Rest day',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(menuSets.upserted.last.dayAt(0)!.label, 'Rest day');
   });
 
   testWidgets('Menu Sets screens render in dark theme without error', (

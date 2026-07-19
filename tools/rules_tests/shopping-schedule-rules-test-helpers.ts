@@ -29,6 +29,7 @@ export const creatorMemberPath =
 export const creatorInvitePath = "householdInvites/DEBUG-CREATOR";
 export const creatorWeeklySchedulePath =
   "households/debug-creator-household/shoppingSchedules/weekly";
+export const creatorUserPath = "users/debug-creator";
 
 export const scheduleRuleProfiles = [
   { name: "development", rulesFile: "firestore.dev.rules" },
@@ -118,6 +119,7 @@ export async function clearScheduleAuthorizationFixtures(
       deleteDoc(doc(db, creatorMemberPath)),
       deleteDoc(doc(db, creatorInvitePath)),
       deleteDoc(doc(db, creatorHouseholdPath)),
+      deleteDoc(doc(db, creatorUserPath)),
     ]);
     await setDoc(
       doc(db, "households/joint-household"),

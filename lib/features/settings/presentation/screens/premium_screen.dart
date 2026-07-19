@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +8,6 @@ import 'package:kitchensync/core/locale/currency_formatter.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
-import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
 /// Screen 15 (premium) · KitchenSync Premium — an upgrade that sells
 /// capability, not a paywall.
@@ -172,7 +171,9 @@ final premiumUpgradeControllerProvider = Provider<PremiumUpgradeController>((
   final auth = ref.watch(firebaseAuthProvider);
   return PremiumUpgradeController(
     auth: auth,
-    db: auth == null ? null : ref.watch(firestoreProvider),
+    functions: auth == null
+        ? null
+        : FirebaseFunctions.instanceFor(region: 'us-central1'),
     activeHousehold: ref.watch(activeHouseholdContextProvider),
   );
 });
@@ -180,19 +181,21 @@ final premiumUpgradeControllerProvider = Provider<PremiumUpgradeController>((
 class PremiumUpgradeController {
   const PremiumUpgradeController({
     required this.auth,
-    required this.db,
     required this.activeHousehold,
+    this.functions,
   });
 
   final FirebaseAuth? auth;
-  final FirebaseFirestore? db;
+  final FirebaseFunctions? functions;
   final ActiveHouseholdContext? activeHousehold;
 
   Future<void> startTrial({required PremiumPlan plan}) async {
     final auth = this.auth;
-    final db = this.db;
+    final functions = this.functions;
     final household = activeHousehold;
-    if (auth == null || db == null) return;
+    if (auth == null || functions == null) {
+      throw StateError('Premium is unavailable until Firebase is configured.');
+    }
     final user = auth.currentUser;
     if (user == null) {
       throw StateError('Sign in before starting Premium.');
@@ -201,42 +204,10 @@ class PremiumUpgradeController {
       throw StateError('Select a household before starting Premium.');
     }
 
-    final now = FieldValue.serverTimestamp();
-    final trialEndsAt = Timestamp.fromDate(
-      DateTime.now().toUtc().add(const Duration(days: 7)),
-    );
-    final planName = plan.name;
-    final userDoc = db.collection('users').doc(user.uid);
-    final householdDoc = db.collection('households').doc(household.id);
-    final subscriptionDoc = householdDoc
-        .collection('subscriptions')
-        .doc('premium');
-    final batch = db.batch()
-      ..set(userDoc, {
-        'isPremium': true,
-        'premiumPlan': planName,
-        'premiumTrialStartedAt': now,
-        'premiumTrialEndsAt': trialEndsAt,
-        'updatedAt': now,
-      }, SetOptions(merge: true))
-      ..set(householdDoc, {
-        'hasPremium': true,
-        'premiumPlan': planName,
-        'premiumOwnerUserId': user.uid,
-        'premiumTrialStartedAt': now,
-        'premiumTrialEndsAt': trialEndsAt,
-        'updatedAt': now,
-      }, SetOptions(merge: true))
-      ..set(subscriptionDoc, {
-        'status': 'trialing',
-        'plan': planName,
-        'ownerUserId': user.uid,
-        'startedAt': now,
-        'trialEndsAt': trialEndsAt,
-        'provider': 'in_app_trial',
-        'updatedAt': now,
-      }, SetOptions(merge: true));
-    await batch.commit();
+    await functions.httpsCallable('startPremiumTrial').call<Object?>({
+      'householdId': household.id,
+      'plan': plan.name,
+    });
   }
 }
 

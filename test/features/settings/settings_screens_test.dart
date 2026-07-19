@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,24 +17,37 @@ Future<Widget> _wrap(
   Widget child, {
   Map<String, Object> prefs = const {},
   ThemeData? theme,
+  List<Override> overrides = const [],
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final instance = await SharedPreferences.getInstance();
   return ProviderScope(
-    overrides: [sharedPreferencesProvider.overrideWithValue(instance)],
+    overrides: [
+      sharedPreferencesProvider.overrideWithValue(instance),
+      ...overrides,
+    ],
     child: MaterialApp(theme: theme ?? AppTheme.light(), home: child),
   );
 }
 
 class _FakePremiumUpgradeController extends PremiumUpgradeController {
-  _FakePremiumUpgradeController()
-    : super(auth: null, db: null, activeHousehold: null);
+  _FakePremiumUpgradeController({this.completion, this.failure})
+    : super(auth: null, activeHousehold: null);
 
+  final Completer<void>? completion;
+  final Object? failure;
   PremiumPlan? startedPlan;
 
   @override
   Future<void> startTrial({required PremiumPlan plan}) async {
     startedPlan = plan;
+    final failure = this.failure;
+    if (failure != null) {
+      if (failure is Error) throw failure;
+      if (failure is Exception) throw failure;
+      throw StateError(failure.toString());
+    }
+    await completion?.future;
   }
 }
 
@@ -49,6 +64,17 @@ class _FakeSignOutController extends SettingsSignOutController {
   }
 }
 
+class _FakeProfileController extends SettingsProfileController {
+  _FakeProfileController() : super(auth: null, db: null);
+
+  String? updatedName;
+
+  @override
+  Future<void> updateDisplayName(String rawName) async {
+    updatedName = rawName.trim();
+  }
+}
+
 void main() {
   testWidgets('SettingsScreen shows the profile, premium banner and list', (
     tester,
@@ -59,12 +85,86 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(await _wrap(const SettingsScreen()));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Ana Holloway'), findsOneWidget);
+    expect(find.text('Account'), findsOneWidget);
     expect(find.text('Try Premium'), findsOneWidget);
     expect(find.text('Household & roles'), findsOneWidget);
+    expect(find.text('Switch kitchen'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
+  });
+
+  testWidgets('SettingsScreen renders and edits the active profile', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final controller = _FakeProfileController();
+    const profile = SettingsProfile(
+      userId: 'user-1',
+      displayName: 'Sam Rivera',
+      email: 'sam@example.test',
+      roleLabel: 'Cook',
+      isEditable: true,
+    );
+
+    await tester.pumpWidget(
+      await _wrap(
+        const SettingsScreen(),
+        overrides: [
+          settingsProfileProvider.overrideWith((ref) => Stream.value(profile)),
+          settingsProfileControllerProvider.overrideWithValue(controller),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sam Rivera'), findsOneWidget);
+    expect(find.text('sam@example.test · Cook'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Edit profile'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Samira Rivera');
+    await tester.tap(find.text('Save profile'));
+    await tester.pumpAndSettle();
+
+    expect(controller.updatedName, 'Samira Rivera');
+    expect(find.text('Profile'), findsNothing);
+  });
+
+  testWidgets('profile editor rejects an empty display name', (tester) async {
+    tester.view.physicalSize = const Size(400, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const profile = SettingsProfile(
+      userId: 'user-1',
+      displayName: 'Sam Rivera',
+      roleLabel: 'Admin',
+      isEditable: true,
+    );
+
+    await tester.pumpWidget(
+      await _wrap(
+        const SettingsScreen(),
+        overrides: [
+          settingsProfileProvider.overrideWith((ref) => Stream.value(profile)),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Edit profile'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), ' ');
+    await tester.tap(find.text('Save profile'));
+    await tester.pump();
+
+    expect(find.text('Name must have at least 2 characters.'), findsOneWidget);
+    expect(find.text('Profile'), findsOneWidget);
   });
 
   testWidgets('Sign out clears debug household skip and routes to onboarding', (
@@ -290,6 +390,73 @@ void main() {
     expect(
       find.text('Premium trial started for this household.'),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('PremiumScreen disables trial submission while it is pending', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final completion = Completer<void>();
+    final upgradeController = _FakePremiumUpgradeController(
+      completion: completion,
+    );
+
+    await tester.pumpWidget(
+      await _wrap(
+        const PremiumScreen(),
+        overrides: [
+          premiumUpgradeControllerProvider.overrideWithValue(upgradeController),
+        ],
+      ),
+    );
+    await tester.tap(find.text('Start 7-day free trial'));
+    await tester.pump();
+
+    expect(find.text('Starting...'), findsOneWidget);
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNull,
+    );
+
+    completion.complete();
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Premium trial started for this household.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('PremiumScreen restores the trial action after an error', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final upgradeController = _FakePremiumUpgradeController(
+      failure: StateError('service unavailable'),
+    );
+
+    await tester.pumpWidget(
+      await _wrap(
+        const PremiumScreen(),
+        overrides: [
+          premiumUpgradeControllerProvider.overrideWithValue(upgradeController),
+        ],
+      ),
+    );
+    await tester.tap(find.text('Start 7-day free trial'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Could not start trial:'), findsOneWidget);
+    expect(find.text('Start 7-day free trial'), findsOneWidget);
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNotNull,
     );
   });
 

@@ -14,8 +14,8 @@ import 'package:kitchensync/features/ingredient_dictionary/presentation/provider
 import 'package:kitchensync/features/pantry/domain/entities/enums.dart';
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/entities/waste_event.dart';
-import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/domain/repositories/inventory_quantity_repository.dart';
+import 'package:kitchensync/features/pantry/domain/repositories/pantry_repository.dart';
 import 'package:kitchensync/features/pantry/presentation/providers/pantry_providers.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/add_pantry_item_screen.dart';
 
@@ -95,7 +95,6 @@ class _IngredientRepositoryFake implements IngredientRepository {
     required String query,
     String? householdId,
     int limit = 30,
-    String? startAfterId,
   }) async => const <Ingredient>[];
 
   @override
@@ -108,9 +107,6 @@ class _IngredientRepositoryFake implements IngredientRepository {
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       const Stream<List<Ingredient>>.empty();
 
-  @override
-  Stream<List<Ingredient>> watchByIds(List<String> ids) =>
-      const Stream<List<Ingredient>>.empty();
 }
 
 class _PantryRepositoryFake
