@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
-import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
-import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 
 /// The persistent dashboard scaffold wrapping every primary surface
-/// (Today · Recipes · Calendar · Shopping List · Pantry · Menu Sets ·
-/// Settings).
+/// (Today · Recipes · Calendar · Shopping List · Pantry · Settings).
 ///
 /// The shell keeps [KsBottomNav] pinned beneath an [IndexedStack] of branch
 /// navigators so the app reads as one bound volume — the design's spine. Branch
@@ -31,14 +28,13 @@ class KsAppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ks = context.ksColors;
-    final household = ref.watch(activeHouseholdContextProvider);
-    const policy = HouseholdPolicy();
-    final showMenuSets = policy.canShowMenuSetsTab(
-      householdHasPremium: household?.hasPremium ?? false,
-    );
+    // Menu Sets is no longer a primary destination — it stays reachable via its
+    // route (e.g. the Calendar entry point and the Premium surface) but is
+    // dropped from the bottom nav. Keeping the branch index (`i`) preserves the
+    // 1:1 alignment between [KsBottomNav.coreTabs] and the shell branches.
     final branchIndexes = [
       for (var i = 0; i < KsBottomNav.coreTabs.length; i++)
-        if (showMenuSets || KsBottomNav.coreTabs[i].label != 'Menu Sets') i,
+        if (KsBottomNav.coreTabs[i].label != 'Menu Sets') i,
     ];
     final destinations = [
       for (final i in branchIndexes) KsBottomNav.coreTabs[i],
