@@ -9,6 +9,7 @@ import 'package:kitchensync/features/household/domain/entities/household_policy_
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/household/presentation/controllers/household_membership_command_controller.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// Screen 14 · Household & roles — who's in the kitchen.
 ///
@@ -237,7 +238,7 @@ final householdDetailsProvider = StreamProvider<HouseholdDetails>((ref) {
   }
   final uid = user.uid;
   final db = ref.watch(firestoreProvider);
-  return db.collection('users').doc(uid).snapshots().asyncExpand((
+  return db.collection('users').doc(uid).snapshots().switchMap((
     userSnapshot,
   ) {
     final householdId = userSnapshot.data()?['activeHouseholdId'] as String?;
@@ -245,7 +246,7 @@ final householdDetailsProvider = StreamProvider<HouseholdDetails>((ref) {
       return Stream.error(StateError('No active household selected.'));
     }
     final householdDoc = db.collection('households').doc(householdId);
-    return householdDoc.snapshots().asyncExpand((householdSnapshot) {
+    return householdDoc.snapshots().switchMap((householdSnapshot) {
       if (!householdSnapshot.exists) {
         return Stream.error(
           StateError('The selected household no longer exists.'),

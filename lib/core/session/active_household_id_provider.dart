@@ -11,6 +11,7 @@ import 'package:kitchensync/core/session/debug_household_session.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:rxdart/rxdart.dart';
 
 part 'active_household_id_provider.g.dart';
 
@@ -115,11 +116,11 @@ final activeHouseholdContextStreamProvider =
       final auth = ref.watch(firebaseAuthProvider);
       if (auth == null) return Stream.value(previewHouseholdContext);
       final refs = ref.watch(firestoreRefsProvider);
-      return auth.authStateChanges().asyncExpand((user) {
+      return auth.authStateChanges().switchMap((user) {
         if (user == null) {
           return Stream.value(null);
         }
-        return refs.user(user.uid).snapshots().asyncExpand((userDoc) {
+        return refs.user(user.uid).snapshots().switchMap((userDoc) {
           final activeHouseholdId =
               userDoc.data()?['activeHouseholdId'] as String?;
           if (activeHouseholdId == null || activeHouseholdId.isEmpty) {
@@ -139,7 +140,7 @@ Stream<ActiveHouseholdContext?> _watchHouseholdContext({
   required String uid,
   required String householdId,
 }) {
-  return refs.household(householdId).snapshots().asyncExpand((householdDoc) {
+  return refs.household(householdId).snapshots().switchMap((householdDoc) {
     if (!householdDoc.exists) {
       return Stream.value(null);
     }
