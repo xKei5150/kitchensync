@@ -41,6 +41,14 @@
       ]
     },
     {
+      "collectionGroup": "recipes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "householdId", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "savedRecipes",
       "queryScope": "COLLECTION",
       "fields": [
