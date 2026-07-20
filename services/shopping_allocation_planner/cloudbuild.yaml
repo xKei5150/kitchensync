@@ -1,0 +1,18 @@
+# Builds the private shopping allocation planner image.
+# Context is the repo root (the service depends on the root `kitchensync`
+# package via `path: ../..` and imports its pure-Dart domain files, whose
+# committed-to-disk freezed/*.g.dart parts must be present in the context).
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - -f
+      - services/shopping_allocation_planner/Dockerfile
+      - -t
+      - '${_IMAGE}'
+      - .
+images:
+  - '${_IMAGE}'
+options:
+  machineType: 'E2_HIGHCPU_8'
+timeout: 1800s

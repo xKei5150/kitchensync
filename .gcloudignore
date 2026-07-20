@@ -1,0 +1,29 @@
+# Keep Cloud Build source uploads small. NOTE: this file intentionally does NOT
+# ignore *.freezed.dart / *.g.dart — those are gitignored but must ship in the
+# build context because the planner Dockerfile does not run code generation.
+.git/
+build/
+.dart_tool/
+node_modules/
+android/
+ios/
+macos/
+windows/
+linux/
+web/
+test/
+integration_test/
+functions/
+tools/
+docs/
+evidence/
+screenshots/
+coverage/
+assets/
+google_fonts/
+planner_service/
+services/shopping_allocation_planner/build/
+services/shopping_allocation_planner/.dart_tool/
+*.apk
+*.aab
+*.png
