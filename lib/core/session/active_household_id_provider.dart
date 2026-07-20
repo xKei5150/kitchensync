@@ -83,9 +83,32 @@ final activeHouseholdContextProvider = Provider<ActiveHouseholdContext?>((ref) {
   return switch (household) {
     AsyncData(value: final value) => value,
     AsyncError() => null,
-    _ => kDebugMode ? previewHouseholdContext : null,
+    _ => _debugLoadingHouseholdContext(auth),
   };
 });
+
+/// The stand-in context used only while the real household stream is still
+/// resolving in debug builds.
+///
+/// It binds to the signed-in user's own seeded debug household
+/// (`debug-household-<uid>`) — a household the anonymous user is a member of —
+/// so household-scoped listeners do not attach to the shared preview id
+/// (`solo-household`), which no real account belongs to and which would fail
+/// every read with permission-denied. Returns null (no context) when there is
+/// no signed-in user yet, so the app waits rather than reading a foreign
+/// household.
+ActiveHouseholdContext? _debugLoadingHouseholdContext(FirebaseAuth auth) {
+  if (!kDebugMode) return null;
+  final user = auth.currentUser;
+  if (user == null) return null;
+  return ActiveHouseholdContext(
+    id: debugHouseholdIdForUser(user.uid),
+    name: debugHouseholdName,
+    role: HouseholdRole.admin,
+    isJoint: false,
+    hasPremium: false,
+  );
+}
 
 final activeHouseholdContextStreamProvider =
     StreamProvider<ActiveHouseholdContext?>((ref) {

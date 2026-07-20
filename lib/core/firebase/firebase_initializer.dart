@@ -70,9 +70,17 @@ class FirebaseInitializer {
   /// Completes network-dependent startup after the first frame is available.
   Future<void> finishInitialization(AppEnv env) async {
     const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+    // Debug builds against the dev backend (e.g. `make run-dev`) set neither
+    // USE_EMULATOR nor KS_DEV_AUTO_ANONYMOUS, so without this they never sign
+    // in and fall back to the non-member preview household — every scoped read
+    // (pantry, notifications, …) then fails with permission-denied. Treating a
+    // dev debug build as auto-anonymous seeds a real per-user debug household
+    // the anonymous user actually belongs to. Prod debug builds still opt in
+    // explicitly, and release builds can never enable it.
     final devAutoAnonymous = shouldEnableDevAutoAnonymous(
       useEmulator: useEmulator,
       isDebugMode: kDebugMode,
+      explicitSetting: env == AppEnv.dev ? true : null,
     );
 
     try {
