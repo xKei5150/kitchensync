@@ -203,6 +203,11 @@ class FirebaseInitializer {
     final householdDoc = db.collection('households').doc(householdId);
     final memberDoc = householdDoc.collection('members').doc(user.uid);
     final userSnapshot = await userDoc.get();
+    // The debug household and its membership are seeded once, on first launch.
+    // On later launches the docs already exist, and re-writing the member doc
+    // would be denied by rules (member updates are admin-edits-another-member
+    // only), so skip — the existing seed is intact.
+    if (userSnapshot.data()?['createdSoloHouseholdId'] == householdId) return;
     final userExists = userSnapshot.exists;
     final householdExists =
         userSnapshot.data()?['createdSoloHouseholdId'] == householdId;
