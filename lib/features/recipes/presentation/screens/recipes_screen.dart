@@ -414,75 +414,40 @@ class _PublicRecipeTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final socialAsync = ref.watch(recipeSocialStateProvider(recipe.id));
-    final social = socialAsync.valueOrNull ?? RecipeSocialState.empty;
+    final social =
+        ref.watch(recipeSocialStateProvider(recipe.id)).valueOrNull ??
+        RecipeSocialState.empty;
     final savedRecipe = ref.watch(savedRecipeForSourceProvider(recipe.id));
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => context.push('/recipe/${recipe.id}'),
-            child: KsRecipeCard.public(
-              key: ValueKey('public-recipe-${recipe.id}'),
-              title: recipe.name,
-              author: recipe.authorUserId,
-              price: price,
-              priceUnit: priceUnit,
-              saved: savedRecipe != null,
-              coverColors: _MyRecipe._colorsForTags(recipe.recipeTags),
-              onSave: () => _toggleSaved(context, ref, savedRecipe),
-            ),
-          ),
-        ),
-        SizedBox(
-          height: 38,
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: socialAsync.hasError
-                    ? null
-                    : () => _setLiked(context, ref, !social.likedByViewer),
-                tooltip: social.likedByViewer ? 'Unlike recipe' : 'Like recipe',
-                icon: Icon(
-                  social.likedByViewer
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  size: 18,
-                ),
-              ),
-              Text('${social.likeCount}'),
-              const Spacer(),
-              IconButton(
-                onPressed: () => context.push('/recipe/${recipe.id}'),
-                tooltip: 'View comments',
-                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-              ),
-              Text('${social.commentCount}'),
-            ],
-          ),
-        ),
-      ],
+    final currentUserId = ref.watch(activeUserIdProvider);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.push('/recipe/${recipe.id}'),
+      // The card owns the byline + like/comment counts; tapping opens the
+      // detail screen where liking and commenting happen. (A second, external
+      // social row here previously duplicated the counts.)
+      child: KsRecipeCard.public(
+        key: ValueKey('public-recipe-${recipe.id}'),
+        title: recipe.name,
+        author: _authorLabel(recipe.authorUserId, currentUserId),
+        price: price,
+        priceUnit: priceUnit,
+        saved: savedRecipe != null,
+        likeCount: social.likeCount,
+        commentCount: social.commentCount,
+        coverColors: _MyRecipe._colorsForTags(recipe.recipeTags),
+        onSave: () => _toggleSaved(context, ref, savedRecipe),
+      ),
     );
   }
 
-  Future<void> _setLiked(
-    BuildContext context,
-    WidgetRef ref,
-    bool liked,
-  ) async {
-    try {
-      await ref
-          .read(recipeSocialControllerProvider)
-          .setLiked(recipeId: recipe.id, liked: liked);
-    } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update like: $error')),
-        );
-      }
-    }
+  /// A friendly byline: your own recipes read "You"; other authors whose id is
+  /// an opaque uid (no display name available) read "A KitchenSync cook"
+  /// rather than exposing a raw uid.
+  String _authorLabel(String authorUserId, String currentUserId) {
+    if (authorUserId == currentUserId) return 'You';
+    final looksLikeUid =
+        authorUserId.length >= 20 && !authorUserId.contains(' ');
+    return looksLikeUid ? 'A KitchenSync cook' : authorUserId;
   }
 
   Future<void> _toggleSaved(

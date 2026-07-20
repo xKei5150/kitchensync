@@ -171,7 +171,9 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Try Premium'));
+    // The default household has Premium, so the banner reads "Premium active"
+    // and still routes to the Premium screen.
+    await tester.tap(find.text('Premium active'));
     await tester.pumpAndSettle();
     expect(find.text('KitchenSync Premium'), findsOneWidget);
     expect(tester.takeException(), isNull);

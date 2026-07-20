@@ -120,17 +120,9 @@ class _MenuSetEditorScreenState extends ConsumerState<MenuSetEditorScreen> {
             const SizedBox(height: KsTokens.space20),
             _RecipeTray(
               recipes: recipes ?? const [],
-              onAddFirstRecipe: () async {
-                final recipe = recipes == null || recipes.isEmpty
-                    ? null
-                    : recipes.first;
-                if (draft == null || recipe == null) {
-                  _showMessage(
-                    context,
-                    draft == null
-                        ? 'Save a menu set draft first.'
-                        : 'Add a recipe before editing this menu set.',
-                  );
+              onAddRecipe: (recipe) async {
+                if (draft == null) {
+                  _showMessage(context, 'Save a menu set draft first.');
                   return;
                 }
                 await _runEditorAction(
@@ -141,36 +133,13 @@ class _MenuSetEditorScreenState extends ConsumerState<MenuSetEditorScreen> {
                         draft: draft,
                         recipeId: recipe.id,
                         mealSlot: 'Dinner',
+                        dayIndex: 0,
                       ),
-                  successMessage: 'Added ${recipe.name} to Wednesday.',
+                  successMessage: 'Added ${recipe.name} to Day 1 dinner.',
                   failureMessage: 'Could not update menu set',
                 );
                 ref.invalidate(activeHouseholdMenuSetsProvider);
               },
-            ),
-            const SizedBox(height: KsTokens.space12),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final firstEntry = _firstEntry(draft);
-                if (draft == null || firstEntry == null) {
-                  _showMessage(context, 'There is no recipe to remove.');
-                  return;
-                }
-                await _runEditorAction(
-                  context,
-                  () => ref
-                      .read(menuSetEditorControllerProvider)
-                      .removeEntryFromDraft(
-                        draft: draft,
-                        entryId: firstEntry.id,
-                      ),
-                  successMessage: 'Removed recipe from menu set.',
-                  failureMessage: 'Could not remove recipe',
-                );
-                ref.invalidate(activeHouseholdMenuSetsProvider);
-              },
-              icon: const Icon(Icons.remove_circle_outline_rounded, size: 16),
-              label: const Text('Remove first recipe'),
             ),
             const SizedBox(height: KsTokens.space20),
             OutlinedButton.icon(
@@ -373,13 +342,13 @@ class _MenuSetEditorScreenState extends ConsumerState<MenuSetEditorScreen> {
   }
 }
 
-/// The "drag from your recipes" tray — colour-coded recipe chips to drop into
-/// the week above.
+/// The recipe tray — colour-coded recipe chips. Tapping a chip adds that recipe
+/// to Day 1's dinner slot; per-day controls above move, clear, or rename days.
 class _RecipeTray extends StatelessWidget {
-  const _RecipeTray({required this.recipes, required this.onAddFirstRecipe});
+  const _RecipeTray({required this.recipes, required this.onAddRecipe});
 
   final List<Recipe> recipes;
-  final VoidCallback onAddFirstRecipe;
+  final ValueChanged<Recipe> onAddRecipe;
 
   @override
   Widget build(BuildContext context) {
@@ -395,7 +364,7 @@ class _RecipeTray extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Drag from your recipes'.toUpperCase(),
+            'Tap a recipe to add to Day 1'.toUpperCase(),
             style: KsTokens.labelSmall.copyWith(
               color: ks.textTertiary,
               fontWeight: FontWeight.w700,
@@ -416,7 +385,7 @@ class _RecipeTray extends StatelessWidget {
               else
                 for (final recipe in recipes.take(6))
                   InkWell(
-                    onTap: recipe == recipes.first ? onAddFirstRecipe : null,
+                    onTap: () => onAddRecipe(recipe),
                     borderRadius: BorderRadius.circular(KsTokens.radius8),
                     child: Container(
                       padding: const EdgeInsets.symmetric(

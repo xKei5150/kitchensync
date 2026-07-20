@@ -1487,10 +1487,11 @@ void main() {
 
     await tester.tap(find.text('Braise'));
     await tester.pumpAndSettle();
-    final added = menuSets.upserted.last.dayAt(2)!.entries;
+    final added = menuSets.upserted.last.dayAt(0)!.entries;
     expect(added.map((entry) => entry.recipeId), contains('braise'));
 
-    await tester.tap(find.text('Remove first recipe'));
+    // Removal is via the per-day "Clear day" control (Day 1 = index 0).
+    await tester.tap(find.byKey(const Key('menu-set-clear-day-0')));
     await tester.pumpAndSettle();
     final remainingIds = [
       for (final day in menuSets.upserted.last.days)

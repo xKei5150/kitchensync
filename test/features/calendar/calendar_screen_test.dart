@@ -467,7 +467,7 @@ void main() {
     expect(find.text('Dinner · serves 3'), findsNothing);
   });
 
-  testWidgets('CalendarScreen marks household waste dates as problem days', (
+  testWidgets('CalendarScreen marks household waste dates with a waste glyph', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(400, 1600);
@@ -508,12 +508,15 @@ void main() {
     final grid = tester.widget<KsAlmanacGrid>(find.byType(KsAlmanacGrid));
     final leadingPad = DateTime(2026, 7).weekday - DateTime.monday;
 
-    expect(grid.days[leadingPad + 8].status, CalendarDayStatus.problem);
+    // A logged waste event with no meals scheduled is a neutral day carrying a
+    // waste marker — not a "problem". The other household's waste never leaks
+    // in, so its day stays neutral with no marker.
+    expect(grid.days[leadingPad + 8].status, CalendarDayStatus.empty);
     expect(
       grid.days[leadingPad + 8].markers,
       contains(CalendarDayMarker.waste),
     );
-    expect(grid.days[leadingPad + 9].status, CalendarDayStatus.problem);
+    expect(grid.days[leadingPad + 9].status, CalendarDayStatus.empty);
     expect(grid.days[leadingPad + 9].markers, isEmpty);
   });
 

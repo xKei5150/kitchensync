@@ -62,7 +62,7 @@ PantryItem _pantry({
 }
 
 void main() {
-  test('unplanned days are problems rather than neutral empty days', () {
+  test('days with nothing scheduled are neutral (unplanned), not problems', () {
     final day = DateTime(2026, 7, 6);
 
     final resolved = _resolver.resolve(
@@ -74,7 +74,7 @@ void main() {
       pantryItems: const [],
     );
 
-    expect(resolved[day]?.status, CalendarDateStatus.problem);
+    expect(resolved[day]?.status, CalendarDateStatus.unplanned);
   });
 
   test('planned meals are green only while pantry stock remains available', () {
@@ -133,7 +133,10 @@ void main() {
     expect(resolved[future]?.status, CalendarDateStatus.shopping);
   });
 
-  test('cancelled-only and explicitly problematic days stay red', () {
+  test('a cancelled-only day is neutral while a marked day stays red', () {
+    // A day whose only meal was cancelled has no active meals left, so it
+    // reads as unplanned/neutral. A day with a meal explicitly marked as a
+    // problem stays red.
     final cancelled = DateTime(2026, 7, 6);
     final problem = DateTime(2026, 7, 7);
 
@@ -149,7 +152,7 @@ void main() {
       pantryItems: [_pantry(quantity: 10)],
     );
 
-    expect(resolved[cancelled]?.status, CalendarDateStatus.problem);
+    expect(resolved[cancelled]?.status, CalendarDateStatus.unplanned);
     expect(resolved[problem]?.status, CalendarDateStatus.problem);
   });
 

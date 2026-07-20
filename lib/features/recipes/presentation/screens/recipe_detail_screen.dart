@@ -107,7 +107,10 @@ class RecipeDetailScreen extends ConsumerWidget {
               return _RecipeDetailBody(
                 recipeId: recipe.id,
                 title: recipe.name,
-                author: recipe.authorUserId,
+                author: authorLabel(
+                  recipe.authorUserId,
+                  ref.watch(activeUserIdProvider),
+                ),
                 location: recipe.location,
                 intro: recipe.description.isEmpty
                     ? recipe.name
@@ -282,7 +285,12 @@ class RecipeDetailScreen extends ConsumerWidget {
     Ingredient? linkedIngredient,
   ) {
     return KsScalableIngredient(
-      name: ingredient.description ?? ingredient.ingredientId,
+      // Prefer the recipe's own note, then the dictionary's display name,
+      // and only fall back to the raw id if neither is available.
+      name:
+          ingredient.description ??
+          linkedIngredient?.name ??
+          _humanizeId(ingredient.ingredientId),
       baseAmount: ingredient.quantity,
       unit: _unitLabel(
         ingredient.unit,
@@ -316,5 +324,22 @@ class RecipeDetailScreen extends ConsumerWidget {
       if (definition.id == unit) return definition;
     }
     return null;
+  }
+
+  /// Turns a kebab-case ingredient id ("baby-spinach") into a readable label
+  /// ("Baby spinach") as a last resort when no dictionary name is available.
+  static String _humanizeId(String id) {
+    final words = id.replaceAll('-', ' ').trim();
+    if (words.isEmpty) return id;
+    return words[0].toUpperCase() + words.substring(1);
+  }
+
+  /// A friendly byline: your own recipes read "You"; an opaque uid author with
+  /// no resolvable display name reads "A KitchenSync cook" rather than a uid.
+  static String authorLabel(String authorUserId, String currentUserId) {
+    if (authorUserId == currentUserId) return 'You';
+    final looksLikeUid =
+        authorUserId.length >= 20 && !authorUserId.contains(' ');
+    return looksLikeUid ? 'A KitchenSync cook' : authorUserId;
   }
 }

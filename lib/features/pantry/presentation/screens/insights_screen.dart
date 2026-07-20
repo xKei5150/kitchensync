@@ -529,40 +529,39 @@ class _WasteTrendCard extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          SizedBox(
-            height: 72,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (var i = 0; i < weeks.length; i++) ...[
-                  if (i > 0) const SizedBox(width: KsTokens.space10),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text('${weeks[i]}'),
-                        const SizedBox(height: KsTokens.space4),
-                        Container(
-                          height: 8 + 40 * (weeks[i] / peak),
-                          decoration: BoxDecoration(
-                            color: weeks[i] == 0
-                                ? ks.neutralSubtle
-                                : KsTokens.expired.withValues(
-                                    alpha: 0.35 + 0.65 * (weeks[i] / peak),
-                                  ),
-                            borderRadius: BorderRadius.circular(
-                              KsTokens.radius4,
-                            ),
+          // The row sizes to its tallest bar column (count + bar + label);
+          // a fixed height here previously clipped the peak bar (~26px).
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var i = 0; i < weeks.length; i++) ...[
+                if (i > 0) const SizedBox(width: KsTokens.space10),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${weeks[i]}'),
+                      const SizedBox(height: KsTokens.space4),
+                      Container(
+                        height: 8 + 40 * (weeks[i] / peak),
+                        decoration: BoxDecoration(
+                          color: weeks[i] == 0
+                              ? ks.neutralSubtle
+                              : KsTokens.expired.withValues(
+                                  alpha: 0.35 + 0.65 * (weeks[i] / peak),
+                                ),
+                          borderRadius: BorderRadius.circular(
+                            KsTokens.radius4,
                           ),
                         ),
-                        const SizedBox(height: KsTokens.space6),
-                        Text('W${i + 1}'),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: KsTokens.space6),
+                      Text('W${i + 1}'),
+                    ],
                   ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
           for (final event in events.take(3)) ...[
             const Divider(),

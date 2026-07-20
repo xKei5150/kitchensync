@@ -77,11 +77,12 @@ List<KsAlmanacDay> _weekDays({
 }
 
 CalendarDayStatus _calendarStatus(ResolvedCalendarDay? day) =>
-    switch (day?.status ?? CalendarDateStatus.problem) {
+    switch (day?.status ?? CalendarDateStatus.unplanned) {
       CalendarDateStatus.planned => CalendarDayStatus.planned,
       CalendarDateStatus.problem => CalendarDayStatus.problem,
       CalendarDateStatus.shopping => CalendarDayStatus.shopping,
       CalendarDateStatus.missed => CalendarDayStatus.missed,
+      CalendarDateStatus.unplanned => CalendarDayStatus.empty,
     };
 
 Set<CalendarDayMarker> _calendarMarkers(ResolvedCalendarDay? day) => {

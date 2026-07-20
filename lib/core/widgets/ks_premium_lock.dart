@@ -19,6 +19,11 @@ class KsPremiumLock extends StatelessWidget {
     super.key,
   });
 
+  /// Minimum height that fits the veil's icon disc, title, body, and CTA plus
+  /// the surrounding [KsTokens.space20] padding — sized so the invitation never
+  /// overflows a short preview [child].
+  static const double _veilMinHeight = 240;
+
   /// The real feature, rendered live beneath the veil.
   final Widget child;
   final String title;
@@ -39,8 +44,14 @@ class KsPremiumLock extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(child: ColoredBox(color: ks.surfaceRaised)),
-            // The feature, working.
-            child,
+            // The feature, working. A minimum height guarantees the veil's
+            // invitation (icon, title, body, CTA) always fits, even when a
+            // caller supplies a short preview — otherwise the veil overflows
+            // the child's bounds.
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _veilMinHeight),
+              child: child,
+            ),
             // Warm veil + invitation.
             Positioned.fill(
               child: ClipRect(

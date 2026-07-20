@@ -2,7 +2,12 @@ import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart
 import 'package:kitchensync/features/pantry/domain/entities/pantry_item.dart';
 import 'package:kitchensync/features/pantry/domain/services/cooking_deduction_planner.dart';
 
-enum CalendarDateStatus { planned, problem, shopping, missed }
+/// The resolved status of a calendar day.
+///
+/// [unplanned] is a day with nothing scheduled — it is neutral, not a problem.
+/// A day only becomes a [problem] when it has active meals that are explicitly
+/// marked as problems or whose ingredients cannot be reserved from the pantry.
+enum CalendarDateStatus { planned, problem, shopping, missed, unplanned }
 
 enum CalendarDateMarker { leftover, spoilage, waste }
 
@@ -74,6 +79,16 @@ class CalendarDayStatusResolver {
       }
 
       final isShoppingDate = normalizedShoppingDates.contains(date);
+      final hasProblem =
+          dayMeals.any(
+            (meal) => meal.marking == ScheduledMealMarking.problem,
+          ) ||
+          !_reserveDayIngredients(
+            date: date,
+            meals: activeMeals,
+            recipesById: recipesById,
+            pantry: pantry,
+          );
       final status =
           isShoppingDate &&
               date.isBefore(today) &&
@@ -81,16 +96,10 @@ class CalendarDayStatusResolver {
           ? CalendarDateStatus.missed
           : isShoppingDate
           ? CalendarDateStatus.shopping
-          : activeMeals.isEmpty ||
-                dayMeals.any(
-                  (meal) => meal.marking == ScheduledMealMarking.problem,
-                ) ||
-                !_reserveDayIngredients(
-                  date: date,
-                  meals: activeMeals,
-                  recipesById: recipesById,
-                  pantry: pantry,
-                )
+          // A day with nothing scheduled is neutral, not a problem.
+          : activeMeals.isEmpty
+          ? CalendarDateStatus.unplanned
+          : hasProblem
           ? CalendarDateStatus.problem
           : CalendarDateStatus.planned;
 

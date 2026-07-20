@@ -88,7 +88,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Account'), findsOneWidget);
-    expect(find.text('Try Premium'), findsOneWidget);
+    // The default test household has Premium, so the banner reflects the
+    // active subscription rather than inviting a trial.
+    expect(find.text('Premium active'), findsOneWidget);
     expect(find.text('Household & roles'), findsOneWidget);
     expect(find.text('Switch kitchen'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);

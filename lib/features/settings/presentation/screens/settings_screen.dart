@@ -92,7 +92,12 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: KsTokens.space16),
-            _PremiumBanner(onTap: () => context.push('/settings/premium')),
+            _PremiumBanner(
+              hasPremium:
+                  ref.watch(activeHouseholdContextProvider)?.hasPremium ??
+                  false,
+              onTap: () => context.push('/settings/premium'),
+            ),
             const SizedBox(height: KsTokens.space16),
             _SettingsGroup(
               rows: [
@@ -172,14 +177,26 @@ class SettingsSignOutController {
 /// The warm "Try Premium" invitation — a wheat-and-amber gradient card that
 /// sells the capability rather than gating it.
 class _PremiumBanner extends StatelessWidget {
-  const _PremiumBanner({required this.onTap});
+  const _PremiumBanner({required this.onTap, this.hasPremium = false});
 
   final VoidCallback onTap;
+
+  /// When the active household already has Premium, the card reflects the
+  /// active subscription instead of inviting a trial.
+  final bool hasPremium;
 
   @override
   Widget build(BuildContext context) {
     final ks = context.ksColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final title = hasPremium ? 'Premium active' : 'Try Premium';
+    final subtitle = hasPremium
+        ? 'Menu Sets, insights & joint households are unlocked'
+        : 'Menu Sets, insights & joint households';
+    final leadingIcon = hasPremium
+        ? Icons.workspace_premium_rounded
+        : Icons.auto_awesome_rounded;
 
     // Warm amber-and-wheat tint over the active raised surface. Dark mode
     // leans further into the accent so the card reads as an intentional gold
@@ -216,11 +233,7 @@ class _PremiumBanner extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(
-                Icons.auto_awesome_rounded,
-                size: 26,
-                color: ks.brandPrimary,
-              ),
+              Icon(leadingIcon, size: 26, color: ks.brandPrimary),
               const SizedBox(width: KsTokens.space12),
               Expanded(
                 child: Column(
@@ -228,7 +241,7 @@ class _PremiumBanner extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Try Premium',
+                      title,
                       style: KsTokens.headlineMedium.copyWith(
                         color: ks.textPrimary,
                         fontWeight: FontWeight.w600,
@@ -236,7 +249,7 @@ class _PremiumBanner extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Menu Sets, insights & joint households',
+                      subtitle,
                       style: KsTokens.bodySmall.copyWith(
                         color: ks.textSecondary,
                         height: 1.3,
