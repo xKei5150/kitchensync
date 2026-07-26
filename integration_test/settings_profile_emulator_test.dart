@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:kitchensync/app/theme.dart';
-import 'package:kitchensync/core/firebase/firebase_initializer.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/features/settings/presentation/screens/settings_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,20 +18,15 @@ void main() {
   testWidgets('profile edit persists and sign out clears the Firebase user', (
     tester,
   ) async {
-    const initializer = FirebaseInitializer();
-    await withTimeout(
-      'configure Firebase emulators',
-      () => initializer.bootstrap(AppEnv.dev),
-    );
-    await withTimeout(
-      'clear stale emulator auth session',
-      FirebaseAuth.instance.signOut,
-    );
-    await withTimeout(
-      'finish anonymous settings initialization',
-      () => initializer.finishInitialization(AppEnv.dev),
-      seconds: 60,
-    );
+    await bootEmulatedApp(clearExistingSession: true);
+    // Pin the keyboard inset for the same reason as the other `enterText`
+    // targets: focusing the display-name field makes the iOS Simulator raise
+    // its software keyboard, reporting a viewInsets bottom of 837-1000pt, which
+    // can collapse the edit form and drop "Save profile" out of the widget tree
+    // before it is tapped. Whether that happens is ambient machine state.
+    tester.view.viewInsets = FakeViewPadding.zero;
+    addTearDown(tester.view.resetViewInsets);
+
     final auth = FirebaseAuth.instance;
     final user = auth.currentUser;
     expect(user, isNotNull);

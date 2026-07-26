@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { deleteApp, initializeApp } from "firebase/app"
-import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth"
+import { connectAuthEmulator, getAuth } from "firebase/auth"
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions"
 import {
   deleteApp as deleteAdminApp,
@@ -8,7 +8,11 @@ import {
 } from "firebase-admin/app"
 import { type Firestore, getFirestore } from "firebase-admin/firestore"
 import { expect } from "vitest"
-import { authEmulatorUrl, functionsEmulatorEndpoint } from "./emulatorEnv.js"
+import {
+  authEmulatorUrl,
+  functionsEmulatorEndpoint,
+  signInWithEmulatorEmailIdentity,
+} from "./emulatorEnv.js"
 
 export type ShoppingCommandRequest = {
   readonly householdId: string
@@ -51,7 +55,7 @@ export async function createShoppingCommandHarness(): Promise<ShoppingCommandHar
   connectFunctionsEmulator(functions, endpoint.host, endpoint.port)
   const adminApp = initializeAdminApp({ projectId }, `test-admin-${randomUUID()}`)
   const db = getFirestore(adminApp)
-  const uid = (await signInAnonymously(auth)).user.uid
+  const uid = (await signInWithEmulatorEmailIdentity(auth)).uid
 
   return {
     db,

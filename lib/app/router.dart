@@ -23,7 +23,8 @@ import 'package:kitchensync/features/menu_sets/presentation/screens/menu_set_edi
 import 'package:kitchensync/features/menu_sets/presentation/screens/menu_sets_screen.dart';
 import 'package:kitchensync/features/notifications/presentation/screens/notification_preferences_screen.dart';
 import 'package:kitchensync/features/notifications/presentation/screens/notifications_screen.dart';
-import 'package:kitchensync/features/onboarding/presentation/screens/household_setup_screen.dart';
+import 'package:kitchensync/features/onboarding/presentation/controllers/authentication_controller.dart';
+import 'package:kitchensync/features/onboarding/presentation/screens/auth_loading_screen.dart';
 import 'package:kitchensync/features/onboarding/presentation/screens/sign_in_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/add_pantry_item_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/bulk_purchase_screen.dart';

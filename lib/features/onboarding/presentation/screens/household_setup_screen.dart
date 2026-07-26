@@ -1,11 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
-import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
@@ -71,20 +69,6 @@ class _HouseholdSetupScreenState extends ConsumerState<HouseholdSetupScreen> {
     ref.invalidate(householdPickerProvider);
     if (!mounted) return;
     context.go('/today');
-  }
-
-  Future<void> _skipForNow() async {
-    await ref
-        .read(sharedPreferencesProvider)
-        .setBool(skipHouseholdSetupPrefKey, true);
-    ref.invalidate(activeHouseholdContextProvider);
-    if (!mounted) return;
-    final router = GoRouter.maybeOf(context);
-    if (router != null) {
-      router.go('/today');
-    } else {
-      await Navigator.of(context).maybePop();
-    }
   }
 
   @override
@@ -154,13 +138,6 @@ class _HouseholdSetupScreenState extends ConsumerState<HouseholdSetupScreen> {
                 onSelect: _selectHousehold,
               ),
             ),
-            if (kDebugMode) ...[
-              const SizedBox(height: KsTokens.space8),
-              TextButton(
-                onPressed: _saving ? null : _skipForNow,
-                child: const Text('Skip for now'),
-              ),
-            ],
           ],
         ),
       ),
@@ -211,7 +188,7 @@ class HouseholdPickerState {
 
   static const empty = HouseholdPickerState(
     households: [],
-    userIsPremium: true,
+    userIsPremium: false,
     canCreateSolo: true,
     canCreateJoint: true,
   );
@@ -320,7 +297,30 @@ class HouseholdOnboardingController {
     });
   }
 
-  Future<String> createHousehold({required KitchenKind kind}) async {
+  /// Returns true when the signed-in identity has no user profile yet.
+  ///
+  /// This is used after an OAuth callback as a safe retry signal: the first
+  /// Firestore transaction either created all provisioning records or none of
+  /// them, so an absent profile can be retried without creating a second solo
+  /// household.
+  Future<bool> needsInitialProvisioning() async {
+    final auth = this.auth;
+    final db = this.db;
+    if (auth == null || db == null) {
+      throw StateError('Firebase is unavailable for household setup.');
+    }
+    final user = _requireSignedInUser(auth);
+    return !(await db.collection('users').doc(user.uid).get()).exists;
+  }
+
+  /// Creates (or restores) the one deterministic solo household owned by a
+  /// Firebase identity. The profile, household, and Admin membership are
+  /// committed in one transaction.
+  ///
+  /// A repeated callback, interrupted registration, or concurrent retry uses
+  /// the same household document ID and observes the existing membership on a
+  /// transaction retry. It never deletes the Firebase identity on failure.
+  Future<String> ensureInitialSoloHousehold() async {
     final auth = this.auth;
     final db = this.db;
     if (auth == null || db == null) {
@@ -328,74 +328,165 @@ class HouseholdOnboardingController {
     }
     final user = _requireSignedInUser(auth);
     final userDoc = db.collection('users').doc(user.uid);
-    final userSnap = await userDoc.get();
-    final storedPremium = userSnap.data()?['isPremium'] as bool? ?? false;
-    final userData = userSnap.data() ?? const <String, dynamic>{};
-    final requestJoint = kind == KitchenKind.joint;
-    final userIsPremium = storedPremium;
-    final hasCreatedJoint =
-        (userData['createdJointHouseholdId'] as String?)?.isNotEmpty ?? false;
-    final hasCreatedSolo =
-        (userData['createdSoloHouseholdId'] as String?)?.isNotEmpty ?? false;
-    final specResult = _policy.creationSpec(
-      HouseholdCreationRequest(
-        userIsPremium: userIsPremium,
-        requestJointHousehold: requestJoint,
-        existingSoloHouseholds: hasCreatedSolo ? 1 : 0,
-        existingCreatedJointHouseholds: hasCreatedJoint ? 1 : 0,
-      ),
-    );
-    final spec = switch (specResult) {
-      Success(value: final value) => value,
-      ResultFailure(failure: final failure) => throw StateError(
-        failure.toString(),
-      ),
-    };
+    final householdId = soloHouseholdIdForUser(user.uid);
+    final householdDoc = db.collection('households').doc(householdId);
+    final memberDoc = householdDoc.collection('members').doc(user.uid);
 
-    final now = FieldValue.serverTimestamp();
-    final households = db.collection('households');
-    final householdDoc = households.doc();
+    return db.runTransaction((transaction) async {
+      final userSnapshot = await transaction.get(userDoc);
+      final userData = userSnapshot.data() ?? const <String, dynamic>{};
+      final existingSoloId = userData['createdSoloHouseholdId'] as String?;
+      final now = FieldValue.serverTimestamp();
+
+      if (existingSoloId?.isNotEmpty ?? false) {
+        final knownSoloId = existingSoloId!;
+        final targetHousehold = db.collection('households').doc(knownSoloId);
+        final targetMember = targetHousehold
+            .collection('members')
+            .doc(user.uid);
+        final householdSnapshot = await transaction.get(targetHousehold);
+        final membershipSnapshot = await transaction.get(targetMember);
+        if (!householdSnapshot.exists || !membershipSnapshot.exists) {
+          throw StateError(
+            'Your existing solo household is incomplete. Contact support '
+            'before creating another.',
+          );
+        }
+        // A prior successful transaction may have selected another household.
+        // Re-select the known valid solo membership without duplicating it.
+        transaction.set(userDoc, {
+          'activeHouseholdId': knownSoloId,
+          'householdIds': FieldValue.arrayUnion([knownSoloId]),
+          'updatedAt': now,
+        }, SetOptions(merge: true));
+        return knownSoloId;
+      }
+
+      // Do not read the proposed household before its membership exists: the
+      // rules correctly deny arbitrary household reads. The user document is
+      // the transaction reservation. A concurrent callback conflicts on that
+      // document, retries, then follows the existing-id branch above.
+      final targetId = householdId;
+      final targetHousehold = householdDoc;
+      final targetMember = memberDoc;
+      transaction
+        ..set(userDoc, {
+          ..._profileFieldsFor(
+            user: user,
+            now: now,
+            isNew: !userSnapshot.exists,
+          ),
+          'activeHouseholdId': targetId,
+          'householdIds': FieldValue.arrayUnion([targetId]),
+          'createdSoloHouseholdId': targetId,
+          'updatedAt': now,
+        }, SetOptions(merge: true))
+        ..set(targetHousehold, {
+          'name': 'My kitchen',
+          'creatorUserId': user.uid,
+          'isJoint': false,
+          'hasPremium': false,
+          'maxMembers': 1,
+          'memberCount': 1,
+          'createdAt': now,
+          'updatedAt': now,
+        })
+        ..set(targetMember, {
+          'role': HouseholdRole.admin.name,
+          'joinedAt': now,
+          'updatedAt': now,
+        });
+      return targetId;
+    });
+  }
+
+  /// The regular household picker reuses the idempotent solo path. Joint
+  /// creation remains separately policy-gated and transactionally serialized.
+  Future<String> createHousehold({required KitchenKind kind}) {
+    return switch (kind) {
+      KitchenKind.solo => ensureInitialSoloHousehold(),
+      KitchenKind.joint => _createJointHousehold(),
+    };
+  }
+
+  Future<String> _createJointHousehold() async {
+    final auth = this.auth;
+    final db = this.db;
+    if (auth == null || db == null) {
+      throw StateError('Firebase is unavailable for household setup.');
+    }
+    final user = _requireSignedInUser(auth);
+    final userDoc = db.collection('users').doc(user.uid);
+    // Allocate the ID once. If two callers race, Firestore retries the second
+    // transaction and the persisted `createdJointHouseholdId` makes policy
+    // reject it before this unused ID is ever written.
+    final householdDoc = db.collection('households').doc();
     final householdId = householdDoc.id;
     final memberDoc = householdDoc.collection('members').doc(user.uid);
-    final isJoint = spec.isJoint;
     final inviteCode = _inviteCodeFor(householdId);
     final inviteDoc = db.collection('householdInvites').doc(inviteCode);
-    final batch = db.batch()
-      ..set(userDoc, {
-        'activeHouseholdId': householdId,
-        'householdIds': FieldValue.arrayUnion([householdId]),
-        if (!userSnap.exists) 'isPremium': false,
-        if (isJoint) 'createdJointHouseholdId': householdId,
-        if (!isJoint) 'createdSoloHouseholdId': householdId,
-        'createdAt': now,
-        'updatedAt': now,
-      }, SetOptions(merge: true))
-      ..set(householdDoc, {
-        'name': isJoint ? 'Shared kitchen' : 'My kitchen',
-        'creatorUserId': user.uid,
-        'isJoint': isJoint,
-        'hasPremium': isJoint && userIsPremium,
-        'maxMembers': spec.maxMembers,
-        'memberCount': 1,
-        'inviteCode': inviteCode,
-        'createdAt': now,
-        'updatedAt': now,
-      })
-      ..set(memberDoc, {
-        'role': spec.initialRole.name,
-        'joinedAt': now,
-        'updatedAt': now,
-      })
-      ..set(inviteDoc, {
-        'householdId': householdId,
-        'createdBy': user.uid,
-        'role': HouseholdRole.member.name,
-        'active': isJoint,
-        'createdAt': now,
-        'updatedAt': now,
-      });
-    await batch.commit();
-    return householdId;
+
+    return db.runTransaction((transaction) async {
+      final userSnapshot = await transaction.get(userDoc);
+      final userData = userSnapshot.data() ?? const <String, dynamic>{};
+      final userIsPremium = userData['isPremium'] as bool? ?? false;
+      final hasCreatedJoint =
+          (userData['createdJointHouseholdId'] as String?)?.isNotEmpty ?? false;
+      final hasCreatedSolo =
+          (userData['createdSoloHouseholdId'] as String?)?.isNotEmpty ?? false;
+      final specResult = _policy.creationSpec(
+        HouseholdCreationRequest(
+          userIsPremium: userIsPremium,
+          requestJointHousehold: true,
+          existingSoloHouseholds: hasCreatedSolo ? 1 : 0,
+          existingCreatedJointHouseholds: hasCreatedJoint ? 1 : 0,
+        ),
+      );
+      final spec = switch (specResult) {
+        Success(value: final value) => value,
+        ResultFailure(failure: final failure) => throw StateError(
+          failure.toString(),
+        ),
+      };
+      final now = FieldValue.serverTimestamp();
+      transaction
+        ..set(userDoc, {
+          ..._profileFieldsFor(
+            user: user,
+            now: now,
+            isNew: !userSnapshot.exists,
+          ),
+          'activeHouseholdId': householdId,
+          'householdIds': FieldValue.arrayUnion([householdId]),
+          'createdJointHouseholdId': householdId,
+          'updatedAt': now,
+        }, SetOptions(merge: true))
+        ..set(householdDoc, {
+          'name': 'Shared kitchen',
+          'creatorUserId': user.uid,
+          'isJoint': true,
+          'hasPremium': true,
+          'maxMembers': spec.maxMembers,
+          'memberCount': 1,
+          'inviteCode': inviteCode,
+          'createdAt': now,
+          'updatedAt': now,
+        })
+        ..set(memberDoc, {
+          'role': spec.initialRole.name,
+          'joinedAt': now,
+          'updatedAt': now,
+        })
+        ..set(inviteDoc, {
+          'householdId': householdId,
+          'createdBy': user.uid,
+          'role': HouseholdRole.member.name,
+          'active': true,
+          'createdAt': now,
+          'updatedAt': now,
+        });
+      return householdId;
+    });
   }
 
   Future<void> joinHousehold({required String code}) async {
@@ -472,10 +563,9 @@ class HouseholdOnboardingController {
           'updatedAt': now,
         })
         ..set(userDoc, {
+          ..._profileFieldsFor(user: user, now: now, isNew: !userSnap.exists),
           'activeHouseholdId': householdId,
           'householdIds': FieldValue.arrayUnion([householdId]),
-          if (!userSnap.exists) 'isPremium': false,
-          if (!userSnap.exists) 'createdAt': now,
           'joinedPremiumHouseholdIds': FieldValue.arrayUnion([householdId]),
           'updatedAt': now,
         }, SetOptions(merge: true))
@@ -492,6 +582,30 @@ class HouseholdOnboardingController {
       throw StateError('Sign in before setting up a household.');
     }
     return user;
+  }
+
+  /// A UID is stable across app restarts and provider callbacks, making this
+  /// a safe idempotency key for an account's one free solo household.
+  @visibleForTesting
+  static String soloHouseholdIdForUser(String uid) => 'solo-$uid';
+
+  static Map<String, Object?> _profileFieldsFor({
+    required User user,
+    required Object now,
+    required bool isNew,
+  }) {
+    if (!isNew) return const <String, Object?>{};
+    return <String, Object?>{
+      'isPremium': false,
+      if (user.email != null) 'email': user.email,
+      if (user.displayName != null) 'displayName': user.displayName,
+      if (user.photoURL != null) 'photoUrl': user.photoURL,
+      'providerIds': user.providerData
+          .map((provider) => provider.providerId)
+          .where((id) => id.isNotEmpty)
+          .toList(growable: false),
+      'createdAt': now,
+    };
   }
 
   static String _inviteCodeFor(String householdId) {

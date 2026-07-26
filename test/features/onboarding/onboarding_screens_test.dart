@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
-import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/onboarding/presentation/screens/household_setup_screen.dart';
 import 'package:kitchensync/features/onboarding/presentation/screens/sign_in_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 Widget _wrap(
   Widget child, {
@@ -21,25 +19,26 @@ Widget _wrap(
 }
 
 void main() {
-  testWidgets('SignInScreen shows disabled OAuth and explicit email modes', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(400, 1400);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'SignInScreen hides unavailable Apple and shows explicit email modes',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(_wrap(const SignInScreen()));
+      await tester.pumpWidget(_wrap(const SignInScreen()));
 
-    expect(find.text('KitchenSync'), findsOneWidget);
-    expect(find.text('Continue with Apple'), findsOneWidget);
-    expect(find.text('Continue with Google'), findsOneWidget);
-    expect(find.text('Not configured'), findsNWidgets(2));
-    expect(find.text('Login'), findsNWidgets(2));
-    expect(find.text('Register'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'you@email.com'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Password'), findsOneWidget);
-  });
+      expect(find.text('KitchenSync'), findsOneWidget);
+      expect(find.text('Continue with Apple'), findsNothing);
+      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.text('Not configured'), findsOneWidget);
+      expect(find.text('Login'), findsNWidgets(2));
+      expect(find.text('Register'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'you@email.com'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Password'), findsOneWidget);
+    },
+  );
 
   testWidgets('SignInScreen does not use anonymous OAuth placeholders', (
     tester,
@@ -51,8 +50,6 @@ void main() {
 
     await tester.pumpWidget(_wrap(const SignInScreen()));
 
-    await tester.tap(find.text('Continue with Apple'));
-    await tester.pump();
     await tester.tap(find.text('Continue with Google'));
     await tester.pump();
 
@@ -175,24 +172,12 @@ void main() {
     expect(find.text('Join with a code'), findsOneWidget);
   });
 
-  testWidgets('HouseholdSetupScreen can skip setup in debug builds', (
+  testWidgets('HouseholdSetupScreen does not offer a debug skip bypass', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    await tester.pumpWidget(
-      _wrap(
-        const HouseholdSetupScreen(),
-        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-      ),
-    );
+    await tester.pumpWidget(_wrap(const HouseholdSetupScreen()));
 
-    expect(find.text('Skip for now'), findsOneWidget);
-
-    await tester.tap(find.text('Skip for now'));
-    await tester.pump();
-
-    expect(prefs.getBool(skipHouseholdSetupPrefKey), isTrue);
+    expect(find.text('Skip for now'), findsNothing);
   });
 
   testWidgets('Onboarding screens render in dark theme without error', (
@@ -207,5 +192,76 @@ void main() {
       _wrap(const HouseholdSetupScreen(), theme: AppTheme.dark()),
     );
     expect(tester.takeException(), isNull);
+  });
+
+  // `OnboardingEntryScreen` is the `/onboarding` destination and the only
+  // widget deciding whether a caller lands on household recovery or the real
+  // Login/Register surface. It lives inside `sign_in_screen.dart`, so a
+  // filename-based inventory misses it; nothing constructed it before.
+  _onboardingEntryRouting();
+}
+
+void _onboardingEntryRouting() {
+  Future<void> pumpEntry(
+    WidgetTester tester, {
+    required AppSessionPhase phase,
+    bool showHouseholdPicker = false,
+  }) async {
+    tester.view.physicalSize = const Size(400, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _wrap(
+        OnboardingEntryScreen(showHouseholdPicker: showHouseholdPicker),
+        overrides: [
+          appSessionStateProvider.overrideWithValue(
+            AppSessionState(phase: phase),
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+  }
+
+  testWidgets('OnboardingEntryScreen sends a signed-out caller to sign in', (
+    tester,
+  ) async {
+    await pumpEntry(tester, phase: AppSessionPhase.signedOut);
+
+    expect(find.byType(SignInScreen), findsOneWidget);
+    expect(find.byType(HouseholdSetupScreen), findsNothing);
+  });
+
+  testWidgets('OnboardingEntryScreen shows household setup when required', (
+    tester,
+  ) async {
+    await pumpEntry(tester, phase: AppSessionPhase.needsHouseholdSetup);
+
+    // A confirmed identity without a household must not see Login/Register.
+    expect(find.byType(HouseholdSetupScreen), findsOneWidget);
+    expect(find.byType(SignInScreen), findsNothing);
+  });
+
+  testWidgets('OnboardingEntryScreen opens the picker for a ready session', (
+    tester,
+  ) async {
+    await pumpEntry(
+      tester,
+      phase: AppSessionPhase.ready,
+      showHouseholdPicker: true,
+    );
+
+    expect(find.byType(HouseholdSetupScreen), findsOneWidget);
+  });
+
+  testWidgets('OnboardingEntryScreen keeps a ready session off the picker', (
+    tester,
+  ) async {
+    await pumpEntry(tester, phase: AppSessionPhase.ready);
+
+    expect(find.byType(SignInScreen), findsOneWidget);
+    expect(find.byType(HouseholdSetupScreen), findsNothing);
   });
 }

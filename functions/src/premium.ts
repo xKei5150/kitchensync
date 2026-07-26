@@ -3,6 +3,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { HttpsError } from "firebase-functions/v2/https"
 import { z } from "zod"
 import { requireAuthUid } from "./shopping/errors.js"
+import { runRetryableTransaction } from "./shopping/transactionRetry.js"
 
 const requestSchema = z
   .object({
@@ -19,7 +20,11 @@ export type PremiumTrialCallableRequest = Readonly<{
 type MemberRecord = Readonly<{ role?: unknown }>
 type PremiumPlan = "annual" | "monthly"
 type PremiumStatus = "trialing" | "active"
-type SubscriptionRecord = Readonly<{ status?: unknown; plan?: unknown }>
+type SubscriptionRecord = Readonly<{
+  status?: unknown
+  plan?: unknown
+  trialEndsAt?: unknown
+}>
 
 export async function startPremiumTrialHandler(
   request: PremiumTrialCallableRequest,
@@ -29,7 +34,7 @@ export async function startPremiumTrialHandler(
   const parsed = requestSchema.safeParse(request.data)
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid Premium trial request")
 
-  return db.runTransaction(async (transaction) => {
+  return runRetryableTransaction(db, async (transaction) => {
     const householdRef = db.collection("households").doc(parsed.data.householdId)
     const memberRef = householdRef.collection("members").doc(authUid)
     const subscriptionRef = householdRef.collection("subscriptions").doc("premium")
@@ -50,7 +55,19 @@ export async function startPremiumTrialHandler(
       if (existingPlan !== "annual" && existingPlan !== "monthly") {
         throw new HttpsError("failed-precondition", "The Premium subscription is malformed")
       }
+      if (
+        existingStatus === "trialing" &&
+        !isCurrentPremiumTrial(subscription?.trialEndsAt, Timestamp.now())
+      ) {
+        // Entitlement checks in Firestore Rules also use the stored deadline.
+        // Do not report an expired trial as active merely because its cleanup
+        // record has not yet been reconciled by trusted billing operations.
+        throw new HttpsError("failed-precondition", "The Premium trial has expired")
+      }
       return { status: existingStatus, plan: existingPlan }
+    }
+    if (existingStatus === "expired") {
+      throw new HttpsError("failed-precondition", "The Premium trial has already been used")
     }
 
     const now = FieldValue.serverTimestamp()
@@ -89,4 +106,8 @@ export async function startPremiumTrialHandler(
     )
     return { status: "trialing", plan: parsed.data.plan }
   })
+}
+
+export function isCurrentPremiumTrial(trialEndsAt: unknown, now: Timestamp): boolean {
+  return trialEndsAt instanceof Timestamp && trialEndsAt.toMillis() > now.toMillis()
 }

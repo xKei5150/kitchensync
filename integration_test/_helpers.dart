@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/core/firebase/firebase_emulator_settings.dart';
 import 'package:kitchensync/core/firebase/firebase_initializer.dart';
+import 'package:kitchensync/core/session/debug_household_session.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/services/search_tokenizer.dart';
 
 /// Runs `body`, throwing a labelled error if it does not complete within
@@ -27,25 +30,181 @@ Future<T> withTimeout<T>(
   return result;
 }
 
-Future<void> bootEmulatedApp() async {
+/// How to advance frames while waiting for a surface.
+typedef SettleStrategy = Future<void> Function(WidgetTester tester);
+
+/// Advances fixed frames. Required for surfaces that animate continuously
+/// (skeleton shimmer, sync spinners), where `pumpAndSettle` never returns.
+Future<void> settleFrames(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+/// Settles if the surface quiesces, and advances fixed frames if it does not.
+///
+/// Several real screens never reach a quiescent frame — Today keeps an
+/// animation running while its streams populate — so a bare `pumpAndSettle`
+/// throws "pumpAndSettle timed out" and the test fails for a reason unrelated
+/// to what it is checking.
+Future<void> settleOrAdvance(WidgetTester tester) async {
+  try {
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 100),
+      EnginePhase.sendSemanticsUpdate,
+      const Duration(seconds: 5),
+    );
+    // `pumpAndSettle` signals its timeout by throwing a FlutterError; there is
+    // no Exception-typed alternative to catch, and treating "did not settle"
+    // as fatal is precisely the behaviour being avoided here.
+    // ignore: avoid_catching_errors
+  } on FlutterError {
+    await settleFrames(tester);
+  }
+}
+
+/// Waits for [finder], adapting to whether the surface settles at all.
+///
+/// The first attempt tries to settle. If the surface turns out to animate
+/// continuously, this stops paying the settle timeout on every subsequent
+/// attempt — otherwise a genuine failure takes 40 × the timeout to report. A
+/// real recipe_nav failure took **10 minutes** before this degradation existed.
+///
+/// [describing] and [diagnose] build the failure message, so a timeout says
+/// which screen was expected and what state the app was actually in rather
+/// than just "timed out".
+Future<void> waitForFinder(
+  WidgetTester tester,
+  Finder finder, {
+  required String describing,
+  String Function()? diagnose,
+}) async {
+  var surfaceQuiesces = true;
+  for (var attempt = 0; attempt < 40; attempt++) {
+    if (surfaceQuiesces) {
+      try {
+        await tester.pumpAndSettle(
+          const Duration(milliseconds: 100),
+          EnginePhase.sendSemanticsUpdate,
+          const Duration(seconds: 3),
+        );
+        // `pumpAndSettle` reports its timeout by throwing a FlutterError, so
+        // there is no Exception-typed alternative to catch here.
+        // ignore: avoid_catching_errors
+      } on FlutterError {
+        surfaceQuiesces = false;
+      }
+    }
+    if (!surfaceQuiesces) await settleFrames(tester);
+    if (finder.evaluate().isNotEmpty) return;
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+  final detail = diagnose == null ? '' : ' ${diagnose()}';
+  fail('Never reached $describing: no match for $finder.$detail');
+}
+
+Future<void> bootEmulatedApp({bool clearExistingSession = false}) async {
+  const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+  if (!useEmulator || !kDebugMode) {
+    throw StateError(
+      'bootEmulatedApp is test-only. Run a debug emulator build with '
+      '--dart-define=USE_EMULATOR=true.',
+    );
+  }
   WidgetsFlutterBinding.ensureInitialized();
   await withTimeout(
     'FirebaseInitializer.initialize',
     () => const FirebaseInitializer().initialize(AppEnv.dev),
   );
   final auth = FirebaseAuth.instance;
-  if (auth.currentUser == null) {
-    final credential = await withTimeout(
-      'signInAnonymously',
-      auth.signInAnonymously,
-    );
-    if (credential.user == null) {
-      throw StateError('[itest] anonymous sign-in returned no user');
-    }
+  if (clearExistingSession && auth.currentUser != null) {
+    await withTimeout('clear existing test auth session', auth.signOut);
   }
+  final user = await signInWithEmulatorTestIdentity(auth);
+  await seedEmulatorTestHouseholdThroughAdmin(user.uid);
+}
+
+/// Obtains an email/password identity from the Auth emulator only.
+///
+/// The project rules reject anonymous Firebase identities in every deployed
+/// profile. Tests therefore use a disposable non-anonymous identity rather
+/// than depending on an Auth-console provider setting for security.
+Future<User> signInWithEmulatorTestIdentity(FirebaseAuth auth) async {
+  const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+  if (!useEmulator || !kDebugMode) {
+    throw StateError(
+      'Emulator test identities require a debug emulator build.',
+    );
+  }
+  final existing = auth.currentUser;
+  if (existing != null && !existing.isAnonymous) return existing;
+  if (existing?.isAnonymous ?? false) {
+    await withTimeout(
+      'sign out anonymous emulator test identity',
+      auth.signOut,
+    );
+  }
+  final suffix = DateTime.now().microsecondsSinceEpoch;
+  final credential = await withTimeout(
+    'create disposable emulator email identity',
+    () => auth.createUserWithEmailAndPassword(
+      email: 'itest-$suffix@example.com',
+      password: 'KitchenSync-$suffix-Aa1!',
+    ),
+  );
+  final user = credential.user;
+  if (user == null || user.isAnonymous) {
+    throw StateError('[itest] emulator email identity was not created.');
+  }
+  return user;
+}
+
+/// Creates the debug fixture through the emulator's trusted REST surface.
+///
+/// This is deliberately test code rather than app startup behavior: ordinary
+/// debug runs now land at real authentication, while legacy integration tests
+/// still receive one deterministic, authorization-valid solo household.
+Future<void> seedEmulatorTestHouseholdThroughAdmin(String uid) async {
+  final householdId = debugHouseholdIdForUser(uid);
+  const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+  if (!useEmulator || !kDebugMode) {
+    throw StateError('Emulator test fixtures require a debug emulator build.');
+  }
+  final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+  final existingUser = await withTimeout(
+    'read emulator test profile',
+    userRef.get,
+  );
+  if (existingUser.data()?['createdSoloHouseholdId'] == householdId) return;
+
+  final now = DateTime.now().toUtc();
   await withTimeout(
-    'wait for authenticated user',
-    () => auth.authStateChanges().firstWhere((user) => user != null),
+    'seed emulator test household through emulator admin',
+    () => seedFirestoreDocumentsThroughEmulatorAdmin({
+      'users/$uid': {
+        'activeHouseholdId': householdId,
+        'createdSoloHouseholdId': householdId,
+        'householdIds': [householdId],
+        'joinedPremiumHouseholdIds': const <String>[],
+        'isPremium': false,
+        'createdAt': now,
+        'updatedAt': now,
+      },
+      'households/$householdId': {
+        'name': debugHouseholdName,
+        'creatorUserId': uid,
+        'isJoint': false,
+        'hasPremium': false,
+        'maxMembers': 1,
+        'memberCount': 1,
+        'createdAt': now,
+        'updatedAt': now,
+      },
+      'households/$householdId/members/$uid': {
+        'role': 'admin',
+        'joinedAt': now,
+        'updatedAt': now,
+      },
+    }),
   );
 }
 
@@ -158,6 +317,14 @@ Future<void> seedFirestoreDocumentsThroughEmulatorAdmin(
         },
       },
   ];
+  await _postEmulatorAdminBatchWrite(writes, 'Emulator admin fixture');
+}
+
+/// Posts a `documents:batchWrite` through the emulator's owner surface.
+Future<void> _postEmulatorAdminBatchWrite(
+  List<Map<String, Object?>> writes,
+  String label,
+) async {
   final settings = firebaseEmulatorSettingsForTarget(defaultTargetPlatform);
   final client = HttpClient();
   try {
@@ -178,13 +345,41 @@ Future<void> seedFirestoreDocumentsThroughEmulatorAdmin(
     final response = await request.close();
     final body = await utf8.decoder.bind(response).join();
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        'Emulator admin fixture failed (${response.statusCode}): $body',
-      );
+      throw StateError('$label failed (${response.statusCode}): $body');
     }
   } finally {
     client.close(force: true);
   }
+}
+
+/// Updates only the named fields of existing fixture documents.
+///
+/// [seedFirestoreDocumentsThroughEmulatorAdmin] sends a `update` write with no
+/// `updateMask`, which the Firestore REST API defines as a **whole-document
+/// replace**. Using it to flip one flag silently deletes every other field —
+/// wiping `activeHouseholdId` off a user, for example, drops the session back
+/// to `needsHouseholdSetup`. This sends an explicit `updateMask` so a partial
+/// update stays partial.
+Future<void> mergeFirestoreDocumentsThroughEmulatorAdmin(
+  Map<String, Map<String, Object?>> documents,
+) async {
+  const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+  if (!useEmulator) {
+    throw StateError('Admin fixture merging is emulator-only.');
+  }
+  final writes = [
+    for (final entry in documents.entries)
+      {
+        'update': {
+          'name':
+              'projects/kitchensync-dev-da503/databases/(default)/documents/'
+              '${entry.key}',
+          'fields': _firestoreFields(entry.value),
+        },
+        'updateMask': {'fieldPaths': entry.value.keys.toList()},
+      },
+  ];
+  await _postEmulatorAdminBatchWrite(writes, 'Emulator admin merge');
 }
 
 /// Checks a fixture document through the emulator-only owner surface without

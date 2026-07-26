@@ -83,7 +83,11 @@ void main() {
         userId: uid,
         householdId: householdId,
         localRecipeId: 'lib-local-copy',
-        savedRecipeId: 'lib-saved-1',
+        // Must match the local recipe id: `isExactSavedRecipeCopy` in
+        // firestore.rules verifies the savedRecipes document that shares the
+        // new recipe's id, and the production caller
+        // (`recipe_repository_providers.dart`) sets both from one generated id.
+        savedRecipeId: 'lib-local-copy',
         now: now,
       ),
     );

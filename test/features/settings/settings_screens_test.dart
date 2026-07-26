@@ -8,7 +8,7 @@ import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/app/theme_mode_controller.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
-import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/features/onboarding/presentation/controllers/authentication_controller.dart';
 import 'package:kitchensync/features/settings/presentation/screens/premium_screen.dart';
 import 'package:kitchensync/features/settings/presentation/screens/settings_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -52,15 +52,19 @@ class _FakePremiumUpgradeController extends PremiumUpgradeController {
 }
 
 class _FakeSignOutController extends SettingsSignOutController {
-  _FakeSignOutController(this.prefs) : super(auth: null, preferences: prefs);
+  _FakeSignOutController()
+    : super(
+        authentication: const AuthenticationController(
+          auth: null,
+          googleSignIn: null,
+        ),
+      );
 
-  final SharedPreferences prefs;
   bool called = false;
 
   @override
   Future<void> signOut() async {
     called = true;
-    await prefs.remove(skipHouseholdSetupPrefKey);
   }
 }
 
@@ -87,10 +91,10 @@ void main() {
     await tester.pumpWidget(await _wrap(const SettingsScreen()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Account'), findsOneWidget);
-    // The default test household has Premium, so the banner reflects the
-    // active subscription rather than inviting a trial.
-    expect(find.text('Premium active'), findsOneWidget);
+    expect(find.text('Account'), findsNWidgets(2));
+    // An isolated screen test has no authenticated household context, so it
+    // must not receive a synthetic Premium state.
+    expect(find.text('Try Premium'), findsOneWidget);
     expect(find.text('Household & roles'), findsOneWidget);
     expect(find.text('Switch kitchen'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
@@ -169,7 +173,7 @@ void main() {
     expect(find.text('Profile'), findsOneWidget);
   });
 
-  testWidgets('Sign out clears debug household skip and routes to onboarding', (
+  testWidgets('Sign out clears the session and routes to onboarding', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(400, 1400);
@@ -177,9 +181,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    SharedPreferences.setMockInitialValues({skipHouseholdSetupPrefKey: true});
+    SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
-    final signOut = _FakeSignOutController(prefs);
+    final signOut = _FakeSignOutController();
     final router = GoRouter(
       routes: [
         GoRoute(path: '/', builder: (_, _) => const SettingsScreen()),
@@ -208,7 +212,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(signOut.called, isTrue);
-    expect(prefs.getBool(skipHouseholdSetupPrefKey), isNull);
     expect(find.text('Onboarding'), findsOneWidget);
   });
 

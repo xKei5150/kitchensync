@@ -18,10 +18,12 @@ const ingredient = {
   category: "spice",
   defaultUnit: "g",
   allowedUnits: ["g", "kg"],
+  localUnitDefinitions: [],
   scope: "householdCustom",
   householdId,
   isBulkCandidate: false,
   isNonFood: false,
+  schemaVersion: 1,
   createdAt: new Date("2026-07-17T00:00:00.000Z"),
   updatedAt: new Date("2026-07-17T00:00:00.000Z"),
 };
@@ -70,6 +72,34 @@ for (const profile of shoppingRuleProfiles) {
           { ...ingredient, category: "nonFood", isNonFood: false },
         ),
       );
+      await assertFails(
+        setDoc(
+          doc(db, `households/${householdId}/customIngredients/custom-ZXNjYWxhdGU`),
+          { ...ingredient, isPremium: true },
+        ),
+      );
+    });
+
+    test("only the Admin-level pantry role can create or update custom ingredients", async () => {
+      const admin = env.authenticatedContext("admin").firestore();
+      const cook = env.authenticatedContext("cook").firestore();
+      const shopper = env.authenticatedContext("shopper").firestore();
+      const path = `households/${householdId}/customIngredients/custom-cm9sZS1ndWFyZA`;
+      await assertSucceeds(setDoc(doc(admin, path), ingredient));
+      await assertFails(setDoc(doc(cook, path), { ...ingredient, name: "cook edit" }));
+      await assertFails(setDoc(doc(shopper, path), { ...ingredient, name: "shopper edit" }));
+      await assertFails(
+        setDoc(
+          doc(cook, `households/${householdId}/customIngredients/custom-Y29vay1uZXc`),
+          ingredient,
+        ),
+      );
+      await assertFails(
+        setDoc(
+          doc(shopper, `households/${householdId}/customIngredients/custom-c2hvcHBlci1uZXc`),
+          ingredient,
+        ),
+      );
     });
 
     test("recipe lines reject dangling, invalid-unit, and foreign custom references", async () => {
@@ -116,7 +146,7 @@ for (const profile of shoppingRuleProfiles) {
       );
     });
 
-    test("pantry and purchases reject inaccessible references and units", async () => {
+    test("pantry rejects inaccessible references and client purchase history is forbidden", async () => {
       const db = env.authenticatedContext("admin").firestore();
       const pantry = {
         householdId,
@@ -145,6 +175,22 @@ for (const profile of shoppingRuleProfiles) {
           purchaseDate: new Date(),
         }),
       );
+      for (const role of ["admin", "cook", "shopper"] as const) {
+        const roleDb = env.authenticatedContext(role).firestore();
+        await assertFails(
+          setDoc(doc(roleDb, `households/${householdId}/purchases/direct-${role}`), {
+            householdId,
+            ingredientId: "rice",
+            quantity: 1,
+            unit: "kg",
+            purchaseDate: new Date(),
+            sourceShoppingListId: "forged-list",
+            isBulk: false,
+            isNonFood: false,
+            schemaVersion: 1,
+          }),
+        );
+      }
       const leftover = {
         ...pantry,
         ingredientId: "rice",

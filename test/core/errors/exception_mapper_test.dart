@@ -34,6 +34,26 @@ void main() {
       expect((f as NotFoundFailure).entity, 'document');
     });
 
+    // iOS reports connection-refused as `unknown`, not `unavailable`, so
+    // before this the offline path was unreachable on iOS.
+    test('iOS connection-refused → NetworkFailure', () {
+      final ex = FirebaseException(
+        plugin: 'firebase_functions',
+        code: 'unknown',
+        message: 'Could not connect to the server.',
+      );
+      expect(ExceptionMapper.toFailure(ex), isA<NetworkFailure>());
+    });
+
+    test('unknown code with an unrelated message stays UnknownFailure', () {
+      final ex = FirebaseException(
+        plugin: 'firebase_functions',
+        code: 'unknown',
+        message: 'Recipe payload was rejected',
+      );
+      expect(ExceptionMapper.toFailure(ex), isA<UnknownFailure>());
+    });
+
     test('unknown code → UnknownFailure carrying cause', () {
       final ex = FirebaseException(
         plugin: 'cloud_firestore',

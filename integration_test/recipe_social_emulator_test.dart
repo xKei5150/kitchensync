@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/session/debug_household_session.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 import 'package:kitchensync/features/recipes/presentation/screens/recipe_detail_screen.dart';
@@ -20,13 +22,29 @@ void main() {
   testWidgets('public recipe likes and comments persist from the iOS UI', (
     tester,
   ) async {
-    await bootEmulatedApp();
+    // Start from a fresh identity. The iOS Simulator keychain survives an
+    // app uninstall, so reusing the previous run's Firebase user would find
+    // this fixed-id recipe already liked and commented on by that uid — the
+    // Like control would render as 'Unlike recipe' and the single-comment
+    // assertion would see stale rows.
+    await bootEmulatedApp(clearExistingSession: true);
+    // Focusing the comment composer makes the iOS Simulator raise its software
+    // keyboard, which reports a viewInsets bottom near the full viewport height
+    // and collapses the detail screen's scroll body. Pin it so this target does
+    // not depend on whether a hardware keyboard is connected. The viewport size
+    // is deliberately left native: this screen's hero overflows a forced
+    // 393x852 logical viewport.
+    tester.view.viewInsets = FakeViewPadding.zero;
+    addTearDown(tester.view.resetViewInsets);
     final user = FirebaseAuth.instance.currentUser;
     expect(user, isNotNull);
     final uid = user!.uid;
     final householdId = debugHouseholdIdForUser(uid);
     final now = DateTime(2026, 7, 18, 12);
-    const recipeId = 'itest-public-social';
+    // Unique per run: a fixed id would already exist from a previous run,
+    // owned by that run's uid and household, so this run's upsert would be
+    // denied by the recipe authorship rules.
+    final recipeId = 'itest-public-social-$uid';
 
     final dataContainer = ProviderContainer();
     addTearDown(dataContainer.dispose);
@@ -61,10 +79,26 @@ void main() {
     final preferences = await SharedPreferences.getInstance();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sharedPreferencesProvider.overrideWithValue(preferences)],
+        // Mounting the screen directly skips the router, which normally holds
+        // `/auth/loading` until the Firebase auth stream emits. Without these
+        // the first build reads `activeUserIdProvider` while the session is
+        // still `loadingAuth` and throws.
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          activeUserIdProvider.overrideWithValue(uid),
+          activeHouseholdContextProvider.overrideWithValue(
+            ActiveHouseholdContext(
+              id: householdId,
+              name: debugHouseholdName,
+              role: HouseholdRole.admin,
+              isJoint: false,
+              hasPremium: false,
+            ),
+          ),
+        ],
         child: MaterialApp(
           theme: AppTheme.light(),
-          home: const RecipeDetailScreen(recipeId: recipeId),
+          home: RecipeDetailScreen(recipeId: recipeId),
         ),
       ),
     );

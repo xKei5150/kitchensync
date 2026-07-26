@@ -56,57 +56,60 @@ void main() {
     final household = await _waitForActiveHousehold(container, householdId);
 
     // Recipe: 100 g flour at default 2 servings.
-    final recipe = await withTimeout(
-      'create recipe',
-      () async {
-        final recipes = await container
-            .read(recipeImportControllerProvider)
-            .importDrafts([
-              const RecipeDraft(
-                name: 'Flatbread',
-                defaultServingSize: 2,
-                timeTags: ['Dinner'],
-                recipeTags: ['bread'],
-                description: 'Multi-meal aggregation fixture.',
-                ingredients: [
-                  RecipeIngredientDraft(
-                    name: 'Flour',
-                    quantity: 100,
-                    unit: UnitId.g,
-                  ),
-                ],
-                instructions: ['Bake.'],
-                visibility: RecipeVisibility.private,
-              ),
-            ]);
-        return recipes.single;
-      },
-    );
+    final recipe = await withTimeout('create recipe', () async {
+      final recipes = await container
+          .read(recipeImportControllerProvider)
+          .importDrafts([
+            const RecipeDraft(
+              name: 'Flatbread',
+              defaultServingSize: 2,
+              timeTags: ['Dinner'],
+              recipeTags: ['bread'],
+              description: 'Multi-meal aggregation fixture.',
+              ingredients: [
+                RecipeIngredientDraft(
+                  name: 'Flour',
+                  quantity: 100,
+                  unit: UnitId.g,
+                ),
+              ],
+              instructions: ['Bake.'],
+              visibility: RecipeVisibility.private,
+            ),
+          ]);
+      return recipes.single;
+    });
     final flourId = recipe.ingredients.single.ingredientId;
 
     // Two meals in the window: one at default 2 servings, one at 4 servings.
     // Expected flour demand = 100*(2/2) + 100*(4/2) = 100 + 200 = 300 g, one line.
     final calendar = container.read(calendarRepositoryProvider);
-    await withTimeout('schedule meal A', () => calendar.upsertMeal(
-      householdId: householdId,
-      entry: MealScheduleEntry(
-        id: 'meal-a',
-        recipeId: recipe.id,
-        date: DateTime(2026, 7, 6),
-        mealLabel: 'Lunch',
-        servingSize: 2,
+    await withTimeout(
+      'schedule meal A',
+      () => calendar.upsertMeal(
+        householdId: householdId,
+        entry: MealScheduleEntry(
+          id: 'meal-a',
+          recipeId: recipe.id,
+          date: DateTime(2026, 7, 6),
+          mealLabel: 'Lunch',
+          servingSize: 2,
+        ),
       ),
-    ));
-    await withTimeout('schedule meal B', () => calendar.upsertMeal(
-      householdId: householdId,
-      entry: MealScheduleEntry(
-        id: 'meal-b',
-        recipeId: recipe.id,
-        date: DateTime(2026, 7, 6),
-        mealLabel: 'Dinner',
-        servingSize: 4,
+    );
+    await withTimeout(
+      'schedule meal B',
+      () => calendar.upsertMeal(
+        householdId: householdId,
+        entry: MealScheduleEntry(
+          id: 'meal-b',
+          recipeId: recipe.id,
+          date: DateTime(2026, 7, 6),
+          mealLabel: 'Dinner',
+          servingSize: 4,
+        ),
       ),
-    ));
+    );
 
     final shopping = ShoppingPlanningController(
       repository: container.read(shoppingRepositoryProvider),
@@ -147,7 +150,8 @@ void main() {
     expect(flourLines.single.quantityNeeded, 300);
     expect(flourLines.single.unit, UnitId.g);
     // NOTE: source-link provenance is not asserted here because the emulator's
-    // ControlledEmulatorAllocationPlannerClient stub emits `sourceMealLinks: []`
+    // The ControlledEmulatorAllocationPlannerClient stub emits an empty
+    // `sourceMealLinks` list by design.
     // by design; source-link preservation is covered via the real planner in
     // FD-SHOP-SUB-01 / FD-MENU-APPLY-SHOP-01.
   });

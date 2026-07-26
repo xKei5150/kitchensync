@@ -119,6 +119,15 @@ export const securityScenarios: readonly SecurityScenario[] = [
       });
       const db = env.authenticatedContext("debug-creator").firestore();
       const batch = writeBatch(db);
+      batch.set(
+        doc(db, creatorUserPath),
+        {
+          activeHouseholdId: "debug-creator-household",
+          householdIds: ["debug-creator-household"],
+          createdJointHouseholdId: "debug-creator-household",
+        },
+        { merge: true },
+      );
       batch.set(doc(db, creatorHouseholdPath), {
         name: "Debug creator kitchen",
         creatorUserId: "debug-creator",

@@ -1,12 +1,32 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    function isSignedIn() { return request.auth != null; }
+    function isSignedIn() {
+      return request.auth != null
+        && (
+          !('firebase' in request.auth.token)
+          || !('sign_in_provider' in request.auth.token.firebase)
+          || request.auth.token.firebase.sign_in_provider != 'anonymous'
+        );
+    }
     function isHouseholdMember(hid) {
-      return isSignedIn() && (
-        hid == 'solo-household' ||
-        firestore.exists(/databases/(default)/documents/households/$(hid)/members/$(request.auth.uid))
+      return isSignedIn()
+        && firestore.exists(
+          /databases/(default)/documents/households/$(hid)/members/$(request.auth.uid)
+        );
+    }
+    function hasFullPantryAccess(hid) {
+      return isHouseholdMember(hid) && (
+        firestore.get(
+          /databases/(default)/documents/households/$(hid)/members/$(request.auth.uid)
+        ).data.role == 'admin' ||
+        firestore.get(/databases/(default)/documents/households/$(hid)).data.isJoint == false
       );
+    }
+    function isValidPantryImage() {
+      return request.resource.size > 0
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
     }
 
     match /ingredients/{path=**} {
@@ -14,11 +34,15 @@ service firebase.storage {
       allow write: if false;
     }
 
-    match /households/{hid}/{path=**} {
+    // Pantry images are read by household members, while new uploads are
+    // limited to the same full-pantry roles as Firestore. Emulator fixtures
+    // are seeded through trusted tooling, never relaxed client rules.
+    match /households/{hid}/pantry/{itemId}/{imageId} {
       allow read: if isHouseholdMember(hid);
-      allow write: if isHouseholdMember(hid)
-        && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+      allow create: if resource == null
+        && hasFullPantryAccess(hid)
+        && isValidPantryImage();
+      allow update, delete: if false;
     }
   }
 }

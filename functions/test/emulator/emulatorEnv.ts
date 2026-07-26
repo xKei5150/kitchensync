@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto"
+import { type Auth, createUserWithEmailAndPassword, type User } from "firebase/auth"
+
 export type EmulatorEndpoint = {
   readonly host: string
   readonly port: number
@@ -16,6 +19,17 @@ export function functionsEmulatorEndpoint(): EmulatorEndpoint {
     ["FUNCTIONS_EMULATOR_HOST", "FIREBASE_FUNCTIONS_EMULATOR_HOST"],
     "127.0.0.1:5001",
   )
+}
+
+/** Returns a new non-anonymous Firebase Auth Emulator user for callable tests. */
+export async function signInWithEmulatorEmailIdentity(auth: Auth): Promise<User> {
+  const suffix = `${Date.now()}-${randomUUID()}`
+  const credential = await createUserWithEmailAndPassword(
+    auth,
+    `functions-${suffix}@example.test`,
+    `KitchenSync-${suffix}-Aa1!`,
+  )
+  return credential.user
 }
 
 function emulatorEndpoint(envKeys: readonly string[], fallback: string): EmulatorEndpoint {

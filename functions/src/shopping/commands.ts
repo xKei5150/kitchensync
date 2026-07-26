@@ -12,6 +12,7 @@ import { deleteShoppingListTransaction } from "./deleteCommand.js"
 import { mapFirestoreErrors, requireAuthUid } from "./errors.js"
 import { mutateShoppingListItemTransaction } from "./itemMutationCommand.js"
 import type { ShoppingWriteResponse } from "./shoppingWriteModels.js"
+import { runRetryableTransaction } from "./transactionRetry.js"
 import { upsertShoppingListTransaction } from "./upsertCommand.js"
 import {
   parseMutateShoppingListItemRequest,
@@ -61,7 +62,7 @@ export async function upsertShoppingListHandler(
   const authUid = requireAuthUid(request.authUid)
   const command = parseUpsertShoppingListRequest(request.data)
   return mapFirestoreErrors(() =>
-    db.runTransaction((transaction) =>
+    runRetryableTransaction(db, (transaction) =>
       upsertShoppingListTransaction({ transaction, db, authUid, command }),
     ),
   )
@@ -74,7 +75,7 @@ export async function mutateShoppingListItemHandler(
   const authUid = requireAuthUid(request.authUid)
   const command = parseMutateShoppingListItemRequest(request.data)
   return mapFirestoreErrors(() =>
-    db.runTransaction((transaction) =>
+    runRetryableTransaction(db, (transaction) =>
       mutateShoppingListItemTransaction({ transaction, db, authUid, command }),
     ),
   )
@@ -88,6 +89,6 @@ async function runShoppingCommand(
   const authUid = requireAuthUid(request.authUid)
   const command = parseShoppingCommandRequest(request.data)
   return mapFirestoreErrors(() =>
-    db.runTransaction((transaction) => execute({ transaction, db, authUid, command })),
+    runRetryableTransaction(db, (transaction) => execute({ transaction, db, authUid, command })),
   )
 }

@@ -119,6 +119,7 @@ check("required Functions use Node 22 and us-central1", () => {
   const packageFile = json("functions/package.json")
   assert(packageFile.engines?.node === "22", "functions/package.json engines.node must be 22")
   const functionsSource = source("functions/src/index.ts")
+  const callableSecuritySource = source("functions/src/callableSecurity.ts")
   const required = [
     "shoppingSmoke",
     "startPremiumTrial",
@@ -132,19 +133,22 @@ check("required Functions use Node 22 and us-central1", () => {
   ]
   const exports = [
     ...functionsSource.matchAll(
-      /export\s+const\s+(\w+)\s*=\s*onCall\s*\(\s*\{\s*region:\s*["']([^"']+)["']/g,
+      /export\s+const\s+(\w+)\s*=\s*onCall\s*\(\s*callableSecurity\s*,/g,
     ),
-  ].map((match) => ({ name: match[1], region: match[2] }))
+  ].map((match) => match[1])
   assert(exports.length === required.length, "Functions callable exports must match the required set")
-  assert(
-    new Set(exports.map((entry) => entry.name)).size === exports.length,
-    "Functions callable exports must not contain duplicate names",
-  )
+  assert(new Set(exports).size === exports.length, "Functions callable exports must not contain duplicate names")
   for (const name of required) {
-    const callable = exports.find((entry) => entry.name === name)
-    assert(callable !== undefined, `missing callable export ${name}`)
-    assert(callable.region === "us-central1", `${name} must use us-central1`)
+    assert(exports.includes(name), `missing callable export ${name}`)
   }
+  assert(
+    callableSecuritySource.includes('region: "us-central1"'),
+    "callable security options must pin us-central1",
+  )
+  assert(
+    callableSecuritySource.includes('enforceAppCheck: environment["FUNCTIONS_EMULATOR"] !== "true"'),
+    "deployed callable functions must enforce App Check",
+  )
 })
 
 check("CI uses Node 22 and Functions gates", () => {

@@ -8,12 +8,11 @@ import 'package:kitchensync/app/theme_mode_controller.dart';
 import 'package:kitchensync/core/locale/app_currency.dart';
 import 'package:kitchensync/core/locale/locale_preferences_controller.dart';
 import 'package:kitchensync/core/locale/unit_system.dart';
-import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
+import 'package:kitchensync/features/onboarding/presentation/controllers/authentication_controller.dart';
 import 'package:rxdart/rxdart.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 part 'settings_profile.dart';
 
@@ -26,6 +25,7 @@ class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    ref.read(authenticationOperationInProgressProvider.notifier).state = true;
     try {
       await ref.read(settingsSignOutControllerProvider).signOut();
     } catch (error) {
@@ -34,8 +34,17 @@ class SettingsScreen extends ConsumerWidget {
         context,
       ).showSnackBar(SnackBar(content: Text('Could not sign out: $error')));
       return;
+    } finally {
+      ref.read(authenticationOperationInProgressProvider.notifier).state =
+          false;
     }
-    ref.invalidate(activeHouseholdContextProvider);
+    // Tear down both identity and household streams before navigation. The
+    // auth-first router then prevents the previous user's context from being
+    // rendered while Firebase emits its signed-out event.
+    ref
+      ..invalidate(activeFirebaseUserProvider)
+      ..invalidate(activeHouseholdContextStreamProvider)
+      ..invalidate(activeHouseholdContextProvider);
     if (context.mounted) context.go('/onboarding');
   }
 
@@ -110,7 +119,7 @@ class SettingsScreen extends ConsumerWidget {
                 _SettingsRow(
                   icon: Icons.swap_horiz_rounded,
                   label: 'Switch kitchen',
-                  onTap: () => context.push('/onboarding/household'),
+                  onTap: () => context.push('/onboarding?switch=household'),
                 ),
                 _SettingsRow(
                   icon: Icons.notifications_none_rounded,
@@ -155,24 +164,16 @@ final settingsSignOutControllerProvider = Provider<SettingsSignOutController>((
   ref,
 ) {
   return SettingsSignOutController(
-    auth: ref.watch(firebaseAuthProvider),
-    preferences: ref.watch(sharedPreferencesProvider),
+    authentication: ref.watch(authenticationControllerProvider),
   );
 });
 
 class SettingsSignOutController {
-  const SettingsSignOutController({
-    required this.auth,
-    required this.preferences,
-  });
+  const SettingsSignOutController({required this.authentication});
 
-  final FirebaseAuth? auth;
-  final SharedPreferences preferences;
+  final AuthenticationController authentication;
 
-  Future<void> signOut() async {
-    await preferences.remove(skipHouseholdSetupPrefKey);
-    await auth?.signOut();
-  }
+  Future<void> signOut() => authentication.signOut();
 }
 
 /// The warm "Try Premium" invitation — a wheat-and-amber gradient card that

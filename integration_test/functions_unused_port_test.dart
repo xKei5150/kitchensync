@@ -4,7 +4,11 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:kitchensync/core/errors/exception_mapper.dart';
+import 'package:kitchensync/core/errors/failure.dart';
+import 'package:kitchensync/core/errors/firebase_reachability.dart';
 import 'package:kitchensync/core/firebase/firebase_initializer.dart';
+import 'package:kitchensync/features/shopping/domain/entities/shopping_command.dart';
 
 const _unusedFunctionsPort = int.fromEnvironment(
   'UNUSED_FUNCTIONS_PORT',
@@ -15,7 +19,20 @@ const _functionsHost = String.fromEnvironment(
   defaultValue: '127.0.0.1',
 );
 
-Future<void> _expectBoundedFunctionsException({
+/// Drives a callable against a port with no listener and asserts how the
+/// **app** classifies the result.
+///
+/// This deliberately does not assert the raw SDK code. On iOS an unreachable
+/// backend is reported as `code == 'unknown'` with message
+/// "Could not connect to the server." — not `'unavailable'`. That is a platform
+/// fact this repository cannot change, and an earlier revision of this test
+/// asserted `'unavailable'` and therefore failed against correct SDK behaviour.
+///
+/// What actually matters is that the app routes an unreachable backend to its
+/// offline/network path on every platform, so that is what is asserted here.
+/// The raw code is still printed to `QA_RESULT` so the platform fact stays
+/// visible in the run log.
+Future<void> _expectBoundedUnreachableClassification({
   required String scenario,
   required Map<String, Object?> payload,
 }) async {
@@ -31,11 +48,31 @@ Future<void> _expectBoundedFunctionsException({
     debugPrint(
       'QA_RESULT scenario=$scenario '
       'exceptionType=${e.runtimeType} code=${e.code} '
-      'message="${e.message}" elapsedMs=${stopwatch.elapsedMilliseconds} '
+      'message="${e.message}" details=${e.details} '
+      'elapsedMs=${stopwatch.elapsedMilliseconds} '
       'host=$_functionsHost port=$_unusedFunctionsPort',
     );
-    expect(e.code, 'unavailable');
+
+    // The SDK must fail fast rather than hang or reach production.
     expect(stopwatch.elapsed, lessThan(const Duration(seconds: 6)));
+
+    // The app must recognise this as an unreachable backend...
+    expect(
+      isFirebaseBackendUnreachable(code: e.code, message: e.message),
+      isTrue,
+      reason:
+          'Unreachable backend was not classified as such. '
+          'code=${e.code} message="${e.message}"',
+    );
+
+    // ...and both classifiers that act on it must agree it is a network
+    // failure, not a generic unknown one.
+    expect(ExceptionMapper.toFailure(e), isA<NetworkFailure>());
+    expect(
+      _shoppingCommandKindFor(e),
+      ShoppingCommandFailureKind.unavailable,
+      reason: 'Shopping commands must take the retryable offline path.',
+    );
   } on TimeoutException catch (e) {
     stopwatch.stop();
     fail(
@@ -45,11 +82,19 @@ Future<void> _expectBoundedFunctionsException({
   }
 }
 
+/// Mirrors `ShoppingCommandRepositoryImpl._run`'s classification for a real
+/// on-device exception, without needing a live command data source.
+ShoppingCommandFailureKind _shoppingCommandKindFor(
+  FirebaseFunctionsException error,
+) => isFirebaseBackendUnreachable(code: error.code, message: error.message)
+    ? ShoppingCommandFailureKind.unavailable
+    : ShoppingCommandFailureKind.unknown;
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('cloud_functions raises bounded FirebaseFunctionsException '
-      'on unused emulator port', (_) async {
+  testWidgets('an unreachable Functions backend is classified as a network '
+      'failure, not an unknown one', (_) async {
     // Given: the app initializer has wired Firebase plugins to emulators, with
     // Functions deliberately pointed at an unused port.
     await const FirebaseInitializer().initialize(AppEnv.dev);
@@ -59,13 +104,13 @@ void main() {
     );
 
     // When: the app calls the real plugin API with a bounded wait.
-    // Then: the SDK surfaces bounded Functions exceptions instead of hanging
-    // or contacting production.
-    await _expectBoundedFunctionsException(
+    // Then: the SDK surfaces a bounded exception and the app treats it as an
+    // offline condition instead of an opaque failure.
+    await _expectBoundedUnreachableClassification(
       scenario: 'emptyPayload',
       payload: <String, Object?>{},
     );
-    await _expectBoundedFunctionsException(
+    await _expectBoundedUnreachableClassification(
       scenario: 'malformedPayload',
       payload: <String, Object?>{'unexpected': 'malformed'},
     );

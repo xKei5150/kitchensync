@@ -25,7 +25,9 @@ class _RecipeScheduleFlow {
       initialDate.month,
       initialDate.day,
     );
-    var selectedMealLabel = _normalizedMealLabel(_mealLabel);
+    // `_mealLabel` already returns a canonical spec-2.3 tag (defaulting to
+    // Dinner when the recipe carries none).
+    var selectedMealLabel = _mealLabel;
     var servingSize =
         _scheduleServingSizeForDate(selectedDate, settings) ?? baseServings;
     await showModalBottomSheet<void>(
@@ -103,21 +105,24 @@ class _RecipeScheduleFlow {
                       ],
                     ),
                     const SizedBox(height: KsTokens.space12),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(
-                          value: 'Breakfast',
-                          label: Text('Breakfast'),
-                        ),
-                        ButtonSegment(value: 'Lunch', label: Text('Lunch')),
-                        ButtonSegment(value: 'Dinner', label: Text('Dinner')),
-                      ],
-                      selected: {selectedMealLabel},
-                      onSelectionChanged: (selection) {
-                        setSheetState(() {
-                          selectedMealLabel = selection.single;
-                        });
-                      },
+                    // Five tags do not fit a phone width as one segmented row,
+                    // so the group scrolls horizontally rather than clipping
+                    // Snack off the edge.
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SegmentedButton<String>(
+                        segments: [
+                          for (final tag in _mealTimeTags)
+                            ButtonSegment(value: tag, label: Text(tag)),
+                        ],
+                        selected: {selectedMealLabel},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (selection) {
+                          setSheetState(() {
+                            selectedMealLabel = selection.single;
+                          });
+                        },
+                      ),
                     ),
                     const SizedBox(height: KsTokens.space12),
                     Row(
@@ -219,20 +224,31 @@ class _RecipeScheduleFlow {
     return DateTime(today.year, today.month, today.day + 1);
   }
 
+  /// Spec 2.3 time tags, in the order they occur through a day.
+  static const _mealTimeTags = <String>[
+    'Breakfast',
+    'Brunch',
+    'Lunch',
+    'Snack',
+    'Dinner',
+  ];
+
   String get _mealLabel {
     for (final tag in tags) {
-      final lower = tag.toLowerCase();
-      if (lower == 'breakfast' || lower == 'lunch' || lower == 'dinner') {
-        return tag;
-      }
+      final normalized = _normalizedMealLabel(tag);
+      if (normalized != null) return normalized;
     }
     return 'Dinner';
   }
 
-  String _normalizedMealLabel(String label) {
-    final lower = label.toLowerCase();
-    if (lower == 'breakfast') return 'Breakfast';
-    if (lower == 'lunch') return 'Lunch';
-    return 'Dinner';
+  /// Returns the canonical spec-2.3 tag, or null when [label] is not one of
+  /// them. Previously anything other than Breakfast/Lunch silently became
+  /// Dinner, which quietly relabelled Brunch and Snack recipes.
+  String? _normalizedMealLabel(String label) {
+    final lower = label.trim().toLowerCase();
+    for (final tag in _mealTimeTags) {
+      if (tag.toLowerCase() == lower) return tag;
+    }
+    return null;
   }
 }

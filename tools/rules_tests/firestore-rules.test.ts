@@ -9,10 +9,12 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  collection,
   deleteDoc,
   setDoc,
   doc,
   getDoc,
+  getDocs,
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
@@ -338,13 +340,44 @@ describe("/households and memberships", () => {
     await assertFails(getDoc(doc(outsiderDb, "households/solo-household")));
   });
 
-  test("signed-in users can create their own household and first admin member", async () => {
+  test("household creation requires an atomic, reserved solo or joint onboarding write", async () => {
     const db = env.authenticatedContext("new-user").firestore();
     const outsiderDb = env.authenticatedContext("outsider").firestore();
+    const soloHouseholdId = "solo-new-user";
+    const now = new Date();
 
+    // A free solo kitchen is tied to the deterministic UID-derived id and a
+    // user reservation, active context, and first Admin membership in the
+    // same commit. It cannot be assembled with separate client writes.
+    const soloOnboarding = writeBatch(db);
+    soloOnboarding.set(doc(db, "users/new-user"), {
+      activeHouseholdId: soloHouseholdId,
+      householdIds: [soloHouseholdId],
+      isPremium: false,
+      createdSoloHouseholdId: soloHouseholdId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    soloOnboarding.set(doc(db, `households/${soloHouseholdId}`), {
+      name: "New kitchen",
+      creatorUserId: "new-user",
+      isJoint: false,
+      hasPremium: false,
+      maxMembers: 1,
+      memberCount: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    soloOnboarding.set(
+      doc(db, `households/${soloHouseholdId}/members/new-user`),
+      { role: "admin", joinedAt: now, updatedAt: now },
+    );
     await assertSucceeds(
-      setDoc(doc(db, "households/new-household"), {
-        name: "New kitchen",
+      soloOnboarding.commit(),
+    );
+    await assertFails(
+      setDoc(doc(db, "households/arbitrary-free-household"), {
+        name: "A second free kitchen",
         creatorUserId: "new-user",
         isJoint: false,
         hasPremium: false,
@@ -352,16 +385,53 @@ describe("/households and memberships", () => {
         memberCount: 1,
       }),
     );
-    await assertSucceeds(
-      setDoc(doc(db, "households/new-household/members/new-user"), {
-        role: "admin",
-      }),
-    );
     await assertFails(
-      setDoc(doc(outsiderDb, "households/new-household/members/outsider"), {
+      setDoc(doc(outsiderDb, `households/${soloHouseholdId}/members/outsider`), {
         role: "member",
       }),
     );
+    await assertFails(
+      updateDoc(doc(db, "users/new-user"), {
+        createdSoloHouseholdId: "solo-someone-else",
+      }),
+    );
+    const secondSoloHouseholdId = "solo-new-user-second";
+    const secondSoloAttempt = writeBatch(db);
+    secondSoloAttempt.set(
+      doc(db, "users/new-user"),
+      {
+        activeHouseholdId: secondSoloHouseholdId,
+        householdIds: [soloHouseholdId, secondSoloHouseholdId],
+        createdSoloHouseholdId: secondSoloHouseholdId,
+      },
+      { merge: true },
+    );
+    secondSoloAttempt.set(doc(db, `households/${secondSoloHouseholdId}`), {
+      name: "A second free kitchen",
+      creatorUserId: "new-user",
+      isJoint: false,
+      hasPremium: false,
+      maxMembers: 1,
+      memberCount: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    secondSoloAttempt.set(
+      doc(db, `households/${secondSoloHouseholdId}/members/new-user`),
+      { role: "admin", joinedAt: now, updatedAt: now },
+    );
+    await assertFails(secondSoloAttempt.commit());
+    await assertFails(
+      setDoc(doc(env.authenticatedContext("reservation-attacker").firestore(), "users/reservation-attacker"), {
+        activeHouseholdId: "solo-reservation-attacker",
+        householdIds: ["solo-reservation-attacker"],
+        isPremium: false,
+        createdSoloHouseholdId: "solo-reservation-attacker",
+      }),
+    );
+
+    // A Premium identity gets one similarly reserved joint household. A
+    // shaped premium household without the reservation remains denied.
     await assertFails(
       setDoc(doc(db, "households/forged-premium-household"), {
         name: "Forged Premium kitchen",
@@ -373,58 +443,303 @@ describe("/households and memberships", () => {
       }),
     );
     const premiumDb = env.authenticatedContext("premium-creator").firestore();
+    const jointHouseholdId = "premium-household";
+    const jointOnboarding = writeBatch(premiumDb);
+    jointOnboarding.set(
+      doc(premiumDb, "users/premium-creator"),
+      {
+        activeHouseholdId: jointHouseholdId,
+        householdIds: [jointHouseholdId],
+        createdJointHouseholdId: jointHouseholdId,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+    jointOnboarding.set(doc(premiumDb, `households/${jointHouseholdId}`), {
+      name: "Premium kitchen",
+      creatorUserId: "premium-creator",
+      isJoint: true,
+      hasPremium: true,
+      maxMembers: 6,
+      memberCount: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    jointOnboarding.set(
+      doc(
+        premiumDb,
+        `households/${jointHouseholdId}/members/premium-creator`,
+      ),
+      { role: "admin", joinedAt: now, updatedAt: now },
+    );
     await assertSucceeds(
-      setDoc(doc(premiumDb, "households/premium-household"), {
-        name: "Premium kitchen",
-        creatorUserId: "premium-creator",
-        isJoint: true,
-        hasPremium: true,
-        maxMembers: 6,
-        memberCount: 1,
+      jointOnboarding.commit(),
+    );
+    await assertFails(
+      updateDoc(doc(premiumDb, "users/premium-creator"), {
+        createdJointHouseholdId: "second-premium-household",
       }),
     );
+    const secondJointHouseholdId = "second-premium-household";
+    const secondJointAttempt = writeBatch(premiumDb);
+    secondJointAttempt.set(
+      doc(premiumDb, "users/premium-creator"),
+      {
+        activeHouseholdId: secondJointHouseholdId,
+        householdIds: [jointHouseholdId, secondJointHouseholdId],
+        createdJointHouseholdId: secondJointHouseholdId,
+      },
+      { merge: true },
+    );
+    secondJointAttempt.set(doc(premiumDb, `households/${secondJointHouseholdId}`), {
+      name: "A second Premium kitchen",
+      creatorUserId: "premium-creator",
+      isJoint: true,
+      hasPremium: true,
+      maxMembers: 6,
+      memberCount: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    secondJointAttempt.set(
+      doc(
+        premiumDb,
+        `households/${secondJointHouseholdId}/members/premium-creator`,
+      ),
+      { role: "admin", joinedAt: now, updatedAt: now },
+    );
+    await assertFails(secondJointAttempt.commit());
   });
 
   test("onboarding batch can create a solo household and active context", async () => {
     const db = env.authenticatedContext("fresh-user").firestore();
+    const householdId = "solo-fresh-user";
+    const now = new Date();
+    const onboarding = writeBatch(db);
+
+    onboarding.set(doc(db, "users/fresh-user"), {
+      activeHouseholdId: householdId,
+      householdIds: [householdId],
+      isPremium: false,
+      createdSoloHouseholdId: householdId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    onboarding.set(doc(db, `households/${householdId}`), {
+      name: "My kitchen",
+      creatorUserId: "fresh-user",
+      isJoint: false,
+      hasPremium: false,
+      maxMembers: 1,
+      memberCount: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    onboarding.set(
+      doc(db, `households/${householdId}/members/fresh-user`),
+      { role: "admin", joinedAt: now, updatedAt: now },
+    );
+    await assertSucceeds(
+      onboarding.commit(),
+    );
+  });
+
+  test("joint onboarding can atomically create its first invite", async () => {
+    const userId = "joint-invite-creator";
+    const householdId = "joint-invite-bootstrap";
+    const inviteCode = "KS-JOINT-BOOTSTRAP";
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/${userId}`), {
+        isPremium: true,
+        householdIds: [],
+        joinedPremiumHouseholdIds: [],
+      });
+    });
+
+    const db = env.authenticatedContext(userId).firestore();
+    const now = new Date();
+    const onboarding = writeBatch(db);
+    onboarding.set(
+      doc(db, `users/${userId}`),
+      {
+        activeHouseholdId: householdId,
+        householdIds: [householdId],
+        createdJointHouseholdId: householdId,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+    onboarding.set(doc(db, `households/${householdId}`), {
+      name: "Shared kitchen",
+      creatorUserId: userId,
+      isJoint: true,
+      hasPremium: true,
+      maxMembers: 6,
+      memberCount: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    onboarding.set(doc(db, `households/${householdId}/members/${userId}`), {
+      role: "admin",
+      joinedAt: now,
+      updatedAt: now,
+    });
+    onboarding.set(doc(db, `householdInvites/${inviteCode}`), {
+      householdId,
+      createdBy: userId,
+      role: "member",
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await assertSucceeds(onboarding.commit());
+  });
+
+  test("removed creators cannot mint or reactivate household invites", async () => {
+    const householdId = "removed-creator-household";
+    const formerCreatorId = "former-creator";
+    const currentAdminId = "current-invite-admin";
+    const inactiveInviteCode = "KS-FORMER-CREATOR-INACTIVE";
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await Promise.all([
+        setDoc(doc(db, `households/${householdId}`), {
+          name: "Managed kitchen",
+          creatorUserId: formerCreatorId,
+          isJoint: true,
+          hasPremium: true,
+          maxMembers: 6,
+          memberCount: 1,
+        }),
+        setDoc(doc(db, `households/${householdId}/members/${currentAdminId}`), {
+          role: "admin",
+        }),
+        setDoc(doc(db, `householdInvites/${inactiveInviteCode}`), {
+          householdId,
+          createdBy: formerCreatorId,
+          role: "member",
+          active: false,
+        }),
+      ]);
+    });
+
+    const formerCreatorDb = env.authenticatedContext(formerCreatorId).firestore();
+    const currentAdminDb = env.authenticatedContext(currentAdminId).firestore();
+    const now = new Date();
+    await assertFails(
+      setDoc(doc(formerCreatorDb, "householdInvites/KS-FORMER-CREATOR-NEW"), {
+        householdId,
+        createdBy: formerCreatorId,
+        role: "member",
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(formerCreatorDb, `householdInvites/${inactiveInviteCode}`), {
+        active: true,
+        updatedAt: now,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(currentAdminDb, "householdInvites/KS-CURRENT-ADMIN-NEW"), {
+        householdId,
+        createdBy: currentAdminId,
+        role: "shopper",
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+  });
+
+  test("invite updates remain bound to their existing household", async () => {
+    const sourceHouseholdId = "source-invite-household";
+    const sourceAdminId = "source-invite-admin";
+    const foreignHouseholdId = "foreign-invite-household";
+    const foreignAdminId = "foreign-invite-admin";
+    const inviteCode = "KS-BOUND-INVITE";
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await Promise.all([
+        setDoc(doc(db, `households/${sourceHouseholdId}`), {
+          name: "Source kitchen",
+          creatorUserId: sourceAdminId,
+          isJoint: true,
+          hasPremium: true,
+          maxMembers: 6,
+          memberCount: 1,
+        }),
+        setDoc(
+          doc(db, `households/${sourceHouseholdId}/members/${sourceAdminId}`),
+          { role: "admin" },
+        ),
+        setDoc(doc(db, `households/${foreignHouseholdId}`), {
+          name: "Foreign kitchen",
+          creatorUserId: foreignAdminId,
+          isJoint: true,
+          hasPremium: true,
+          maxMembers: 6,
+          memberCount: 1,
+        }),
+        setDoc(
+          doc(
+            db,
+            `households/${foreignHouseholdId}/members/${foreignAdminId}`,
+          ),
+          { role: "admin" },
+        ),
+        setDoc(doc(db, `householdInvites/${inviteCode}`), {
+          householdId: sourceHouseholdId,
+          createdBy: sourceAdminId,
+          role: "member",
+          active: false,
+        }),
+      ]);
+    });
+
+    const sourceAdminDb = env.authenticatedContext(sourceAdminId).firestore();
+    const foreignAdminDb = env.authenticatedContext(foreignAdminId).firestore();
+    const now = new Date();
+    await assertSucceeds(
+      updateDoc(doc(sourceAdminDb, `householdInvites/${inviteCode}`), {
+        active: true,
+        role: "cook",
+        updatedAt: now,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(foreignAdminDb, `householdInvites/${inviteCode}`), {
+        householdId: foreignHouseholdId,
+        active: true,
+        role: "shopper",
+        updatedAt: now,
+      }),
+    );
+  });
+
+  test("Admins cannot rewrite household topology or capacity", async () => {
+    const db = env.authenticatedContext("admin").firestore();
+    const household = doc(db, "households/joinable-household");
+    const now = new Date();
 
     await assertSucceeds(
-      setDoc(doc(db, "users/fresh-user"), {
-        activeHouseholdId: "fresh-household",
-        isPremium: false,
-        createdSoloHouseholdId: "fresh-household",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+      updateDoc(household, {
+        name: "Renamed kitchen",
+        updatedAt: now,
       }),
     );
-    await assertSucceeds(
-      setDoc(doc(db, "households/fresh-household"), {
-        name: "My kitchen",
-        creatorUserId: "fresh-user",
-        isJoint: false,
-        hasPremium: false,
-        maxMembers: 1,
-        memberCount: 1,
-        inviteCode: "KS-FRESH",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+    await assertFails(
+      updateDoc(household, {
+        maxMembers: 99,
+        updatedAt: now,
       }),
     );
-    await assertSucceeds(
-      setDoc(doc(db, "households/fresh-household/members/fresh-user"), {
-        role: "admin",
-        joinedAt: new Date(),
-        updatedAt: new Date(),
-      }),
-    );
-    await assertSucceeds(
-      setDoc(doc(db, "householdInvites/KS-FRESH"), {
-        householdId: "fresh-household",
-        createdBy: "fresh-user",
-        role: "member",
-        active: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+    await assertFails(
+      updateDoc(household, {
+        memberCount: 99,
+        updatedAt: now,
       }),
     );
   });
@@ -436,6 +751,7 @@ describe("/households and memberships", () => {
     await assertSucceeds(
       getDoc(doc(inviteeDb, "householdInvites/KS-JOIN1")),
     );
+    await assertFails(getDocs(collection(inviteeDb, "householdInvites")));
     const now = new Date();
     const joinBatch = writeBatch(inviteeDb);
     joinBatch.set(
@@ -607,6 +923,87 @@ describe("/households and memberships", () => {
     });
 
     await assertFails(batch.commit());
+  });
+
+  test("free users cannot erase premium-join history before a second invite", async () => {
+    const firstHouseholdId = "history-first-household";
+    const secondHouseholdId = "history-second-household";
+    const userId = "free-history-user";
+    const inviteCode = "KS-HISTORY-SECOND";
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await Promise.all([
+        setDoc(doc(db, `households/${firstHouseholdId}`), {
+          name: "First premium kitchen",
+          creatorUserId: "history-admin",
+          isJoint: true,
+          hasPremium: true,
+          maxMembers: 6,
+          memberCount: 1,
+        }),
+        setDoc(doc(db, `households/${firstHouseholdId}/members/${userId}`), {
+          role: "member",
+        }),
+        setDoc(doc(db, `households/${secondHouseholdId}`), {
+          name: "Second premium kitchen",
+          creatorUserId: "second-history-admin",
+          isJoint: true,
+          hasPremium: true,
+          maxMembers: 6,
+          memberCount: 1,
+        }),
+        setDoc(doc(db, `householdInvites/${inviteCode}`), {
+          householdId: secondHouseholdId,
+          createdBy: "second-history-admin",
+          role: "member",
+          active: true,
+        }),
+        setDoc(doc(db, `users/${userId}`), {
+          isPremium: false,
+          activeHouseholdId: firstHouseholdId,
+          householdIds: [firstHouseholdId],
+          joinedPremiumHouseholdIds: [firstHouseholdId],
+        }),
+      ]);
+    });
+
+    const db = env.authenticatedContext(userId).firestore();
+    const now = new Date();
+    await assertFails(
+      updateDoc(doc(db, `users/${userId}`), {
+        joinedPremiumHouseholdIds: [],
+        updatedAt: now,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(db, `users/${userId}`), {
+        joinedPremiumHouseholdIds: [secondHouseholdId],
+        updatedAt: now,
+      }),
+    );
+
+    const secondJoin = writeBatch(db);
+    secondJoin.set(doc(db, `households/${secondHouseholdId}/members/${userId}`), {
+      role: "member",
+      inviteCode,
+      joinedAt: now,
+      updatedAt: now,
+    });
+    secondJoin.set(
+      doc(db, `users/${userId}`),
+      {
+        activeHouseholdId: secondHouseholdId,
+        householdIds: [firstHouseholdId, secondHouseholdId],
+        joinedPremiumHouseholdIds: [firstHouseholdId, secondHouseholdId],
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+    secondJoin.update(doc(db, `households/${secondHouseholdId}`), {
+      memberCount: 2,
+      updatedAt: now,
+    });
+    await assertFails(secondJoin.commit());
   });
 
   test("premium users can join additional premium households", async () => {
@@ -929,9 +1326,14 @@ describe("/households/{hid}/customIngredients", () => {
         name: "mangosteen",
         scope: "householdCustom",
         householdId: "solo-household",
+        displayNames: { en: "Mangosteen" },
         category: "produce",
         defaultUnit: "piece",
         allowedUnits: ["piece"],
+        localUnitDefinitions: [],
+        isBulkCandidate: false,
+        isNonFood: false,
+        schemaVersion: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
       }),

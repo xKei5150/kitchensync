@@ -8,22 +8,35 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:kitchensync/core/firebase/firebase_emulator_settings.dart';
-import 'package:kitchensync/core/session/debug_household_session.dart';
 import 'package:kitchensync/firebase_options_dev.dart' as dev;
 import 'package:kitchensync/firebase_options_prod.dart' as prod;
 
 enum AppEnv { dev, prod }
+
+class AppCheckProviderSettings {
+  const AppCheckProviderSettings({
+    required this.androidProvider,
+    required this.appleProvider,
+  });
+
+  final AndroidProvider androidProvider;
+  final AppleProvider appleProvider;
+}
 
 class FirebaseInitializer {
   const FirebaseInitializer();
 
   /// Performs only the local setup required before Flutter renders.
   ///
-  /// Firebase telemetry, authentication, and the debug Firestore seed can all
-  /// wait on remote services. They must not keep the native launch view on
-  /// screen when a Firebase project is unavailable or misconfigured.
+  /// Firebase telemetry and deferred authentication setup can wait on remote
+  /// services. They must not keep the native launch view on screen when a
+  /// Firebase project is unavailable or misconfigured.
   Future<void> bootstrap(AppEnv env) async {
-    const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+    const requestedEmulator = bool.fromEnvironment('USE_EMULATOR');
+    final useEmulator = shouldUseFirebaseEmulator(
+      requestedEmulator: requestedEmulator,
+      isDebugMode: kDebugMode,
+    );
     final options = _firebaseOptions(env: env, useEmulator: useEmulator);
 
     try {
@@ -36,7 +49,7 @@ class FirebaseInitializer {
       debugPrint(
         'Firebase.initializeApp failed (env=${env.name}, code=${e.code}). '
         'Did you run '
-        '`flutterfire configure --project=kitchensync-${env.name}`? '
+        '`flutterfire configure --project=${firebaseProjectIdFor(env)}`? '
         'See tools/README.md.',
       );
       rethrow;
@@ -69,18 +82,10 @@ class FirebaseInitializer {
 
   /// Completes network-dependent startup after the first frame is available.
   Future<void> finishInitialization(AppEnv env) async {
-    const useEmulator = bool.fromEnvironment('USE_EMULATOR');
-    // Debug builds against the dev backend (e.g. `make run-dev`) set neither
-    // USE_EMULATOR nor KS_DEV_AUTO_ANONYMOUS, so without this they never sign
-    // in and fall back to the non-member preview household — every scoped read
-    // (pantry, notifications, …) then fails with permission-denied. Treating a
-    // dev debug build as auto-anonymous seeds a real per-user debug household
-    // the anonymous user actually belongs to. Prod debug builds still opt in
-    // explicitly, and release builds can never enable it.
-    final devAutoAnonymous = shouldEnableDevAutoAnonymous(
-      useEmulator: useEmulator,
+    const requestedEmulator = bool.fromEnvironment('USE_EMULATOR');
+    final useEmulator = shouldUseFirebaseEmulator(
+      requestedEmulator: requestedEmulator,
       isDebugMode: kDebugMode,
-      explicitSetting: env == AppEnv.dev ? true : null,
     );
 
     try {
@@ -97,43 +102,22 @@ class FirebaseInitializer {
 
         await FirebaseCrashlytics.instance.setCustomKey('env', env.name);
         await FirebaseCrashlytics.instance.setCustomKey(
-          'app_check_enforced',
-          false,
+          'app_check_provider',
+          kDebugMode ? 'debug' : 'attested',
         );
 
-        // App Check — scaffolded only. Both envs use debug providers in Plan 1.
-        // TODO(plan-3): switch prod to AndroidProvider.playIntegrity and
-        // AppleProvider.deviceCheck once platform attestation is provisioned,
-        // then flip the app_check_enforced custom key to true.
+        // The debug provider is useful for local device debugging, but it is
+        // never selected by a profile or release build. Production-like builds
+        // use Firebase's platform attestation providers instead.
+        final appCheckProviders = appCheckProviderSettingsFor(
+          isDebugMode: kDebugMode,
+        );
         await FirebaseAppCheck.instance.activate(
-          androidProvider: AndroidProvider.debug,
-          appleProvider: AppleProvider.debug,
+          androidProvider: appCheckProviders.androidProvider,
+          appleProvider: appCheckProviders.appleProvider,
         );
 
         await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-      }
-
-      try {
-        await establishAuthSession(
-          devAutoAnonymous: devAutoAnonymous,
-          hasCurrentUser: FirebaseAuth.instance.currentUser != null,
-          signInAnonymously: () async {
-            await FirebaseAuth.instance.signInAnonymously();
-          },
-        );
-      } on FirebaseAuthException catch (e) {
-        // Anonymous Auth must be enabled in the Firebase Console
-        // (Authentication → Sign-in method → Anonymous). The app shell
-        // still renders without a session — downstream Firestore calls
-        // will be denied by rules until a user is signed in.
-        debugPrint(
-          'Anonymous sign-in failed (code=${e.code}). Enable Anonymous Auth '
-          'in the Firebase Console for kitchensync-${env.name}.',
-        );
-      }
-
-      if (devAutoAnonymous && env == AppEnv.dev) {
-        await _ensureDebugHousehold();
       }
     } catch (error, stackTrace) {
       // A telemetry or Firebase configuration failure is recoverable at boot.
@@ -151,24 +135,29 @@ class FirebaseInitializer {
     return raw == 'prod' ? AppEnv.prod : AppEnv.dev;
   }
 
-  static Future<void> establishAuthSession({
-    required bool devAutoAnonymous,
-    required bool hasCurrentUser,
-    required Future<void> Function() signInAnonymously,
-  }) async {
-    if (!devAutoAnonymous || hasCurrentUser) return;
-    await signInAnonymously();
-  }
+  @visibleForTesting
+  static String firebaseProjectIdFor(AppEnv env) => switch (env) {
+    AppEnv.dev => 'kitchensync-dev-da503',
+    AppEnv.prod => 'kitchensync-prod-8d6fd',
+  };
 
   @visibleForTesting
-  static bool shouldEnableDevAutoAnonymous({
-    required bool useEmulator,
+  static bool shouldUseFirebaseEmulator({
+    required bool requestedEmulator,
     required bool isDebugMode,
-    bool? explicitSetting,
-  }) {
-    const configured = bool.fromEnvironment('KS_DEV_AUTO_ANONYMOUS');
-    return isDebugMode && (useEmulator || (explicitSetting ?? configured));
-  }
+  }) => isDebugMode && requestedEmulator;
+
+  @visibleForTesting
+  static AppCheckProviderSettings appCheckProviderSettingsFor({
+    required bool isDebugMode,
+  }) => AppCheckProviderSettings(
+    androidProvider: isDebugMode
+        ? AndroidProvider.debug
+        : AndroidProvider.playIntegrity,
+    appleProvider: isDebugMode
+        ? AppleProvider.debug
+        : AppleProvider.appAttestWithDeviceCheckFallback,
+  );
 
   FirebaseOptions _firebaseOptions({
     required AppEnv env,
@@ -190,55 +179,5 @@ class FirebaseInitializer {
       storageBucket: 'kitchensync-dev-da503.appspot.com',
       iosBundleId: 'com.example.kitchensync',
     );
-  }
-
-  Future<void> _ensureDebugHousehold() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final db = FirebaseFirestore.instance;
-    final now = FieldValue.serverTimestamp();
-    final householdId = debugHouseholdIdForUser(user.uid);
-    final userDoc = db.collection('users').doc(user.uid);
-    final householdDoc = db.collection('households').doc(householdId);
-    final memberDoc = householdDoc.collection('members').doc(user.uid);
-    final userSnapshot = await userDoc.get();
-    // The debug household and its membership are seeded once, on first launch.
-    // On later launches the docs already exist, and re-writing the member doc
-    // would be denied by rules (member updates are admin-edits-another-member
-    // only), so skip — the existing seed is intact.
-    if (userSnapshot.data()?['createdSoloHouseholdId'] == householdId) return;
-    final userExists = userSnapshot.exists;
-    final householdExists =
-        userSnapshot.data()?['createdSoloHouseholdId'] == householdId;
-
-    final batch = db.batch()
-      ..set(userDoc, {
-        'activeHouseholdId': householdId,
-        if (!userExists) 'isPremium': false,
-        'createdSoloHouseholdId': householdId,
-        'updatedAt': now,
-      }, SetOptions(merge: true))
-      ..set(householdDoc, {
-        'name': debugHouseholdName,
-        'creatorUserId': user.uid,
-        'isJoint': false,
-        if (!householdExists) 'hasPremium': false,
-        'maxMembers': 1,
-        'memberCount': 1,
-        'updatedAt': now,
-      }, SetOptions(merge: true))
-      ..set(memberDoc, {
-        'role': 'admin',
-        'updatedAt': now,
-      }, SetOptions(merge: true));
-    try {
-      await batch.commit();
-    } on FirebaseException catch (e) {
-      debugPrint(
-        'Debug household seed failed (code=${e.code}). '
-        'The app will use the local debug household fallback.',
-      );
-    }
   }
 }

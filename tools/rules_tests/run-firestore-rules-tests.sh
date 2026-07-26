@@ -7,6 +7,9 @@ PROJECT_ID="${FIRESTORE_RULES_TEST_PROJECT:-kitchensync-rules-test}"
 EMULATOR_HOST="${FIRESTORE_EMULATOR_HOST:-127.0.0.1:18080}"
 EMULATOR_HOSTNAME="${EMULATOR_HOST%:*}"
 EMULATOR_PORT="${EMULATOR_HOST##*:}"
+STORAGE_EMULATOR_HOST="${FIREBASE_STORAGE_EMULATOR_HOST:-127.0.0.1:19199}"
+STORAGE_EMULATOR_HOSTNAME="${STORAGE_EMULATOR_HOST%:*}"
+STORAGE_EMULATOR_PORT="${STORAGE_EMULATOR_HOST##*:}"
 TMP_CONFIG="$(mktemp)"
 EMULATOR_PID=""
 EMULATOR_DESCENDANTS=()
@@ -15,12 +18,23 @@ if nc -z "$EMULATOR_HOSTNAME" "$EMULATOR_PORT" >/dev/null 2>&1; then
   echo "Port $EMULATOR_PORT is already in use at $EMULATOR_HOSTNAME; set FIRESTORE_EMULATOR_HOST to a free host:port." >&2
   exit 1
 fi
+if nc -z "$STORAGE_EMULATOR_HOSTNAME" "$STORAGE_EMULATOR_PORT" >/dev/null 2>&1; then
+  echo "Port $STORAGE_EMULATOR_PORT is already in use at $STORAGE_EMULATOR_HOSTNAME; set FIREBASE_STORAGE_EMULATOR_HOST to a free host:port." >&2
+  exit 1
+fi
 
 node -e "
 const fs = require('node:fs');
+const path = require('node:path');
 const config = JSON.parse(fs.readFileSync('$ROOT_DIR/firebase.json', 'utf8'));
 config.emulators = config.emulators || {};
+config.firestore = config.firestore || {};
+config.storage = config.storage || {};
+config.firestore.rules = path.resolve('$ROOT_DIR', config.firestore.rules || 'firestore.rules');
+config.firestore.indexes = path.resolve('$ROOT_DIR', config.firestore.indexes || 'firestore.indexes.json');
+config.storage.rules = path.resolve('$ROOT_DIR', config.storage.rules || 'storage.rules');
 config.emulators.firestore = { ...(config.emulators.firestore || {}), host: '$EMULATOR_HOSTNAME', port: Number('$EMULATOR_PORT') };
+config.emulators.storage = { ...(config.emulators.storage || {}), host: '$STORAGE_EMULATOR_HOSTNAME', port: Number('$STORAGE_EMULATOR_PORT') };
 config.emulators.ui = { enabled: false };
 fs.writeFileSync('$TMP_CONFIG', JSON.stringify(config));
 "
@@ -28,7 +42,8 @@ fs.writeFileSync('$TMP_CONFIG', JSON.stringify(config));
 # Give the Firebase CLI its own process group. The Firestore Java emulator
 # creates another group, so cleanup also records and terminates descendants.
 set -m
-firebase emulators:start --only firestore --project="$PROJECT_ID" \
+FIRESTORE_EMULATOR_HOST="$EMULATOR_HOST" \
+  firebase emulators:start --only firestore,storage --project="$PROJECT_ID" \
   --config "$TMP_CONFIG" \
   >/tmp/kitchensync-firestore-emulator.log 2>&1 &
 EMULATOR_PID=$!
@@ -56,6 +71,11 @@ has_live_emulator_processes() {
   return 1
 }
 
+has_bound_emulator_ports() {
+  nc -z "$EMULATOR_HOSTNAME" "$EMULATOR_PORT" >/dev/null 2>&1 ||
+    nc -z "$STORAGE_EMULATOR_HOSTNAME" "$STORAGE_EMULATOR_PORT" >/dev/null 2>&1
+}
+
 terminate_emulator_processes() {
   local signal="$1"
   local pid
@@ -80,13 +100,13 @@ cleanup() {
     terminate_emulator_processes TERM
 
     for _ in {1..20}; do
-      if ! has_live_emulator_processes && ! nc -z "$EMULATOR_HOSTNAME" "$EMULATOR_PORT" >/dev/null 2>&1; then
+      if ! has_live_emulator_processes && ! has_bound_emulator_ports; then
         break
       fi
       sleep 0.25
     done
 
-    if has_live_emulator_processes || nc -z "$EMULATOR_HOSTNAME" "$EMULATOR_PORT" >/dev/null 2>&1; then
+    if has_live_emulator_processes || has_bound_emulator_ports; then
       terminate_emulator_processes KILL
     fi
 
@@ -95,8 +115,8 @@ cleanup() {
 
   rm -f "$TMP_CONFIG"
 
-  if nc -z "$EMULATOR_HOSTNAME" "$EMULATOR_PORT" >/dev/null 2>&1; then
-    echo "Firestore emulator cleanup left $EMULATOR_HOST bound" >&2
+  if has_bound_emulator_ports; then
+    echo "Rules emulator cleanup left Firestore or Storage ports bound" >&2
     cleanup_status=1
   fi
 
@@ -117,17 +137,25 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 for _ in {1..60}; do
-  if nc -z "$EMULATOR_HOSTNAME" "$EMULATOR_PORT" >/dev/null 2>&1; then
+  if nc -z "$EMULATOR_HOSTNAME" "$EMULATOR_PORT" >/dev/null 2>&1 &&
+    nc -z "$STORAGE_EMULATOR_HOSTNAME" "$STORAGE_EMULATOR_PORT" >/dev/null 2>&1; then
     break
   fi
   sleep 0.5
 done
 
-if ! nc -z "$EMULATOR_HOSTNAME" "$EMULATOR_PORT" >/dev/null 2>&1; then
+if ! nc -z "$EMULATOR_HOSTNAME" "$EMULATOR_PORT" >/dev/null 2>&1 ||
+  ! nc -z "$STORAGE_EMULATOR_HOSTNAME" "$STORAGE_EMULATOR_PORT" >/dev/null 2>&1; then
   cat /tmp/kitchensync-firestore-emulator.log >&2
-  echo "Firestore emulator did not start on $EMULATOR_HOST" >&2
+  echo "Firestore or Storage emulator did not start on $EMULATOR_HOST / $STORAGE_EMULATOR_HOST" >&2
   exit 1
 fi
 
 cd "$TEST_DIR"
-GCLOUD_PROJECT="$PROJECT_ID" FIRESTORE_EMULATOR_HOST="$EMULATOR_HOST" node ./node_modules/vitest/vitest.mjs run "$@"
+# Firestore and Storage rule environments share a constrained emulator
+# process. Running files serially avoids false 5-second Storage timeouts
+# under parallel RPC contention while keeping the standard gate deterministic.
+GCLOUD_PROJECT="$PROJECT_ID" \
+  FIRESTORE_EMULATOR_HOST="$EMULATOR_HOST" \
+  FIREBASE_STORAGE_EMULATOR_HOST="$STORAGE_EMULATOR_HOST" \
+  node ./node_modules/vitest/vitest.mjs run --no-file-parallelism "$@"

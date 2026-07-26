@@ -8,7 +8,11 @@ import {
   httpsCallable,
 } from "firebase/functions"
 import { afterEach, describe, expect, it } from "vitest"
-import { authEmulatorUrl, functionsEmulatorEndpoint } from "./emulatorEnv.js"
+import {
+  authEmulatorUrl,
+  functionsEmulatorEndpoint,
+  signInWithEmulatorEmailIdentity,
+} from "./emulatorEnv.js"
 
 const gcloudProjectEnvKey = "GCLOUD_PROJECT"
 const projectId = process.env[gcloudProjectEnvKey] ?? "kitchensync-dev-da503"
@@ -58,7 +62,7 @@ describe("shoppingSmoke emulator smoke", () => {
     }
   })
 
-  it("returns ok for an authenticated caller and unauthenticated for an anonymous transport", async () => {
+  it("returns ok for an email caller and rejects anonymous transport", async () => {
     // Given: a real Functions emulator client and an unsigned callable request.
     const client = createClient()
     appToDelete = client.app
@@ -67,8 +71,13 @@ describe("shoppingSmoke emulator smoke", () => {
     // When/Then: the unsigned transport receives Firebase's unauthenticated code.
     await expectCallableCode(() => smoke({}), "unauthenticated")
 
-    // Given: the same client signs in through the real Auth emulator.
+    // Given: anonymous Firebase Auth is not an application identity.
     await signInAnonymously(client.auth)
+    await expectCallableCode(() => smoke({}), "unauthenticated")
+    await client.auth.signOut()
+
+    // Given: the same client signs in through the real Auth emulator.
+    await signInWithEmulatorEmailIdentity(client.auth)
 
     // When: the callable is invoked through the Functions emulator.
     const response = await smoke({})

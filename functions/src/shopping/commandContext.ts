@@ -1,5 +1,5 @@
 import type { DocumentReference, Firestore, Transaction } from "firebase-admin/firestore"
-import { FieldValue } from "firebase-admin/firestore"
+import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { HttpsError } from "firebase-functions/v2/https"
 import type { ShoppingCommandRequest, ShoppingCommandResponse } from "./contracts.js"
 import { parseHousehold, parseMember, parseReceipt, type ReceiptData } from "./firestoreModels.js"
@@ -72,6 +72,36 @@ export async function authorizeHouseholdShoppingRole(input: {
     isJointHousehold: household.isJoint,
   }
 }
+
+/**
+ * Bulk replenishment is a household Premium feature. Keep this check at the
+ * callable boundary as well as in the Flutter controller: callers can forge
+ * the stable `suggested` origin accepted by the allocation contract.
+ */
+export function requireCurrentHouseholdPremiumEntitlement(household: unknown): void {
+  if (!hasCurrentHouseholdPremiumEntitlement(household, Timestamp.now())) {
+    throw new HttpsError("permission-denied", "A current Premium household is required")
+  }
+}
+
+export function hasCurrentHouseholdPremiumEntitlement(household: unknown, now: Timestamp): boolean {
+  if (!isHouseholdEntitlement(household) || household.hasPremium !== true) return false
+  const trialEndsAt = household.premiumTrialEndsAt
+  return (
+    trialEndsAt === undefined ||
+    trialEndsAt === null ||
+    (trialEndsAt instanceof Timestamp && trialEndsAt.toMillis() > now.toMillis())
+  )
+}
+
+function isHouseholdEntitlement(value: unknown): value is HouseholdEntitlement {
+  return typeof value === "object" && value !== null
+}
+
+type HouseholdEntitlement = Readonly<{
+  readonly hasPremium?: unknown
+  readonly premiumTrialEndsAt?: unknown
+}>
 
 export function requireExactReceipt(
   data: unknown,

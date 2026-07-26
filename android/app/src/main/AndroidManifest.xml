@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Firebase Authentication and the other Firebase SDKs need network
+         access in every build variant, including release. Emulator-only
+         cleartext policy remains in src/debug/AndroidManifest.xml. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="kitchensync"
         android:name="${applicationName}"

@@ -101,28 +101,55 @@ void main() {
     final day1 = DateTime(2026, 7, 6);
     final day2 = DateTime(2026, 7, 7);
 
-    await withTimeout('seed day1 dinner', () => calendar.upsertMeal(
-      householdId: householdId,
-      entry: _meal(id: 'm1', recipeId: 'r1', date: day1, mealLabel: 'Dinner'),
-    ));
-    await withTimeout('seed day1 lunch', () => calendar.upsertMeal(
-      householdId: householdId,
-      entry: _meal(id: 'm2', recipeId: 'r2', date: day1, mealLabel: 'Lunch'),
-    ));
-    await withTimeout('seed day1 cancelled', () => calendar.upsertMeal(
-      householdId: householdId,
-      entry: _meal(
-        id: 'm3',
-        recipeId: 'r3',
-        date: day1,
-        mealLabel: 'Breakfast',
-        state: ScheduledMealState.cancelled,
-      ),
-    ));
-    await withTimeout('seed day2 dinner', () => calendar.upsertMeal(
-      householdId: householdId,
-      entry: _meal(id: 'm4', recipeId: 'r4', date: day2, mealLabel: 'Dinner'),
-    ));
+      await withTimeout(
+        'seed day1 dinner',
+        () => calendar.upsertMeal(
+          householdId: householdId,
+          entry: _meal(
+            id: 'm1',
+            recipeId: 'r1',
+            date: day1,
+            mealLabel: 'Dinner',
+          ),
+        ),
+      );
+      await withTimeout(
+        'seed day1 lunch',
+        () => calendar.upsertMeal(
+          householdId: householdId,
+          entry: _meal(
+            id: 'm2',
+            recipeId: 'r2',
+            date: day1,
+            mealLabel: 'Lunch',
+          ),
+        ),
+      );
+      await withTimeout(
+        'seed day1 cancelled',
+        () => calendar.upsertMeal(
+          householdId: householdId,
+          entry: _meal(
+            id: 'm3',
+            recipeId: 'r3',
+            date: day1,
+            mealLabel: 'Breakfast',
+            state: ScheduledMealState.cancelled,
+          ),
+        ),
+      );
+      await withTimeout(
+        'seed day2 dinner',
+        () => calendar.upsertMeal(
+          householdId: householdId,
+          entry: _meal(
+            id: 'm4',
+            recipeId: 'r4',
+            date: day2,
+            mealLabel: 'Dinner',
+          ),
+        ),
+      );
 
     final editor = _editor(
       container,
@@ -136,23 +163,24 @@ void main() {
       () => editor.createFromPastCalendar(startDate: day1, endDate: day2),
     );
 
-    final repo = container.read(menuSetRepositoryProvider);
-    final loaded = await withTimeout(
-      'reload created menu set',
-      () => repo
-          .watchById(householdId: householdId, menuSetId: created.id)
-          .firstWhere((m) => m != null),
-    );
-    expect(loaded!.lengthInDays, 2);
-    final d0 = loaded.dayAt(0)!;
-    final d1 = loaded.dayAt(1)!;
-    // Day 1 kept its two active meals; the cancelled breakfast was dropped.
-    expect(d0.entries, hasLength(2));
-    expect(d0.entries.map((e) => e.recipeId).toSet(), {'r1', 'r2'});
-    expect(d0.entries.map((e) => e.recipeId), isNot(contains('r3')));
-    expect(d1.entries, hasLength(1));
-    expect(d1.entries.single.recipeId, 'r4');
-  });
+      final repo = container.read(menuSetRepositoryProvider);
+      final loaded = await withTimeout(
+        'reload created menu set',
+        () => repo
+            .watchById(householdId: householdId, menuSetId: created.id)
+            .firstWhere((m) => m != null),
+      );
+      expect(loaded!.lengthInDays, 2);
+      final d0 = loaded.dayAt(0)!;
+      final d1 = loaded.dayAt(1)!;
+      // Day 1 kept its two active meals; the cancelled breakfast was dropped.
+      expect(d0.entries, hasLength(2));
+      expect(d0.entries.map((e) => e.recipeId).toSet(), {'r1', 'r2'});
+      expect(d0.entries.map((e) => e.recipeId), isNot(contains('r3')));
+      expect(d1.entries, hasLength(1));
+      expect(d1.entries.single.recipeId, 'r4');
+    },
+  );
 
   testWidgets('day-structure edits persist through the repository', (
     tester,
@@ -209,27 +237,27 @@ void main() {
   testWidgets(
     'duplicating persists an independent copy authored by the actor',
     (tester) async {
-    await bootEmulatedApp();
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    final householdId = debugHouseholdIdForUser(uid);
-    await withTimeout(
-      'upgrade household to premium',
-      () => _upgradeHouseholdToPremium(
-        uid: uid,
+      await bootEmulatedApp();
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final householdId = debugHouseholdIdForUser(uid);
+      await withTimeout(
+        'upgrade household to premium',
+        () => _upgradeHouseholdToPremium(
+          uid: uid,
+          householdId: householdId,
+          now: DateTime(2026, 7, 5),
+        ),
+      );
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final repo = container.read(menuSetRepositoryProvider);
+      final editor = _editor(
+        container,
         householdId: householdId,
-        now: DateTime(2026, 7, 5),
-      ),
-    );
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    final repo = container.read(menuSetRepositoryProvider);
-    final editor = _editor(
-      container,
-      householdId: householdId,
-      userId: uid,
-      ids: ['dup-source', ...List.generate(20, (i) => 'dup-$i')],
-      clockNow: DateTime(2026, 7, 10, 9),
-    );
+        userId: uid,
+        ids: ['dup-source', ...List.generate(20, (i) => 'dup-$i')],
+        clockNow: DateTime(2026, 7, 10, 9),
+      );
 
     // Persist a source set, then add a recipe so it has nested content.
     var source = await withTimeout(
@@ -265,20 +293,22 @@ void main() {
     expect(loadedCopy.createdByUserId, uid);
     expect(loadedCopy.dayAt(0)!.entries.single.recipeId, 'braise');
 
-    // Independence: rename the COPY's day; the SOURCE must be unaffected.
-    await withTimeout(
-      'rename copy day 0',
-      () => editor.renameDay(draft: loadedCopy, dayIndex: 0, label: 'Copy day'),
-    );
-    final sourceAfter = await withTimeout(
-      'reload source after copy edit',
-      () => repo
-          .watchById(householdId: householdId, menuSetId: source.id)
-          .firstWhere((m) => m != null),
-    );
-    expect(sourceAfter!.dayAt(0)!.label, isNot('Copy day'));
-    expect(sourceAfter.dayAt(0)!.entries.single.recipeId, 'braise');
-  });
+      // Independence: rename the COPY's day; the SOURCE must be unaffected.
+      await withTimeout(
+        'rename copy day 0',
+        () =>
+            editor.renameDay(draft: loadedCopy, dayIndex: 0, label: 'Copy day'),
+      );
+      final sourceAfter = await withTimeout(
+        'reload source after copy edit',
+        () => repo
+            .watchById(householdId: householdId, menuSetId: source.id)
+            .firstWhere((m) => m != null),
+      );
+      expect(sourceAfter!.dayAt(0)!.label, isNot('Copy day'));
+      expect(sourceAfter.dayAt(0)!.entries.single.recipeId, 'braise');
+    },
+  );
 
   testWidgets('move and clear day operations persist through the repository', (
     tester,

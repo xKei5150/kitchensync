@@ -8,6 +8,7 @@ Household kitchen-management app — Flutter + Firebase.
 2. **Install deps:** `flutter pub get`
 3. **Generate code:** `make gen`
 4. **Configure Firebase:** see [`tools/README.md`](tools/README.md) for the one-time `flutterfire configure` steps. `lib/firebase_options_{dev,prod}.dart`, `android/app/google-services.json`, and `ios/Runner/GoogleService-Info-*.plist` are gitignored — every contributor regenerates them locally against the shared Firebase projects.
+5. **Configure authentication providers:** follow [the native OAuth and emulator guide](docs/authentication-development.md) before testing Google or Apple sign-in. It covers the exact package/bundle IDs, ignored local configuration, console-side prerequisites, and installed-artifact checks.
 
 ## Run
 

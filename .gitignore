@@ -53,6 +53,9 @@ android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 ios/Runner/GoogleService-Info-dev.plist
 ios/Runner/GoogleService-Info-prod.plist
+# Local Xcode values for the native Google Sign-In URL callback. Keep the
+# committed example so contributors know which public identifiers are needed.
+ios/Flutter/Auth.xcconfig
 
 # Service account credentials (NEVER commit)
 tools/seed_uploader/service-account*.json
@@ -76,11 +79,23 @@ tools/seed_uploader/node_modules/
 .entire/
 .omo/
 .superpowers/
+.firecrawl/
 package.json
 bun.lock
+
+# Per-environment public OAuth client IDs supplied to Flutter through
+# --dart-define-from-file. The example contains only placeholders.
+tool/auth/auth.*.json
+!tool/auth/auth.*.example.json
 
 # Nested Flutter build output (service package)
 services/shopping_allocation_planner/build/
 
 # Local visual-verification screenshots (flutter drive gallery)
 screenshots/
+
+# Per-target logs written by scripts/run-integration.sh
+.integration-logs/
+
+# Firebase CLI debug output
+firepit-log.txt

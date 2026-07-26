@@ -33,8 +33,17 @@ void main() {
 
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1;
+      // Pin the keyboard inset. Focusing a field makes the iOS Simulator raise
+      // its software keyboard, which reports a viewInsets bottom of 837-1000pt
+      // against an 852pt viewport; any sheet that pads by
+      // MediaQuery.viewInsets.bottom then collapses and its fields leave the
+      // widget tree entirely (observed: textFields=0). That depends on whether
+      // a hardware keyboard happens to be connected to the simulator, which is
+      // ambient machine state, not behaviour under test.
+      tester.view.viewInsets = FakeViewPadding.zero;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
 
       final suffix = DateTime.now().microsecondsSinceEpoch;
       const password = 'KitchenSync-123!';

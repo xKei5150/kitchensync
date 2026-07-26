@@ -21,12 +21,20 @@ import 'package:kitchensync/features/recipes/presentation/providers/recipe_repos
 import 'package:kitchensync/features/recipes/presentation/screens/recipes_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const _defaultHousehold = ActiveHouseholdContext(
+  id: 'solo-household',
+  name: 'Debug kitchen',
+  role: HouseholdRole.admin,
+  isJoint: false,
+  hasPremium: true,
+);
+
 Future<Widget> _wrap(
   Widget home, {
   ThemeData? theme,
   IngredientRepository? ingredientRepository,
   RecipeRepository? recipeRepository,
-  ActiveHouseholdContext? household,
+  ActiveHouseholdContext household = _defaultHousehold,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
@@ -36,8 +44,9 @@ Future<Widget> _wrap(
       ingredientRepositoryProvider.overrideWithValue(ingredientRepository),
     if (recipeRepository != null)
       recipeRepositoryProvider.overrideWithValue(recipeRepository),
-    if (household != null)
-      activeHouseholdContextProvider.overrideWithValue(household),
+    // Each presentation test uses an explicit household fixture. Production
+    // routing still receives a context only from Firebase membership.
+    activeHouseholdContextProvider.overrideWithValue(household),
   ];
   return ProviderScope(
     overrides: overrides,
@@ -1100,10 +1109,10 @@ void main() {
 
     expect(imported, hasLength(2));
     expect(imported.map((r) => r.name), ['Parsed One', 'Parsed Two']);
-    expect(
-      repo.recipes.map((r) => r.name).toSet(),
-      {'Parsed One', 'Parsed Two'},
-    );
+    expect(repo.recipes.map((r) => r.name).toSet(), {
+      'Parsed One',
+      'Parsed Two',
+    });
   });
 
   test('RecipeLibraryController rejects member recipe edits', () async {

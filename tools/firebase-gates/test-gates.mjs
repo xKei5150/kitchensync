@@ -190,11 +190,25 @@ function testWrongAliasBlocksDeployment() {
   }
 }
 
-function testSemanticSmokeRegistersCleanup() {
+function testSemanticSmokeRequiresRealAttestation() {
   const smoke = readFileSync(resolve(repoRoot, "tools/firebase-gates/smoke-dev.mjs"), "utf8")
-  assert(smoke.includes("function cleanupFixture"), "semantic smoke is missing fixture cleanup")
-  assert(smoke.includes("shoppingCommandReceipts"), "semantic smoke does not clean command receipts")
-  assert(smoke.includes("cleanupFixture(householdId"), "semantic smoke does not run cleanup on failure")
+  assert(
+    smoke.includes("FIREBASE_SEMANTIC_SMOKE_ID_TOKEN"),
+    "semantic smoke does not require a real Firebase identity token",
+  )
+  assert(
+    smoke.includes("FIREBASE_SEMANTIC_SMOKE_APP_CHECK_TOKEN"),
+    "semantic smoke does not require an App Check token",
+  )
+  assert(smoke.includes("x-firebase-appcheck"), "semantic smoke omits the App Check header")
+  assert(smoke.includes("assertNonAnonymousIdentity"), "semantic smoke permits anonymous identities")
+  assert(smoke.includes("shoppingSmoke"), "semantic smoke does not verify the deployed callable")
+  assert(smoke.includes("direct purchase write was not denied"), "semantic smoke does not verify rules")
+  assert(
+    !smoke.includes("signUp?key="),
+    "semantic smoke still creates an anonymous Firebase identity",
+  )
+  assert(!smoke.includes("upsertShoppingList"), "semantic smoke calls retired shopping write APIs")
 }
 
 function testAndroidCallableGateIsDevicePinned() {
@@ -205,6 +219,10 @@ function testAndroidCallableGateIsDevicePinned() {
   assert(gate.includes("pass an explicit Android device ID"), "Android gate does not fail closed without a device")
   assert(gate.includes("flutter drive --device-id=$DEVICE_ID"), "Android gate does not pin flutter drive")
   assert(gate.includes("FIREBASE_EMULATOR_HOST=10.0.2.2"), "Android gate does not use the host bridge")
+  assert(
+    !gate.includes("KS_ENABLE_TEST_ANONYMOUS_BOOTSTRAP"),
+    "Android gate must not depend on an anonymous test identity",
+  )
   assert(!gate.includes("flutter test integration_test"), "Android gate can silently select another platform")
 }
 
@@ -230,7 +248,7 @@ const tests = [
   ["readiness rejects incomplete deployment", testReadinessRejectsIncompleteDeployment],
   ["smoke failure blocks rules", testSmokeFailureBlocksRules],
   ["wrong alias blocks deployment", testWrongAliasBlocksDeployment],
-  ["semantic smoke cleanup", testSemanticSmokeRegistersCleanup],
+  ["semantic smoke requires real attestation", testSemanticSmokeRequiresRealAttestation],
   ["device-pinned Android callable gate", testAndroidCallableGateIsDevicePinned],
   ["debug build disables production telemetry", testDebugBuildDisablesProductionTelemetry],
 ]

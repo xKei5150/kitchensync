@@ -7,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/router.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/clock.dart';
 import 'package:kitchensync/features/calendar/domain/entities/meal_schedule.dart';
 import 'package:kitchensync/features/calendar/domain/repositories/calendar_repository.dart';
 import 'package:kitchensync/features/calendar/presentation/providers/calendar_repository_providers.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart';
@@ -123,9 +125,28 @@ class _FakeRecipeRepository implements RecipeRepository {
 Future<GoRouter> _pumpApp(WidgetTester tester) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
+  const household = ActiveHouseholdContext(
+    id: 'test-solo-household',
+    name: 'Test kitchen',
+    role: HouseholdRole.admin,
+    isJoint: false,
+    hasPremium: true,
+  );
   final container = ProviderContainer(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
+      activeHouseholdContextProvider.overrideWithValue(household),
+      // The router fixture intentionally bypasses Firebase, but Recipe Detail
+      // still needs an authenticated actor for its provider-backed controls.
+      // Keep that identity explicit in the test rather than restoring any
+      // synthetic app-wide fallback.
+      activeUserIdProvider.overrideWithValue('user-1'),
+      appSessionStateProvider.overrideWithValue(
+        const AppSessionState(
+          phase: AppSessionPhase.ready,
+          household: household,
+        ),
+      ),
       clockProvider.overrideWithValue(FakeClock(DateTime(2026, 7, 6, 9))),
       calendarRepositoryProvider.overrideWithValue(_FakeCalendarRepository()),
       recipeRepositoryProvider.overrideWithValue(_FakeRecipeRepository()),

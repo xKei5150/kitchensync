@@ -33,8 +33,8 @@ class _FakeShoppingCommandDataSource implements ShoppingCommandDataSource {
 }
 
 class _TestFunctionsException extends FirebaseFunctionsException {
-  _TestFunctionsException(String code)
-    : super(code: code, message: 'test failure');
+  _TestFunctionsException(String code, {super.message = 'test failure'})
+    : super(code: code);
 }
 
 void main() {
@@ -70,6 +70,50 @@ void main() {
       );
     });
   }
+
+  // On iOS an unreachable backend arrives as `unknown` + a transport message,
+  // never as `unavailable`, so keying on the code alone left iOS users on the
+  // generic unknown path instead of the retryable offline one.
+  test('maps the iOS connection-refused shape to unavailable', () async {
+    final repository = ShoppingCommandRepositoryImpl(
+      _FakeShoppingCommandDataSource(
+        _TestFunctionsException(
+          'unknown',
+          message: 'Could not connect to the server.',
+        ),
+      ),
+    );
+
+    await expectLater(
+      repository.completeList(request),
+      throwsA(
+        isA<ShoppingCommandFailure>().having(
+          (failure) => failure.kind,
+          'kind',
+          ShoppingCommandFailureKind.unavailable,
+        ),
+      ),
+    );
+  });
+
+  test('leaves an unknown code with an unrelated message unknown', () async {
+    final repository = ShoppingCommandRepositoryImpl(
+      _FakeShoppingCommandDataSource(
+        _TestFunctionsException('unknown', message: 'Command was rejected'),
+      ),
+    );
+
+    await expectLater(
+      repository.completeList(request),
+      throwsA(
+        isA<ShoppingCommandFailure>().having(
+          (failure) => failure.kind,
+          'kind',
+          ShoppingCommandFailureKind.unknown,
+        ),
+      ),
+    );
+  });
 
   test('maps malformed callable response to invalidResponse', () async {
     final repository = ShoppingCommandRepositoryImpl(

@@ -8,7 +8,11 @@ import {
   validatePlannedDraft,
 } from "./allocationDraftValidation.js"
 import { canonicalPayloadHash } from "./canonicalPayload.js"
-import { authorizeHouseholdShoppingRole, shoppingCommandType } from "./commandContext.js"
+import {
+  authorizeHouseholdShoppingRole,
+  requireCurrentHouseholdPremiumEntitlement,
+  shoppingCommandType,
+} from "./commandContext.js"
 import { mapFirestoreErrors, requireAuthUid } from "./errors.js"
 import { requireIngredientReference } from "./ingredientIntegrity.js"
 import {
@@ -24,6 +28,7 @@ import {
   requireExactShoppingWriteReceipt,
   shoppingWriteReceiptData,
 } from "./shoppingWriteReceipts.js"
+import { runRetryableTransaction } from "./transactionRetry.js"
 import { applyFirestoreWrites, type FirestoreWrite, maxTransactionWrites } from "./writePlan.js"
 
 export type PlanShoppingAllocationCallableRequest = Readonly<{
@@ -58,8 +63,8 @@ export async function planShoppingAllocationHandler(
 async function authorizePlanning(
   input: Omit<DraftOperationInput, "planned" | "draftId">,
 ): Promise<void> {
-  await input.db.runTransaction((transaction) =>
-    authorizeHouseholdShoppingRole({
+  await runRetryableTransaction(input.db, async (transaction) => {
+    const context = await authorizeHouseholdShoppingRole({
       transaction,
       db: input.db,
       authUid: input.authUid,
@@ -67,8 +72,12 @@ async function authorizePlanning(
       listId: input.command.commandId,
       receiptId: input.command.commandId,
       allowedJointRoles: planningRoles(input.command.intent.kind),
-    }),
-  )
+    })
+    if (isBulkSuggestion(input.command.intent)) {
+      const household = await transaction.get(context.householdRef)
+      requireCurrentHouseholdPremiumEntitlement(household.data())
+    }
+  })
 }
 
 type DraftOperationInput = Readonly<{
@@ -80,7 +89,7 @@ type DraftOperationInput = Readonly<{
 }>
 
 async function persistReadyDraft(input: DraftOperationInput): Promise<void> {
-  await input.db.runTransaction(async (transaction) => {
+  await runRetryableTransaction(input.db, async (transaction) => {
     const context = await contextFor(transaction, input)
     const receipt = await transaction.get(context.receiptRef)
     if (receipt.exists) return
@@ -94,7 +103,7 @@ async function persistReadyDraft(input: DraftOperationInput): Promise<void> {
 async function consumeReadyDraft(
   input: DraftOperationInput & Readonly<{ readonly payloadHash: string }>,
 ): Promise<ShoppingWriteResponse> {
-  return input.db.runTransaction(async (transaction) => {
+  return runRetryableTransaction(input.db, async (transaction) => {
     const context = await contextFor(transaction, input)
     const receipt = await transaction.get(context.receiptRef)
     if (receipt.exists) return replayResponse(receipt.data(), input, context.listRef)
@@ -140,7 +149,7 @@ async function consumeReadyDraft(
 }
 
 async function contextFor(transaction: Transaction, input: DraftOperationInput) {
-  return authorizeHouseholdShoppingRole({
+  const context = await authorizeHouseholdShoppingRole({
     transaction,
     db: input.db,
     authUid: input.authUid,
@@ -149,6 +158,17 @@ async function contextFor(transaction: Transaction, input: DraftOperationInput) 
     receiptId: input.command.commandId,
     allowedJointRoles: planningRoles(input.command.intent.kind),
   })
+  if (isBulkSuggestion(input.command.intent)) {
+    const household = await transaction.get(context.householdRef)
+    requireCurrentHouseholdPremiumEntitlement(household.data())
+  }
+  return context
+}
+
+function isBulkSuggestion(
+  intent: ReturnType<typeof parsePlanShoppingAllocationRequest>["intent"],
+): boolean {
+  return intent.kind === "suggested" && intent.originId === "bulk"
 }
 
 function planningRoles(intentKind: string) {

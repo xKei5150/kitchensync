@@ -3,11 +3,8 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
-import 'package:kitchensync/core/preferences/preferences_providers.dart';
-import 'package:kitchensync/core/session/debug_household_session.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -33,21 +30,60 @@ class ActiveHouseholdContext {
   bool get isSolo => !isJoint;
 }
 
-const previewHouseholdContext = ActiveHouseholdContext(
-  id: debugPreviewHouseholdId,
-  name: debugHouseholdName,
-  role: HouseholdRole.admin,
-  isJoint: false,
-  hasPremium: true,
-);
+/// The finite session states which are safe for routing.
+///
+/// In particular, [loadingAuth] and [loadingHousehold] are deliberately not
+/// represented by a fabricated household. A data screen must wait for one of
+/// [signedOut], [needsHouseholdSetup], or [ready] instead.
+enum AppSessionPhase {
+  loadingAuth,
+  signedOut,
+  loadingHousehold,
+  needsHouseholdSetup,
+  ready,
+  error,
+  unavailable,
+}
 
-const skipHouseholdSetupPrefKey = 'debug.skip_household_setup';
+class AppSessionState {
+  const AppSessionState({
+    required this.phase,
+    this.user,
+    this.household,
+    this.error,
+  });
+
+  const AppSessionState.loadingAuth()
+    : this(phase: AppSessionPhase.loadingAuth);
+  const AppSessionState.signedOut() : this(phase: AppSessionPhase.signedOut);
+  const AppSessionState.loadingHousehold(User user)
+    : this(phase: AppSessionPhase.loadingHousehold, user: user);
+  const AppSessionState.needsHouseholdSetup(User user)
+    : this(phase: AppSessionPhase.needsHouseholdSetup, user: user);
+  const AppSessionState.ready({
+    required User user,
+    required ActiveHouseholdContext household,
+  }) : this(phase: AppSessionPhase.ready, user: user, household: household);
+  const AppSessionState.error({User? user, required Object error})
+    : this(phase: AppSessionPhase.error, user: user, error: error);
+  const AppSessionState.unavailable()
+    : this(phase: AppSessionPhase.unavailable);
+
+  final AppSessionPhase phase;
+  final User? user;
+  final ActiveHouseholdContext? household;
+  final Object? error;
+
+  bool get isLoading =>
+      phase == AppSessionPhase.loadingAuth ||
+      phase == AppSessionPhase.loadingHousehold;
+}
 
 /// Firebase Auth is only available after [Firebase.initializeApp].
 ///
-/// Widget tests that render screens without booting Firebase receive `null`
-/// here, and [activeHouseholdContextProvider] uses the preview context. The
-/// initialized app path never falls back to a hard-coded household.
+/// The production entry point initializes Firebase before rendering. A null
+/// value therefore means an explicitly isolated widget test or an unavailable
+/// Firebase setup, never a reason to fabricate a signed-in household.
 final firebaseAuthProvider = Provider<FirebaseAuth?>(
   (ref) => Firebase.apps.isEmpty ? null : FirebaseAuth.instance,
 );
@@ -58,63 +94,10 @@ final activeFirebaseUserProvider = StreamProvider<User?>((ref) {
   return auth.authStateChanges();
 });
 
-final activeUserIdProvider = Provider<String>((ref) {
-  final auth = ref.watch(firebaseAuthProvider);
-  if (auth == null) return debugUserId;
-  final user = ref.watch(activeFirebaseUserProvider).valueOrNull;
-  if (user == null) {
-    if (kDebugMode) return debugUserId;
-    throw StateError('No signed-in user.');
-  }
-  return user.uid;
-});
-
-final activeHouseholdContextProvider = Provider<ActiveHouseholdContext?>((ref) {
-  final skipHouseholdSetup =
-      kDebugMode &&
-      (ref
-              .watch(sharedPreferencesProvider)
-              .getBool(skipHouseholdSetupPrefKey) ??
-          false);
-  if (skipHouseholdSetup) return previewHouseholdContext;
-
-  final auth = ref.watch(firebaseAuthProvider);
-  if (auth == null) return previewHouseholdContext;
-  final household = ref.watch(activeHouseholdContextStreamProvider);
-  return switch (household) {
-    AsyncData(value: final value) => value,
-    AsyncError() => null,
-    _ => _debugLoadingHouseholdContext(auth),
-  };
-});
-
-/// The stand-in context used only while the real household stream is still
-/// resolving in debug builds.
-///
-/// It binds to the signed-in user's own seeded debug household
-/// (`debug-household-<uid>`) — a household the anonymous user is a member of —
-/// so household-scoped listeners do not attach to the shared preview id
-/// (`solo-household`), which no real account belongs to and which would fail
-/// every read with permission-denied. Returns null (no context) when there is
-/// no signed-in user yet, so the app waits rather than reading a foreign
-/// household.
-ActiveHouseholdContext? _debugLoadingHouseholdContext(FirebaseAuth auth) {
-  if (!kDebugMode) return null;
-  final user = auth.currentUser;
-  if (user == null) return null;
-  return ActiveHouseholdContext(
-    id: debugHouseholdIdForUser(user.uid),
-    name: debugHouseholdName,
-    role: HouseholdRole.admin,
-    isJoint: false,
-    hasPremium: false,
-  );
-}
-
 final activeHouseholdContextStreamProvider =
     StreamProvider<ActiveHouseholdContext?>((ref) {
       final auth = ref.watch(firebaseAuthProvider);
-      if (auth == null) return Stream.value(previewHouseholdContext);
+      if (auth == null) return Stream.value(null);
       final refs = ref.watch(firestoreRefsProvider);
       return auth.authStateChanges().switchMap((user) {
         if (user == null) {
@@ -135,17 +118,78 @@ final activeHouseholdContextStreamProvider =
       });
     });
 
+/// The authoritative identity + household state for application routing.
+///
+/// This provider purposely retains the distinction between a Firestore read
+/// that has not completed, a user who needs onboarding, and a read that failed.
+/// That prevents redirect races and prevents signed-out users from seeing a
+/// previous household while listeners are being torn down.
+final appSessionStateProvider = Provider<AppSessionState>((ref) {
+  final auth = ref.watch(firebaseAuthProvider);
+  if (auth == null) return const AppSessionState.unavailable();
+
+  final authState = ref.watch(activeFirebaseUserProvider);
+  return authState.when(
+    loading: () => const AppSessionState.loadingAuth(),
+    error: (error, _) => AppSessionState.error(error: error),
+    data: (user) {
+      if (user == null) return const AppSessionState.signedOut();
+      final householdState = ref.watch(activeHouseholdContextStreamProvider);
+      return householdState.when(
+        loading: () => AppSessionState.loadingHousehold(user),
+        error: (error, _) => AppSessionState.error(user: user, error: error),
+        data: (household) => household == null
+            ? AppSessionState.needsHouseholdSetup(user)
+            : AppSessionState.ready(user: user, household: household),
+      );
+    },
+  );
+});
+
+/// The active household is null unless the server has confirmed a real
+/// membership. Tests that need a household inject this provider explicitly.
+final activeHouseholdContextProvider = Provider<ActiveHouseholdContext?>((ref) {
+  return ref.watch(appSessionStateProvider).household;
+});
+
+/// An actor used only by isolated widget tests that deliberately do not boot
+/// Firebase. It is never a session or household fallback: production starts
+/// Firebase before rendering, and a real signed-out Firebase Auth instance
+/// still makes [activeUserIdProvider] fail closed below.
+// Keep legacy isolated presentation fixtures deterministic. This is not used
+// by a booted application or by any Firebase-backed request.
+const isolatedWidgetTestUserId = 'demo-user';
+
+final activeUserIdProvider = Provider<String>((ref) {
+  // Several focused widget tests exercise presentation-only controls without
+  // installing Firebase plugins. Let those explicitly isolated trees supply a
+  // deterministic actor while retaining the production invariant that a
+  // booted-but-signed-out app cannot act as any user.
+  if (ref.watch(firebaseAuthProvider) == null) {
+    return isolatedWidgetTestUserId;
+  }
+  final user = ref.watch(appSessionStateProvider).user;
+  if (user == null) throw StateError('No signed-in user.');
+  return user.uid;
+});
+
 Stream<ActiveHouseholdContext?> _watchHouseholdContext({
   required FirestoreRefs refs,
   required String uid,
   required String householdId,
 }) {
-  return refs.household(householdId).snapshots().switchMap((householdDoc) {
-    if (!householdDoc.exists) {
+  // Read the self membership first. Its rule explicitly permits a user to
+  // inspect their own (including absent) membership, while a household read
+  // requires membership. This turns a stale/removed active household into the
+  // recoverable `null` state instead of a permission-denied route error.
+  return refs.householdMember(householdId, uid).snapshots().switchMap((
+    memberDoc,
+  ) {
+    if (!memberDoc.exists) {
       return Stream.value(null);
     }
-    return refs.householdMember(householdId, uid).snapshots().map((memberDoc) {
-      if (!memberDoc.exists) {
+    return refs.household(householdId).snapshots().map((householdDoc) {
+      if (!householdDoc.exists) {
         return null;
       }
       return _contextFromDocs(

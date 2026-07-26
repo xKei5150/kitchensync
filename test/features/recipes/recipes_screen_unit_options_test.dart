@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
+import 'package:kitchensync/core/session/active_household_id_provider.dart';
+import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/enums.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/entities/ingredient.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/repositories/ingredient_repository.dart';
@@ -14,6 +16,14 @@ import 'package:kitchensync/features/recipes/domain/repositories/recipe_reposito
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 import 'package:kitchensync/features/recipes/presentation/screens/recipes_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+const _testHousehold = ActiveHouseholdContext(
+  id: 'solo-household',
+  name: 'Debug kitchen',
+  role: HouseholdRole.admin,
+  isJoint: false,
+  hasPremium: true,
+);
 
 Future<Widget> _wrap(
   Widget home, {
@@ -25,6 +35,7 @@ Future<Widget> _wrap(
   return ProviderScope(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
+      activeHouseholdContextProvider.overrideWithValue(_testHousehold),
       ingredientRepositoryProvider.overrideWithValue(ingredientRepository),
       recipeRepositoryProvider.overrideWithValue(recipeRepository),
     ],

@@ -513,19 +513,26 @@ List<MealScheduleEntry> _orderedMeals(List<MealScheduleEntry> meals) {
   });
 }
 
+// Spec 2.3 defines five time tags: Breakfast, Brunch, Lunch, Dinner, Snack.
+// This ordering matches `today_screen.dart` so a day reads the same on both
+// surfaces.
 int _mealOrder(String mealLabel) {
   return switch (mealLabel.toLowerCase()) {
     'breakfast' => 0,
-    'lunch' => 1,
-    'dinner' => 2,
-    _ => 3,
+    'brunch' => 1,
+    'lunch' => 2,
+    'snack' => 3,
+    'dinner' => 4,
+    _ => 5,
   };
 }
 
 String _timeForMeal(String mealLabel) {
   return switch (mealLabel.toLowerCase()) {
     'breakfast' => '8a',
+    'brunch' => '11a',
     'lunch' => '1p',
+    'snack' => '4p',
     'dinner' => '7p',
     _ => '',
   };

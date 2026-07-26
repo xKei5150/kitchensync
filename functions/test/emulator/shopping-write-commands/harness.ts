@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { deleteApp, initializeApp } from "firebase/app"
-import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth"
+import { connectAuthEmulator, getAuth } from "firebase/auth"
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions"
 import {
   deleteApp as deleteAdminApp,
@@ -10,7 +10,11 @@ import { getFirestore } from "firebase-admin/firestore"
 import type { PlanShoppingAllocationRequest } from "../../../src/shopping/allocationDraftContracts.js"
 import type { ShoppingWriteResponse } from "../../../src/shopping/shoppingWriteModels.js"
 import type { MutateShoppingListItemRequest } from "../../../src/shopping/writeContracts.js"
-import { authEmulatorUrl, functionsEmulatorEndpoint } from "../emulatorEnv.js"
+import {
+  authEmulatorUrl,
+  functionsEmulatorEndpoint,
+  signInWithEmulatorEmailIdentity,
+} from "../emulatorEnv.js"
 import { expectCallableCode, randomId } from "../shoppingCommandHarness.js"
 
 const gcloudProjectEnvKey = "GCLOUD_PROJECT"
@@ -31,7 +35,7 @@ export async function createShoppingWriteHarness() {
   connectFunctionsEmulator(functions, endpoint.host, endpoint.port)
   const adminApp = initializeAdminApp({ projectId }, `write-admin-${randomUUID()}`)
   const db = getFirestore(adminApp)
-  const uid = (await signInAnonymously(auth)).user.uid
+  const uid = (await signInWithEmulatorEmailIdentity(auth)).uid
 
   return {
     db,

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { deleteApp, initializeApp } from "firebase/app"
-import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth"
+import { connectAuthEmulator, getAuth } from "firebase/auth"
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions"
 import {
   deleteApp as deleteAdminApp,
@@ -8,7 +8,11 @@ import {
 } from "firebase-admin/app"
 import { getFirestore } from "firebase-admin/firestore"
 import { afterEach, describe, expect, it } from "vitest"
-import { authEmulatorUrl, functionsEmulatorEndpoint } from "./emulatorEnv.js"
+import {
+  authEmulatorUrl,
+  functionsEmulatorEndpoint,
+  signInWithEmulatorEmailIdentity,
+} from "./emulatorEnv.js"
 import { expectCallableCode, randomId } from "./shoppingCommandHarness.js"
 
 type HouseholdCommandRequest = {
@@ -47,7 +51,7 @@ describe("household membership callables", () => {
 
     await expectCallableCode(() => current.removeMember(request), "unauthenticated")
 
-    const callerUserId = (await signInAnonymously(current.auth)).user.uid
+    const callerUserId = (await signInWithEmulatorEmailIdentity(current.auth)).uid
     await current.db.doc(`households/${householdId}`).set({
       isJoint: true,
       memberCount: 2,
@@ -79,7 +83,7 @@ describe("household membership callables", () => {
     const fallbackHouseholdId = randomId("fallback")
     const otherPremiumHouseholdId = randomId("premium")
     const targetUserId = randomId("target")
-    const callerUserId = (await signInAnonymously(current.auth)).user.uid
+    const callerUserId = (await signInWithEmulatorEmailIdentity(current.auth)).uid
     const commandId = randomId("remove-command")
 
     await current.db.doc(`households/${householdId}`).set({
@@ -168,7 +172,7 @@ describe("household membership callables", () => {
     disposals.push(current.dispose)
     const householdId = randomId("household")
     const targetUserId = randomId("target")
-    const callerUserId = (await signInAnonymously(current.auth)).user.uid
+    const callerUserId = (await signInWithEmulatorEmailIdentity(current.auth)).uid
     const request = {
       householdId,
       targetUserId,
@@ -199,7 +203,15 @@ describe("household membership callables", () => {
       (await current.db.doc(`households/${householdId}/members/${targetUserId}`).get()).get("role"),
     ).toBe("cook")
 
-    await current.db.doc(`users/${targetUserId}`).update({ isPremium: true })
+    await current.db.doc(`users/${targetUserId}`).update({
+      isPremium: true,
+      premiumTrialEndsAt: new Date(Date.now() - 1_000),
+    })
+    await expectCallableCode(() => current.transferAdmin(request), "failed-precondition")
+
+    await current.db.doc(`users/${targetUserId}`).update({
+      premiumTrialEndsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    })
     const first = await current.transferAdmin(request)
     expect(first.data).toEqual({
       householdId,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/design_tokens.dart';
+import 'package:kitchensync/app/shell/ks_app_shell.dart';
 import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 
@@ -25,6 +26,7 @@ Future<void> _pump(
 }
 
 void main() {
+  _menuSetsTabGating();
   group('KsFolioHeader', () {
     testWidgets('renders an uppercased eyebrow, the title, and actions', (
       tester,
@@ -545,6 +547,43 @@ void main() {
       );
       final text = tester.widget<Text>(find.text('25'));
       expect(text.style?.color, KsColors.dark.brandPrimary);
+    });
+  });
+}
+
+void _menuSetsTabGating() {
+  group('KsAppShell Menu Sets gating (spec 1.2 Step 5, 1.7)', () {
+    String labelAt(int index) => KsBottomNav.coreTabs[index].label;
+
+    test('a free household is not offered the Menu Sets tab', () {
+      final labels = KsAppShell.visibleBranchIndexes(
+        hasPremium: false,
+      ).map(labelAt).toList();
+
+      expect(labels, isNot(contains('Menu Sets')));
+      expect(labels, containsAll(['Today', 'Recipes', 'Settings']));
+    });
+
+    test('a premium household is offered the Menu Sets tab', () {
+      final labels = KsAppShell.visibleBranchIndexes(
+        hasPremium: true,
+      ).map(labelAt).toList();
+
+      expect(labels, contains('Menu Sets'));
+    });
+
+    test('branch indexes stay aligned with coreTabs in both states', () {
+      for (final hasPremium in [false, true]) {
+        final indexes = KsAppShell.visibleBranchIndexes(
+          hasPremium: hasPremium,
+        );
+        // Each retained index must still address its own destination, so the
+        // shell's branch navigator cannot drift out of alignment.
+        expect(indexes, equals(indexes.toList()..sort()));
+        for (final index in indexes) {
+          expect(index, inInclusiveRange(0, KsBottomNav.coreTabs.length - 1));
+        }
+      }
     });
   });
 }

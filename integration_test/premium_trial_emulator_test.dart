@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:kitchensync/app/theme.dart';
-import 'package:kitchensync/core/firebase/firebase_initializer.dart';
 import 'package:kitchensync/core/preferences/preferences_providers.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/session/debug_household_session.dart';
@@ -24,20 +23,7 @@ void main() {
   testWidgets('visible Premium trial grants the household entitlement', (
     tester,
   ) async {
-    const initializer = FirebaseInitializer();
-    await withTimeout(
-      'configure Premium Firebase emulators',
-      () => initializer.bootstrap(AppEnv.dev),
-    );
-    await withTimeout(
-      'clear stale Premium auth session',
-      FirebaseAuth.instance.signOut,
-    );
-    await withTimeout(
-      'finish anonymous Premium initialization',
-      () => initializer.finishInitialization(AppEnv.dev),
-      seconds: 60,
-    );
+    await bootEmulatedApp(clearExistingSession: true);
 
     final user = FirebaseAuth.instance.currentUser;
     expect(user, isNotNull);

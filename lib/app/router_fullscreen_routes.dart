@@ -1,6 +1,13 @@
 part of 'router.dart';
 
 List<RouteBase> _fullscreenRoutes() => [
+  GoRoute(
+    path: '/auth/loading',
+    name: 'authLoading',
+    parentNavigatorKey: _rootNavigatorKey,
+    pageBuilder: (context, state) =>
+        _authPage(state, const AuthLoadingScreen()),
+  ),
   // Full-screen routes pushed over the shell (no bottom nav), each using
   // the shared reduced-motion-aware [_page] transition.
   GoRoute(
@@ -69,16 +76,12 @@ List<RouteBase> _fullscreenRoutes() => [
     path: '/onboarding',
     name: 'onboarding',
     parentNavigatorKey: _rootNavigatorKey,
-    pageBuilder: (context, state) => _page(state, const SignInScreen()),
-    routes: [
-      GoRoute(
-        path: 'household',
-        name: 'onboardingHousehold',
-        parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) =>
-            _page(state, const HouseholdSetupScreen()),
+    pageBuilder: (context, state) => _authPage(
+      state,
+      OnboardingEntryScreen(
+        showHouseholdPicker: state.uri.queryParameters['switch'] == 'household',
       ),
-    ],
+    ),
   ),
   GoRoute(
     path: '/ingredient/pick',

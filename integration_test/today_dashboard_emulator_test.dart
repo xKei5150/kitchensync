@@ -44,32 +44,29 @@ void main() {
     );
 
     // Seed live data: a recipe and pantry item in the active household.
-    final recipe = await withTimeout(
-      'create today recipe',
-      () async {
-        final recipes = await container
-            .read(recipeImportControllerProvider)
-            .importDrafts([
-              const RecipeDraft(
-                name: 'Dashboard demo stew',
-                defaultServingSize: 2,
-                timeTags: ['Dinner'],
-                recipeTags: ['qa'],
-                description: 'Recipe seeded for the Today dashboard test.',
-                ingredients: [
-                  RecipeIngredientDraft(
-                    name: 'Dashboard onion',
-                    quantity: 2,
-                    unit: UnitId.piece,
-                  ),
-                ],
-                instructions: ['Cook.'],
-                visibility: RecipeVisibility.private,
-              ),
-            ]);
-        return recipes.single;
-      },
-    );
+    final recipe = await withTimeout('create today recipe', () async {
+      final recipes = await container
+          .read(recipeImportControllerProvider)
+          .importDrafts([
+            const RecipeDraft(
+              name: 'Dashboard demo stew',
+              defaultServingSize: 2,
+              timeTags: ['Dinner'],
+              recipeTags: ['qa'],
+              description: 'Recipe seeded for the Today dashboard test.',
+              ingredients: [
+                RecipeIngredientDraft(
+                  name: 'Dashboard onion',
+                  quantity: 2,
+                  unit: UnitId.piece,
+                ),
+              ],
+              instructions: ['Cook.'],
+              visibility: RecipeVisibility.private,
+            ),
+          ]);
+      return recipes.single;
+    });
 
     await withTimeout(
       'add pantry item',
@@ -109,10 +106,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
-          theme: AppTheme.light(),
-          home: const TodayScreen(),
-        ),
+        child: MaterialApp(theme: AppTheme.light(), home: const TodayScreen()),
       ),
     );
     await tester.pump(const Duration(milliseconds: 500));
@@ -126,7 +120,7 @@ Future<String> _waitForActiveHouseholdId(ProviderContainer container) async {
   final stopwatch = Stopwatch()..start();
   while (stopwatch.elapsed < const Duration(seconds: 25)) {
     final context = container.read(activeHouseholdContextProvider);
-    if (context != null && context.id != previewHouseholdContext.id) {
+    if (context != null) {
       return context.id;
     }
     await Future<void>.delayed(const Duration(milliseconds: 100));

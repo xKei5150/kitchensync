@@ -1,0 +1,12 @@
+// Copy this file to Auth.xcconfig (which is intentionally ignored) after the
+// Firebase console has generated the iOS Google OAuth client. These are public
+// mobile OAuth identifiers, not secrets, but keep environment-specific values
+// out of the shared project file so dev and prod cannot be mixed accidentally.
+//
+// Values come from the local, ignored ios/Runner/GoogleService-Info.plist:
+//   CLIENT_ID          -> GOOGLE_IOS_CLIENT_ID
+//   REVERSED_CLIENT_ID -> GOOGLE_IOS_REVERSED_CLIENT_ID
+//
+// Do not replace these placeholders in the committed example.
+GOOGLE_IOS_CLIENT_ID = replace-with-the-ios-client-id.apps.googleusercontent.com
+GOOGLE_IOS_REVERSED_CLIENT_ID = com.googleusercontent.apps.replace-with-the-ios-client-id

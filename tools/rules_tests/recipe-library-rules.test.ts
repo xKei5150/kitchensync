@@ -11,8 +11,7 @@ import { deleteDoc, doc, setDoc, writeBatch } from "firebase/firestore";
 import { test } from "vitest";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const firestoreHost =
-  process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
+const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
 const [host, port] = firestoreHost.split(":");
 const profiles = [
   { name: "production", rules: "firestore.rules" },
@@ -119,12 +118,28 @@ test("recipe library rules allow only exact member-owned save copies", async () 
         await setDoc(doc(db, "households/shared-household"), {
           isJoint: true,
         });
+        await setDoc(doc(db, "households/recipe-owner-household"), {
+          isJoint: true,
+        });
+        await setDoc(doc(db, "households/recipe-attacker-household"), {
+          isJoint: true,
+        });
         for (const role of ["admin", "member", "shopper"] as const) {
-          await setDoc(
-            doc(db, `households/shared-household/members/${role}`),
-            { role },
-          );
+          await setDoc(doc(db, `households/shared-household/members/${role}`), {
+            role,
+          });
         }
+        await setDoc(
+          doc(db, "households/recipe-owner-household/members/recipe-owner"),
+          { role: "cook" },
+        );
+        await setDoc(
+          doc(
+            db,
+            "households/recipe-attacker-household/members/recipe-attacker",
+          ),
+          { role: "cook" },
+        );
         await setDoc(doc(db, "ingredients/onion"), {
           name: "onion",
           defaultUnit: "piece",
@@ -132,6 +147,11 @@ test("recipe library rules allow only exact member-owned save copies", async () 
           scope: "global",
         });
         await setDoc(doc(db, "recipes/public-source"), sourceRecipe);
+        await setDoc(doc(db, "recipes/cross-household-boundary"), {
+          ...sourceRecipe,
+          householdId: "recipe-owner-household",
+          visibility: "private",
+        });
         await setDoc(
           doc(db, "recipes/public-source/ingredients/source-line"),
           sourceIngredient,
@@ -154,10 +174,7 @@ test("recipe library rules allow only exact member-owned save copies", async () 
       );
       await assertFails(
         deleteDoc(
-          doc(
-            memberDb,
-            "households/shared-household/savedRecipes/member-copy",
-          ),
+          doc(memberDb, "households/shared-household/savedRecipes/member-copy"),
         ),
       );
       await assertFails(deleteDoc(doc(memberDb, "recipes/member-copy")));
@@ -168,12 +185,31 @@ test("recipe library rules allow only exact member-owned save copies", async () 
       );
       unsave.delete(doc(memberDb, "recipes/member-copy"));
       unsave.delete(
-        doc(
-          memberDb,
-          "households/shared-household/savedRecipes/member-copy",
-        ),
+        doc(memberDb, "households/shared-household/savedRecipes/member-copy"),
       );
       await assertSucceeds(unsave.commit());
+
+      // Recipe edits are authorized against the existing household. A Cook in
+      // a different household must not be able to claim that household in the
+      // update payload and take over a recipe they do not own.
+      const ownerDb = env.authenticatedContext("recipe-owner").firestore();
+      const attackerDb = env
+        .authenticatedContext("recipe-attacker")
+        .firestore();
+      await assertSucceeds(
+        setDoc(
+          doc(ownerDb, "recipes/cross-household-boundary"),
+          { name: "Owner-only soup" },
+          { merge: true },
+        ),
+      );
+      await assertFails(
+        setDoc(
+          doc(attackerDb, "recipes/cross-household-boundary"),
+          { householdId: "recipe-attacker-household" },
+          { merge: true },
+        ),
+      );
     } finally {
       await env?.cleanup();
     }

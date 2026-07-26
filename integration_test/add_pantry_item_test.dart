@@ -59,7 +59,7 @@ void main() {
 Future<String> _waitForActiveHouseholdId(ProviderContainer container) async {
   while (true) {
     final context = container.read(activeHouseholdContextProvider);
-    if (context != null && context.id != previewHouseholdContext.id) {
+    if (context != null) {
       return context.id;
     }
     await Future<void>.delayed(const Duration(milliseconds: 100));

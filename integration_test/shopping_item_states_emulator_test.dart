@@ -86,16 +86,19 @@ void main() {
     });
 
     final calendar = container.read(calendarRepositoryProvider);
-    await withTimeout('schedule meal', () => calendar.upsertMeal(
-      householdId: householdId,
-      entry: MealScheduleEntry(
-        id: 'states-meal',
-        recipeId: recipe.id,
-        date: DateTime(2026, 7, 6),
-        mealLabel: 'Dinner',
-        servingSize: 2,
+    await withTimeout(
+      'schedule meal',
+      () => calendar.upsertMeal(
+        householdId: householdId,
+        entry: MealScheduleEntry(
+          id: 'states-meal',
+          recipeId: recipe.id,
+          date: DateTime(2026, 7, 6),
+          mealLabel: 'Dinner',
+          servingSize: 2,
+        ),
       ),
-    ));
+    );
 
     final shopping = ShoppingPlanningController(
       repository: container.read(shoppingRepositoryProvider),

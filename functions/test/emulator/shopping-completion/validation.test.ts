@@ -104,6 +104,16 @@ describe("shopping completion validation and write bounds", () => {
     await current.seedList(householdId, listId, { type: "scheduled" })
     const batch = current.db.batch()
     for (let index = 0; index < 225; index += 1) {
+      batch.set(current.db.doc(`ingredients/ingredient-${index}`), {
+        name: `ingredient-${index}`,
+        displayNames: { en: `ingredient-${index}` },
+        category: "other",
+        defaultUnit: "count",
+        allowedUnits: ["count"],
+        isBulkCandidate: false,
+        isNonFood: false,
+        scope: "global",
+      })
       batch.set(
         current.db.doc(`households/${householdId}/shoppingLists/${listId}/items/line-${index}`),
         {

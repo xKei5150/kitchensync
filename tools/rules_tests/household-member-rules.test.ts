@@ -69,7 +69,7 @@ for (const profile of shoppingRuleProfiles) {
       );
     });
 
-    test("Admin promotion requires a premium target user", async () => {
+    test("Admin promotion is callable-only, even for a Premium target user", async () => {
       const db = env.authenticatedContext("admin").firestore();
       await assertFails(
         updateDoc(doc(db, memberPath), {
@@ -77,10 +77,29 @@ for (const profile of shoppingRuleProfiles) {
           updatedAt: new Date("2026-07-18T00:00:00.000Z"),
         }),
       );
-      await assertSucceeds(
+      await assertFails(
         updateDoc(doc(db, shopperPath), {
           role: "admin",
           updatedAt: new Date("2026-07-18T00:01:00.000Z"),
+        }),
+      );
+    });
+
+    test("admins cannot directly create arbitrary member or Admin grants", async () => {
+      const db = env.authenticatedContext("admin").firestore();
+      const now = new Date("2026-07-18T00:02:00.000Z");
+      await assertFails(
+        setDoc(doc(db, `households/${householdId}/members/direct-member`), {
+          role: "member",
+          joinedAt: now,
+          updatedAt: now,
+        }),
+      );
+      await assertFails(
+        setDoc(doc(db, `households/${householdId}/members/direct-admin`), {
+          role: "admin",
+          joinedAt: now,
+          updatedAt: now,
         }),
       );
     });
@@ -95,6 +114,11 @@ for (const profile of shoppingRuleProfiles) {
       );
       await assertFails(deleteDoc(doc(db, adminPath)));
       await assertFails(deleteDoc(doc(db, memberPath)));
+    });
+
+    test("household root deletion is trusted-backend only", async () => {
+      const db = env.authenticatedContext("admin").firestore();
+      await assertFails(deleteDoc(doc(db, `households/${householdId}`)));
     });
   });
 }

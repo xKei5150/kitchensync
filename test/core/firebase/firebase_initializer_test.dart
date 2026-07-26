@@ -1,3 +1,4 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/core/firebase/firebase_emulator_settings.dart';
@@ -14,6 +15,17 @@ void main() {
 
       // Then: the app keeps the existing dev default.
       expect(env, AppEnv.dev);
+    });
+
+    test('uses the configured Firebase project in setup guidance', () {
+      expect(
+        FirebaseInitializer.firebaseProjectIdFor(AppEnv.dev),
+        'kitchensync-dev-da503',
+      );
+      expect(
+        FirebaseInitializer.firebaseProjectIdFor(AppEnv.prod),
+        'kitchensync-prod-8d6fd',
+      );
     });
 
     test('uses Android host and default port for Functions emulator', () {
@@ -46,79 +58,60 @@ void main() {
     });
 
     test('derives debug bootstrap document IDs from Firebase UID', () {
-      const uid = 'anonymous-user';
+      const uid = 'emulator-test-user';
 
-      expect(debugHouseholdIdForUser(uid), 'debug-household-anonymous-user');
-      expect(debugHouseholdInviteCodeForUser(uid), 'DEBUG-anonymous-user');
-    });
-
-    test('signs in anonymously when development auth has no user', () async {
-      final actions = <String>[];
-
-      await FirebaseInitializer.establishAuthSession(
-        devAutoAnonymous: true,
-        hasCurrentUser: false,
-        signInAnonymously: () async => actions.add('signInAnonymously'),
-      );
-
-      expect(actions, <String>['signInAnonymously']);
-    });
-
-    test('preserves an existing production user', () async {
-      final actions = <String>[];
-
-      await FirebaseInitializer.establishAuthSession(
-        devAutoAnonymous: false,
-        hasCurrentUser: true,
-        signInAnonymously: () async => actions.add('signInAnonymously'),
-      );
-
-      expect(actions, isEmpty);
-    });
-
-    test('preserves an existing emulator user', () async {
-      final actions = <String>[];
-
-      await FirebaseInitializer.establishAuthSession(
-        devAutoAnonymous: true,
-        hasCurrentUser: true,
-        signInAnonymously: () async => actions.add('signInAnonymously'),
-      );
-
-      expect(actions, isEmpty);
-    });
-
-    test('debug emulator enables anonymous development bootstrap', () {
       expect(
-        FirebaseInitializer.shouldEnableDevAutoAnonymous(
-          useEmulator: true,
-          isDebugMode: true,
-          explicitSetting: false,
-        ),
-        isTrue,
+        debugHouseholdIdForUser(uid),
+        'debug-household-emulator-test-user',
       );
+      expect(debugHouseholdInviteCodeForUser(uid), 'DEBUG-emulator-test-user');
     });
 
-    test('explicit debug setting enables anonymous development bootstrap', () {
+    test('release configuration cannot select Firebase emulators', () {
       expect(
-        FirebaseInitializer.shouldEnableDevAutoAnonymous(
-          useEmulator: false,
-          isDebugMode: true,
-          explicitSetting: true,
-        ),
-        isTrue,
-      );
-    });
-
-    test('release configuration cannot enable anonymous bootstrap', () {
-      expect(
-        FirebaseInitializer.shouldEnableDevAutoAnonymous(
-          useEmulator: true,
+        FirebaseInitializer.shouldUseFirebaseEmulator(
+          requestedEmulator: true,
           isDebugMode: false,
-          explicitSetting: true,
         ),
         isFalse,
       );
     });
+
+    test('release configuration never selects debug App Check providers', () {
+      final releaseProviders = FirebaseInitializer.appCheckProviderSettingsFor(
+        isDebugMode: false,
+      );
+      expect(releaseProviders.androidProvider, AndroidProvider.playIntegrity);
+      expect(
+        releaseProviders.appleProvider,
+        AppleProvider.appAttestWithDeviceCheckFallback,
+      );
+
+      final debugProviders = FirebaseInitializer.appCheckProviderSettingsFor(
+        isDebugMode: true,
+      );
+      expect(debugProviders.androidProvider, AndroidProvider.debug);
+      expect(debugProviders.appleProvider, AppleProvider.debug);
+    });
+
+    test(
+      'debug configuration selects Firebase emulators only when requested',
+      () {
+        expect(
+          FirebaseInitializer.shouldUseFirebaseEmulator(
+            requestedEmulator: false,
+            isDebugMode: true,
+          ),
+          isFalse,
+        );
+        expect(
+          FirebaseInitializer.shouldUseFirebaseEmulator(
+            requestedEmulator: true,
+            isDebugMode: true,
+          ),
+          isTrue,
+        );
+      },
+    );
   });
 }

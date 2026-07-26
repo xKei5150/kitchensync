@@ -1,8 +1,9 @@
 import type { DocumentData, Firestore, Transaction } from "firebase-admin/firestore"
-import { FieldValue } from "firebase-admin/firestore"
+import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { HttpsError } from "firebase-functions/v2/https"
 import { z } from "zod"
 import { mapFirestoreErrors, requireAuthUid } from "./shopping/errors.js"
+import { runRetryableTransaction } from "./shopping/transactionRetry.js"
 
 const commandSchema = z
   .object({
@@ -33,6 +34,7 @@ type HouseholdRecord = Readonly<{ memberCount?: unknown }>
 type MemberRecord = Readonly<{ role?: unknown }>
 type UserRecord = Readonly<{
   isPremium?: unknown
+  premiumTrialEndsAt?: unknown
   activeHouseholdId?: unknown
   householdIds?: unknown
   joinedPremiumHouseholdIds?: unknown
@@ -74,7 +76,7 @@ async function runHouseholdCommand(
     throw new HttpsError("invalid-argument", "Choose another household member")
   }
   return mapFirestoreErrors(() =>
-    db.runTransaction((transaction) =>
+    runRetryableTransaction(db, (transaction) =>
       apply({ transaction, db, authUid, command: parsed.data, commandType }),
     ),
   )
@@ -156,7 +158,7 @@ async function transferAdmin(input: HouseholdTransactionInput): Promise<Househol
   if (!targetMember.exists || !targetUser.exists) {
     throw new HttpsError("not-found", "Household member not found")
   }
-  if ((targetUser.data() as UserRecord).isPremium !== true) {
+  if (!hasActivePremiumEntitlement(targetUser.data() as UserRecord, Timestamp.now())) {
     throw new HttpsError("failed-precondition", "Admin can only be transferred to a Premium member")
   }
   const now = FieldValue.serverTimestamp()
@@ -215,6 +217,16 @@ async function firstValidMembership(
 function stringList(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return [...new Set(value.filter((entry): entry is string => typeof entry === "string"))]
+}
+
+function hasActivePremiumEntitlement(user: UserRecord, now: Timestamp): boolean {
+  if (user.isPremium !== true) return false
+  const trialEndsAt = user.premiumTrialEndsAt
+  return (
+    trialEndsAt === undefined ||
+    trialEndsAt === null ||
+    (trialEndsAt instanceof Timestamp && trialEndsAt.toMillis() > now.toMillis())
+  )
 }
 
 function receiptData(

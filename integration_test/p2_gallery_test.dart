@@ -1,81 +1,78 @@
-import 'dart:async';
-
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:kitchensync/app/router.dart';
 import 'package:kitchensync/app/theme.dart';
+import 'package:kitchensync/features/household/presentation/screens/household_screen.dart';
+import 'package:kitchensync/features/menu_sets/presentation/screens/menu_set_editor_screen.dart';
+import 'package:kitchensync/features/menu_sets/presentation/screens/menu_sets_screen.dart';
+import 'package:kitchensync/features/notifications/presentation/screens/notifications_screen.dart';
+import 'package:kitchensync/features/onboarding/presentation/screens/sign_in_screen.dart';
+import 'package:kitchensync/features/settings/presentation/screens/premium_screen.dart';
+import 'package:kitchensync/features/settings/presentation/screens/settings_screen.dart';
+import 'package:kitchensync/features/today/presentation/screens/today_screen.dart';
 
-/// On-device visual walk of the P2 "Premium & system" screens. Boots the real
-/// router on the simulator and drives real taps through every P2 surface,
-/// screenshotting each. Presentational screens — no Firebase needed.
+import '_gallery_harness.dart';
+
+/// On-device visual walk of the P2 "Premium & system" screens.
+///
+/// Runs on the emulator harness — see [bootGallery] for why building the real
+/// router without Firebase made this gallery screenshot the sign-in page for
+/// every surface.
+///
+/// Each hop asserts the destination screen by widget type rather than by copy,
+/// so a redirect (for example `/menu-sets` bouncing to `/settings/premium` for
+/// a household without Premium) fails the target instead of quietly capturing
+/// the wrong screen. `/menu-sets` therefore needs a Premium household, which
+/// the harness grants explicitly.
+///
+/// Tap-level interactions (the role sheet, the apply sheet) are covered by
+/// `test/app/p2_routes_test.dart`; this target covers on-device rendering.
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  Future<GoRouter> pumpApp(WidgetTester tester) async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    final router = container.read(routerProvider);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp.router(
-          theme: AppTheme.light(),
-          routerConfig: router,
-        ),
-      ),
+  testWidgets('P2 premium and system screens render on-device', (tester) async {
+    final gallery = await bootGallery(
+      tester,
+      binding,
+      theme: AppTheme.light(),
+      grantPremium: true,
     );
-    await tester.pumpAndSettle();
-    return router;
-  }
 
-  Future<void> shot(WidgetTester tester, String name) async {
-    await tester.pumpAndSettle();
-    await binding.takeScreenshot(name);
-  }
+    await gallery.capture('01-today', expect: find.byType(TodayScreen));
 
-  testWidgets('P2 screens render on-device', (tester) async {
-    // iOS needs the surface converted to an image before screenshots.
-    await binding.convertFlutterSurfaceToImage();
-    final router = await pumpApp(tester);
-
-    // Navigation is driven through the real router (robust on iOS); the
-    // tap-based entry points are covered by test/app/p2_routes_test.dart.
-    Future<void> go(String location, String shotName) async {
-      router.go('/today');
-      await tester.pumpAndSettle();
-      unawaited(router.push(location));
-      await shot(tester, shotName);
-    }
-
-    // Today now carries the notifications / settings / account entry points.
-    await shot(tester, '01-today');
-
-    await go('/notifications', '02-notifications');
-    await go('/settings', '03-settings');
-    await go('/settings/premium', '04-premium');
-
-    // Household → tap a non-admin member to reveal the role sheet.
-    await go('/household', '05-household');
-    await tester.tap(find.text('Ben'));
-    await shot(tester, '06-role-sheet');
-    await tester.tap(find.text('Save role')); // dismiss the sheet
-    await tester.pumpAndSettle();
-
-    // Menu Sets deck → editor → apply sheet.
-    await go('/menu-sets', '07-menu-sets');
-    unawaited(router.push('/menu-sets/edit'));
-    await shot(tester, '08-menu-set-editor');
-    await tester.tap(find.text('Apply to calendar').last);
-    await shot(tester, '09-apply-sheet');
-    await tester.tap(find.text('Apply · 28 meals')); // dismiss the sheet
-    await tester.pumpAndSettle();
-
-    // Onboarding front door → household setup.
-    await go('/onboarding', '10-sign-in');
-    unawaited(router.push('/onboarding/household'));
-    await shot(tester, '11-household-setup');
+    await gallery.visit(
+      '/notifications',
+      expect: find.byType(NotificationsScreen),
+      screenshot: '02-notifications',
+    );
+    await gallery.visit(
+      '/settings',
+      expect: find.byType(SettingsScreen),
+      screenshot: '03-settings',
+    );
+    await gallery.visit(
+      '/settings/premium',
+      expect: find.byType(PremiumScreen),
+      screenshot: '04-premium',
+    );
+    await gallery.visit(
+      '/household',
+      expect: find.byType(HouseholdScreen),
+      screenshot: '05-household',
+    );
+    await gallery.visit(
+      '/menu-sets',
+      expect: find.byType(MenuSetsScreen),
+      screenshot: '06-menu-sets',
+    );
+    await gallery.visit(
+      '/menu-sets/edit',
+      expect: find.byType(MenuSetEditorScreen),
+      screenshot: '07-menu-set-editor',
+    );
+    await gallery.visit(
+      '/onboarding?switch=household',
+      expect: find.byType(OnboardingEntryScreen),
+      screenshot: '08-household-switch',
+    );
   });
 }

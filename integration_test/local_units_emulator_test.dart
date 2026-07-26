@@ -5,6 +5,7 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,11 +55,8 @@ void main() {
 
       await withTimeout(
         'seed local unit household',
-        () => _seedClientHousehold(
-          uid: uid,
-          householdId: householdId,
-          now: now,
-        ),
+        () =>
+            _seedClientHousehold(uid: uid, householdId: householdId, now: now),
       );
 
       SharedPreferences.setMockInitialValues({});
@@ -292,11 +290,7 @@ void main() {
 
     await withTimeout(
       'seed duplicate local unit household',
-      () => _seedClientHousehold(
-        uid: uid,
-        householdId: householdId,
-        now: now,
-      ),
+      () => _seedClientHousehold(uid: uid, householdId: householdId, now: now),
     );
 
     SharedPreferences.setMockInitialValues({});
@@ -351,17 +345,19 @@ void main() {
 }
 
 Future<void> _bootEmulatedFirebase() async {
+  const useEmulator = bool.fromEnvironment('USE_EMULATOR');
+  if (!useEmulator || !kDebugMode) {
+    throw StateError(
+      'Local-unit emulator QA requires a debug build with '
+      '--dart-define=USE_EMULATOR=true.',
+    );
+  }
   WidgetsFlutterBinding.ensureInitialized();
   await withTimeout(
     'FirebaseInitializer.initialize for local unit QA',
     () => const FirebaseInitializer().initialize(AppEnv.dev),
   );
-  if (FirebaseAuth.instance.currentUser == null) {
-    await withTimeout(
-      'signInAnonymously for local unit QA',
-      () => FirebaseAuth.instance.signInAnonymously(),
-    );
-  }
+  await signInWithEmulatorTestIdentity(FirebaseAuth.instance);
 }
 
 Future<T> withTimeout<T>(

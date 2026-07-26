@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { deleteApp, initializeApp } from "firebase/app"
-import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth"
+import { connectAuthEmulator, getAuth } from "firebase/auth"
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions"
 import {
   deleteApp as deleteAdminApp,
@@ -8,7 +8,11 @@ import {
 } from "firebase-admin/app"
 import { getFirestore, Timestamp } from "firebase-admin/firestore"
 import { afterEach, describe, expect, it } from "vitest"
-import { authEmulatorUrl, functionsEmulatorEndpoint } from "./emulatorEnv.js"
+import {
+  authEmulatorUrl,
+  functionsEmulatorEndpoint,
+  signInWithEmulatorEmailIdentity,
+} from "./emulatorEnv.js"
 import { expectCallableCode, randomId } from "./shoppingCommandHarness.js"
 
 type PremiumTrialRequest = {
@@ -41,7 +45,7 @@ describe("Premium trial callable", () => {
       "unauthenticated",
     )
 
-    const uid = (await signInAnonymously(current.auth)).user.uid
+    const uid = (await signInWithEmulatorEmailIdentity(current.auth)).uid
     await current.db.doc(`households/${householdId}`).set({ hasPremium: false })
     await current.db.doc(`households/${householdId}/members/${uid}`).set({ role: "cook" })
 
@@ -58,7 +62,7 @@ describe("Premium trial callable", () => {
     const current = createHarness()
     disposals.push(current.dispose)
     const householdId = randomId("premium-household")
-    const uid = (await signInAnonymously(current.auth)).user.uid
+    const uid = (await signInWithEmulatorEmailIdentity(current.auth)).uid
     await current.db.doc(`users/${uid}`).set({ displayName: "Trial owner" })
     await current.db.doc(`households/${householdId}`).set({
       name: "Premium kitchen",
@@ -102,6 +106,34 @@ describe("Premium trial callable", () => {
 
     expect(retry.data).toEqual({ status: "trialing", plan: "annual" })
     expect(retriedSubscription.updateTime?.toMillis()).toBe(firstUpdateTime)
+  })
+
+  it("does not report an expired trial as active on retry", async () => {
+    const current = createHarness()
+    disposals.push(current.dispose)
+    const householdId = randomId("expired-premium-household")
+    const uid = (await signInWithEmulatorEmailIdentity(current.auth)).uid
+    await current.db.doc(`users/${uid}`).set({
+      isPremium: true,
+      premiumTrialEndsAt: Timestamp.fromMillis(Date.now() - 1_000),
+    })
+    await current.db.doc(`households/${householdId}`).set({
+      hasPremium: true,
+      premiumOwnerUserId: uid,
+      premiumTrialEndsAt: Timestamp.fromMillis(Date.now() - 1_000),
+    })
+    await current.db.doc(`households/${householdId}/members/${uid}`).set({ role: "admin" })
+    await current.db.doc(`households/${householdId}/subscriptions/premium`).set({
+      status: "trialing",
+      plan: "annual",
+      ownerUserId: uid,
+      trialEndsAt: Timestamp.fromMillis(Date.now() - 1_000),
+    })
+
+    await expectCallableCode(
+      () => current.startTrial({ householdId, plan: "annual" }),
+      "failed-precondition",
+    )
   })
 })
 

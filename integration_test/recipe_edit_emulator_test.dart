@@ -24,6 +24,17 @@ void main() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final householdId = debugHouseholdIdForUser(uid);
     final now = DateTime(2026, 7, 18, 9);
+    // This case asserts every spec-2.9 field round-trips, including
+    // `monetization: paid`. `isValidRecipeMonetization` in firestore.rules only
+    // admits paid authoring for a currently-entitled Premium user, so grant the
+    // entitlement through the trusted owner surface rather than weakening the
+    // rule or dropping the field from the assertion.
+    await withTimeout(
+      'grant premium entitlement for paid authoring',
+      () => seedFirestoreDocumentsThroughEmulatorAdmin({
+        'users/$uid': {'isPremium': true, 'updatedAt': now},
+      }),
+    );
     final container = ProviderContainer();
     addTearDown(container.dispose);
     final repo = container.read(recipeRepositoryProvider);

@@ -15,6 +15,7 @@ Future<GoRouter> _pumpApp(
   WidgetTester tester, {
   ActiveHouseholdContext? activeHousehold,
   bool overrideActiveHousehold = false,
+  AppSessionState? session,
 }) async {
   tester.view.physicalSize = const Size(400, 1600);
   tester.view.devicePixelRatio = 1.0;
@@ -23,11 +24,29 @@ Future<GoRouter> _pumpApp(
 
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
+  const defaultHousehold = ActiveHouseholdContext(
+    id: 'test-solo-household',
+    name: 'Test kitchen',
+    role: HouseholdRole.admin,
+    isJoint: false,
+    hasPremium: true,
+  );
+  final effectiveHousehold = overrideActiveHousehold
+      ? activeHousehold
+      : defaultHousehold;
+  final effectiveSession =
+      session ??
+      (effectiveHousehold == null
+          ? const AppSessionState(phase: AppSessionPhase.needsHouseholdSetup)
+          : AppSessionState(
+              phase: AppSessionPhase.ready,
+              household: effectiveHousehold,
+            ));
   final container = ProviderContainer(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
-      if (overrideActiveHousehold)
-        activeHouseholdContextProvider.overrideWithValue(activeHousehold),
+      activeHouseholdContextProvider.overrideWithValue(effectiveHousehold),
+      appSessionStateProvider.overrideWithValue(effectiveSession),
     ],
   );
   addTearDown(container.dispose);
@@ -47,7 +66,6 @@ void main() {
     tester,
   ) async {
     await _pumpApp(tester, overrideActiveHousehold: true);
-
     expect(find.text('Set up your kitchen'), findsOneWidget);
     expect(find.text('Create a household'), findsOneWidget);
   });
@@ -196,16 +214,14 @@ void main() {
   testWidgets('Onboarding keeps unconfigured Google sign-in unavailable', (
     tester,
   ) async {
-    final router = await _pumpApp(tester);
+    await _pumpApp(tester, session: const AppSessionState.signedOut());
 
-    unawaited(router.push('/onboarding'));
-    await tester.pumpAndSettle();
     expect(find.widgetWithText(FilledButton, 'Login'), findsOneWidget);
 
     await tester.tap(find.text('Continue with Google'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(FilledButton, 'Login'), findsOneWidget);
-    expect(find.text('Not configured'), findsNWidgets(2));
+    expect(find.text('Not configured'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

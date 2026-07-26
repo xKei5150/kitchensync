@@ -1,4 +1,5 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:kitchensync/core/errors/firebase_reachability.dart';
 import 'package:kitchensync/features/shopping/data/datasources/shopping_command_remote_data_source.dart';
 import 'package:kitchensync/features/shopping/domain/entities/shopping_command.dart';
 import 'package:kitchensync/features/shopping/domain/repositories/shopping_command_repository.dart';
@@ -48,6 +49,17 @@ final class ShoppingCommandRepositoryImpl
     try {
       return await command();
     } on FirebaseFunctionsException catch (error) {
+      // iOS surfaces an unreachable backend as `unknown` rather than
+      // `unavailable`, so the code alone cannot decide this.
+      if (isFirebaseBackendUnreachable(
+        code: error.code,
+        message: error.message,
+      )) {
+        throw ShoppingCommandFailure(
+          ShoppingCommandFailureKind.unavailable,
+          code: error.code,
+        );
+      }
       throw ShoppingCommandFailure(_failureKind(error.code), code: error.code);
     } on FormatException {
       throw const ShoppingCommandFailure(

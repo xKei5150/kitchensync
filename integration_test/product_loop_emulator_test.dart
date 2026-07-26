@@ -53,7 +53,6 @@ void main() {
       ),
     );
     final uid = authSession.uid;
-    final token = authSession.idToken;
     final householdId = 'itest-loop-$uid';
     final now = DateTime(2026, 7, 6, 9);
     final cookTime = DateTime(2026, 7, 6, 20);
@@ -65,7 +64,6 @@ void main() {
       () => _seedAdminHousehold(
         uid: uid,
         householdId: householdId,
-        authToken: token,
         now: Timestamp.fromDate(now),
       ),
     );
@@ -582,117 +580,49 @@ Future<_AuthSession> _createAuthSession() async {
   }
 }
 
+/// Seeds the household fixture through the emulator's trusted owner surface.
+///
+/// This deliberately does NOT write as the signed-in user. Household
+/// creation is reserved: `firestore.rules` only accepts the deterministic
+/// `solo-<uid>` id or a valid Premium joint reservation, so a client-token
+/// PATCH of an arbitrary `itest-loop-<uid>` household is correctly denied.
+/// Seeding with the owner token keeps that production authorization boundary
+/// intact instead of weakening a rule to make a test pass.
 Future<void> _seedAdminHousehold({
   required String uid,
   required String householdId,
-  required String authToken,
   required Timestamp now,
 }) async {
+  final at = now.toDate();
   await withTimeout(
-    'seed user profile',
-    () => _patchDocument(
-      'users/$uid',
-      authToken: authToken,
-      fields: {
-        'isPremium': _booleanValue(false),
-        'updatedAt': _timestampValue(now),
+    'seed household fixture through emulator admin',
+    () => seedFirestoreDocumentsThroughEmulatorAdmin({
+      'users/$uid': {
+        'activeHouseholdId': householdId,
+        'householdIds': [householdId],
+        'joinedPremiumHouseholdIds': const <String>[],
+        'isPremium': false,
+        'createdAt': at,
+        'updatedAt': at,
       },
-    ),
-  );
-  await withTimeout(
-    'seed household',
-    () => _patchDocument(
-      'households/$householdId',
-      authToken: authToken,
-      fields: {
-        'name': _stringValue('Integration kitchen'),
-        'creatorUserId': _stringValue(uid),
-        'isJoint': _booleanValue(false),
-        'hasPremium': _booleanValue(false),
-        'maxMembers': _integerValue(1),
-        'memberCount': _integerValue(1),
-        'createdAt': _timestampValue(now),
-        'updatedAt': _timestampValue(now),
+      'households/$householdId': {
+        'name': 'Integration kitchen',
+        'creatorUserId': uid,
+        'isJoint': false,
+        'hasPremium': false,
+        'maxMembers': 1,
+        'memberCount': 1,
+        'createdAt': at,
+        'updatedAt': at,
       },
-    ),
-  );
-  await withTimeout(
-    'seed admin member',
-    () => _patchDocument(
-      'households/$householdId/members/$uid',
-      authToken: authToken,
-      fields: {
-        'role': _stringValue('admin'),
-        'joinedAt': _timestampValue(now),
-        'updatedAt': _timestampValue(now),
+      'households/$householdId/members/$uid': {
+        'role': 'admin',
+        'joinedAt': at,
+        'updatedAt': at,
       },
-    ),
-  );
-  await withTimeout(
-    'select active household',
-    () => _patchDocument(
-      'users/$uid',
-      authToken: authToken,
-      fields: {
-        'activeHouseholdId': _stringValue(householdId),
-        'householdIds': _stringArrayValue([householdId]),
-        'isPremium': _booleanValue(false),
-        'updatedAt': _timestampValue(now),
-      },
-    ),
+    }),
   );
 }
-
-Future<void> _patchDocument(
-  String path, {
-  required String authToken,
-  required Map<String, Map<String, Object?>> fields,
-}) async {
-  const host = String.fromEnvironment(
-    'FIRESTORE_EMULATOR_HOST',
-    defaultValue: '127.0.0.1',
-  );
-  const port = int.fromEnvironment(
-    'FIRESTORE_EMULATOR_PORT',
-    defaultValue: 8080,
-  );
-  final uri = Uri.http(
-    '$host:$port',
-    '/v1/projects/kitchensync-dev-da503/databases/(default)/documents/$path',
-  );
-  final client = HttpClient();
-  try {
-    final request = await client.patchUrl(uri);
-    request.headers.contentType = ContentType.json;
-    request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $authToken');
-    request.write(jsonEncode({'fields': fields}));
-    final response = await request.close();
-    final body = await utf8.decodeStream(response);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        'Firestore REST seed failed ${response.statusCode}: $body',
-      );
-    }
-  } finally {
-    client.close(force: true);
-  }
-}
-
-Map<String, Object?> _stringValue(String value) => {'stringValue': value};
-
-Map<String, Object?> _booleanValue(bool value) => {'booleanValue': value};
-
-Map<String, Object?> _integerValue(int value) => {'integerValue': '$value'};
-
-Map<String, Object?> _stringArrayValue(List<String> values) => {
-  'arrayValue': {
-    'values': [for (final value in values) _stringValue(value)],
-  },
-};
-
-Map<String, Object?> _timestampValue(Timestamp value) => {
-  'timestampValue': value.toDate().toUtc().toIso8601String(),
-};
 
 Future<ActiveHouseholdContext> _waitForActiveHousehold(
   ProviderContainer container,

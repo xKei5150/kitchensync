@@ -222,6 +222,70 @@ describe("server-owned shopping allocations", () => {
     expect((await current.db.doc(`shoppingCommandReceipts/${commandId}`).get()).exists).toBe(false)
   })
 
+  it("rejects a free household bulk suggestion before contacting the planner", async () => {
+    const current = await createShoppingWriteHarness()
+    harness = current
+    const householdId = randomId("household")
+    let plannerCalls = 0
+    await current.seedMembership(householdId, "shopper")
+
+    await expect(
+      planShoppingAllocationHandler(
+        {
+          authUid: current.uid,
+          data: {
+            householdId,
+            commandId: randomId("command"),
+            intent: {
+              kind: "suggested",
+              originId: "bulk",
+              windowStart: "2026-07-13",
+              windowEnd: "2026-07-14",
+              startDate: "2026-07-13",
+              endDate: "2026-07-14",
+            },
+          },
+        },
+        current.db,
+        () => ({
+          async plan(): Promise<PlannerDraft> {
+            plannerCalls += 1
+            return plannerDraft({ householdId, listId: randomId("list") })
+          },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "permission-denied" })
+    expect(plannerCalls).toBe(0)
+  })
+
+  it("permits a current Premium household bulk suggestion", async () => {
+    const current = await createShoppingWriteHarness()
+    harness = current
+    const householdId = randomId("household")
+    const listId = randomId("list")
+    await current.seedMembership(householdId, "shopper")
+    await current.db.doc(`households/${householdId}`).update({
+      hasPremium: true,
+      premiumTrialEndsAt: new Date(Date.now() + 60_000),
+    })
+    const intent = {
+      kind: "suggested" as const,
+      originId: "bulk",
+      windowStart: "2026-07-13",
+      windowEnd: "2026-07-14",
+      startDate: "2026-07-13",
+      endDate: "2026-07-14",
+    }
+
+    await expect(
+      planShoppingAllocationHandler(
+        { authUid: current.uid, data: { householdId, commandId: randomId("command"), intent } },
+        current.db,
+        () => ({ plan: async () => plannerDraft({ householdId, listId, intent }) }),
+      ),
+    ).resolves.toMatchObject({ listId, alreadyApplied: false })
+  })
+
   it("rejects injected client list and draft identifiers without writes", async () => {
     const current = await createShoppingWriteHarness()
     harness = current

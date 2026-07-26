@@ -42,6 +42,11 @@ void main() {
 
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1;
+      // The iOS Simulator's software keyboard reports a viewInsets bottom near
+      // the full viewport height, collapsing sheets and dropping their fields
+      // out of the widget tree entirely.
+      tester.view.viewInsets = FakeViewPadding.zero;
+      addTearDown(tester.view.resetViewInsets);
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
@@ -149,7 +154,7 @@ void main() {
           for (var index = 0; index < 3; index++) 'menu-day-$index',
           'removed-entry',
           'persisted-entry',
-          for (var index = 0; index < 9; index++) 'applied-meal-$index',
+          for (var index = 0; index < 10; index++) 'applied-meal-$index',
         ],
       );
 
@@ -179,15 +184,22 @@ void main() {
       expect(storedDays.docs, hasLength(3));
       await _waitForKeyToDisappear(tester, const Key('menu-set-name-field'));
 
+      _captureEmptyDayRecipeBaseline();
       await _tapRecipe(tester);
       await _waitForEntryCount(db, householdId, 1);
-      await _waitForRecipeInstances(tester, 2);
-      await tester.tap(find.text('Remove first recipe'));
+      await _waitForRecipeInDay(tester, present: true);
+      // The editor has no "Remove first recipe" button any more. The recipe
+      // tray always adds to day index 0 (`onAddRecipe` passes `dayIndex: 0`,
+      // "Added ... to Day 1 dinner"), so clearing day 0 is the removal path.
+      final clearDay = find.byKey(const Key('menu-set-clear-day-0'));
+      await tester.ensureVisible(clearDay);
+      await tester.tap(clearDay);
+      await tester.pump();
       await _waitForEntryCount(db, householdId, 0);
-      await _waitForRecipeInstances(tester, 1);
+      await _waitForRecipeInDay(tester, present: false);
       await _tapRecipe(tester);
       await _waitForEntryCount(db, householdId, 1);
-      await _waitForRecipeInstances(tester, 2);
+      await _waitForRecipeInDay(tester, present: true);
 
       final applyButton = find.widgetWithText(
         FilledButton,
@@ -204,7 +216,7 @@ void main() {
       );
       final confirmApplyButton = find.widgetWithText(
         FilledButton,
-        'Apply · 9 meals',
+        'Apply · 10 meals',
       );
       expect(confirmApplyButton, findsOneWidget);
       await tester.tap(find.text('Replace'));
@@ -217,22 +229,27 @@ void main() {
       final meals = await _waitForAppliedMeals(
         db,
         householdId,
-        expectedCount: 9,
+        expectedCount: 10,
       );
-      expect(meals, hasLength(9));
+      expect(meals, hasLength(10));
       expect(meals.every((meal) => meal.data()['servingSize'] == 8), isTrue);
       expect(
         meals.map((meal) => meal.data()['date']),
         containsAll([
-          '2026-07-08',
-          '2026-07-11',
-          '2026-07-14',
-          '2026-07-17',
-          '2026-07-20',
-          '2026-07-23',
-          '2026-07-26',
-          '2026-07-29',
-          '2026-08-01',
+          // Start date is _nextMonday(2026-07-06) = 2026-07-06 and the default
+          // range is start + 27 days inclusive (28 dates, spec 6.6.1). The one
+          // entry sits on template day 0, so it lands on every offset where
+          // offset % 3 == 0: 0, 3, ... 27.
+          '2026-07-06',
+          '2026-07-09',
+          '2026-07-12',
+          '2026-07-15',
+          '2026-07-18',
+          '2026-07-21',
+          '2026-07-24',
+          '2026-07-27',
+          '2026-07-30',
+          '2026-08-02',
         ]),
       );
       expect(
@@ -283,7 +300,7 @@ void main() {
         preferences: preferences,
         now: now,
         ids: [
-          for (var index = 0; index < 9; index++) 'admin-meal-$index',
+          for (var index = 0; index < 10; index++) 'admin-meal-$index',
           for (var index = 0; index < 5; index++) 'shopping-command-$index',
           'shopping-preview',
         ],
@@ -328,12 +345,12 @@ void main() {
       final tomato = preview.items.singleWhere(
         (item) => item.ingredientId == 'tomato',
       );
-      expect(tomato.sourceMealLinks, hasLength(9));
+      expect(tomato.sourceMealLinks, hasLength(10));
       expect(tomato.sourceMealLinks.map((link) => link.recipeId).toSet(), {
         recipeId,
       });
       expect(tomato.sourceMealLinks.map((link) => link.mealEntryId).toSet(), {
-        for (var index = 0; index < 9; index++) 'admin-meal-$index',
+        for (var index = 0; index < 10; index++) 'admin-meal-$index',
       });
       await _waitForScheduledShoppingLists(db, householdId, expectedCount: 5);
       final editedMeal = MealScheduleEntry(
@@ -447,18 +464,39 @@ Future<void> _tapRecipe(WidgetTester tester) async {
   await tester.pump();
 }
 
-Future<void> _waitForRecipeInstances(
-  WidgetTester tester,
-  int expected, {
+/// Times the recipe name is painted while the day holds no entry.
+///
+/// The editor renders a scheduled recipe in several places and that count is a
+/// layout detail which has changed before. Comparing against the empty-day
+/// baseline keeps the real assertion — the editor reflects the entry being
+/// added and removed — without coupling it to the layout.
+int _emptyDayRecipeInstances = 0;
+
+void _captureEmptyDayRecipeBaseline() {
+  _emptyDayRecipeInstances = find.text('Braise').evaluate().length;
+}
+
+Future<void> _waitForRecipeInDay(
+  WidgetTester tester, {
+  required bool present,
   Duration timeout = const Duration(seconds: 30),
 }) async {
   final recipe = find.text('Braise');
   final deadline = DateTime.now().add(timeout);
-  while (recipe.evaluate().length != expected &&
-      DateTime.now().isBefore(deadline)) {
+  final baseline = _emptyDayRecipeInstances;
+  bool satisfied() => present
+      ? recipe.evaluate().length > baseline
+      : recipe.evaluate().length == baseline;
+  while (!satisfied() && DateTime.now().isBefore(deadline)) {
     await tester.pump(const Duration(milliseconds: 100));
   }
-  expect(recipe, findsNWidgets(expected));
+  expect(
+    satisfied(),
+    isTrue,
+    reason:
+        'baseline $baseline, found ${recipe.evaluate().length}, '
+        'present=$present',
+  );
 }
 
 Future<DocumentSnapshot<Map<String, dynamic>>> _waitForDocument(

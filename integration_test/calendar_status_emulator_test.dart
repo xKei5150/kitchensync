@@ -230,7 +230,15 @@ void main() {
       KsAlmanacDay day(int value) => grid.days[leadingPad + value - 1];
 
       expect(day(1).status, CalendarDayStatus.shopping);
-      expect(day(5).status, CalendarDayStatus.problem);
+      // Spec 3.3 lists "Red - Unplanned OR missing ingredients / cooking
+      // problem", but this product deliberately treats a day with nothing
+      // scheduled as neutral rather than a problem, so a quiet month does not
+      // read as all-red. That decision is asserted by
+      // calendar_day_status_resolver_test.dart ("days with nothing scheduled
+      // are neutral (unplanned), not problems"). July 5 has no meal, so it
+      // resolves neutral; the spoilage and waste that occurred on it are still
+      // surfaced through the day's markers, which is what spec 3.11 requires.
+      expect(day(5).status, CalendarDayStatus.empty);
       expect(
         day(5).markers,
         containsAll({CalendarDayMarker.spoilage, CalendarDayMarker.waste}),

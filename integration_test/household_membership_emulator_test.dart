@@ -33,8 +33,18 @@ void main() {
 
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1;
+      // Pin the keyboard inset. `enterText` focuses the invite-code field,
+      // which makes the iOS Simulator raise its software keyboard; it reports a
+      // viewInsets bottom of 837-1000pt against an 852pt viewport, the join Row
+      // collapses, and its sibling Join button leaves the widget tree entirely
+      // (observed: ensureVisible found 0 elements one line after the field had
+      // been found and filled). Whether that happens depends on a hardware
+      // keyboard being connected to the simulator — ambient machine state, not
+      // behaviour under test.
+      tester.view.viewInsets = FakeViewPadding.zero;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
 
       final router = GoRouter(
         initialLocation: '/household',

@@ -288,6 +288,81 @@ void main() {
     },
   );
 
+  testWidgets(
+    'RecipeDetailScreen schedule offers every spec-2.3 time tag and keeps '
+    'Brunch instead of relabelling it Dinner',
+    (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final calendar = _FakeCalendarRepository();
+      final recipe = Recipe(
+        id: 'brunch-hash',
+        authorUserId: 'user-1',
+        householdId: 'solo-household',
+        name: 'Brunch Hash',
+        description: 'A late morning plate',
+        defaultServingSize: 2,
+        // Spec 2.3 lists Brunch as a first-class time tag.
+        mealTimeTags: const ['Brunch'],
+        recipeTags: const ['Eggs'],
+        location: 'Home',
+        visibility: RecipeVisibility.private,
+        monetization: RecipeMonetization.free,
+        createdAt: DateTime(2026, 7, 5),
+        updatedAt: DateTime(2026, 7, 5),
+        ingredients: const [
+          RecipeIngredient(
+            id: 'ri-1',
+            recipeId: 'brunch-hash',
+            ingredientId: 'potato',
+            quantity: 500,
+            unit: UnitId.g,
+          ),
+        ],
+        instructions: const ['Crisp the potatoes.'],
+      );
+
+      await tester.pumpWidget(
+        await _wrap(
+          const RecipeDetailScreen(recipeId: 'brunch-hash'),
+          overrides: [
+            activeHouseholdContextProvider.overrideWithValue(_cookHousehold),
+            calendarRepositoryProvider.overrideWithValue(calendar),
+            clockProvider.overrideWithValue(FakeClock(DateTime(2026, 7, 5, 9))),
+            idGeneratorProvider.overrideWithValue(FakeIdGenerator(['meal-1'])),
+            recipeRecordProvider(
+              'brunch-hash',
+            ).overrideWith((ref) => Stream.value(recipe)),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Schedule'));
+      await tester.tap(find.text('Schedule'));
+      await tester.pumpAndSettle();
+
+      // All five spec-2.3 tags must be selectable, not just the three that
+      // used to be hard-coded.
+      for (final tag in ['Breakfast', 'Brunch', 'Lunch', 'Snack', 'Dinner']) {
+        expect(
+          find.text(tag),
+          findsWidgets,
+          reason: 'Spec 2.3 time tag "$tag" should be offered.',
+        );
+      }
+
+      await tester.ensureVisible(find.text('Add to calendar'));
+      await tester.tap(find.text('Add to calendar'));
+      await tester.pumpAndSettle();
+
+      expect(calendar.upserted?.mealLabel, 'Brunch');
+    },
+  );
+
   testWidgets('RecipeDetailScreen renders a persisted recipe by id', (
     tester,
   ) async {

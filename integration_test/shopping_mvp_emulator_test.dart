@@ -59,12 +59,7 @@ void main() {
       final rangeEndDateKey = DateFormat('yyyy-MM-dd').format(rangeEnd);
       await withTimeout(
         'seed shopping MVP household',
-        () => _seedHousehold(
-          uid: uid,
-          householdId: householdId,
-          token: token!,
-          now: now,
-        ),
+        () => _seedHousehold(uid: uid, householdId: householdId, now: now),
       );
 
       final container = ProviderContainer(
@@ -628,65 +623,42 @@ DateTime _canonicalQaDate(String value) {
   return DateTime(parsed.year, parsed.month, parsed.day);
 }
 
+/// Seeds the household fixture through the emulator's trusted owner surface.
+///
+/// Household creation is reserved by `firestore.rules` to the deterministic
+/// `solo-<uid>` id or a valid Premium joint reservation, so PATCHing an
+/// arbitrary `shopping-mvp-<uid>` household with the signed-in user's token is
+/// correctly denied. Seeding with the owner token arranges the fixture without
+/// weakening that production authorization boundary.
 Future<void> _seedHousehold({
   required String uid,
   required String householdId,
-  required String token,
   required DateTime now,
 }) async {
-  await _patch('users/$uid', token, {
-    'isPremium': _boolean(false),
-    'activeHouseholdId': _string(householdId),
-    'updatedAt': _timestamp(now),
+  await seedFirestoreDocumentsThroughEmulatorAdmin({
+    'users/$uid': {
+      'isPremium': false,
+      'activeHouseholdId': householdId,
+      'householdIds': [householdId],
+      'createdAt': now,
+      'updatedAt': now,
+    },
+    'households/$householdId': {
+      'name': 'Shopping MVP kitchen',
+      'creatorUserId': uid,
+      'isJoint': false,
+      'hasPremium': false,
+      'maxMembers': 1,
+      'memberCount': 1,
+      'createdAt': now,
+      'updatedAt': now,
+    },
+    'households/$householdId/members/$uid': {
+      'role': 'admin',
+      'joinedAt': now,
+      'updatedAt': now,
+    },
   });
-  await _patch('households/$householdId', token, {
-    'name': _string('Shopping MVP kitchen'),
-    'creatorUserId': _string(uid),
-    'isJoint': _boolean(false),
-    'hasPremium': _boolean(false),
-    'maxMembers': _integer(1),
-    'createdAt': _timestamp(now),
-    'updatedAt': _timestamp(now),
-  });
-  await _patch('households/$householdId/members/$uid', token, {
-    'role': _string('admin'),
-    'joinedAt': _timestamp(now),
-    'updatedAt': _timestamp(now),
-  });
-}
-
-Future<void> _patch(
-  String path,
-  String token,
-  Map<String, Map<String, Object?>> fields,
-) async {
-  const host = String.fromEnvironment(
-    'FIRESTORE_EMULATOR_HOST',
-    defaultValue: '127.0.0.1',
-  );
-  const port = int.fromEnvironment(
-    'FIRESTORE_EMULATOR_PORT',
-    defaultValue: 8080,
-  );
-  final client = HttpClient();
-  try {
-    final request = await client.patchUrl(
-      Uri.http(
-        '$host:$port',
-        '/v1/projects/kitchensync-dev-da503/databases/(default)/documents/$path',
-      ),
-    );
-    request.headers.contentType = ContentType.json;
-    request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-    request.write(jsonEncode({'fields': fields}));
-    final response = await request.close();
-    final body = await utf8.decodeStream(response);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError('Firestore seed ${response.statusCode}: $body');
-    }
-  } finally {
-    client.close(force: true);
-  }
 }
 
 Future<int> _currentRevision(String householdId, String listId) async {
@@ -721,10 +693,3 @@ void _expectIntentOnlyPayload(ConsumeShoppingAllocationIntent command) {
   expect(intent, isA<Map<String, Object?>>());
   debugPrint('QA_ALLOCATION_INTENT_PAYLOAD=${jsonEncode(payload)}');
 }
-
-Map<String, Object?> _string(String value) => {'stringValue': value};
-Map<String, Object?> _boolean(bool value) => {'booleanValue': value};
-Map<String, Object?> _integer(int value) => {'integerValue': '$value'};
-Map<String, Object?> _timestamp(DateTime value) => {
-  'timestampValue': value.toUtc().toIso8601String(),
-};

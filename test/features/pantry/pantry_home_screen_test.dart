@@ -19,6 +19,14 @@ import 'package:kitchensync/features/pantry/presentation/providers/pantry_provid
 import 'package:kitchensync/features/pantry/presentation/screens/pantry_home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const _testHousehold = ActiveHouseholdContext(
+  id: 'solo-household',
+  name: 'Test kitchen',
+  role: HouseholdRole.admin,
+  isJoint: false,
+  hasPremium: true,
+);
+
 Ingredient _ingredient(
   String id,
   String name, {
@@ -65,12 +73,17 @@ PantryItem _item(
 Future<Widget> _wrap({
   required List<Override> overrides,
   ThemeData? theme,
+  ActiveHouseholdContext household = _testHousehold,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
   return ProviderScope(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
+      // Widget tests intentionally do not boot Firebase. Give each screen an
+      // explicit household fixture rather than relying on the retired preview
+      // session that production routing must never expose.
+      activeHouseholdContextProvider.overrideWithValue(household),
       ...overrides,
     ],
     child: MaterialApp(
@@ -267,15 +280,6 @@ void main() {
     await tester.pumpWidget(
       await _wrap(
         overrides: [
-          activeHouseholdContextProvider.overrideWithValue(
-            const ActiveHouseholdContext(
-              id: 'solo-household',
-              name: 'Test kitchen',
-              role: HouseholdRole.admin,
-              isJoint: false,
-              hasPremium: true,
-            ),
-          ),
           clockProvider.overrideWithValue(FakeClock(now)),
           pantryAllItemsStreamProvider.overrideWith(
             (ref) => Stream.value([item, nonFoodItem]),
