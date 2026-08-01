@@ -34,7 +34,10 @@ active_project=$("$FIREBASE_BIN" use --json | jq -er '
 ') || fail "Firebase project lookup failed"
 [ "$active_project" = "$DEV_PROJECT" ] || fail "active Firebase project is not $DEV_PROJECT"
 
-expected_functions='["shoppingSmoke","startPremiumTrial","removeHouseholdMember","transferHouseholdAdmin","completeShoppingList","cancelShoppingList","deleteShoppingList","planShoppingAllocation","mutateShoppingListItem"]'
+# All public Functions must be active before client and Rules rollout proceeds.
+# `cleanupTerminalInviteMetadataDaily` is a scheduled worker, not a callable,
+# but its runtime metadata is subject to the same Node 22/region readiness gate.
+expected_functions='["shoppingSmoke","startPremiumTrial","removeHouseholdMember","transferHouseholdAdmin","issueHouseholdInvite","redeemHouseholdInvite","revokeHouseholdInvite","completeShoppingList","cancelShoppingList","deleteShoppingList","planShoppingAllocation","mutateShoppingListItem","adminHealthGet","adminUserGet","adminHouseholdGet","adminEntitlementGet","cleanupTerminalInviteMetadataDaily"]'
 expected_indexes=$(jq -cer '
   select((.indexes | type) == "array" and (.indexes | length > 0)) |
   select(all(.indexes[];

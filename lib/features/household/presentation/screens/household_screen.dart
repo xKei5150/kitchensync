@@ -7,6 +7,7 @@ import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
 import 'package:kitchensync/features/household/domain/services/household_policy.dart';
+import 'package:kitchensync/features/household/presentation/controllers/household_invite_command_controller.dart';
 import 'package:kitchensync/features/household/presentation/controllers/household_membership_command_controller.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 import 'package:rxdart/rxdart.dart';
@@ -216,12 +217,9 @@ class HouseholdScreen extends ConsumerWidget {
                       : null,
                 ),
               ],
-            if (details != null &&
-                canInviteMembers &&
-                details.inviteCode != null &&
-                details.inviteCode!.isNotEmpty) ...[
+            if (details != null && details.isJoint && canInviteMembers) ...[
               const SizedBox(height: KsTokens.space20),
-              KsInviteCode(code: details.inviteCode!, label: 'Invite code'),
+              _HouseholdInviteIssuer(householdId: details.id),
             ],
           ],
         ),
@@ -254,7 +252,6 @@ final householdDetailsProvider = StreamProvider<HouseholdDetails>((ref) {
       }
       final data = householdSnapshot.data() ?? const <String, dynamic>{};
       final isJoint = data['isJoint'] as bool? ?? false;
-      final inviteCode = data['inviteCode'] as String?;
       final maxMembers = data['maxMembers'] as int? ?? (isJoint ? 6 : 1);
       final name = data['name'] as String? ?? 'My kitchen';
       return householdDoc.collection('members').snapshots().map((snapshot) {
@@ -273,7 +270,6 @@ final householdDetailsProvider = StreamProvider<HouseholdDetails>((ref) {
           name: name,
           isJoint: isJoint,
           maxMembers: maxMembers,
-          inviteCode: inviteCode,
           members: members,
         );
       });
@@ -311,7 +307,6 @@ class HouseholdDetails {
     required this.name,
     required this.isJoint,
     required this.maxMembers,
-    required this.inviteCode,
     required this.members,
   });
 
@@ -319,8 +314,81 @@ class HouseholdDetails {
   final String name;
   final bool isJoint;
   final int maxMembers;
-  final String? inviteCode;
   final List<HouseholdMemberSummary> members;
+}
+
+class _HouseholdInviteIssuer extends ConsumerStatefulWidget {
+  const _HouseholdInviteIssuer({required this.householdId});
+
+  final String householdId;
+
+  @override
+  ConsumerState<_HouseholdInviteIssuer> createState() =>
+      _HouseholdInviteIssuerState();
+}
+
+class _HouseholdInviteIssuerState
+    extends ConsumerState<_HouseholdInviteIssuer> {
+  bool _issuing = false;
+  String? _inviteToken;
+  String? _error;
+
+  Future<void> _issue() async {
+    setState(() {
+      _issuing = true;
+      _error = null;
+    });
+    try {
+      final result = await ref
+          .read(householdInviteCommandControllerProvider)
+          .issueMemberInvite(householdId: widget.householdId);
+      if (!mounted) return;
+      if (result.alreadyIssued || result.inviteToken == null) {
+        setState(() {
+          _issuing = false;
+          _inviteToken = null;
+          _error =
+              'We could not safely recover a previous invite. Create a new '
+              'invite to get a code.';
+        });
+        return;
+      }
+      setState(() {
+        _issuing = false;
+        // This bearer token exists only while this widget is mounted.
+        _inviteToken = result.inviteToken;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _issuing = false;
+        _error = error is StateError
+            ? error.message
+            : 'Could not create an invite.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final token = _inviteToken;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (token != null) KsInviteCode(code: token, label: 'Invite code'),
+        if (token == null)
+          FilledButton.tonalIcon(
+            onPressed: _issuing ? null : _issue,
+            icon: const Icon(Icons.mail_outline_rounded),
+            label: Text(_issuing ? 'Creating invite...' : 'Create invite'),
+          ),
+        if (_error != null) ...[
+          const SizedBox(height: KsTokens.space10),
+          KsErrorAlert(message: _error!),
+        ],
+      ],
+    );
+  }
 }
 
 HouseholdMemberSummary? _currentMember(List<HouseholdMemberSummary> members) {

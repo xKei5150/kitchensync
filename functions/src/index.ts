@@ -1,4 +1,7 @@
+import { randomUUID } from "node:crypto"
+import { defineString } from "firebase-functions/params"
 import { onCall } from "firebase-functions/v2/https"
+import { onSchedule } from "firebase-functions/v2/scheduler"
 import { callableSecurityOptions, nonAnonymousCallableUid } from "./callableSecurity.js"
 import { firestore } from "./firebase.js"
 import {
@@ -6,6 +9,22 @@ import {
   removeHouseholdMemberHandler,
   transferHouseholdAdminHandler,
 } from "./household.js"
+import {
+  inviteHmacKeyFromRuntimeSecret,
+  inviteTokenHmacKeySecret,
+  issueHouseholdInviteHandler,
+} from "./invites/inviteIssuance.js"
+import {
+  inviteRateLimitKeyFromRuntimeSecret,
+  inviteRateLimitKeySecret,
+  trustedCallableSourceIp,
+} from "./invites/inviteRateLimit.js"
+import { redeemHouseholdInviteHandler } from "./invites/inviteRedemption.js"
+import { revokeHouseholdInviteHandler } from "./invites/inviteRevocation.js"
+import {
+  cleanupTerminalInviteMetadata,
+  inviteCleanupSchedule,
+} from "./invites/inviteTerminalCleanup.js"
 import { startPremiumTrialHandler } from "./premium.js"
 import {
   cancelShoppingListHandler,
@@ -19,7 +38,19 @@ import { ControlledEmulatorAllocationPlannerClient } from "./shopping/controlled
 import { CloudRunAllocationPlannerClient } from "./shopping/plannerClient.js"
 import { type ShoppingSmokeCallableRequest, shoppingSmokeHandler } from "./shopping/smoke.js"
 
+export {
+  adminEntitlementGet,
+  adminHealthGet,
+  adminHouseholdGet,
+  adminUserGet,
+} from "./admin/callables.js"
+
 const callableSecurity = callableSecurityOptions(process.env)
+export const inviteRuntimeServiceAccount = defineString("INVITE_RUNTIME_SERVICE_ACCOUNT")
+const inviteCallableSecurity = {
+  ...callableSecurity,
+  serviceAccount: inviteRuntimeServiceAccount,
+}
 
 export const shoppingSmoke = onCall(callableSecurity, (request) =>
   shoppingSmokeHandler(smokeRequest(nonAnonymousCallableUid(request.auth), request.data)),
@@ -44,6 +75,59 @@ export const transferHouseholdAdmin = onCall(callableSecurity, (request) =>
     householdRequest(nonAnonymousCallableUid(request.auth), request.data),
     firestore,
   ),
+)
+
+export const issueHouseholdInvite = onCall(
+  { ...inviteCallableSecurity, secrets: [inviteTokenHmacKeySecret, inviteRateLimitKeySecret] },
+  (request) =>
+    issueHouseholdInviteHandler(
+      householdRequest(nonAnonymousCallableUid(request.auth), request.data),
+      firestore,
+      {
+        hmacKey: () => inviteHmacKeyFromRuntimeSecret(inviteTokenHmacKeySecret.value()),
+        rateLimitKey: () => inviteRateLimitKeyFromRuntimeSecret(inviteRateLimitKeySecret.value()),
+        requestId: randomUUID,
+      },
+    ),
+)
+
+export const redeemHouseholdInvite = onCall(
+  { ...inviteCallableSecurity, secrets: [inviteTokenHmacKeySecret, inviteRateLimitKeySecret] },
+  (request) =>
+    redeemHouseholdInviteHandler(
+      householdRequest(nonAnonymousCallableUid(request.auth), request.data),
+      firestore,
+      {
+        hmacKey: () => inviteHmacKeyFromRuntimeSecret(inviteTokenHmacKeySecret.value()),
+        rateLimitKey: () => inviteRateLimitKeyFromRuntimeSecret(inviteRateLimitKeySecret.value()),
+        sourceIp: trustedCallableSourceIp(request.rawRequest),
+        requestId: randomUUID,
+      },
+    ),
+)
+
+export const revokeHouseholdInvite = onCall(inviteCallableSecurity, (request) =>
+  revokeHouseholdInviteHandler(
+    householdRequest(nonAnonymousCallableUid(request.auth), request.data),
+    firestore,
+    { requestId: randomUUID },
+  ),
+)
+
+// This has no browser/callable entrypoint. The deployed Function identity is
+// the database access boundary; the cleanup module's explicit collection
+// allowlist is the application-level scope boundary.
+export const cleanupTerminalInviteMetadataDaily = onSchedule(
+  {
+    schedule: inviteCleanupSchedule,
+    timeZone: "Etc/UTC",
+    serviceAccount: inviteRuntimeServiceAccount,
+  },
+  async () => {
+    const summary = await cleanupTerminalInviteMetadata(firestore)
+    // Count-only summary; never include household IDs, user IDs, tokens, or HMACs.
+    console.info("terminal invite metadata cleanup completed", summary)
+  },
 )
 
 export const completeShoppingList = onCall(callableSecurity, (request) =>

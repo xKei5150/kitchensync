@@ -6,7 +6,6 @@ import {
 import { doc, getDoc, setDoc, writeBatch } from "firebase/firestore";
 import {
   creatorHouseholdPath,
-  creatorInvitePath,
   creatorMemberPath,
   creatorUserPath,
   creatorWeeklySchedulePath,
@@ -135,15 +134,8 @@ export const securityScenarios: readonly SecurityScenario[] = [
         hasPremium: true,
         maxMembers: 6,
         memberCount: 1,
-        inviteCode: "DEBUG-CREATOR",
       });
       batch.set(doc(db, creatorMemberPath), { role: "admin" });
-      batch.set(doc(db, creatorInvitePath), {
-        householdId: "debug-creator-household",
-        createdBy: "debug-creator",
-        role: "member",
-        active: true,
-      });
 
       await assertSucceeds(batch.commit());
       await assertSucceeds(

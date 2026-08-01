@@ -26,7 +26,6 @@ export const forgedInvitePath = "householdInvites/FORGED-OUTSIDER";
 export const creatorHouseholdPath = "households/debug-creator-household";
 export const creatorMemberPath =
   "households/debug-creator-household/members/debug-creator";
-export const creatorInvitePath = "householdInvites/DEBUG-CREATOR";
 export const creatorWeeklySchedulePath =
   "households/debug-creator-household/shoppingSchedules/weekly";
 export const creatorUserPath = "users/debug-creator";
@@ -117,7 +116,6 @@ export async function clearScheduleAuthorizationFixtures(
       deleteDoc(doc(db, forgedInvitePath)),
       deleteDoc(doc(db, creatorWeeklySchedulePath)),
       deleteDoc(doc(db, creatorMemberPath)),
-      deleteDoc(doc(db, creatorInvitePath)),
       deleteDoc(doc(db, creatorHouseholdPath)),
       deleteDoc(doc(db, creatorUserPath)),
     ]);

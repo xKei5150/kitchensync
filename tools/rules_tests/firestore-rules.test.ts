@@ -544,10 +544,9 @@ describe("/households and memberships", () => {
     );
   });
 
-  test("joint onboarding can atomically create its first invite", async () => {
+  test("joint onboarding can create its reserved household and initial Admin membership", async () => {
     const userId = "joint-invite-creator";
     const householdId = "joint-invite-bootstrap";
-    const inviteCode = "KS-JOINT-BOOTSTRAP";
     await env.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), `users/${userId}`), {
         isPremium: true,
@@ -584,18 +583,10 @@ describe("/households and memberships", () => {
       joinedAt: now,
       updatedAt: now,
     });
-    onboarding.set(doc(db, `householdInvites/${inviteCode}`), {
-      householdId,
-      createdBy: userId,
-      role: "member",
-      active: true,
-      createdAt: now,
-      updatedAt: now,
-    });
     await assertSucceeds(onboarding.commit());
   });
 
-  test("removed creators cannot mint or reactivate household invites", async () => {
+  test("no client, including a household Admin, can mint or reactivate household invites", async () => {
     const householdId = "removed-creator-household";
     const formerCreatorId = "former-creator";
     const currentAdminId = "current-invite-admin";
@@ -642,7 +633,7 @@ describe("/households and memberships", () => {
         updatedAt: now,
       }),
     );
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(currentAdminDb, "householdInvites/KS-CURRENT-ADMIN-NEW"), {
         householdId,
         createdBy: currentAdminId,
@@ -654,7 +645,7 @@ describe("/households and memberships", () => {
     );
   });
 
-  test("invite updates remain bound to their existing household", async () => {
+  test("household Admins cannot update legacy invites", async () => {
     const sourceHouseholdId = "source-invite-household";
     const sourceAdminId = "source-invite-admin";
     const foreignHouseholdId = "foreign-invite-household";
@@ -702,7 +693,7 @@ describe("/households and memberships", () => {
     const sourceAdminDb = env.authenticatedContext(sourceAdminId).firestore();
     const foreignAdminDb = env.authenticatedContext(foreignAdminId).firestore();
     const now = new Date();
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(sourceAdminDb, `householdInvites/${inviteCode}`), {
         active: true,
         role: "cook",
@@ -744,11 +735,11 @@ describe("/households and memberships", () => {
     );
   });
 
-  test("invite codes allow self-joining the invited household role only", async () => {
+  test("legacy invite codes cannot be read or used for direct membership creation", async () => {
     const inviteeDb = env.authenticatedContext("invitee").firestore();
     const outsiderDb = env.authenticatedContext("outsider").firestore();
 
-    await assertSucceeds(
+    await assertFails(
       getDoc(doc(inviteeDb, "householdInvites/KS-JOIN1")),
     );
     await assertFails(getDocs(collection(inviteeDb, "householdInvites")));
@@ -777,7 +768,7 @@ describe("/households and memberships", () => {
       memberCount: 5,
       updatedAt: now,
     });
-    await assertSucceeds(joinBatch.commit());
+    await assertFails(joinBatch.commit());
 
     await assertFails(
       setDoc(doc(outsiderDb, "households/joinable-household/members/other"), {
@@ -1006,7 +997,7 @@ describe("/households and memberships", () => {
     await assertFails(secondJoin.commit());
   });
 
-  test("premium users can join additional premium households", async () => {
+  test("premium users cannot bypass backend redemption for additional premium households", async () => {
     await env.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
       await setDoc(doc(db, "households/additional-household"), {
@@ -1060,7 +1051,7 @@ describe("/households and memberships", () => {
       updatedAt: now,
     });
 
-    await assertSucceeds(batch.commit());
+    await assertFails(batch.commit());
   });
 
   test("household premium subscription records are server-owned", async () => {

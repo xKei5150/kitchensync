@@ -29,9 +29,12 @@ case "$*" in
         --arg status "\${FUNCTIONS_STATUS:-success}" \
         --arg duplicate "\${DUPLICATE_FUNCTION:-}" '
           ["shoppingSmoke", "startPremiumTrial", "removeHouseholdMember",
-            "transferHouseholdAdmin", "completeShoppingList",
-            "cancelShoppingList", "deleteShoppingList",
-            "planShoppingAllocation", "mutateShoppingListItem"] |
+            "transferHouseholdAdmin", "issueHouseholdInvite",
+            "redeemHouseholdInvite", "revokeHouseholdInvite",
+            "completeShoppingList", "cancelShoppingList", "deleteShoppingList",
+            "planShoppingAllocation", "mutateShoppingListItem", "adminHealthGet",
+            "adminUserGet", "adminHouseholdGet", "adminEntitlementGet",
+            "cleanupTerminalInviteMetadataDaily"] |
           map(select(. != $missing) | {
             id: ., region: "us-central1", platform: "gcfv2",
             runtime: "nodejs22", state: "ACTIVE"

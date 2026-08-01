@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
 import {
+  cpSync,
   existsSync,
+  mkdtempSync,
+  mkdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
@@ -35,11 +40,19 @@ const requiredFunctions = [
   "startPremiumTrial",
   "removeHouseholdMember",
   "transferHouseholdAdmin",
+  "issueHouseholdInvite",
+  "redeemHouseholdInvite",
+  "revokeHouseholdInvite",
   "completeShoppingList",
   "cancelShoppingList",
   "deleteShoppingList",
   "planShoppingAllocation",
   "mutateShoppingListItem",
+  "adminHealthGet",
+  "adminUserGet",
+  "adminHouseholdGet",
+  "adminEntitlementGet",
+  "cleanupTerminalInviteMetadataDaily",
 ]
 
 function assertReadinessBlocks(extra, label) {
@@ -89,13 +102,128 @@ function testVerifierContract() {
   assert(result.status === 0, `verifier exited ${result.status}: ${result.stderr}`)
   const output = `${result.stdout}\n${result.stderr}`
   for (const label of [
+    "PASS Firebase JSON, aliases, and admin Hosting target prerequisite",
     "PASS exact Todo 9 composite indexes",
+    "PASS current Functions exports use Node 22 and us-central1",
+    "PASS admin web Hosting boundary",
     "PASS CI uses Node 22 and Functions gates",
     "PASS Make exposes reproducible Firebase gates",
     "PASS rollout script is fail closed",
   ]) {
     assert(output.includes(label), `verifier did not prove: ${label}`)
   }
+}
+
+function verifierFixture() {
+  const root = mkdtempSync(resolve(tmpdir(), "kitchensync-verifier-contract-"))
+  const requiredPaths = [
+    ".firebaserc",
+    "firebase.json",
+    "firebase.dev.json",
+    "firebase.prod.json",
+    "firestore.indexes.json",
+    "functions/package.json",
+    "functions/src/index.ts",
+    "functions/src/callableSecurity.ts",
+    "functions/src/admin/callables.ts",
+    ".github/workflows/ci.yml",
+    "Makefile",
+    "tools/firebase-gates/rollout-dev.sh",
+    "tools/firebase-gates/firebase.sh",
+    "apps/admin-web/package.json",
+    "apps/admin-web/src",
+  ]
+  for (const path of requiredPaths) {
+    const destination = resolve(root, path)
+    mkdirSync(dirname(destination), { recursive: true })
+    cpSync(resolve(repoRoot, path), destination, { recursive: true })
+  }
+  return root
+}
+
+function assertVerifierRejects(mutator, label, expectedFailure) {
+  const fixture = verifierFixture()
+  try {
+    mutator(fixture)
+    const result = run(node, ["tools/verify-firebase-gates.mjs"], {
+      env: { FIREBASE_GATE_REPO_ROOT: fixture },
+    })
+    assert(result.status !== 0, `${label} unexpectedly passed the verifier`)
+    assert(
+      `${result.stdout}\n${result.stderr}`.includes(expectedFailure),
+      `${label} did not fail for the expected contract: ${result.stderr}`,
+    )
+  } finally {
+    rmSync(fixture, { recursive: true, force: true })
+  }
+}
+
+function testVerifierRejectsStaleCallableAndHostingContracts() {
+  assertVerifierRejects(
+    (fixture) => {
+      const index = resolve(fixture, "functions/src/index.ts")
+      writeFileSync(
+        index,
+        readFileSync(index, "utf8").replace(
+          /export\s*\{[\s\S]*?\}\s*from\s*["']\.\/admin\/callables\.js["']\s*;?/,
+          "",
+        ),
+      )
+    },
+    "legacy callable set without admin exports",
+    "Functions human-callable exports must match exactly",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const index = resolve(fixture, "functions/src/index.ts")
+      writeFileSync(
+        index,
+        readFileSync(index, "utf8").replace("export const issueHouseholdInvite", "const issueHouseholdInvite"),
+      )
+    },
+    "missing invite callable",
+    "Functions human-callable exports must match exactly",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const configPath = resolve(fixture, "firebase.dev.json")
+      const config = JSON.parse(readFileSync(configPath, "utf8"))
+      config.hosting.rewrites = []
+      writeFileSync(configPath, JSON.stringify(config))
+    },
+    "malformed admin Hosting configuration",
+    "firebase.dev.json Hosting must configure the SPA rewrite to /index.html",
+  )
+  assertVerifierRejects(
+    (fixture) => rmSync(resolve(fixture, "firebase.prod.json")),
+    "missing production Firebase configuration",
+    "firebase.prod.json is not valid JSON",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const configPath = resolve(fixture, "firebase.dev.json")
+      const config = JSON.parse(readFileSync(configPath, "utf8"))
+      const csp = config.hosting.headers[0].headers.find(
+        (header) => header.key === "Content-Security-Policy",
+      )
+      csp.value += " https://us-central1-kitchensync-prod-8d6fd.cloudfunctions.net"
+      writeFileSync(configPath, JSON.stringify(config))
+    },
+    "cross-environment CSP origin leakage",
+    "firebase.dev.json Hosting CSP must not include prod origins",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const configPath = resolve(fixture, "firebase.prod.json")
+      const config = JSON.parse(readFileSync(configPath, "utf8"))
+      config.hosting.headers[0].headers = config.hosting.headers[0].headers.filter(
+        (header) => header.key !== "X-Content-Type-Options",
+      )
+      writeFileSync(configPath, JSON.stringify(config))
+    },
+    "malformed production Hosting headers",
+    "firebase.prod.json Hosting must set X-Content-Type-Options",
+  )
 }
 
 function testRolloutOrdering() {
@@ -242,6 +370,7 @@ function testDebugBuildDisablesProductionTelemetry() {
 
 const tests = [
   ["verifier contract", testVerifierContract],
+  ["verifier rejects stale callable and Hosting contracts", testVerifierRejectsStaleCallableAndHostingContracts],
   ["rollout ordering", testRolloutOrdering],
   ["backend deploy is noninteractive", testBackendDeployIsNoninteractive],
   ["generated stubs are POSIX sh", testGeneratedStubsArePosix],

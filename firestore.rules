@@ -493,9 +493,6 @@ service cloud.firestore {
     function isSelf(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
-    function inviteDoc(code) {
-      return get(/databases/$(database)/documents/householdInvites/$(code));
-    }
     function userRef(uid) {
       return /databases/$(database)/documents/users/$(uid);
     }
@@ -593,45 +590,6 @@ service cloud.firestore {
         && userAfter.get('householdIds', []).hasAny([hid])
         && userAfter.get('joinedPremiumHouseholdIds', []).hasAny([hid])
         && (hasActivePremiumUser(uid) || joinedBefore.size() == 0);
-    }
-    function isValidInviteJoin(hid, uid) {
-      let code = request.resource.data.inviteCode;
-      let invite = inviteDoc(code).data;
-      let household = get(householdRef(hid)).data;
-      return request.auth.uid == uid
-        && code is string
-        && invite.active == true
-        && invite.householdId == hid
-        && invite.role == request.resource.data.role
-        && request.resource.data.role in ['member', 'shopper', 'cook']
-        && household.isJoint == true
-        && hasActiveHouseholdPremium(hid)
-        && household.memberCount is int
-        && getAfter(householdRef(hid)).data.memberCount == household.memberCount + 1
-        && getAfter(householdRef(hid)).data.memberCount <= household.maxMembers
-        && canUserJoinPremiumHousehold(uid, hid);
-    }
-    function isValidJoinCapacityUpdate(hid) {
-      let memberAfter = getAfter(householdMemberRef(hid, request.auth.uid)).data;
-      let code = memberAfter.inviteCode;
-      let invite = inviteDoc(code).data;
-      return isSignedIn()
-        && !exists(householdMemberRef(hid, request.auth.uid))
-        && existsAfter(householdMemberRef(hid, request.auth.uid))
-        && resource.data.isJoint == true
-        && hasActiveHouseholdPremium(hid)
-        && resource.data.memberCount is int
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'memberCount',
-          'updatedAt',
-        ])
-        && request.resource.data.memberCount == resource.data.memberCount + 1
-        && request.resource.data.memberCount <= resource.data.maxMembers
-        && code is string
-        && invite.active == true
-        && invite.householdId == hid
-        && invite.role == memberAfter.role
-        && canUserJoinPremiumHousehold(request.auth.uid, hid);
     }
     function isValidMemberRoleUpdate(hid, uid) {
       let nextRole = request.resource.data.role;
@@ -743,10 +701,9 @@ service cloud.firestore {
         && (!joinedPremiumHouseholdIdsChanged || joinedPremiumHouseholdHistoryIsValid());
     }
     function isValidAdminHouseholdUpdate(hid) {
-      // Household topology and entitlement fields are established by trusted
-      // provisioning/callables. Admins may edit only the user-facing name;
-      // the separate invite-join rule below is the sole client path that may
-      // increment memberCount.
+      // Household topology, entitlement, and membership counts are established
+      // by trusted provisioning/callables. Admins may edit only the
+      // user-facing name.
       return isHouseholdAdmin(hid)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'name',
@@ -803,6 +760,70 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Invite issuance, redemption, revocation, and rate-limit state are
+    // callable-only. Firebase Admin SDK operations bypass these Rules.
+    // Legacy KS-* records remain explicitly inaccessible while the client
+    // migrates to the trusted callable flow.
+    match /householdInvites/{inviteId} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteTokens/{tokenLookupHmac} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteManagement/{inviteId} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteIssueReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteRedemptionReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteRevocationReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /inviteRateLimitBuckets/{bucketId} {
+      allow read, write: if false;
+    }
+
+    match /serverInviteTerminalCleanupCursors/{cursorId} {
+      allow read, write: if false;
+    }
+
+    // Control-plane records are callable- and backend-only. Firebase Admin SDK
+    // operations bypass these Rules; browser clients never receive access.
+    match /platform_staff/{staffUid} {
+      allow read, write: if false;
+    }
+
+    match /admin_audit_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /admin_rate_limit_buckets/{bucketId} {
+      allow read, write: if false;
+    }
+
+    // Reserve future control-plane roots as server-only before their schemas
+    // and trusted operation handlers are introduced.
+    match /moderation_cases/{caseId} {
+      allow read, write: if false;
+    }
+
+    match /privacy_requests/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /repair_jobs/{jobId} {
+      allow read, write: if false;
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create: if isValidUserCreate(uid);
@@ -826,42 +847,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /householdInvites/{code} {
-      // Invite codes are bearer-style secrets. Permit lookup of a known active
-      // code, but never collection queries that could enumerate usable codes.
-      allow get: if isSignedIn() && resource.data.active == true;
-      allow list: if false;
-      allow create: if isSignedIn()
-        && request.resource.data.householdId is string
-        && request.resource.data.active is bool
-        && request.resource.data.role in ['member', 'shopper', 'cook']
-        && (
-          isHouseholdAdmin(request.resource.data.householdId)
-          // The initial joint onboarding transaction creates the household,
-          // its first Admin membership, and the first invite together. After
-          // that transaction, only a current Admin can manage invites.
-          || (
-            request.resource.data.createdBy == request.auth.uid
-            && hasReservedJointHouseholdCreation(
-              request.auth.uid,
-              request.resource.data.householdId
-            )
-          )
-        );
-      allow update: if isSignedIn()
-        && request.resource.data.householdId is string
-        && request.resource.data.householdId == resource.data.householdId
-        && request.resource.data.active is bool
-        && request.resource.data.role in ['member', 'shopper', 'cook']
-        && isHouseholdAdmin(resource.data.householdId);
-      allow delete: if false;
-    }
-
     match /households/{hid} {
       allow read: if isHouseholdMember(hid);
       allow create: if isValidHouseholdCreate(hid);
-      allow update: if isValidAdminHouseholdUpdate(hid)
-        || isValidJoinCapacityUpdate(hid);
+      allow update: if isValidAdminHouseholdUpdate(hid);
       // Firestore does not cascade parent deletes. Teardown must use trusted
       // code that removes memberships, child data, and user context together.
       allow delete: if false;
@@ -869,10 +858,7 @@ service cloud.firestore {
       match /members/{uid} {
         allow read: if isHouseholdMember(hid) || isSelf(uid);
         allow create: if isSignedIn()
-          && (
-            isReservedInitialAdminMembership(hid, uid) ||
-            isValidInviteJoin(hid, uid)
-          );
+          && isReservedInitialAdminMembership(hid, uid);
         allow update: if isValidMemberRoleUpdate(hid, uid);
         // Membership removal is a trusted callable-only operation because it
         // must also update the household count and the removed user's context.

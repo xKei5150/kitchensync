@@ -3,5 +3,15 @@
     "default": "kitchensync-dev-da503",
     "dev": "kitchensync-dev-da503",
     "prod": "kitchensync-prod-8d6fd"
-  }
+  },
+  "targets": {
+    "kitchensync-dev-da503": {
+      "hosting": {
+        "admin": [
+          "kitchensync-admin-dev-da503"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

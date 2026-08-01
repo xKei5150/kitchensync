@@ -5,6 +5,8 @@ import 'package:kitchensync/app/theme.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
+import 'package:kitchensync/features/household/data/datasources/household_invite_remote_data_source.dart';
+import 'package:kitchensync/features/household/presentation/controllers/household_invite_command_controller.dart';
 import 'package:kitchensync/features/household/presentation/controllers/household_membership_command_controller.dart';
 import 'package:kitchensync/features/household/presentation/screens/household_screen.dart';
 
@@ -39,6 +41,7 @@ Widget _wrap({
   ActiveHouseholdContext household = _adminHousehold,
   Stream<HouseholdDetails>? details,
   HouseholdMembershipCommandController? commands,
+  HouseholdInviteCommandController? inviteCommands,
 }) {
   return ProviderScope(
     overrides: [
@@ -52,7 +55,6 @@ Widget _wrap({
                 name: 'Joint kitchen',
                 isJoint: true,
                 maxMembers: 6,
-                inviteCode: 'SAGE-417',
                 members: _members,
               ),
             ),
@@ -61,13 +63,18 @@ Widget _wrap({
         householdMembershipCommandControllerProvider.overrideWithValue(
           commands,
         ),
+      if (inviteCommands != null)
+        householdInviteCommandControllerProvider.overrideWithValue(
+          inviteCommands,
+        ),
     ],
     child: MaterialApp(theme: theme, home: const HouseholdScreen()),
   );
 }
 
 void main() {
-  testWidgets('HouseholdScreen lists members and the invite code', (
+  testWidgets('Admin issues an invite through the trusted callable '
+      'controller', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(400, 1400);
@@ -75,13 +82,102 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(_wrap(theme: AppTheme.light()));
+    final inviteDataSource = _FakeInviteDataSource(
+      issueResult: const HouseholdInviteIssueResult(
+        requestId: 'request-1',
+        householdId: 'joint-household',
+        role: HouseholdInviteRole.member,
+        inviteId: 'MTIzNDU2Nzg5MDEyMzQ1Ng',
+        alreadyIssued: false,
+        inviteToken: _inviteToken,
+      ),
+    );
+    await tester.pumpWidget(
+      _wrap(
+        theme: AppTheme.light(),
+        inviteCommands: HouseholdInviteCommandController(
+          dataSource: inviteDataSource,
+          idGenerator: FakeIdGenerator(['issue-command-1']),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text("Who's in the kitchen"), findsOneWidget);
     expect(find.byType(KsMemberRow), findsNWidgets(2));
+    expect(find.byType(KsInviteCode), findsNothing);
+    await tester.tap(find.widgetWithText(FilledButton, 'Create invite'));
+    await tester.pumpAndSettle();
+    expect(inviteDataSource.issueCalls, [
+      (
+        'joint-household',
+        HouseholdInviteRole.member,
+        'issue-command-1',
+      ),
+    ]);
     expect(find.byType(KsInviteCode), findsOneWidget);
-    expect(find.text('SAGE-417'), findsOneWidget);
+    expect(find.text(_inviteToken), findsOneWidget);
+  });
+
+  testWidgets('token-free issuance replay prompts an Admin to create a new '
+      'invite', (
+    tester,
+  ) async {
+    final inviteDataSource = _FakeInviteDataSource(
+      issueResult: const HouseholdInviteIssueResult(
+        requestId: 'request-1',
+        householdId: 'joint-household',
+        role: HouseholdInviteRole.member,
+        inviteId: 'MTIzNDU2Nzg5MDEyMzQ1Ng',
+        alreadyIssued: true,
+        inviteToken: null,
+      ),
+    );
+    await tester.pumpWidget(
+      _wrap(
+        theme: AppTheme.light(),
+        inviteCommands: HouseholdInviteCommandController(
+          dataSource: inviteDataSource,
+          idGenerator: FakeIdGenerator(['issue-command-1']),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Create invite'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(KsInviteCode), findsNothing);
+    expect(find.textContaining('could not safely recover'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Create invite'), findsOneWidget);
+  });
+
+  testWidgets('invite issue errors stay user-safe and leave no token on '
+      'screen', (
+    tester,
+  ) async {
+    final inviteDataSource = _FakeInviteDataSource(
+      issueError: StateError('Invite service returned an invalid response.'),
+    );
+    await tester.pumpWidget(
+      _wrap(
+        theme: AppTheme.light(),
+        inviteCommands: HouseholdInviteCommandController(
+          dataSource: inviteDataSource,
+          idGenerator: FakeIdGenerator(['issue-command-1']),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Create invite'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(KsInviteCode), findsNothing);
+    expect(
+      find.text('Invite service returned an invalid response.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('tapping a non-admin member opens the role sheet', (
@@ -235,7 +331,6 @@ void main() {
             name: 'Joint kitchen',
             isJoint: true,
             maxMembers: 6,
-            inviteCode: 'SAGE-417',
             members: [
               HouseholdMemberSummary(
                 userId: 'member-1',
@@ -289,4 +384,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+}
+
+const _inviteToken = 'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE';
+
+class _FakeInviteDataSource implements HouseholdInviteDataSource {
+  _FakeInviteDataSource({this.issueResult, this.issueError});
+
+  final HouseholdInviteIssueResult? issueResult;
+  final StateError? issueError;
+  final issueCalls = <(String, HouseholdInviteRole, String)>[];
+
+  @override
+  Future<HouseholdInviteIssueResult> issue({
+    required String householdId,
+    required HouseholdInviteRole role,
+    required String commandId,
+  }) async {
+    issueCalls.add((householdId, role, commandId));
+    if (issueError case final error?) throw error;
+    return issueResult!;
+  }
+
+  @override
+  Future<HouseholdInviteRedemptionResult> redeem({
+    required String inviteToken,
+    required String commandId,
+  }) => throw UnimplementedError();
 }
