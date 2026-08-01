@@ -10,6 +10,12 @@ read-only admin dashboard, its supporting opaque-invite security work, and the
 release-gate documentation. It is a path allowlist, not permission to include
 every current working-tree change.
 
+The current backend policy is password-only: `mfaRequired: false` and
+`ADMIN_ALLOWED_SECOND_FACTORS=none`. This deliberately reduced assurance does
+not replace App Check, RBAC, five-minute freshness, or revocation verification.
+The frontend is aligned to the same password-only contract. App Check remains
+required and is not phone MFA.
+
 Production deployment, if separately approved, must use
 `--config firebase.prod.json`. The root `firebase.json` and
 `firebase.dev.json` are development/default configuration inputs. The nested
@@ -41,7 +47,10 @@ Include the following admin-slice paths after normal review:
 - the admin ADR/runbook/progress/architecture documents and this manifest under
   `docs/`
 - `docs/admin_dashboard_development_release_record.md` — development-only
-  deployment evidence; not a production approval or readiness assertion
+  historical phone-MFA evidence; not a password-only or production approval
+- `docs/admin_staff_password_only_adr.md` and
+  `docs/admin_dashboard_password_only_deployment_record.md` — approved policy
+  and verified development evidence, respectively
 - `firebase.prod.json`
 
 ## Required invite files

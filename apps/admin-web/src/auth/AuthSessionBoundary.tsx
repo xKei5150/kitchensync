@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import type { AdminApi } from "../api/callable";
 import type { CallableEnvelope, HealthDto } from "../api/dtos";
 import type { RuntimeConfig } from "../config/runtime";
-import type { PhoneMfaFactor, SessionGateway, SessionUser } from "./session";
+import type { SessionGateway, SessionUser } from "./session";
 import { StaffAccessContext, type StaffAccess } from "./staffAccess";
 
 interface AuthSessionBoundaryProps {
@@ -178,7 +178,7 @@ function AccessDenied({ onRenew }: { readonly onRenew: () => void }) {
       <div className="boundary-page__mark boundary-page__mark--warning" aria-hidden="true" />
       <p className="eyebrow">Access denied</p>
       <h1>This account cannot access the administration console.</h1>
-      <p>Staff access could not be verified. No administrative data is available in this session. Sign out and complete a new staff sign-in, including any required second factor.</p>
+      <p>Staff access could not be verified. No administrative data is available in this session. Sign out and complete a new staff account email and password sign-in.</p>
       <button className="button button--secondary" type="button" onClick={onRenew}>Sign out and sign in again</button>
     </main>
   );
@@ -189,121 +189,37 @@ export function SignInPanel({ session }: { readonly session: SessionGateway }) {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [factors, setFactors] = useState<readonly PhoneMfaFactor[] | null>(null);
-  const [selectedFactor, setSelectedFactor] = useState("");
-  const [challengeSent, setChallengeSent] = useState(false);
-  const [verificationCode, setVerificationCode] = useState("");
-  const verifierContainer = useRef<HTMLDivElement>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setSubmitting(true);
     setFailed(false);
     try {
-      const outcome = await session.signIn(email.trim(), password);
-      if (outcome.kind === "mfa-required") {
-        setFactors(outcome.factors);
-        setSelectedFactor(outcome.factors[0]?.id ?? "");
-        setPassword("");
-        setSubmitting(false);
-      }
+      await session.signIn(email.trim(), password);
     } catch {
       setFailed(true);
       setSubmitting(false);
     }
-  }
-
-  async function sendPhoneChallenge(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    if (!selectedFactor || !verifierContainer.current) {
-      setFailed(true);
-      return;
-    }
-    setSubmitting(true);
-    setFailed(false);
-    try {
-      await session.beginPhoneMfa(selectedFactor, verifierContainer.current);
-      setChallengeSent(true);
-    } catch {
-      setFailed(true);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function completePhoneChallenge(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    if (!/^\d{6,8}$/.test(verificationCode)) {
-      setFailed(true);
-      return;
-    }
-    setSubmitting(true);
-    setFailed(false);
-    try {
-      await session.completePhoneMfa(verificationCode);
-      setVerificationCode("");
-    } catch {
-      setFailed(true);
-      setSubmitting(false);
-    }
-  }
-
-  function resetPhoneChallenge(): void {
-    session.resetMfaChallenge();
-    setChallengeSent(false);
-    setVerificationCode("");
-    setFailed(false);
-  }
-
-  function cancelMfa(): void {
-    session.cancelMfa();
-    setFactors(null);
-    setSelectedFactor("");
-    setChallengeSent(false);
-    setVerificationCode("");
-    setFailed(false);
   }
 
   return (
     <main className="boundary-page boundary-page--signin">
       <div className="boundary-page__mark" aria-hidden="true" />
       <p className="eyebrow">KitchenSync administration</p>
-      <h1>{factors ? "Verify your second factor" : "Sign in with your staff account"}</h1>
-      <p>{factors ? "Choose an enrolled phone factor and enter its verification code to finish signing in." : "Access is verified against the authoritative staff service after authentication."}</p>
-      {!factors ? (
-        <form className="signin-form" onSubmit={submit} noValidate>
-          <label>
-            <span>Email</span>
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" required />
-          </label>
-          <label>
-            <span>Password</span>
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
-          </label>
-          <button className="button" type="submit" disabled={submitting}>{submitting ? "Signing in" : "Sign in"}</button>
-          {failed ? <p className="form-error" role="alert">Sign-in could not be completed. Check your credentials and try again.</p> : null}
-        </form>
-      ) : !challengeSent ? (
-        <form className="signin-form" onSubmit={sendPhoneChallenge} noValidate>
-          {factors.length > 1 ? <fieldset className="mfa-factor-list"><legend>Choose a phone factor</legend>{factors.map((factor) => <label key={factor.id}><input type="radio" name="phone-factor" value={factor.id} checked={selectedFactor === factor.id} onChange={() => setSelectedFactor(factor.id)} /> <span>{factor.label}</span></label>)}</fieldset> : <p className="mfa-factor-note">{factors[0]?.label}</p>}
-          <div className="mfa-recaptcha" ref={verifierContainer} aria-live="polite" />
-          <button className="button" type="submit" disabled={submitting}>{submitting ? "Sending code" : "Send verification code"}</button>
-          <button className="button button--secondary" type="button" onClick={cancelMfa}>Cancel</button>
-          {failed ? <p className="form-error" role="alert">The second-factor challenge could not be completed. Try again or use a new staff sign-in.</p> : null}
-        </form>
-      ) : (
-        <form className="signin-form" onSubmit={completePhoneChallenge} noValidate>
-          <label>
-            <span>Verification code</span>
-            <input value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))} inputMode="numeric" autoComplete="one-time-code" maxLength={8} required />
-          </label>
-          <div className="mfa-recaptcha" ref={verifierContainer} aria-live="polite" />
-          <button className="button" type="submit" disabled={submitting}>{submitting ? "Verifying" : "Verify and sign in"}</button>
-          <button className="button button--secondary" type="button" onClick={resetPhoneChallenge}>Send a new code</button>
-          <button className="button button--secondary" type="button" onClick={cancelMfa}>Cancel</button>
-          {failed ? <p className="form-error" role="alert">The verification code could not be accepted. Try again or use a new staff sign-in.</p> : null}
-        </form>
-      )}
+      <h1>Sign in with your staff account</h1>
+      <p>Use your staff account email and password to access the administration console.</p>
+      <form className="signin-form" onSubmit={submit} noValidate>
+        <label>
+          <span>Email</span>
+          <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" required />
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
+        </label>
+        <button className="button" type="submit" disabled={submitting}>{submitting ? "Signing in" : "Sign in"}</button>
+        {failed ? <p className="form-error" role="alert">Sign-in could not be completed. Check your email and password and try again.</p> : null}
+      </form>
     </main>
   );
 }

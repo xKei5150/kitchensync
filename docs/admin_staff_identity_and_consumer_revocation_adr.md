@@ -1,6 +1,9 @@
 # ADR: staff identity and consumer direct-data revocation
 
-**Status:** Approved — repository policy decision; not deployment evidence.
+**Status:** Superseded for staff authentication/MFA by
+[`admin_staff_password_only_adr.md`](admin_staff_password_only_adr.md).
+Consumer direct-data revocation content is retained as historical policy
+evidence; this document is not deployment evidence.
 **Date:** 2026-08-01
 
 ## Context

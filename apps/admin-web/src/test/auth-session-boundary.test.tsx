@@ -9,10 +9,6 @@ function createSession(user: SessionUser | null): SessionGateway {
   return {
     subscribe(listener) { listener(user); return () => undefined; },
     signIn: vi.fn().mockResolvedValue({ kind: "signed-in" }),
-    beginPhoneMfa: vi.fn().mockResolvedValue(undefined),
-    completePhoneMfa: vi.fn().mockResolvedValue(undefined),
-    resetMfaChallenge: vi.fn(),
-    cancelMfa: vi.fn(),
     signOut: vi.fn().mockResolvedValue(undefined),
   };
 }

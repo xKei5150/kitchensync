@@ -43,7 +43,7 @@ const config: AdminRuntimeConfig = {
   policyVersion: "staff-policy-v1",
   allowedProviders: ["password"],
   allowedTenants: ["none"],
-  allowedSecondFactors: ["phone"],
+  allowedSecondFactors: ["none"],
   allowedOrigins: ["https://admin.example.test"],
   rateLimitKeyVersion: "admin-rate-limit-hmac-sha256-v1",
   auditHmacKeyVersion: "admin-audit-hmac-sha256-v1",
@@ -388,6 +388,58 @@ describe("admin read-only handlers against the Firestore emulator", () => {
     ).toBe(false)
   })
 
+  it("accepts password-only staff tokens and denies unexpected second factors in both checks", async () => {
+    const harness = createHarness()
+    disposals.push(harness.dispose)
+    const fixture = await seedFixture(harness.db)
+    const initialState = dependencyStateFor(fixture)
+    const initialDependencies = createDependencies(
+      harness.db,
+      fixture,
+      initialState,
+      () => fixture.householdRequestId,
+    )
+
+    for (const secondFactor of ["phone", "none"]) {
+      await expect(
+        adminHouseholdGetHandler(householdRequest(fixture, { secondFactor }), initialDependencies),
+      ).rejects.toMatchObject({ code: "permission-denied" })
+    }
+    expect(initialState.verifications).toEqual([])
+
+    for (const secondFactor of ["phone", "none"]) {
+      const revocationState = dependencyStateFor(fixture)
+      const revocationDependencies = createDependencies(
+        harness.db,
+        fixture,
+        revocationState,
+        () => fixture.householdRequestId,
+        { verifiedSecondFactor: secondFactor },
+      )
+      await expect(
+        adminHouseholdGetHandler(householdRequest(fixture), revocationDependencies),
+      ).rejects.toMatchObject({ code: "permission-denied" })
+      expect(revocationState.verifications).toEqual([[fixture.rawToken, true]])
+      expect(
+        await requireDocument(
+          harness.db,
+          `${ADMIN_AUDIT_COLLECTION}/${fixture.householdRequestId}`,
+        ),
+      ).toEqual(
+        expectedAudit({
+          requestId: fixture.householdRequestId,
+          operation: "admin.household.get",
+          caseId: fixture.householdCaseId,
+          targetType: "household",
+          targetId: fixture.householdId,
+          actorUid: fixture.staffUid,
+          outcome: "denied",
+          reason: "permission_denied",
+        }),
+      )
+    }
+  })
+
   it("fails closed when the server-only rate bucket is malformed", async () => {
     const harness = createHarness()
     disposals.push(harness.dispose)
@@ -538,7 +590,7 @@ async function seedFixture(
       roles: ["support"],
       capabilities: ["user.read.summary", "household.read.summary"],
       scope: { environments: ["production"] },
-      mfaRequired: true,
+      mfaRequired: false,
       policyVersion: config.policyVersion,
       createdAt: fixedNowTimestamp,
       updatedAt: fixedNowTimestamp,
@@ -592,6 +644,7 @@ function createDependencies(
   fixture: Fixture,
   state: DependencyState,
   requestId: () => string,
+  options: Readonly<{ readonly verifiedSecondFactor?: unknown }> = {},
 ): AdminHandlerDependencies {
   return {
     store: firestoreAdminStore(db),
@@ -602,7 +655,7 @@ function createDependencies(
     auditHmacKey: () => auditHmacKey,
     verifyIdToken: async (rawToken, checkRevoked) => {
       state.verifications.push([rawToken, checkRevoked])
-      return verifiedToken(fixture.staffUid)
+      return verifiedToken(fixture.staffUid, options.verifiedSecondFactor)
     },
     getAuthUser: async (uid) => {
       state.authUserUids.push(uid)
@@ -627,7 +680,11 @@ function dependencyStateFor(_fixture: Fixture): DependencyState {
 
 function userRequest(
   fixture: Fixture,
-  options: Readonly<{ readonly authUid?: string; readonly platformStaff?: boolean }> = {},
+  options: Readonly<{
+    readonly authUid?: string
+    readonly platformStaff?: boolean
+    readonly secondFactor?: unknown
+  }> = {},
 ): AdminCallableRequest {
   return {
     data: {
@@ -644,7 +701,11 @@ function userRequest(
 
 function householdRequest(
   fixture: Fixture,
-  options: Readonly<{ readonly authUid?: string; readonly platformStaff?: boolean }> = {},
+  options: Readonly<{
+    readonly authUid?: string
+    readonly platformStaff?: boolean
+    readonly secondFactor?: unknown
+  }> = {},
 ): AdminCallableRequest {
   return {
     data: {
@@ -660,7 +721,11 @@ function householdRequest(
 
 function authFor(
   fixture: Fixture,
-  options: Readonly<{ readonly authUid?: string; readonly platformStaff?: boolean }>,
+  options: Readonly<{
+    readonly authUid?: string
+    readonly platformStaff?: boolean
+    readonly secondFactor?: unknown
+  }>,
 ): NonNullable<AdminCallableRequest["auth"]> {
   const uid = options.authUid ?? fixture.staffUid
   return {
@@ -672,13 +737,15 @@ function authFor(
       auth_time: Math.floor(fixedNow.getTime() / 1000),
       firebase: {
         sign_in_provider: "password",
-        sign_in_second_factor: "phone",
+        ...(options.secondFactor === undefined
+          ? {}
+          : { sign_in_second_factor: options.secondFactor }),
       },
     },
   }
 }
 
-function verifiedToken(staffUid: string): Record<string, unknown> {
+function verifiedToken(staffUid: string, secondFactor?: unknown): Record<string, unknown> {
   return {
     uid: staffUid,
     aud: projectId,
@@ -686,7 +753,7 @@ function verifiedToken(staffUid: string): Record<string, unknown> {
     auth_time: Math.floor(fixedNow.getTime() / 1000),
     firebase: {
       sign_in_provider: "password",
-      sign_in_second_factor: "phone",
+      ...(secondFactor === undefined ? {} : { sign_in_second_factor: secondFactor }),
     },
   }
 }
@@ -699,7 +766,7 @@ function expectedAudit(input: {
   readonly targetId: string
   readonly actorUid: string
   readonly outcome: "success" | "denied"
-  readonly reason: "completed" | "rate_limited"
+  readonly reason: "completed" | "rate_limited" | "permission_denied"
 }): Record<string, unknown> {
   return {
     requestId: input.requestId,
@@ -728,7 +795,7 @@ function expectedAudit(input: {
       input.operation === "admin.user.get" ? "user.read.summary" : "household.read.summary",
     provider: "password",
     tenantClassification: "none",
-    secondFactor: "phone",
+    secondFactor: "none",
     authAgeSeconds: 0,
     appReference: adminAuditAppReferenceHmac(auditHmacKey, config.auditHmacKeyVersion, adminAppId),
     occurredAt: fixedNow.toISOString(),

@@ -300,6 +300,8 @@ export function adminRuntimeConfigFromEnvironment(
     allowedProviders === undefined ||
     allowedTenants === undefined ||
     allowedSecondFactors === undefined ||
+    allowedSecondFactors.length !== 1 ||
+    allowedSecondFactors[0] !== "none" ||
     allowedOrigins === undefined
   ) {
     return { ok: false }

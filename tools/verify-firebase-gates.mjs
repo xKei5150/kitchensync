@@ -25,6 +25,11 @@ const expectedHumanCallableNames = [
   "adminHouseholdGet",
   "adminEntitlementGet",
 ]
+const expectedInviteCallableNames = [
+  "issueHouseholdInvite",
+  "redeemHouseholdInvite",
+  "revokeHouseholdInvite",
+]
 const expectedScheduledWorkerNames = ["cleanupTerminalInviteMetadataDaily"]
 const hostingEnvironments = {
   dev: {
@@ -377,12 +382,28 @@ check("current Functions exports use Node 22 and us-central1", () => {
   for (const name of expectedScheduledWorkerNames) {
     assert(!callables.has(name), `${name} must be a scheduled worker, not a callable`)
   }
-  for (const name of expectedHumanCallableNames.filter((name) => !name.startsWith("admin"))) {
+  for (const name of expectedHumanCallableNames.filter(
+    (name) => !name.startsWith("admin") && !expectedInviteCallableNames.includes(name),
+  )) {
     assert(
       new RegExp(
         `export\\s+const\\s+${name}\\s*=\\s*onCall\\s*\\(\\s*(?:callableSecurity\\s*,|\\{\\s*\\.\\.\\.callableSecurity\\s*,)`,
       ).test(functionsSource),
       `${name} must use the shared callable security options`,
+    )
+  }
+  assert(
+    /const\s+inviteCallableSecurity\s*=\s*\{\s*\.\.\.callableSecurity\s*,\s*serviceAccount\s*:\s*inviteRuntimeServiceAccount\s*,?\s*\}/.test(
+      functionsSource,
+    ),
+    "invite callable security options must inherit callableSecurity and use inviteRuntimeServiceAccount",
+  )
+  for (const name of expectedInviteCallableNames) {
+    assert(
+      new RegExp(
+        `export\\s+const\\s+${name}\\s*=\\s*onCall\\s*\\(\\s*(?:inviteCallableSecurity\\s*,|\\{\\s*\\.\\.\\.inviteCallableSecurity\\s*,)`,
+      ).test(functionsSource),
+      `${name} must use inviteCallableSecurity`,
     )
   }
   for (const name of expectedHumanCallableNames.filter((name) => name.startsWith("admin"))) {

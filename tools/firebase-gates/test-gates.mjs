@@ -186,6 +186,31 @@ function testVerifierRejectsStaleCallableAndHostingContracts() {
   )
   assertVerifierRejects(
     (fixture) => {
+      const index = resolve(fixture, "functions/src/index.ts")
+      writeFileSync(
+        index,
+        readFileSync(index, "utf8").replace("  ...callableSecurity,\n", ""),
+      )
+    },
+    "invite wrapper without shared callable security inheritance",
+    "invite callable security options must inherit callableSecurity and use inviteRuntimeServiceAccount",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const index = resolve(fixture, "functions/src/index.ts")
+      writeFileSync(
+        index,
+        readFileSync(index, "utf8").replace(
+          "export const revokeHouseholdInvite = onCall(inviteCallableSecurity,",
+          "export const revokeHouseholdInvite = onCall(callableSecurity,",
+        ),
+      )
+    },
+    "invite callable using base security options",
+    "revokeHouseholdInvite must use inviteCallableSecurity",
+  )
+  assertVerifierRejects(
+    (fixture) => {
       const configPath = resolve(fixture, "firebase.dev.json")
       const config = JSON.parse(readFileSync(configPath, "utf8"))
       config.hosting.rewrites = []

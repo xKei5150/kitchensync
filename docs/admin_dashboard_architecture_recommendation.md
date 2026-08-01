@@ -224,7 +224,7 @@ These are support vocabulary and validation inputs. “Observed” is backed by 
 
 ### Identity model
 
-**Approved policy.** [`admin_staff_identity_and_consumer_revocation_adr.md`](admin_staff_identity_and_consumer_revocation_adr.md) selects same-project, non-tenant Firebase Auth initially: dedicated human staff UIDs use email/password plus phone SMS MFA. `platform_staff` and the admin SPA are for human staff only. Every staff identity requires both the coarse `platformStaff: true` claim and an authoritative staff record; consumer/staff dual use is prohibited. Real production enrollment, phone-factor delivery, and offboarding execution remain target-environment evidence requirements.
+**Approved policy.** [`admin_staff_password_only_adr.md`](admin_staff_password_only_adr.md) supersedes the prior staff-authentication decision: dedicated same-project, non-tenant human staff UIDs use password-only Firebase Auth. The organization explicitly accepts the reduced assurance for the bounded read-only slice. `platform_staff` and the admin SPA are for human staff only. Every staff identity requires both the coarse `platformStaff: true` claim and an authoritative staff record; consumer/staff dual use is prohibited. App Check, RBAC, recent authentication, and revocation checks remain required; target-environment password-only identity enrollment remains separate evidence.
 
 Human staff authorization MUST use two layers:
 
@@ -242,7 +242,7 @@ platform_staff/{uid}
   roles: string[]
   capabilities: string[]                 // server-recognized allowlist
   scope: { environments, regions?, queues? }
-  mfaRequired: true
+  mfaRequired: false
   createdAt, updatedAt, disabledAt?
   policyVersion
   breakGlass: { eligible: boolean, expiresAt? }  // no standing broad grant
@@ -282,7 +282,7 @@ Roles bundle capabilities; endpoint authorization MUST check specific capabiliti
 | Actor | Exact human capability set, allowed staff roles, prohibited roles, and whether workload identity is separately permitted. |
 | Target | Allowed target types, tenant/environment scope, field masks, data classification, and maximum breadth/count. |
 | Risk and approvals | `read_non_sensitive | read_sensitive | mutation_low | mutation_high | destructive`; approver capability/independence, approval TTL, preview-hash binding, and whether case validation is required. |
-| Authentication strength | Expected tenant/provider, MFA/second-factor evidence, maximum `auth_time` age, recent-auth rule, and token-revocation check requirement. |
+| Authentication strength | Expected tenant/provider, password-only second-factor policy (`none`), maximum `auth_time` age, recent-auth rule, and token-revocation check requirement. |
 | Execution controls | Rate-limit bucket/limit, idempotency requirement, timeout, pagination/query budget, mutation-switch class, and queue/worker identity. |
 | Evidence and recovery | Audit mode, log fields, retention, before/after summary mask, rollback/compensation category, and terminal job semantics. |
 
@@ -292,7 +292,7 @@ Roles bundle capabilities; endpoint authorization MUST check specific capabiliti
 
 | Control | Requirement |
 | --- | --- |
-| Staff MFA | **Required.** All human staff accounts MUST use MFA before console access. Firebase-managed web MFA requires Identity Platform; do not claim Firebase Authentication alone enforces it. Server verification MUST require the expected Firebase project/tenant/provider and, where Firebase MFA is used, the `firebase.sign_in_second_factor` token evidence; it MUST also enforce a registry-defined maximum token `auth_time` age. A corporate IdP may satisfy this only when it supplies a server-verifiable signed assurance/MFA claim plus issuer/audience, subject, enrollment, and offboarding guarantees. |
+| Staff assurance | **Approved password-only policy.** Current staff tokens must use the expected password provider, non-tenant posture, and an absent `firebase.sign_in_second_factor`, audited as `none`; carried factors are denied under the global `none` allowlist. The organization explicitly accepts this reduced assurance for the read-only slice. App Check, authoritative RBAC, five-minute freshness, and revocation verification remain required. |
 | Step-up | **Required.** Sensitive read, account disable/enable, session revocation, privacy export/deletion, entitlement correction, content removal, repair execute, staff administration, and break-glass use MUST require the registry-defined recent `auth_time` and fresh MFA/step-up evidence. Browser assertion alone is insufficient. |
 | Two-person approval | **Required.** High-risk actions MUST require a different eligible approver. Approval MUST bind the actor, target, preview hash, reason, expiry, and expected change; edits invalidate approval. |
 | Session revocation | **Required.** Account-control actions that revoke a user MUST call `revokeRefreshTokens(uid)` through trusted backend code and record the revocation time and reason. It does not retroactively invalidate every already-issued ID token unless the endpoint verifies revocation. |
@@ -939,7 +939,7 @@ admin_audit_events/{eventId}
 - Separate React/TypeScript/Vite repository area and classic Hosting dev site; environment/version display and SPA rewrite.
 - Independently remediate the predictable joint-household invite vulnerability: opaque >=128-bit random backend-redeemed tokens, legacy invite invalidation/rotation, and adversarial Rules/integration tests. This is a consumer-security prerequisite, not an admin feature.
 - Dedicated `functions/src/admin/` boundary, strict contracts, request envelope, separate HTTP/callable error contracts, rate limiter, bounded pagination utility, operation policy registry, and classed mutation switches.
-- Approved human-identity ADR; dedicated same-project non-tenant staff UIDs, coarse claim, authoritative record, phone SMS MFA, no dual-use policy, offboarding procedure, and target-environment enrollment evidence.
+- Approved human-identity ADR; dedicated same-project non-tenant staff UIDs, coarse claim, authoritative record with `mfaRequired: false`, password-only absent-factor policy, no dual-use policy, offboarding procedure, and target-environment enrollment evidence.
 - Approved eventual consumer revocation SLA with direct Firestore/Storage pre-revocation-token tests; dedicated service-account/IAM review that acknowledges database-level Firestore IAM, project/app/environment/App Check validation, secrets handling, and CORS policy.
 - Application audit schema/outbox semantics, structured logging, minimum dashboards/alerts, and basic health endpoint.
 - Security test suite proving consumer household Admin denial and core role matrix.
@@ -1063,7 +1063,7 @@ admin_audit_events/{eventId}
 
 | Assumption | Status | Validation needed |
 | --- | --- | --- |
-| Human staff accounts can be governed separately from consumer accounts in the same Firebase project initially without dual-use identities. | **Approved ADR** | Use dedicated same-project non-tenant staff UIDs, email/password plus phone SMS MFA, authoritative claim/record checks, and the specified offboarding order; validate real enrollment and MFA delivery before release. |
+| Human staff accounts can be governed separately from consumer accounts in the same Firebase project initially without dual-use identities. | **Approved ADR** | Use dedicated same-project non-tenant staff UIDs, password-only authentication with no carried second factor, authoritative claim/record checks, and the specified offboarding order; validate target-environment enrollment before release. |
 | Predictable legacy invites will be remediated and all joint-household invite values rotated before any admin rollout. | **Required P0 prerequisite** | Secure backend token issuance/redemption migration, user communication, capacity-race tests, and incident owner. |
 | Classic Hosting supports the required static SPA deployment and preview workflow. | **Recommended** | Implement dev Hosting target/site and verify rewrite, preview restrictions, custom-domain and app configuration. |
 | Current Firestore schema is heterogeneous enough to require read-tolerant diagnostics. | **Verified current state/assumption** | Build schema inventory in dev; do not use a single inferred schema as write authority. |
@@ -1076,7 +1076,7 @@ admin_audit_events/{eventId}
 | --- | --- |
 | Household Admin mistaken for platform Admin | Separate terminology, code paths, claims/records, and negative authorization tests. |
 | Public recipe reveals predictable invite | Treat as current critical vulnerability; remediate opaque backend-redeemed tokens independently, invalidate/rotate legacy values, and test derivation denial. |
-| Admin SDK turns staff browser compromise into broad data exposure | No direct broad Rules access; backend capabilities, masks, MFA, step-up, rate limits, audit, and separate service accounts. |
+| Admin SDK turns staff browser compromise into broad data exposure | No direct broad Rules access; App Check, backend capabilities, masks, password-only policy, five-minute freshness, revocation checks, rate limits, audit, and separate service accounts. |
 | Assumed collection-scoped Firestore IAM | Treat IAM as database/project scoped; use application allowlists or separate database/project with outbox/saga tradeoffs for hard isolation. |
 | Denormalized household/entitlement drift creates harmful repairs | Evidence-first diagnostics, computed effective state, preview/revalidation, approval, idempotency, and domain commands. |
 | Unbounded cross-module scans cause cost/outage | Pagination, indexes, query budgets, projections/jobs, concurrency limits, and SLO monitoring. |

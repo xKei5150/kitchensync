@@ -8,12 +8,13 @@ control records, and the Hosting target. It is not evidence that an environment
 has been provisioned or released **by itself**. No customer-state mutation class is enabled
 by this runbook.
 
-The staff-identity and consumer-revocation policy decisions are approved in
-[`admin_staff_identity_and_consumer_revocation_adr.md`](admin_staff_identity_and_consumer_revocation_adr.md).
+The password-only staff policy is approved in
+[`admin_staff_password_only_adr.md`](admin_staff_password_only_adr.md). Consumer
+revocation remains recorded in the superseded staff-identity ADR.
 They do not establish deployment evidence:
 
-1. Staff initially use dedicated, same-project non-tenant Firebase Auth UIDs,
-   email/password, and phone SMS MFA. Consumer/staff dual use is prohibited.
+1. Staff use dedicated, same-project non-tenant Firebase Auth UIDs and
+   password-only authentication. Consumer/staff dual use is prohibited.
    Callable access requires both `platformStaff: true` and the authoritative
    least-privilege `platform_staff/{uid}` record.
 2. Consumer direct Firestore/Storage revocation is eventual: pre-revocation ID
@@ -21,8 +22,9 @@ They do not establish deployment evidence:
    immediate-revocation claim is permitted. Admin callables continue to use
    `verifyIdToken(rawToken, true)`.
 
-Production-grade real MFA enrollment, App Check, target transport, Secret
-Manager/IAM, and target-production deployment evidence remain release blockers.
+The explicitly accepted reduced assurance does not replace App Check, RBAC,
+recent authentication, revocation checks, target transport, Secret Manager/IAM,
+or target-production deployment evidence.
 
 ## 2026-08-01 development deployment evidence
 
@@ -43,14 +45,22 @@ rate-metadata-redaction checks. The evidence record documents cleanup of all
 canary identities, data, rate buckets, and local credentials without recording
 their sensitive details.
 
-This is **development-only** evidence. It does not establish production
-resource/billing provisioning, production staff/MFA, production App Check or
+This is **development-only historical** phone-MFA evidence. It predates the
+approved password-only policy and does not establish a password-only
+deployment. The separate password-only development evidence is recorded in
+[`admin_dashboard_password_only_deployment_record.md`](admin_dashboard_password_only_deployment_record.md).
+It does not establish production
+resource/billing provisioning, production staff authentication, production App Check or
 transport behavior, a production revocation canary, mobile invite-client
 distribution/enforcement, legacy invite inventory/disposition, historical
 environment-file response, production approvals, or an observation/monitoring
 period. Keep all P2/P3 mutation classes disabled.
 The record contains no secret values, test-phone details, disposable identity
 data, raw tokens, raw audit data, or customer content.
+
+Do not update the historical phone-MFA record to represent the password-only
+deployment. Use the separate password-only deployment record for that
+evidence.
 
 ## Required per-environment resources
 
@@ -66,7 +76,8 @@ For each environment, create and record all of the following before a release:
 
 A Hosting site and Web App are deployment/UI boundaries, not staff
 authorization boundaries. The callable still independently checks Firebase
-Auth, `platformStaff: true`, App Check app ID, provider/tenant/MFA claims,
+Auth, `platformStaff: true`, App Check app ID, provider/tenant/second-factor
+policy,
 recent auth, the authoritative staff record, capability, and environment.
 
 Apply the root Hosting target named `admin` separately for every Firebase
@@ -100,7 +111,7 @@ Set these values for the target environment:
 | `ADMIN_POLICY_VERSION` | Current reviewed staff policy version. |
 | `ADMIN_ALLOWED_SIGN_IN_PROVIDERS` | Comma-separated allowlisted staff sign-in providers. |
 | `ADMIN_ALLOWED_TENANTS` | Comma-separated tenant allowlist; use literal `none` for the initially approved same-project, non-tenant staff tokens. |
-| `ADMIN_ALLOWED_SECOND_FACTORS` | Comma-separated values accepted from `firebase.sign_in_second_factor`. |
+| `ADMIN_ALLOWED_SECOND_FACTORS` | Explicit `firebase.sign_in_second_factor` allowlist. Global password-only configuration is exactly `none`: an absent factor is accepted and audited as `none`; a carried factor is denied. |
 | `ADMIN_ALLOWED_ORIGINS` | Comma-separated exact SPA HTTPS origins. Development/preview may additionally use `http://localhost` or `http://127.0.0.1`; production may not. No wildcard, path, credential, query, or fragment origin is accepted. |
 | `ADMIN_RATE_LIMIT_KEY_VERSION` | Reviewed identifier for the active rate-limit HMAC key. It is persisted with bucket records and participates in bucket identity. |
 | `ADMIN_AUDIT_HMAC_KEY_VERSION` | Reviewed identifier for the active audit HMAC key. It is persisted in audit events and prefixes every audit/member HMAC reference. |
@@ -153,7 +164,7 @@ access and does not replace App Check or staff authorization.
    production evidence.
 2. Preserve the implemented environment-exact CSP origins when
    building/deploying the admin Hosting site. All configurations permit Google
-   App Check/MFA dependencies through `script-src` origins
+   App Check browser dependencies through `script-src` origins
    `https://apis.google.com`, `https://www.google.com`, and
    `https://www.gstatic.com`; and shared `connect-src`/`frame-src` Google
    origins `https://www.google.com` and `https://www.recaptcha.net`. The root
@@ -168,17 +179,12 @@ access and does not replace App Check or staff authorization.
    `https://securetoken.googleapis.com`, and
    `https://content-firebaseappcheck.googleapis.com` in `connect-src`.
    Review any environment/origin change before changing these exact allowlists.
-3. The SPA implements the Firebase phone MFA resolver flow: it lists masked
-   enrolled phone factors, creates an invisible `RecaptchaVerifier`, requests a
-   `PhoneAuthProvider` challenge for the selected factor, and resolves sign-in
-   only after the submitted SMS code creates a phone MFA assertion. This is
-   implementation evidence only; it is not proof of real phone/SMS delivery.
+ 3. The current SPA implements password-only staff sign-in. Firebase App Check
+    remains required and is independent of phone MFA.
 4. Provision a dedicated human staff UID in the same Firebase project with no
-   tenant. Use email/password plus phone SMS MFA; do not reuse a consumer UID.
-   Development may use configured Firebase test phone numbers. Production
-   requires a separately controlled real staff identity and enrolled real phone
-   factor, then verification of the expected provider, non-tenant posture, and
-   `firebase.sign_in_second_factor` evidence.
+   tenant. Use password-only authentication; do not reuse a consumer UID. Verify
+   the expected password provider, non-tenant posture, and absence of
+   `firebase.sign_in_second_factor`.
 5. Through the separate trusted staff-provisioning control plane, set the
    coarse custom claim exactly as `platformStaff: true`. Require the user to
    obtain a refreshed ID token after the claim change.
@@ -197,7 +203,7 @@ access and does not replace App Check or staff authorization.
                     "household.read.summary", "entitlement.read"],
      scope: { environments: ["development" | "preview" | "production"],
               regions?: [...], queues?: [...] },
-     mfaRequired: true,
+      mfaRequired: false,
      policyVersion: "<ADMIN_POLICY_VERSION>",
      createdAt?: <trusted timestamp>, updatedAt?: <trusted timestamp>,
      disabledAt?: <trusted timestamp>,
@@ -269,10 +275,12 @@ access and does not replace App Check or staff authorization.
    admin Web App ID, Hosting site ID, and change/incident reference in the
    release record. Do not record secrets, raw Auth tokens, or customer content.
 
-## Required target-environment verification (not yet evidence)
+## Required target-environment verification
 
 Use a disposable staff identity and non-production data. Verify both expected
-allow and deny paths:
+allow and deny paths for each target; development evidence is recorded in
+`admin_dashboard_password_only_deployment_record.md`, while production remains
+unverified:
 
 - successful `adminHealthGet` returns only its fixed health DTO, enforces its
   five-minute `auth_time` freshness bound, and, like every current admin
@@ -281,7 +289,7 @@ allow and deny paths:
   when audit persistence is unavailable; audit events include the audit-key
   version and non-sensitive authorization assurance metadata;
 - absent claim, absent/disabled/malformed staff record, wrong project, wrong
-  App Check app, wrong provider/tenant/second factor, stale `auth_time`, wrong
+  App Check app, wrong provider/tenant, unexpected second factor, stale `auth_time`, wrong
   environment/region, `break_glass` role, and missing capability deny safely;
 - all four operations reject a real revoked token;
 - direct consumer Firestore/Storage testing observes and documents the approved
@@ -300,9 +308,10 @@ allow and deny paths:
   `contextConsistency: "missing"` when no profile/household context exists.
 
 Unit tests do **not** establish callable/Auth/App Check transport behavior or
-real MFA behavior. Those are staging/deployment evidence: perform a real
-browser-to-callable App Check check, an Auth provider/tenant/MFA check, and a
-revocation check in the target environment before production release.
+password-only transport behavior. Those are target-environment evidence:
+perform a real browser-to-callable App Check check, an Auth provider/tenant and
+absence-of-second-factor check, and a revocation check in the target
+environment before production release.
 
 ## Proven local verification commands and repository evidence
 
@@ -331,9 +340,9 @@ node tools/firebase-gates/test-gates.mjs
 git diff --check
 ```
 
-The final verified repository evidence is: Functions unit gate **17 files / 153
-tests**; admin-handler Firestore Emulator gate **1 file / 4 tests**; admin-web
-unit gate **11 files / 31 tests**; Playwright **4 tests** across desktop and
+The final verified repository evidence is: Functions unit gate **18 files / 163
+tests**; admin-handler Firestore Emulator gate **1 file / 5 tests**; admin-web
+unit gate **11 files / 33 tests**; Playwright **4 tests** across desktop and
 mobile; focused Rules gate **3 files / 11 tests**; and passing Firebase verifier
 and rollout-contract gates. The Firebase verifier validates `firebase.json`,
 `firebase.dev.json`, and `firebase.prod.json`, including environment-exact CSP.
@@ -353,12 +362,11 @@ callable/client release instead.
 Production release remains blocked by:
 
 - a real registered App Check Enterprise token exchange for the target admin Web
-  App, real phone MFA/SMS challenge delivery, and deployed CORS/Hosting-header
-  verification;
+  App and deployed CORS/Hosting-header verification;
 - real Secret Manager provisioning, secret-version retention/rotation evidence,
   and reviewed deployment/service-account IAM;
-- real separately controlled staff-identity enrollment, phone MFA/SMS delivery,
-  and `verifyIdToken(..., true)` revocation evidence for all current operations;
+- real separately controlled password-only staff-identity enrollment and
+  `verifyIdToken(..., true)` revocation evidence for all current operations;
 - target-environment confirmation of the approved eventual consumer direct
   Firestore/Storage revocation behavior, including its up-to-60-minute residual
   token lifetime;

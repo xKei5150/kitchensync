@@ -111,12 +111,6 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .eyebrow { margin: 0 0 var(--space-8); color: var(--brand-primary-dark); font-size: 11px; font-weight: 800; letter-spacing: 0.12em; line-height: 1.2; text-transform: uppercase; }
 .signin-form { width: 100%; display: grid; gap: var(--space-16); }
-.mfa-factor-list { display: grid; gap: var(--space-8); min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-10); margin: 0; padding: var(--space-12); }
-.mfa-factor-list legend { color: var(--text-secondary); font-size: 13px; font-weight: 700; padding: 0 var(--space-4); }
-.mfa-factor-list label { display: flex; align-items: center; gap: var(--space-8); color: var(--text-primary); font-size: 13px; font-weight: 650; }
-.mfa-factor-list input { width: 16px; min-height: 16px; margin: 0; accent-color: var(--brand-primary); }
-.mfa-factor-note { border: 1px solid var(--border); border-radius: var(--radius-10); background: var(--surface-sunken); color: var(--text-secondary); margin: 0; padding: var(--space-12); font-size: 13px; font-weight: 650; }
-.mfa-recaptcha:empty { display: none; }
 .signin-form label, .case-form label, .lookup-form label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 13px; font-weight: 700; }
 input { width: 100%; min-height: 44px; border: 1px solid var(--border-strong); border-radius: var(--radius-6); background: rgb(255 255 255 / 80%); color: var(--text-primary); padding: 10px 12px; transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
 input:hover { border-color: #b8b2a5; }

@@ -18,10 +18,6 @@ function createControlledSession(): ControlledSession {
     gateway: {
       subscribe(next) { listener = next; return () => { listener = undefined; }; },
       signIn: vi.fn().mockResolvedValue({ kind: "signed-in" }),
-      beginPhoneMfa: vi.fn().mockResolvedValue(undefined),
-      completePhoneMfa: vi.fn().mockResolvedValue(undefined),
-      resetMfaChallenge: vi.fn(),
-      cancelMfa: vi.fn(),
       signOut: vi.fn().mockResolvedValue(undefined),
     },
     emit(user) { listener?.(user); },
@@ -93,7 +89,7 @@ describe("staff session security boundary", () => {
     expect(api.health).toHaveBeenCalledTimes(3);
   });
 
-  it("clears the protected view and signs out before requiring a fresh MFA-capable sign-in", async () => {
+  it("clears the protected view and signs out before requiring a fresh password sign-in", async () => {
     const user = userEvent.setup();
     const controlled = createControlledSession();
     const api = createApi(vi.fn().mockRejectedValue(new Error("denied")));

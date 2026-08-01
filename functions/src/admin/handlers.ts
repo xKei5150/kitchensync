@@ -78,7 +78,7 @@ const platformStaffRecordSchema = z
     roles: z.array(adminRoleSchema).min(1).max(9).refine(hasUniqueEntries),
     capabilities: z.array(adminCapabilitySchema).min(1).max(4).refine(hasUniqueEntries),
     scope: staffScopeSchema,
-    mfaRequired: z.literal(true),
+    mfaRequired: z.literal(false),
     policyVersion: z.string().min(1).max(64),
     createdAt: staffTimestampMetadataSchema.optional(),
     updatedAt: staffTimestampMetadataSchema.optional(),
@@ -809,7 +809,12 @@ function allowedSecondFactor(
   config: AdminRuntimeConfig,
 ): string | undefined {
   const secondFactor = firebase?.["sign_in_second_factor"]
-  return typeof secondFactor === "string" && config.allowedSecondFactors.includes(secondFactor)
+  if (secondFactor === undefined) {
+    return config.allowedSecondFactors.includes("none") ? "none" : undefined
+  }
+  return typeof secondFactor === "string" &&
+    secondFactor !== "none" &&
+    config.allowedSecondFactors.includes(secondFactor)
     ? secondFactor
     : undefined
 }
