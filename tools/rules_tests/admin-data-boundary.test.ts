@@ -18,7 +18,6 @@ import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterAll, beforeAll, describe, test } from "vitest"
 import { shoppingRuleProfiles } from "./shopping-rules-test-helpers.js"
-import { authenticatedContext } from "./authenticated-context.js"
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080"
@@ -73,8 +72,8 @@ for (const profile of shoppingRuleProfiles) {
     test("denies every client operation on all control-plane roots", async () => {
       const clients = [
         env.unauthenticatedContext().firestore(),
-        authenticatedContext(env, "ordinary-user").firestore(),
-        authenticatedContext(env, "household-admin").firestore(),
+        env.authenticatedContext("ordinary-user").firestore(),
+        env.authenticatedContext("household-admin").firestore(),
       ]
 
       for (const client of clients) {
@@ -90,7 +89,7 @@ for (const profile of shoppingRuleProfiles) {
     })
 
     test("retains an ordinary permitted household Admin operation", async () => {
-      const admin = authenticatedContext(env, "household-admin").firestore()
+      const admin = env.authenticatedContext("household-admin").firestore()
 
       await assertSucceeds(
         updateDoc(doc(admin, `households/${householdId}`), {

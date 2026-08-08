@@ -2,7 +2,6 @@ import type { DocumentData, Firestore, Transaction } from "firebase-admin/firest
 import { Timestamp } from "firebase-admin/firestore"
 import { HttpsError } from "firebase-functions/v2/https"
 import { z } from "zod"
-import { requireActiveAccountLifecycle } from "../accountLifecycleBarrier.js"
 import { hasCurrentHouseholdPremiumEntitlement } from "../shopping/commandContext.js"
 import { requireAuthUid } from "../shopping/errors.js"
 import { runRetryableTransaction } from "../shopping/transactionRetry.js"
@@ -73,17 +72,15 @@ export async function revokeHouseholdInviteHandler(
     if (!parsed.success) {
       throw new HttpsError("invalid-argument", "Invalid invite revocation request")
     }
-    const result = await runRetryableTransaction(db, async (transaction) => {
-      const now = dependencies.now?.() ?? Timestamp.now()
-      await requireActiveAccountLifecycle(transaction, db, authUid, now)
-      return revokeInTransaction({
+    const result = await runRetryableTransaction(db, (transaction) =>
+      revokeInTransaction({
         transaction,
         db,
         authUid,
         command: parsed.data,
-        now,
-      })
-    })
+        now: dependencies.now?.() ?? Timestamp.now(),
+      }),
+    )
     if (result.outcome === "rejected") throw unavailableInviteRevocation()
     return { requestId, inviteId: result.inviteId, alreadyRevoked: result.alreadyRevoked }
   } catch (error) {

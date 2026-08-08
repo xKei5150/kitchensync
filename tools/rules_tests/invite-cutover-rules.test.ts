@@ -19,7 +19,6 @@ import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { shoppingRuleProfiles } from "./shopping-rules-test-helpers.js"
-import { authenticatedContext } from "./authenticated-context.js"
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080"
@@ -90,7 +89,7 @@ for (const profile of shoppingRuleProfiles) {
     })
 
     test("a public household ID cannot produce a readable or redeemable legacy KS invite", async () => {
-      const attacker = authenticatedContext(env, "attacker").firestore()
+      const attacker = env.authenticatedContext("attacker").firestore()
       const recipe = await assertSucceeds(getDoc(doc(attacker, "recipes/public-household-reference")))
       const leakedHouseholdId = recipe.data()?.["householdId"]
       expect(leakedHouseholdId).toBe(householdId)
@@ -130,8 +129,8 @@ for (const profile of shoppingRuleProfiles) {
 
     test("ordinary users and household Admins cannot access server-only invite collections", async () => {
       const clients = [
-        authenticatedContext(env, "attacker").firestore(),
-        authenticatedContext(env, "admin").firestore(),
+        env.authenticatedContext("attacker").firestore(),
+        env.authenticatedContext("admin").firestore(),
       ]
       for (const client of clients) {
         for (const collectionId of serverOnlyInviteCollections) {
@@ -146,7 +145,7 @@ for (const profile of shoppingRuleProfiles) {
     })
 
     test("independently authorized provisioning and existing Admin updates remain available", async () => {
-      const admin = authenticatedContext(env, "admin").firestore()
+      const admin = env.authenticatedContext("admin").firestore()
       await assertSucceeds(
         updateDoc(doc(admin, `households/${householdId}`), {
           name: "Renamed shared kitchen",
@@ -156,14 +155,13 @@ for (const profile of shoppingRuleProfiles) {
 
       const freshUserId = `fresh-solo-${profile.name}`
       const soloHouseholdId = `solo-${freshUserId}`
-      const freshUser = authenticatedContext(env, freshUserId).firestore()
+      const freshUser = env.authenticatedContext(freshUserId).firestore()
       const now = new Date("2026-08-01T12:00:00.000Z")
       const provisioning = writeBatch(freshUser)
       provisioning.set(doc(freshUser, `users/${freshUserId}`), {
         activeHouseholdId: soloHouseholdId,
         householdIds: [soloHouseholdId],
         isPremium: false,
-        providerIds: ["password"],
         createdSoloHouseholdId: soloHouseholdId,
         createdAt: now,
         updatedAt: now,
@@ -171,7 +169,6 @@ for (const profile of shoppingRuleProfiles) {
       provisioning.set(doc(freshUser, `households/${soloHouseholdId}`), {
         name: "My kitchen",
         creatorUserId: freshUserId,
-        ownerUserId: freshUserId,
         isJoint: false,
         hasPremium: false,
         maxMembers: 1,
@@ -179,17 +176,11 @@ for (const profile of shoppingRuleProfiles) {
         createdAt: now,
         updatedAt: now,
       })
-      provisioning.set(
-        doc(freshUser, `households/${soloHouseholdId}/members/${freshUserId}`),
-        {
-          role: "admin",
-          userId: freshUserId,
-          householdId: soloHouseholdId,
-          schemaVersion: 1,
-          joinedAt: now,
-          updatedAt: now,
-        },
-      )
+      provisioning.set(doc(freshUser, `households/${soloHouseholdId}/members/${freshUserId}`), {
+        role: "admin",
+        joinedAt: now,
+        updatedAt: now,
+      })
       await assertSucceeds(provisioning.commit())
     })
   })

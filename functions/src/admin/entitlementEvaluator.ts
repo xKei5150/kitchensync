@@ -1,5 +1,3 @@
-import { Timestamp } from "firebase-admin/firestore"
-import { evaluateSupportedPremiumTrial } from "../premiumTrialContracts.js"
 import type { EntitlementOperation } from "./contracts.js"
 
 export const ENTITLEMENT_RULE_VERSION = "rules-household-menu-sets-v1"
@@ -174,17 +172,6 @@ function trialBillingConsistency(
   if (profileAlignment === "aligned") evidenceCodes.push("profile_household_alignment")
 
   if (householdAlignment === "aligned" && profileAlignment === "aligned") {
-    const canonicalTrial = evaluateSupportedPremiumTrial({
-      household: canonicalTimestampRecord(household),
-      subscription: canonicalTimestampRecord(subscription),
-      ownerProfile: canonicalTimestampRecord(asRecord(ownerProfileValue)),
-      householdId,
-      ownerUserId,
-      now: Timestamp.fromMillis(now.getTime()),
-      requireFuture: false,
-      subscriptionStatus: status,
-    })
-    if (canonicalTrial === undefined) return { state: "inconsistent", evidenceCodes }
     const deadlineElapsed = subscriptionTrialEndsAt.getTime() <= now.getTime()
     return {
       state: deadlineElapsed
@@ -410,18 +397,4 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined
-}
-
-function canonicalTimestampRecord(
-  value: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-  if (value === undefined) return undefined
-  const result = { ...value }
-  for (const field of ["premiumTrialStartedAt", "premiumTrialEndsAt", "startedAt", "trialEndsAt"]) {
-    if (!(field in result)) continue
-    const date = observedDate(result[field])
-    if (date === undefined) return undefined
-    result[field] = Timestamp.fromMillis(date.getTime())
-  }
-  return result
 }

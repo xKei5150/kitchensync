@@ -185,7 +185,9 @@ void main() {
   });
 
   testWidgets('HouseholdSetupScreen rejects a legacy invite locally without '
-      'a fallback', (tester) async {
+      'a fallback', (
+    tester,
+  ) async {
     await tester.pumpWidget(_wrap(const HouseholdSetupScreen()));
     await tester.pumpAndSettle();
 
@@ -200,15 +202,13 @@ void main() {
     expect(find.textContaining('Invite code not found'), findsNothing);
   });
 
-  test(
-    'opaque invite normalization removes whitespace without changing case',
-    () {
-      expect(
-        HouseholdOnboardingController.normalizeInviteToken(' AbC_d-12 3\n'),
-        'AbC_d-123',
-      );
-    },
-  );
+  test('opaque invite normalization removes whitespace without changing case',
+      () {
+    expect(
+      HouseholdOnboardingController.normalizeInviteToken(' AbC_d-12 3\n'),
+      'AbC_d-123',
+    );
+  });
 
   testWidgets('Onboarding screens render in dark theme without error', (
     tester,

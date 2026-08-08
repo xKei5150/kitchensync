@@ -58,7 +58,6 @@ const requiredFunctions = [
   "adminHouseholdGet",
   "adminEntitlementGet",
   "cleanupTerminalInviteMetadataDaily",
-  "processAccountDeletionRequestsEveryFifteenMinutes",
 ]
 
 function assertReadinessBlocks(extra, label) {
@@ -110,7 +109,6 @@ function testVerifierContract() {
   for (const label of [
     "PASS Firebase JSON, aliases, and admin Hosting target prerequisite",
     "PASS exact Todo 9 composite indexes",
-    "PASS account-deletion worker collection-group inventory indexes",
     "PASS current Functions exports use Node 22 and us-central1",
     "PASS admin web Hosting boundary",
     "PASS CI uses Node 22 and Functions gates",
@@ -132,7 +130,6 @@ function verifierFixture() {
     "functions/package.json",
     "functions/src/index.ts",
     "functions/src/callableSecurity.ts",
-    "functions/src/accountDeletionWorker.ts",
     "functions/src/admin/callables.ts",
     ".github/workflows/ci.yml",
     "Makefile",
@@ -194,6 +191,31 @@ function testVerifierRejectsStaleCallableAndHostingContracts() {
   )
   assertVerifierRejects(
     (fixture) => {
+      const index = resolve(fixture, "functions/src/index.ts")
+      writeFileSync(
+        index,
+        readFileSync(index, "utf8").replace("  ...callableSecurity,\n", ""),
+      )
+    },
+    "invite wrapper without shared callable security inheritance",
+    "invite callable security options must inherit callableSecurity and use inviteRuntimeServiceAccount",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const index = resolve(fixture, "functions/src/index.ts")
+      writeFileSync(
+        index,
+        readFileSync(index, "utf8").replace(
+          "export const revokeHouseholdInvite = onCall(inviteCallableSecurity,",
+          "export const revokeHouseholdInvite = onCall(callableSecurity,",
+        ),
+      )
+    },
+    "invite callable using base security options",
+    "revokeHouseholdInvite must use inviteCallableSecurity",
+  )
+  assertVerifierRejects(
+    (fixture) => {
       const configPath = resolve(fixture, "firebase.dev.json")
       const config = JSON.parse(readFileSync(configPath, "utf8"))
       config.hosting.rewrites = []
@@ -231,26 +253,6 @@ function testVerifierRejectsStaleCallableAndHostingContracts() {
     },
     "malformed production Hosting headers",
     "firebase.prod.json Hosting must set X-Content-Type-Options",
-  )
-}
-
-function testWorkerCollectionGroupIndexGateRejectsOmissions() {
-  assertVerifierRejects(
-    (fixture) => {
-      const indexesPath = resolve(fixture, "firestore.indexes.json")
-      const indexes = JSON.parse(readFileSync(indexesPath, "utf8"))
-      indexes.indexes = indexes.indexes.filter(
-        (index) =>
-          !(
-            index.collectionGroup === "comments" &&
-            index.queryScope === "COLLECTION_GROUP" &&
-            index.fields?.some((field) => field.fieldPath === "authorUserId")
-          ),
-      )
-      writeFileSync(indexesPath, JSON.stringify(indexes))
-    },
-    "missing worker collection-group inventory index",
-    "missing collection-group index for comments.authorUserId",
   )
 }
 
@@ -420,7 +422,6 @@ function testDebugBuildDisablesProductionTelemetry() {
 const tests = [
   ["verifier contract", testVerifierContract],
   ["verifier rejects stale callable and Hosting contracts", testVerifierRejectsStaleCallableAndHostingContracts],
-  ["worker collection-group index gate rejects omissions", testWorkerCollectionGroupIndexGateRejectsOmissions],
   ["rollout ordering", testRolloutOrdering],
   ["rules deployment includes Storage Rules", testRulesDeploymentIncludesStorageAndNoWeakerPath],
   ["backend deploy is noninteractive", testBackendDeployIsNoninteractive],

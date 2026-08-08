@@ -2,7 +2,6 @@ import type { DocumentData, Firestore, Transaction } from "firebase-admin/firest
 import { Timestamp } from "firebase-admin/firestore"
 import { HttpsError } from "firebase-functions/v2/https"
 import { z } from "zod"
-import { requireActiveAccountLifecycle } from "../accountLifecycleBarrier.js"
 import { hasCurrentHouseholdPremiumEntitlement } from "../shopping/commandContext.js"
 import { requireAuthUid } from "../shopping/errors.js"
 import { runRetryableTransaction } from "../shopping/transactionRetry.js"
@@ -36,7 +35,6 @@ type InviteRole = "member" | "shopper" | "cook"
 
 export type InviteRedemptionCallableRequest = Readonly<{
   readonly authUid?: string
-  readonly emailVerified?: boolean
   readonly data: unknown
 }>
 
@@ -84,9 +82,6 @@ export async function redeemHouseholdInviteHandler(
     const parsed = redeemInviteSchema.safeParse(request.data)
     if (!parsed.success) {
       throw new HttpsError("invalid-argument", "Invalid invite redemption request")
-    }
-    if (request.emailVerified !== true) {
-      throw new HttpsError("failed-precondition", "Email verification is required")
     }
     const now = dependencies.now?.() ?? Timestamp.now()
     const rateLimitKey = dependencies.rateLimitKey()
@@ -137,7 +132,6 @@ type RedemptionTransactionInput = Readonly<{
 async function redeemInTransaction(
   input: RedemptionTransactionInput,
 ): Promise<RedemptionTransactionResult> {
-  await requireActiveAccountLifecycle(input.transaction, input.db, input.authUid, input.now)
   const inviteRef = input.db.collection(opaqueInviteCollection).doc(input.storage.tokenLookupHmac)
   const receiptRef = input.db
     .collection(opaqueInviteRedemptionReceiptCollection)
@@ -196,9 +190,6 @@ async function redeemInTransaction(
 
   input.transaction.create(memberRef, {
     role: storedInvite.role,
-    userId: input.authUid,
-    householdId: storedInvite.householdId,
-    schemaVersion: 1,
     joinedAt: input.now,
     updatedAt: input.now,
   })
@@ -264,9 +255,8 @@ async function lookupForRedeemableToken(input: {
   try {
     return lookupForInviteToken(input.rawToken, input.hmacKey)
   } catch {
-    await runRetryableTransaction(input.db, async (transaction) => {
-      await requireActiveAccountLifecycle(transaction, input.db, input.authUid, input.now)
-      await reserveInviteRateLimits({
+    await runRetryableTransaction(input.db, (transaction) =>
+      reserveInviteRateLimits({
         db: input.db,
         transaction,
         buckets: redemptionRateLimitBuckets({
@@ -275,8 +265,8 @@ async function lookupForRedeemableToken(input: {
           sourceIp: input.sourceIp,
           now: input.now,
         }),
-      })
-    })
+      }),
+    )
     throw unavailableInvite()
   }
 }

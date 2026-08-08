@@ -35,7 +35,6 @@ describe("trusted household invite redemption", () => {
       redeemHouseholdInviteHandler(
         {
           authUid: "joiner-1",
-          emailVerified: true,
           data: { inviteToken: validToken(0x61), commandId: "redeem-1", householdId: "forged" },
         },
         harness.firestore,
@@ -46,42 +45,13 @@ describe("trusted household invite redemption", () => {
     expect(harness.transactionAttempts).toBe(0)
   })
 
-  it("rejects an unverified identity before invite lookup or membership mutation", async () => {
-    const harness = eligibleHarness()
-    const rawToken = validToken(0x60)
-    seedActiveInvite(harness, rawToken)
-
-    await expect(
-      redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: false,
-          data: { inviteToken: rawToken, commandId: "redeem-1" },
-        },
-        harness.firestore,
-        dependencies(),
-      ),
-    ).rejects.toMatchObject({
-      code: "failed-precondition",
-      message: "Email verification is required",
-      details: { requestId: "request-1" },
-    })
-
-    expect(harness.transactionAttempts).toBe(0)
-    expect(harness.dataAt("households/household-1/members/joiner-1")).toBeUndefined()
-  })
-
   it("generically rejects a derived legacy KS token without looking it up or writing membership", async () => {
     const harness = new InviteRedemptionHarness()
     const legacyToken = "KS-HOUSEH"
 
     await expect(
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: legacyToken, commandId: "redeem-1" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: legacyToken, commandId: "redeem-1" } },
         harness.firestore,
         dependencies(),
       ),
@@ -105,11 +75,7 @@ describe("trusted household invite redemption", () => {
     const storage = seedActiveInvite(harness, rawToken)
 
     const response = await redeemHouseholdInviteHandler(
-      {
-        authUid: "joiner-1",
-        emailVerified: true,
-        data: { inviteToken: rawToken, commandId: "redeem-1" },
-      },
+      { authUid: "joiner-1", data: { inviteToken: rawToken, commandId: "redeem-1" } },
       harness.firestore,
       dependencies(),
     )
@@ -156,11 +122,7 @@ describe("trusted household invite redemption", () => {
     const harness = eligibleHarness()
     const rawToken = validToken(0x63)
     seedActiveInvite(harness, rawToken)
-    const request = {
-      authUid: "joiner-1",
-      emailVerified: true,
-      data: { inviteToken: rawToken, commandId: "redeem-1" },
-    }
+    const request = { authUid: "joiner-1", data: { inviteToken: rawToken, commandId: "redeem-1" } }
 
     const first = await redeemHouseholdInviteHandler(request, harness.firestore, dependencies())
     const replay = await redeemHouseholdInviteHandler(request, harness.firestore, dependencies())
@@ -188,22 +150,14 @@ describe("trusted household invite redemption", () => {
     ).toMatchObject({ count: 2 })
     await expect(
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: rawToken, commandId: "redeem-2" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: rawToken, commandId: "redeem-2" } },
         harness.firestore,
         dependencies(),
       ),
     ).rejects.toMatchObject({ code: "failed-precondition", message: "Invite cannot be redeemed" })
     await expect(
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: validToken(0x64), commandId: "redeem-1" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: validToken(0x64), commandId: "redeem-1" } },
         harness.firestore,
         dependencies(),
       ),
@@ -229,11 +183,7 @@ describe("trusted household invite redemption", () => {
 
     await expect(
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: rawToken, commandId: "redeem-1" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: rawToken, commandId: "redeem-1" } },
         harness.firestore,
         dependencies(),
       ),
@@ -256,11 +206,7 @@ describe("trusted household invite redemption", () => {
 
     await expect(
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: duplicateToken, commandId: "redeem-1" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: duplicateToken, commandId: "redeem-1" } },
         duplicateHarness.firestore,
         dependencies(),
       ),
@@ -279,11 +225,7 @@ describe("trusted household invite redemption", () => {
 
     await expect(
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: freeUserToken, commandId: "redeem-1" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: freeUserToken, commandId: "redeem-1" } },
         freeUserHarness.firestore,
         dependencies(),
       ),
@@ -303,11 +245,7 @@ describe("trusted household invite redemption", () => {
 
     await expect(
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: expiredTrialToken, commandId: "redeem-1" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: expiredTrialToken, commandId: "redeem-1" } },
         expiredTrialHarness.firestore,
         dependencies(),
       ),
@@ -328,11 +266,7 @@ describe("trusted household invite redemption", () => {
 
     await expect(
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: nonJointToken, commandId: "redeem-1" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: nonJointToken, commandId: "redeem-1" } },
         nonJointHarness.firestore,
         dependencies(),
       ),
@@ -353,7 +287,6 @@ describe("trusted household invite redemption", () => {
       redeemHouseholdInviteHandler(
         {
           authUid: "joiner-1",
-          emailVerified: true,
           data: { inviteToken: expiredHouseholdToken, commandId: "redeem-1" },
         },
         expiredHouseholdHarness.firestore,
@@ -385,11 +318,7 @@ describe("trusted household invite redemption", () => {
 
     await expect(
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: rawToken, commandId: "redeem-1" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: rawToken, commandId: "redeem-1" } },
         harness.firestore,
         dependencies(),
       ),
@@ -436,20 +365,12 @@ describe("trusted household invite redemption", () => {
 
     const results = await Promise.allSettled([
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-1",
-          emailVerified: true,
-          data: { inviteToken: firstToken, commandId: "redeem-1" },
-        },
+        { authUid: "joiner-1", data: { inviteToken: firstToken, commandId: "redeem-1" } },
         harness.firestore,
         dependencies(),
       ),
       redeemHouseholdInviteHandler(
-        {
-          authUid: "joiner-2",
-          emailVerified: true,
-          data: { inviteToken: secondToken, commandId: "redeem-2" },
-        },
+        { authUid: "joiner-2", data: { inviteToken: secondToken, commandId: "redeem-2" } },
         harness.firestore,
         dependencies(),
       ),

@@ -28,21 +28,13 @@ describe("versioned admin entitlement evaluator", () => {
       input(
         {
           hasPremium: true,
-          isJoint: true,
-          ownerUserId: "owner-1",
           premiumOwnerUserId: "owner-1",
-          premiumOwnership: { type: "in_app_trial", ownerUserId: "owner-1" },
-          premiumPlan: "monthly",
-          premiumTrialStartedAt: now,
           premiumTrialEndsAt: futureTrial,
         },
         {
           status: "trialing",
-          provider: "in_app_trial",
           plan: "monthly",
           ownerUserId: "owner-1",
-          premiumOwnership: { type: "in_app_trial", ownerUserId: "owner-1" },
-          startedAt: now,
           trialEndsAt: futureTrial,
         },
         ownerProfile(futureTrial),
@@ -54,32 +46,6 @@ describe("versioned admin entitlement evaluator", () => {
       "trial_end_after_now",
       "profile_household_alignment",
     ])
-
-    const rejectedByRuntime = evaluateEntitlement(
-      input(
-        {
-          hasPremium: true,
-          isJoint: true,
-          ownerUserId: "owner-1",
-          premiumOwnerUserId: "owner-1",
-          premiumOwnership: { type: "in_app_trial", ownerUserId: "owner-1" },
-          premiumPlan: "monthly",
-          premiumTrialStartedAt: now,
-          premiumTrialEndsAt: futureTrial,
-        },
-        {
-          status: "trialing",
-          provider: "in_app_trial",
-          plan: "monthly",
-          ownerUserId: "owner-1",
-          premiumOwnership: { type: "in_app_trial", ownerUserId: "owner-1" },
-          startedAt: now,
-          trialEndsAt: futureTrial,
-        },
-        { ...ownerProfile(futureTrial), joinedPremiumHouseholdIds: ["household-1", "other"] },
-      ),
-    )
-    expect(rejectedByRuntime.billingConsistency).toEqual({ state: "inconsistent" })
   })
 
   it("classifies an expired subscription with coherent elapsed trial evidence", () => {
@@ -87,24 +53,16 @@ describe("versioned admin entitlement evaluator", () => {
       input(
         {
           hasPremium: true,
-          isJoint: true,
-          ownerUserId: "owner-1",
           premiumOwnerUserId: "owner-1",
-          premiumOwnership: { type: "in_app_trial", ownerUserId: "owner-1" },
-          premiumPlan: "annual",
-          premiumTrialStartedAt: now,
           premiumTrialEndsAt: expiredTrial,
         },
         {
           status: "expired",
-          provider: "in_app_trial",
           plan: "annual",
           ownerUserId: "owner-1",
-          premiumOwnership: { type: "in_app_trial", ownerUserId: "owner-1" },
-          startedAt: now,
           trialEndsAt: expiredTrial,
         },
-        ownerProfile(expiredTrial, "annual"),
+        ownerProfile(expiredTrial),
       ),
     )
     expect(expired.productionAccess.state).toBe("denied")
@@ -287,18 +245,12 @@ function input(
   }
 }
 
-function ownerProfile(
-  trialEndsAt: Date,
-  plan: "annual" | "monthly" = "monthly",
-): Record<string, unknown> {
+function ownerProfile(trialEndsAt: Date): Record<string, unknown> {
   return {
     isPremium: true,
-    premiumPlan: plan,
-    premiumTrialStartedAt: now,
     premiumTrialEndsAt: trialEndsAt,
     activeHouseholdId: "household-1",
     householdIds: ["household-1"],
-    joinedPremiumHouseholdIds: ["household-1"],
   }
 }
 

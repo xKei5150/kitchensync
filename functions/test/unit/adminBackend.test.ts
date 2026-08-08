@@ -53,7 +53,7 @@ const config: AdminRuntimeConfig = {
   policyVersion: "staff-policy-v1",
   allowedProviders: ["password"],
   allowedTenants: ["none"],
-  allowedSecondFactors: ["phone"],
+  allowedSecondFactors: ["none"],
   allowedOrigins: ["https://admin.example.test"],
   rateLimitKeyVersion: "rate-v1",
   auditHmacKeyVersion: "audit-v1",
@@ -140,13 +140,37 @@ describe("admin backend fail-closed controls", () => {
         ADMIN_POLICY_VERSION: "staff-policy-v1",
         ADMIN_ALLOWED_SIGN_IN_PROVIDERS: "password",
         ADMIN_ALLOWED_TENANTS: "none",
-        ADMIN_ALLOWED_SECOND_FACTORS: "phone",
+        ADMIN_ALLOWED_SECOND_FACTORS: "none",
         ADMIN_ALLOWED_ORIGINS: "https://admin.example.test/admin-path",
         ADMIN_RATE_LIMIT_KEY_VERSION: "rate-v1",
         ADMIN_AUDIT_HMAC_KEY_VERSION: "audit-v1",
         ADMIN_API_VERSION: "v1",
       }),
     ).toEqual({ ok: false })
+  })
+
+  it("requires exactly the password-only second-factor configuration", () => {
+    expect(adminRuntimeConfigFromEnvironment(runtimeEnvironment())).toMatchObject({
+      ok: true,
+      config: { allowedSecondFactors: ["none"] },
+    })
+
+    for (const secondFactors of [
+      "phone",
+      "none,phone",
+      "phone,none",
+      "none,none",
+      "phone,phone",
+      "none,",
+      ",none",
+      "NONE",
+    ]) {
+      expect(
+        adminRuntimeConfigFromEnvironment(
+          runtimeEnvironment({ ADMIN_ALLOWED_SECOND_FACTORS: secondFactors }),
+        ),
+      ).toEqual({ ok: false })
+    }
   })
 
   it("parses callable CORS as exact origins and fails closed to cors:false", () => {
@@ -200,7 +224,7 @@ describe("admin backend fail-closed controls", () => {
       { staffType: "service" },
       { policyVersion: "old-policy" },
       { scope: { environments: ["preview"] } },
-      { mfaRequired: false },
+      { mfaRequired: true },
       { scope: { environments: ["production"], regions: [] } },
     ]) {
       const invalid = fixture()
@@ -234,6 +258,24 @@ describe("admin backend fail-closed controls", () => {
     ).rejects.toMatchObject({ code: "permission-denied" })
   })
 
+  it("rejects every carried second-factor value in the revocation-checked token", async () => {
+    for (const secondFactor of ["phone", "none"]) {
+      const subject = fixture()
+      subject.seedStaff()
+      let verified: readonly unknown[] = []
+      await expect(
+        adminHealthGetHandler(healthRequest(), {
+          ...subject.dependencies,
+          verifyIdToken: async (rawToken, checkRevoked) => {
+            verified = [rawToken, checkRevoked]
+            return verifiedToken({ sign_in_second_factor: secondFactor })
+          },
+        }),
+      ).rejects.toMatchObject({ code: "permission-denied" })
+      expect(verified).toEqual(["raw-health-token", true])
+    }
+  })
+
   it("denies wrong App Check app, audience, provider, tenant, MFA, auth age, and capability", async () => {
     const cases: readonly Readonly<{
       readonly name: string
@@ -251,8 +293,12 @@ describe("admin backend fail-closed controls", () => {
         request: healthRequest({ firebase: tokenFirebase({ tenant: "tenant-a" }) }),
       },
       {
-        name: "missing MFA",
-        request: healthRequest({ firebase: tokenFirebase({ sign_in_second_factor: undefined }) }),
+        name: "unexpected second factor",
+        request: healthRequest({ firebase: tokenFirebase({ sign_in_second_factor: "phone" }) }),
+      },
+      {
+        name: "carried none marker",
+        request: healthRequest({ firebase: tokenFirebase({ sign_in_second_factor: "none" }) }),
       },
       {
         name: "stale auth",
@@ -426,7 +472,7 @@ describe("admin backend fail-closed controls", () => {
       requiredCapability: "user.read.summary",
       provider: "password",
       tenantClassification: "none",
-      secondFactor: "phone",
+      secondFactor: "none",
       authAgeSeconds: 0,
       appReference: expect.stringMatching(/^admin-audit-app-hmac-sha256-v1:audit-v1:/),
     })
@@ -756,7 +802,7 @@ function fixture(): Readonly<{
           "entitlement.read",
         ],
         scope: { environments: ["production"] },
-        mfaRequired: true,
+        mfaRequired: false,
         policyVersion: "staff-policy-v1",
         ...patch,
       })
@@ -770,10 +816,7 @@ function seedReadableUser(subject: ReturnType<typeof fixture>): void {
   subject.store.seed("users/target-1", {
     activeHouseholdId: "household-1",
     householdIds: ["household-1"],
-    joinedPremiumHouseholdIds: ["household-1"],
     isPremium: true,
-    premiumPlan: "monthly",
-    premiumTrialStartedAt: now,
     premiumTrialEndsAt: new Date(now.getTime() + 60_000),
     privateNote: "support private note",
   })
@@ -788,11 +831,7 @@ function seedReadableHousehold(subject: ReturnType<typeof fixture>): void {
     maxMembers: 6,
     createdAt: now,
     hasPremium: true,
-    ownerUserId: "target-1",
     premiumOwnerUserId: "target-1",
-    premiumOwnership: { type: "in_app_trial", ownerUserId: "target-1" },
-    premiumPlan: "monthly",
-    premiumTrialStartedAt: now,
     premiumTrialEndsAt: trialEndsAt,
     label: "The family secret household",
     imageUrl: "https://images.example/private.png",
@@ -801,11 +840,8 @@ function seedReadableHousehold(subject: ReturnType<typeof fixture>): void {
   })
   subject.store.seed("households/household-1/subscriptions/premium", {
     status: "trialing",
-    provider: "in_app_trial",
     plan: "monthly",
     ownerUserId: "target-1",
-    premiumOwnership: { type: "in_app_trial", ownerUserId: "target-1" },
-    startedAt: now,
     trialEndsAt,
   })
   subject.store.seed("households/household-1/members/target-1", {
@@ -882,16 +918,16 @@ function userPayloadRequest(): AdminCallableRequest {
 }
 
 function tokenFirebase(patch: Record<string, unknown> = {}): Record<string, unknown> {
-  return { sign_in_provider: "password", sign_in_second_factor: "phone", ...patch }
+  return { sign_in_provider: "password", ...patch }
 }
 
-function verifiedToken(): Record<string, unknown> {
+function verifiedToken(firebasePatch: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     uid: "staff-1",
     aud: config.expectedProjectId,
     platformStaff: true,
     auth_time: Math.floor(now.getTime() / 1000),
-    firebase: tokenFirebase(),
+    firebase: tokenFirebase(firebasePatch),
   }
 }
 
@@ -903,7 +939,7 @@ function runtimeEnvironment(overrides: Record<string, string> = {}): NodeJS.Proc
     ADMIN_POLICY_VERSION: "staff-policy-v1",
     ADMIN_ALLOWED_SIGN_IN_PROVIDERS: "password",
     ADMIN_ALLOWED_TENANTS: "none",
-    ADMIN_ALLOWED_SECOND_FACTORS: "phone",
+    ADMIN_ALLOWED_SECOND_FACTORS: "none",
     ADMIN_ALLOWED_ORIGINS: "https://admin.example.test",
     ADMIN_RATE_LIMIT_KEY_VERSION: "rate-v1",
     ADMIN_AUDIT_HMAC_KEY_VERSION: "audit-v1",

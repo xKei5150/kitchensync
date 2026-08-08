@@ -632,7 +632,7 @@ describe("/households and memberships", () => {
     );
   });
 
-  test("client joint onboarding is denied because Premium transfer is callable-only", async () => {
+  test("joint onboarding can create its reserved household and initial Admin membership", async () => {
     const userId = "joint-invite-creator";
     const householdId = "joint-invite-bootstrap";
     await env.withSecurityRulesDisabled(async (context) => {
@@ -676,7 +676,7 @@ describe("/households and memberships", () => {
       joinedAt: now,
       updatedAt: now,
     });
-    await assertFails(onboarding.commit());
+    await assertSucceeds(onboarding.commit());
   });
 
   test("no client, including a household Admin, can mint or reactivate household invites", async () => {
@@ -829,8 +829,8 @@ describe("/households and memberships", () => {
   });
 
   test("legacy invite codes cannot be read or used for direct membership creation", async () => {
-    const inviteeDb = authenticatedContext(env, "invitee").firestore();
-    const outsiderDb = authenticatedContext(env, "outsider").firestore();
+    const inviteeDb = env.authenticatedContext("invitee").firestore();
+    const outsiderDb = env.authenticatedContext("outsider").firestore();
 
     await assertFails(
       getDoc(doc(inviteeDb, "householdInvites/KS-JOIN1")),

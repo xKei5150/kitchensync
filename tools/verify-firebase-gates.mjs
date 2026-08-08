@@ -10,11 +10,6 @@ const devProject = "kitchensync-dev-da503"
 const expectedHumanCallableNames = [
   "shoppingSmoke",
   "startPremiumTrial",
-  "createJointHouseholdWithTrialTransfer",
-  "accountDeletionPreflight",
-  "requestAccountDeletion",
-  "leaveJointHousehold",
-  "transferJointHouseholdOwnership",
   "removeHouseholdMember",
   "transferHouseholdAdmin",
   "issueHouseholdInvite",
@@ -30,10 +25,12 @@ const expectedHumanCallableNames = [
   "adminHouseholdGet",
   "adminEntitlementGet",
 ]
-const expectedScheduledWorkerNames = [
-  "cleanupTerminalInviteMetadataDaily",
-  "processAccountDeletionRequestsEveryFifteenMinutes",
+const expectedInviteCallableNames = [
+  "issueHouseholdInvite",
+  "redeemHouseholdInvite",
+  "revokeHouseholdInvite",
 ]
+const expectedScheduledWorkerNames = ["cleanupTerminalInviteMetadataDaily"]
 const hostingEnvironments = {
   dev: {
     functionsOrigin: "https://us-central1-kitchensync-dev-da503.cloudfunctions.net",
@@ -372,37 +369,6 @@ check("exact Todo 9 composite indexes", () => {
   assert(!explicitName, "shoppingLists indexes must not declare __name__ explicitly")
 })
 
-check("account-deletion worker collection-group inventory indexes", () => {
-  const workerSource = source("functions/src/accountDeletionWorker.ts")
-  const queries = new Set()
-  const queryList = workerSource.match(
-    /export const accountDeletionWorkerCollectionGroupQueries\s*=\s*\[([\s\S]*?)\]\s*as const/,
-  )
-  assert(queryList !== null, "worker collection-group query inventory is missing")
-  for (const match of queryList[1].matchAll(
-    /collectionGroup:\s*"([^"]+)"\s*,\s*fieldPath:\s*"([^"]+)"/g,
-  )) {
-    queries.add(`${match[1]}|${match[2]}`)
-  }
-  for (const match of workerSource.matchAll(
-    /\.collectionGroup\(\s*"([^"]+)"\s*\)\s*\.where\(\s*"([^"]+)"/g,
-  )) {
-    queries.add(`${match[1]}|${match[2]}`)
-  }
-  assert(queries.size > 0, "worker collection-group query inventory is empty")
-  const indexesFile = json("firestore.indexes.json")
-  for (const query of queries) {
-    const [collectionGroup, fieldPath] = query.split("|")
-    const covered = indexesFile.indexes.some(
-      (index) =>
-        index.collectionGroup === collectionGroup &&
-        index.queryScope === "COLLECTION_GROUP" &&
-        index.fields?.some((field) => field.fieldPath === fieldPath),
-    )
-    assert(covered, `missing collection-group index for ${collectionGroup}.${fieldPath}`)
-  }
-})
-
 check("current Functions exports use Node 22 and us-central1", () => {
   const packageFile = json("functions/package.json")
   assert(packageFile.engines?.node === "22", "functions/package.json engines.node must be 22")
@@ -416,12 +382,28 @@ check("current Functions exports use Node 22 and us-central1", () => {
   for (const name of expectedScheduledWorkerNames) {
     assert(!callables.has(name), `${name} must be a scheduled worker, not a callable`)
   }
-  for (const name of expectedHumanCallableNames.filter((name) => !name.startsWith("admin"))) {
+  for (const name of expectedHumanCallableNames.filter(
+    (name) => !name.startsWith("admin") && !expectedInviteCallableNames.includes(name),
+  )) {
     assert(
       new RegExp(
-        `export\\s+const\\s+${name}\\s*=\\s*onCall\\s*\\(\\s*(?:(?:callableSecurity|[A-Za-z_$][\\w$]*CallableSecurity)\\s*,|\\{\\s*\\.\\.\\.(?:callableSecurity|[A-Za-z_$][\\w$]*CallableSecurity)\\s*,)`,
+        `export\\s+const\\s+${name}\\s*=\\s*onCall\\s*\\(\\s*(?:callableSecurity\\s*,|\\{\\s*\\.\\.\\.callableSecurity\\s*,)`,
       ).test(functionsSource),
       `${name} must use the shared callable security options`,
+    )
+  }
+  assert(
+    /const\s+inviteCallableSecurity\s*=\s*\{\s*\.\.\.callableSecurity\s*,\s*serviceAccount\s*:\s*inviteRuntimeServiceAccount\s*,?\s*\}/.test(
+      functionsSource,
+    ),
+    "invite callable security options must inherit callableSecurity and use inviteRuntimeServiceAccount",
+  )
+  for (const name of expectedInviteCallableNames) {
+    assert(
+      new RegExp(
+        `export\\s+const\\s+${name}\\s*=\\s*onCall\\s*\\(\\s*(?:inviteCallableSecurity\\s*,|\\{\\s*\\.\\.\\.inviteCallableSecurity\\s*,)`,
+      ).test(functionsSource),
+      `${name} must use inviteCallableSecurity`,
     )
   }
   for (const name of expectedHumanCallableNames.filter((name) => name.startsWith("admin"))) {
