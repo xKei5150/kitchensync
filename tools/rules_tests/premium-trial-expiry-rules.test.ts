@@ -9,6 +9,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { doc, setDoc } from "firebase/firestore";
 import { test } from "vitest";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
@@ -86,11 +87,9 @@ for (const profile of profiles) {
         premiumTrialEndsAt: activeTrialEndsAt,
       });
 
-      const expiredTrialCook = env
-        .authenticatedContext("expired-trial-cook")
+      const expiredTrialCook = authenticatedContext(env, "expired-trial-cook")
         .firestore();
-      const activeTrialCook = env
-        .authenticatedContext("active-trial-cook")
+      const activeTrialCook = authenticatedContext(env, "active-trial-cook")
         .firestore();
 
       await assertSucceeds(

@@ -242,3 +242,18 @@ git status --short --ignored \
 Review native changes for release safety: release builds need network access,
 but must not contain emulator endpoints, cleartext exceptions, debug App
 Check, preview households, anonymous identities, or test credentials.
+
+## CI configuration
+
+Clean Linux CI must receive the ignored FlutterFire Dart option files and
+Android `google-services.json` through GitHub Actions secrets. From the
+repository root, set them with stdin so their contents are not printed:
+
+```bash
+gh secret set --repo xKei5150/kitchensync KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV < lib/firebase_options_dev.dart
+gh secret set --repo xKei5150/kitchensync KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD < lib/firebase_options_prod.dart
+gh secret set --repo xKei5150/kitchensync KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_DEV < android/app/google-services.json
+```
+
+Rotate or update these secrets whenever the FlutterFire configuration changes.
+Keep the source files ignored; do not commit them.

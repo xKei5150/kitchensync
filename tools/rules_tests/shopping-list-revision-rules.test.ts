@@ -13,6 +13,7 @@ import {
   seedShoppingHousehold,
   shoppingRuleProfiles,
 } from "./shopping-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 for (const profile of shoppingRuleProfiles) {
   describe(`${profile.name} shopping list revision compatibility`, () => {
@@ -33,14 +34,14 @@ for (const profile of shoppingRuleProfiles) {
 
     test("member can read a legacy list without a revision", async () => {
       await seedPendingList(env);
-      const db = env.authenticatedContext("member").firestore();
+      const db = authenticatedContext(env, "member").firestore();
 
       await assertSucceeds(getDoc(doc(db, pendingListPath)));
     });
 
     test("member can read a current list with a revision", async () => {
       await seedPendingList(env, { revision: 3 });
-      const db = env.authenticatedContext("member").firestore();
+      const db = authenticatedContext(env, "member").firestore();
 
       const snapshot = await assertSucceeds(getDoc(doc(db, pendingListPath)));
       if (snapshot.data()?.revision !== 3) {
@@ -50,7 +51,7 @@ for (const profile of shoppingRuleProfiles) {
 
     test("direct revision advance is denied and preserves the document", async () => {
       await seedPendingList(env, { revision: 3 });
-      const db = env.authenticatedContext("shopper").firestore();
+      const db = authenticatedContext(env, "shopper").firestore();
 
       await assertFails(
         updateDoc(doc(db, pendingListPath), {
@@ -71,7 +72,7 @@ for (const profile of shoppingRuleProfiles) {
 
     test("direct legacy revision addition is denied", async () => {
       await seedPendingList(env);
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertFails(
         updateDoc(doc(db, pendingListPath), {

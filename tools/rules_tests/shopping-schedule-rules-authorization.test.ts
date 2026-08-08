@@ -20,6 +20,7 @@ import {
   soloWeeklySchedulePath,
   weeklySchedule,
 } from "./shopping-schedule-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 for (const profile of scheduleRuleProfiles) {
   describe(`${profile.name} weekly shopping schedule authorization rules`, () => {
@@ -40,7 +41,7 @@ for (const profile of scheduleRuleProfiles) {
     });
 
     test("admin can create a joint weekly schedule", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertSucceeds(
         setDoc(
@@ -52,7 +53,7 @@ for (const profile of scheduleRuleProfiles) {
 
     test("admin can update a joint weekly schedule", async () => {
       await seedJointWeeklySchedule(env);
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertSucceeds(
         setDoc(
@@ -64,13 +65,13 @@ for (const profile of scheduleRuleProfiles) {
 
     test("admin can delete a joint weekly schedule", async () => {
       await seedJointWeeklySchedule(env);
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertSucceeds(deleteDoc(doc(db, jointWeeklySchedulePath)));
     });
 
     test("solo member can create a weekly schedule", async () => {
-      const db = env.authenticatedContext("solo-member").firestore();
+      const db = authenticatedContext(env, "solo-member").firestore();
 
       await assertSucceeds(
         setDoc(
@@ -82,7 +83,7 @@ for (const profile of scheduleRuleProfiles) {
 
     test("solo member can update a weekly schedule", async () => {
       await seedSoloWeeklySchedule(env);
-      const db = env.authenticatedContext("solo-member").firestore();
+      const db = authenticatedContext(env, "solo-member").firestore();
 
       await assertSucceeds(
         setDoc(
@@ -94,14 +95,14 @@ for (const profile of scheduleRuleProfiles) {
 
     test("solo member can delete a weekly schedule", async () => {
       await seedSoloWeeklySchedule(env);
-      const db = env.authenticatedContext("solo-member").firestore();
+      const db = authenticatedContext(env, "solo-member").firestore();
 
       await assertSucceeds(deleteDoc(doc(db, soloWeeklySchedulePath)));
     });
 
     for (const role of ["cook", "shopper", "member"] as const) {
       test(`joint ${role} cannot create a weekly schedule`, async () => {
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         await assertFails(
           setDoc(
@@ -113,7 +114,7 @@ for (const profile of scheduleRuleProfiles) {
 
       test(`joint ${role} cannot update a weekly schedule`, async () => {
         await seedJointWeeklySchedule(env);
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         await assertFails(
           setDoc(
@@ -125,7 +126,7 @@ for (const profile of scheduleRuleProfiles) {
 
       test(`joint ${role} cannot delete a weekly schedule`, async () => {
         await seedJointWeeklySchedule(env);
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         await assertFails(deleteDoc(doc(db, jointWeeklySchedulePath)));
       });
@@ -134,7 +135,7 @@ for (const profile of scheduleRuleProfiles) {
     for (const role of ["cook", "shopper", "member"] as const) {
       test(`${role} can read a joint weekly schedule`, async () => {
         await seedJointWeeklySchedule(env);
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         await assertSucceeds(getDoc(doc(db, jointWeeklySchedulePath)));
       });
@@ -142,7 +143,7 @@ for (const profile of scheduleRuleProfiles) {
 
     test("outsider cannot read a joint weekly schedule", async () => {
       await seedJointWeeklySchedule(env);
-      const db = env.authenticatedContext("outsider").firestore();
+      const db = authenticatedContext(env, "outsider").firestore();
 
       await assertFails(getDoc(doc(db, jointWeeklySchedulePath)));
     });
@@ -153,7 +154,7 @@ for (const profile of scheduleRuleProfiles) {
 
     test("member cannot read an Admin-SDK-seeded monthly schedule", async () => {
       await seedJointMonthlySchedule(env);
-      const db = env.authenticatedContext("member").firestore();
+      const db = authenticatedContext(env, "member").firestore();
 
       await assertFails(getDoc(doc(db, jointMonthlySchedulePath)));
     });

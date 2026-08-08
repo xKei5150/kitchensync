@@ -11,6 +11,7 @@ import {
   seedShoppingHousehold,
   shoppingRuleProfiles,
 } from "./shopping-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const ordinaryPath = `households/${householdId}/pantryItems/rice`;
 const leftoverPath = `households/${householdId}/pantryItems/leftover`;
@@ -77,7 +78,7 @@ for (const profile of shoppingRuleProfiles) {
     });
 
     test("cook can create and partially consume only a valid leftover", async () => {
-      const db = env.authenticatedContext("cook").firestore();
+      const db = authenticatedContext(env, "cook").firestore();
       await assertSucceeds(setDoc(doc(db, leftoverPath), leftover));
       await assertSucceeds(
         updateDoc(doc(db, leftoverPath), {
@@ -98,7 +99,7 @@ for (const profile of shoppingRuleProfiles) {
       await env.withSecurityRulesDisabled(async (context) => {
         await setDoc(doc(context.firestore(), ordinaryPath), ordinary);
       });
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
       await assertFails(
         updateDoc(doc(db, ordinaryPath), {
           section: "leftover",
@@ -114,7 +115,7 @@ for (const profile of shoppingRuleProfiles) {
       await env.withSecurityRulesDisabled(async (context) => {
         await setDoc(doc(context.firestore(), ordinaryPath), ordinary);
       });
-      const db = env.authenticatedContext("cook").firestore();
+      const db = authenticatedContext(env, "cook").firestore();
       await assertSucceeds(
         updateDoc(doc(db, ordinaryPath), {
           quantity: 4,
@@ -139,7 +140,7 @@ for (const profile of shoppingRuleProfiles) {
       await env.withSecurityRulesDisabled(async (context) => {
         await setDoc(doc(context.firestore(), ordinaryPath), ordinary);
       });
-      const shopperDb = env.authenticatedContext("shopper").firestore();
+      const shopperDb = authenticatedContext(env, "shopper").firestore();
       await assertSucceeds(
         updateDoc(doc(shopperDb, ordinaryPath), {
           quantity: 6,
@@ -152,7 +153,7 @@ for (const profile of shoppingRuleProfiles) {
           updatedAt: new Date("2026-07-18T00:01:00.000Z"),
         }),
       );
-      const memberDb = env.authenticatedContext("member").firestore();
+      const memberDb = authenticatedContext(env, "member").firestore();
       await assertFails(
         updateDoc(doc(memberDb, ordinaryPath), {
           quantity: 7,
@@ -162,11 +163,11 @@ for (const profile of shoppingRuleProfiles) {
     });
 
     test("shopper correction audits are append-only and cook/member cannot forge them", async () => {
-      const shopperDb = env.authenticatedContext("shopper").firestore();
+      const shopperDb = authenticatedContext(env, "shopper").firestore();
       await assertSucceeds(setDoc(doc(shopperDb, adjustmentPath), correction));
       await assertFails(updateDoc(doc(shopperDb, adjustmentPath), { quantityDelta: 2 }));
       for (const role of ["cook", "member"] as const) {
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
         await assertFails(
           setDoc(
             doc(db, `households/${householdId}/inventoryAdjustmentEvents/${role}`),

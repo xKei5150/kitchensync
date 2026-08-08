@@ -11,6 +11,7 @@ import {
   seedShoppingHousehold,
   shoppingRuleProfiles,
 } from "./shopping-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const memberPath = `households/${householdId}/members/member`;
 const shopperPath = `households/${householdId}/members/shopper`;
@@ -43,7 +44,7 @@ for (const profile of shoppingRuleProfiles) {
     });
 
     test("admin can assign a non-admin role with an audit timestamp", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
       await assertSucceeds(
         updateDoc(doc(db, memberPath), {
           role: "cook",
@@ -53,14 +54,14 @@ for (const profile of shoppingRuleProfiles) {
     });
 
     test("non-admin and arbitrary membership-field updates are denied", async () => {
-      const cookDb = env.authenticatedContext("cook").firestore();
+      const cookDb = authenticatedContext(env, "cook").firestore();
       await assertFails(
         updateDoc(doc(cookDb, memberPath), {
           role: "shopper",
           updatedAt: new Date("2026-07-18T00:00:00.000Z"),
         }),
       );
-      const adminDb = env.authenticatedContext("admin").firestore();
+      const adminDb = authenticatedContext(env, "admin").firestore();
       await assertFails(
         updateDoc(doc(adminDb, memberPath), {
           displayName: "forged profile data",
@@ -70,7 +71,7 @@ for (const profile of shoppingRuleProfiles) {
     });
 
     test("Admin promotion is callable-only, even for a Premium target user", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
       await assertFails(
         updateDoc(doc(db, memberPath), {
           role: "admin",
@@ -86,7 +87,7 @@ for (const profile of shoppingRuleProfiles) {
     });
 
     test("admins cannot directly create arbitrary member or Admin grants", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
       const now = new Date("2026-07-18T00:02:00.000Z");
       await assertFails(
         setDoc(doc(db, `households/${householdId}/members/direct-member`), {
@@ -104,8 +105,36 @@ for (const profile of shoppingRuleProfiles) {
       );
     });
 
+    test("admins cannot self-grant a modern-shaped Admin membership", async () => {
+      const db = authenticatedContext(env, "admin").firestore();
+      await assertFails(
+        setDoc(doc(db, `households/${householdId}/members/modern-admin`), {
+          role: "admin",
+          userId: "admin",
+          householdId,
+          schemaVersion: 1,
+          joinedAt: new Date("2026-07-18T00:02:00.000Z"),
+          updatedAt: new Date("2026-07-18T00:02:00.000Z"),
+        }),
+      );
+    });
+
+    test("a verified outsider cannot self-grant an exact modern-shaped Admin membership", async () => {
+      const db = authenticatedContext(env, "verified-outside-user").firestore();
+      await assertFails(
+        setDoc(doc(db, `households/${householdId}/members/verified-outside-user`), {
+          role: "admin",
+          userId: "verified-outside-user",
+          householdId,
+          schemaVersion: 1,
+          joinedAt: new Date("2026-07-18T00:02:00.000Z"),
+          updatedAt: new Date("2026-07-18T00:02:00.000Z"),
+        }),
+      );
+    });
+
     test("all direct membership deletion is denied", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
       await assertFails(
         updateDoc(doc(db, adminPath), {
           role: "member",
@@ -117,8 +146,42 @@ for (const profile of shoppingRuleProfiles) {
     });
 
     test("household root deletion is trusted-backend only", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
       await assertFails(deleteDoc(doc(db, `households/${householdId}`)));
+    });
+
+    test("privacy and lifecycle control-plane roots are server-only", async () => {
+      const db = authenticatedContext(env, "admin").firestore();
+      await assertFails(
+        setDoc(doc(db, "privacyRequests/request-1"), {
+          requestType: "accountDeletion",
+          status: "queued",
+        }),
+      );
+      await assertFails(
+        setDoc(doc(db, "accountLifecycleState/admin"), {
+          status: "queued",
+        }),
+      );
+    });
+
+    test("membership identity fields are immutable once present", async () => {
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), memberPath), {
+          role: "member",
+          userId: "member",
+          householdId,
+          schemaVersion: 1,
+        });
+      });
+      const db = authenticatedContext(env, "admin").firestore();
+      await assertFails(
+        updateDoc(doc(db, memberPath), {
+          userId: "forged",
+          householdId: "other-household",
+          schemaVersion: 1,
+        }),
+      );
     });
   });
 }

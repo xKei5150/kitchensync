@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, test } from "vitest";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
@@ -88,15 +89,13 @@ for (const profile of profiles) {
 
     test("household members can read pantry images but outsiders cannot", async () => {
       await assertSucceeds(
-        env
-          .authenticatedContext("member")
+        authenticatedContext(env, "member")
           .storage()
           .ref(photoPath)
           .getMetadata(),
       );
       await assertFails(
-        env
-          .authenticatedContext("outsider")
+        authenticatedContext(env, "outsider")
           .storage()
           .ref(photoPath)
           .getMetadata(),
@@ -109,20 +108,20 @@ for (const profile of profiles) {
     test("only Admins and solo members can create valid pantry images", async () => {
       await assertSucceeds(
         upload(
-          env.authenticatedContext("admin").storage(),
+          authenticatedContext(env, "admin").storage(),
           `households/${jointHouseholdId}/pantry/rice/admin.jpg`,
         ),
       );
       await assertSucceeds(
         upload(
-          env.authenticatedContext("solo-member").storage(),
+          authenticatedContext(env, "solo-member").storage(),
           `households/${soloHouseholdId}/pantry/rice/solo.jpg`,
         ),
       );
       for (const uid of ["cook", "shopper", "member", "outsider"] as const) {
         await assertFails(
           upload(
-            env.authenticatedContext(uid).storage(),
+            authenticatedContext(env, uid).storage(),
             `households/${jointHouseholdId}/pantry/rice/${uid}.jpg`,
           ),
         );
@@ -132,14 +131,14 @@ for (const profile of profiles) {
     test("the legacy preview household does not grant storage access", async () => {
       await assertFails(
         upload(
-          env.authenticatedContext("outsider").storage(),
+          authenticatedContext(env, "outsider").storage(),
           `households/${legacyHouseholdId}/pantry/rice/forged.jpg`,
         ),
       );
     });
 
     test("uploads require supported image content and are immutable", async () => {
-      const adminStorage = env.authenticatedContext("admin").storage();
+      const adminStorage = authenticatedContext(env, "admin").storage();
       await assertFails(
         upload(
           adminStorage,

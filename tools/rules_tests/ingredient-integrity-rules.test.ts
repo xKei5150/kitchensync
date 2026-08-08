@@ -11,6 +11,7 @@ import {
   seedShoppingHousehold,
   shoppingRuleProfiles,
 } from "./shopping-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const ingredient = {
   name: "house blend",
@@ -56,7 +57,7 @@ for (const profile of shoppingRuleProfiles) {
     afterAll(async () => env.cleanup());
 
     test("custom creation enforces deterministic identity and category invariants", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
       await assertSucceeds(
         setDoc(
           doc(db, `households/${householdId}/customIngredients/custom-aG91c2UgYmxlbmQ`),
@@ -81,9 +82,9 @@ for (const profile of shoppingRuleProfiles) {
     });
 
     test("only the Admin-level pantry role can create or update custom ingredients", async () => {
-      const admin = env.authenticatedContext("admin").firestore();
-      const cook = env.authenticatedContext("cook").firestore();
-      const shopper = env.authenticatedContext("shopper").firestore();
+      const admin = authenticatedContext(env, "admin").firestore();
+      const cook = authenticatedContext(env, "cook").firestore();
+      const shopper = authenticatedContext(env, "shopper").firestore();
       const path = `households/${householdId}/customIngredients/custom-cm9sZS1ndWFyZA`;
       await assertSucceeds(setDoc(doc(admin, path), ingredient));
       await assertFails(setDoc(doc(cook, path), { ...ingredient, name: "cook edit" }));
@@ -102,8 +103,36 @@ for (const profile of shoppingRuleProfiles) {
       );
     });
 
+    // IngredientRemoteDataSource.updateCustom overwrites the whole document
+    // and carries createdAt through unchanged. These assertions pin the rule
+    // that makes that shape legal, and the one that makes a re-stamped
+    // createdAt illegal.
+    test("an admin edit of a custom ingredient is permitted only when createdAt is preserved", async () => {
+      const admin = authenticatedContext(env, "admin").firestore();
+      const path = `households/${householdId}/customIngredients/custom-ZWRpdC1ndWFyZA`;
+      await assertSucceeds(setDoc(doc(admin, path), ingredient));
+
+      await assertSucceeds(
+        setDoc(doc(admin, path), {
+          ...ingredient,
+          name: "house blend reserve",
+          displayNames: { en: "House Blend Reserve" },
+          updatedAt: new Date("2026-07-27T00:00:00.000Z"),
+        }),
+      );
+
+      await assertFails(
+        setDoc(doc(admin, path), {
+          ...ingredient,
+          name: "house blend restamped",
+          createdAt: new Date("2026-07-27T00:00:00.000Z"),
+          updatedAt: new Date("2026-07-27T00:00:00.000Z"),
+        }),
+      );
+    });
+
     test("recipe lines reject dangling, invalid-unit, and foreign custom references", async () => {
-      const db = env.authenticatedContext("cook").firestore();
+      const db = authenticatedContext(env, "cook").firestore();
       await assertSucceeds(
         setDoc(doc(db, "recipes/integrity-recipe"), {
           authorUserId: "cook",
@@ -147,7 +176,7 @@ for (const profile of shoppingRuleProfiles) {
     });
 
     test("pantry rejects inaccessible references and client purchase history is forbidden", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
       const pantry = {
         householdId,
         ingredientId: "rice",
@@ -176,7 +205,7 @@ for (const profile of shoppingRuleProfiles) {
         }),
       );
       for (const role of ["admin", "cook", "shopper"] as const) {
-        const roleDb = env.authenticatedContext(role).firestore();
+        const roleDb = authenticatedContext(env, role).firestore();
         await assertFails(
           setDoc(doc(roleDb, `households/${householdId}/purchases/direct-${role}`), {
             householdId,
@@ -251,7 +280,7 @@ for (const profile of shoppingRuleProfiles) {
           reason: "expired",
         }),
       );
-      const foreign = env.authenticatedContext("admin").firestore();
+      const foreign = authenticatedContext(env, "admin").firestore();
       await assertFails(
         getDoc(
           doc(foreign, "households/foreign/customIngredients/custom-Zm9yZWlnbg"),

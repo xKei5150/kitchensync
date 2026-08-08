@@ -6,7 +6,6 @@ import {
 import { doc, getDoc, setDoc, writeBatch } from "firebase/firestore";
 import {
   creatorHouseholdPath,
-  creatorInvitePath,
   creatorMemberPath,
   creatorUserPath,
   creatorWeeklySchedulePath,
@@ -19,6 +18,7 @@ import {
   seedJointWeeklySchedule,
   weeklySchedule,
 } from "./shopping-schedule-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 type SecurityScenario = {
   readonly name: string;
@@ -30,7 +30,7 @@ export const securityScenarios: readonly SecurityScenario[] = [
     name: "outsider cannot self-create Admin membership then read and write the schedule",
     run: async (env) => {
       await seedJointWeeklySchedule(env);
-      const db = env.authenticatedContext("outsider").firestore();
+      const db = authenticatedContext(env, "outsider").firestore();
 
       await assertFails(
         setDoc(doc(db, jointOutsiderMemberPath), { role: "admin" }),
@@ -47,7 +47,7 @@ export const securityScenarios: readonly SecurityScenario[] = [
   {
     name: "joint member cannot flip the household to solo then write the schedule",
     run: async (env) => {
-      const db = env.authenticatedContext("member").firestore();
+      const db = authenticatedContext(env, "member").firestore();
 
       await assertFails(
         setDoc(
@@ -68,14 +68,14 @@ export const securityScenarios: readonly SecurityScenario[] = [
     name: "outsider cannot read household day settings",
     run: async (env) => {
       await seedJointDaySettings(env);
-      const db = env.authenticatedContext("outsider").firestore();
+      const db = authenticatedContext(env, "outsider").firestore();
       await assertFails(getDoc(doc(db, jointDaySettingsPath)));
     },
   },
   {
     name: "outsider cannot write household day settings",
     run: async (env) => {
-      const db = env.authenticatedContext("outsider").firestore();
+      const db = authenticatedContext(env, "outsider").firestore();
       await assertFails(setDoc(doc(db, jointDaySettingsPath), daySettings()));
     },
   },
@@ -97,7 +97,7 @@ export const securityScenarios: readonly SecurityScenario[] = [
   {
     name: "outsider cannot forge a household invite",
     run: async (env) => {
-      const db = env.authenticatedContext("outsider").firestore();
+      const db = authenticatedContext(env, "outsider").firestore();
       await assertFails(
         setDoc(doc(db, forgedInvitePath), {
           householdId: "joint-household",
@@ -117,39 +117,38 @@ export const securityScenarios: readonly SecurityScenario[] = [
           premiumPlan: "annual",
         });
       });
-      const db = env.authenticatedContext("debug-creator").firestore();
+      const db = authenticatedContext(env, "debug-creator").firestore();
       const batch = writeBatch(db);
       batch.set(
         doc(db, creatorUserPath),
         {
-          activeHouseholdId: "debug-creator-household",
-          householdIds: ["debug-creator-household"],
-          createdJointHouseholdId: "debug-creator-household",
+          activeHouseholdId: "solo-debug-creator",
+          householdIds: ["solo-debug-creator"],
+          createdSoloHouseholdId: "solo-debug-creator",
         },
         { merge: true },
       );
       batch.set(doc(db, creatorHouseholdPath), {
         name: "Debug creator kitchen",
         creatorUserId: "debug-creator",
-        isJoint: true,
-        hasPremium: true,
-        maxMembers: 6,
+        ownerUserId: "debug-creator",
+        isJoint: false,
+        hasPremium: false,
+        maxMembers: 1,
         memberCount: 1,
-        inviteCode: "DEBUG-CREATOR",
       });
-      batch.set(doc(db, creatorMemberPath), { role: "admin" });
-      batch.set(doc(db, creatorInvitePath), {
-        householdId: "debug-creator-household",
-        createdBy: "debug-creator",
-        role: "member",
-        active: true,
+      batch.set(doc(db, creatorMemberPath), {
+        role: "admin",
+        userId: "debug-creator",
+        householdId: "solo-debug-creator",
+        schemaVersion: 1,
       });
 
       await assertSucceeds(batch.commit());
       await assertSucceeds(
         setDoc(
           doc(db, creatorWeeklySchedulePath),
-          weeklySchedule("debug-creator-household", "debug-creator"),
+          weeklySchedule("solo-debug-creator", "debug-creator"),
         ),
       );
     },

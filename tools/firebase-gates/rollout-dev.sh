@@ -34,11 +34,14 @@ active_project=$("$FIREBASE_BIN" use --json | jq -er '
 ') || fail "Firebase project lookup failed"
 [ "$active_project" = "$DEV_PROJECT" ] || fail "active Firebase project is not $DEV_PROJECT"
 
-expected_functions='["shoppingSmoke","startPremiumTrial","removeHouseholdMember","transferHouseholdAdmin","completeShoppingList","cancelShoppingList","deleteShoppingList","planShoppingAllocation","mutateShoppingListItem"]'
+# All public Functions must be active before client and Rules rollout proceeds.
+# `cleanupTerminalInviteMetadataDaily` is a scheduled worker, not a callable,
+# but its runtime metadata is subject to the same Node 22/region readiness gate.
+expected_functions='["shoppingSmoke","startPremiumTrial","createJointHouseholdWithTrialTransfer","removeHouseholdMember","transferHouseholdAdmin","issueHouseholdInvite","redeemHouseholdInvite","revokeHouseholdInvite","accountDeletionPreflight","requestAccountDeletion","leaveJointHousehold","transferJointHouseholdOwnership","completeShoppingList","cancelShoppingList","deleteShoppingList","planShoppingAllocation","mutateShoppingListItem","adminHealthGet","adminUserGet","adminHouseholdGet","adminEntitlementGet","cleanupTerminalInviteMetadataDaily","processAccountDeletionRequestsEveryFifteenMinutes"]'
 expected_indexes=$(jq -cer '
   select((.indexes | type) == "array" and (.indexes | length > 0)) |
   select(all(.indexes[];
-    (.collectionGroup | type) == "string" and .queryScope == "COLLECTION" and
+    (.collectionGroup | type) == "string" and (.queryScope == "COLLECTION" or .queryScope == "COLLECTION_GROUP") and
     (.fields | type) == "array" and (.fields | length > 0) and
     all(.fields[]; (.fieldPath | type) == "string" and .fieldPath != "__name__" and
       (((.order // .arrayConfig) | type) == "string")))) |
@@ -105,7 +108,7 @@ while [ "$attempt" -le "$WAIT_ATTEMPTS" ]; do
 done
 
 "$SMOKE_COMMAND" before-rules
-"$FIREBASE_BIN" deploy --project "$DEV_PROJECT" --only firestore:rules
+"$FIREBASE_BIN" deploy --project "$DEV_PROJECT" --only firestore:rules,storage:rules
 "$SMOKE_COMMAND" after-rules
 
 printf 'Firebase dev rollout completed safely for %s\n' "$DEV_PROJECT"

@@ -12,6 +12,8 @@ rediscover those recipes.
 scripts/run-integration.sh              # every target
 scripts/run-integration.sh shopping_mvp_emulator recipe_nav
 scripts/run-integration.sh --list       # target names
+# Android: start a healthy AVD first, then use the same target recipes.
+INTEGRATION_PLATFORM=android scripts/run-integration.sh recipe_nav
 ```
 
 Logs land in `.integration-logs/<target>.log`; the emulator log is
@@ -47,8 +49,19 @@ Base defines for every target:
 --dart-define=FUNCTIONS_EMULATOR_PORT=15001
 ```
 
-Device: iPhone 17 Pro `B1177420-2859-43F7-8E26-B3835A85C984`
-(override with `INTEGRATION_DEVICE`).
+Default iOS device: iPhone 17 Pro `B1177420-2859-43F7-8E26-B3835A85C984`.
+Set `INTEGRATION_PLATFORM=android` to use the Android default
+`emulator-5554`; either may be overridden with `INTEGRATION_DEVICE`.
+
+The Flutter app already resolves Firebase emulator hosts to `10.0.2.2` for
+Android and `127.0.0.1` for iOS. The runner keeps the target-specific Firebase
+ports and clean-stack lifecycle identical on both platforms. For Android it
+also binds the screenshot capture handshake listener to `0.0.0.0`, so the
+emulator can reach it through `10.0.2.2`; iOS continues to use `127.0.0.1`.
+Before every Android driver launch the runner wakes and keeps the AVD display
+awake. A sleeping AVD can give Flutter a 0x0 surface and prevent the driver
+extension from becoming available, which otherwise appears as an opaque
+post-install watchdog timeout.
 
 ## The four targets that need parameters
 
@@ -60,7 +73,7 @@ like a product defect. `scripts/run-integration.sh` supplies all of them.
 | `functions_unused_port` | `FUNCTIONS_EMULATOR_PORT` **and** `UNUSED_FUNCTIONS_PORT` set to a port with **nothing listening** (default 56551). Pointed at the live emulator the call succeeds and the "expect an exception" assertion correctly fails. |
 | `shopping_mvp_emulator` | `QA_CANONICAL_DATE=YYYY-MM-DD` **and** `FINAL_CAPTURE_SIGNAL_PORT` with a live listener. |
 | `shopping_visual_state_matrix` | `VISUAL_CAPTURE_SIGNAL_PORT` with a live listener (it signals up to 3 times). |
-| `email_auth_session_restore_emulator` | Runs **twice against one emulator**: `AUTH_SESSION_PHASE=create` then `=restore`, sharing one `AUTH_SESSION_RUN_ID`. A per-target emulator restart destroys the account between phases. |
+| `email_auth_session_restore_emulator` | iOS runs **twice against one emulator**: `AUTH_SESSION_PHASE=create` then `=restore`, sharing one `AUTH_SESSION_RUN_ID`. Android builds and installs one target APK, clears it once before create, then force-stops and Intent-launches the same package for restore; a test-only channel reads that transient phase value from the current Activity Intent. Both phases attach with `--use-existing-app`, so restore neither clears nor replaces package state. A per-target Firebase emulator restart destroys the account between phases. |
 
 Two more targets are not mis-parameterised but are environment-sensitive:
 

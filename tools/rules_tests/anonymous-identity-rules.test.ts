@@ -82,6 +82,41 @@ for (const profile of profiles) {
       await assertSucceeds(getDoc(doc(email, `households/${householdId}`)))
     })
 
+    test("retains existing access for an unverified email/password member", async () => {
+      const unverified = env
+        .authenticatedContext(emailUid, {
+          email_verified: false,
+          firebase: { sign_in_provider: "password" },
+        })
+        .firestore()
+      await assertSucceeds(getDoc(doc(unverified, `households/${householdId}`)))
+    })
+
+    test.each(["password", "google.com", "apple.com"] as const)(
+      "accepts the deployed %s provider on Firestore and Storage",
+      async (provider) => {
+        const token = { firebase: { sign_in_provider: provider } }
+        const firestore = env.authenticatedContext(emailUid, token).firestore()
+        const storage = env.authenticatedContext(emailUid, token).storage()
+        await assertSucceeds(getDoc(doc(firestore, `households/${householdId}`)))
+        await assertSucceeds(storage.ref(imagePath).getMetadata())
+      },
+    )
+
+    test.each([
+      ["missing firebase claims", {}],
+      ["missing provider claim", { firebase: {} }],
+      ["anonymous", { firebase: { sign_in_provider: "anonymous" } }],
+      ["custom token", { firebase: { sign_in_provider: "custom" } }],
+      ["phone", { firebase: { sign_in_provider: "phone" } }],
+      ["unknown provider", { firebase: { sign_in_provider: "saml.example" } }],
+    ] as const)("rejects %s on Firestore and Storage", async (_label, token) => {
+      const firestore = env.authenticatedContext(emailUid, token as never).firestore()
+      const storage = env.authenticatedContext(emailUid, token as never).storage()
+      await assertFails(getDoc(doc(firestore, `households/${householdId}`)))
+      await assertFails(storage.ref(imagePath).getMetadata())
+    })
+
     test("denies anonymous Storage reads even with fixture membership", async () => {
       const anonymous = env
         .authenticatedContext(anonymousUid, {

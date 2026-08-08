@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore"
+import { authenticatedContext } from "./authenticated-context.js"
 
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:23081"
 const [host, port] = firestoreHost.split(":")
@@ -37,13 +38,13 @@ for (const [profile, rulesFile] of [
     })
 
     test("authenticated clients cannot read root command receipts", async () => {
-      const db = env.authenticatedContext("shopper").firestore()
+      const db = authenticatedContext(env, "shopper").firestore()
 
       await assertFails(getDoc(doc(db, "shoppingCommandReceipts/command-1")))
     })
 
     test("authenticated clients cannot create root command receipts", async () => {
-      const db = env.authenticatedContext("shopper").firestore()
+      const db = authenticatedContext(env, "shopper").firestore()
 
       await assertFails(
         setDoc(doc(db, "shoppingCommandReceipts/command-1"), {
@@ -55,7 +56,7 @@ for (const [profile, rulesFile] of [
     })
 
     test("authenticated clients cannot delete root command receipts", async () => {
-      const db = env.authenticatedContext("shopper").firestore()
+      const db = authenticatedContext(env, "shopper").firestore()
 
       await assertFails(deleteDoc(doc(db, "shoppingCommandReceipts/command-1")))
     })
@@ -68,7 +69,7 @@ for (const [profile, rulesFile] of [
           targetListId: "list-1",
         })
       })
-      const db = env.authenticatedContext("shopper").firestore()
+      const db = authenticatedContext(env, "shopper").firestore()
 
       await assertFails(
         updateDoc(doc(db, "shoppingCommandReceipts/command-1"), {
@@ -108,7 +109,7 @@ for (const [profile, rulesFile] of [
 
     test("household command receipts remain server-owned", async () => {
       const receiptPath = "householdCommandReceipts/household-command-1"
-      const db = env.authenticatedContext("admin").firestore()
+      const db = authenticatedContext(env, "admin").firestore()
 
       await assertFails(getDoc(doc(db, receiptPath)))
       await assertFails(

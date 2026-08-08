@@ -43,8 +43,15 @@ Google OAuth clients or enable the Apple Developer capability. Follow
 for the exact console work, ignored local OAuth configuration, Firebase config
 refresh command, emulator commands, and installed Android/iOS checks.
 
-## Future tools (added in later plans)
+## Tooling
 
-- `tools/seed_builder/` — produces `assets/seed/ingredients.json` (Plan 2)
-- `tools/seed_uploader/` — uploads the seed via Firebase Admin SDK (Plan 2)
-- `tools/rules_tests/` — security-rules unit tests (Plan 3)
+- `tools/seed_builder/` — Dart tool that curates and builds the ingredient seed
+  (`assets/seed/ingredients.json`), with Agrovoc multilingual enrichment and an
+  LLM classifier. See [`seed_builder/README.md`](seed_builder/README.md).
+- `tools/seed_uploader/` — TypeScript tool that uploads the seed via the
+  Firebase Admin SDK. See [`seed_uploader/README.md`](seed_uploader/README.md).
+- `tools/rules_tests/` — Firestore security-rules unit tests run against the
+  emulator. See [`rules_tests/README.md`](rules_tests/README.md).
+- `tools/verify-firebase-gates.mjs` — verifies Firebase project/firebase.json gates.
+- `tools/run-shopping-mobile-qa.sh` / `tools/run-shopping-planner-runtime-qa.sh` —
+  QA smoke-test scripts.

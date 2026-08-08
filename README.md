@@ -1,6 +1,15 @@
 # KitchenSync
 
-Household kitchen-management app — Flutter + Firebase.
+Household kitchen-management platform. A cross-platform Flutter app backed by
+TypeScript Firebase Cloud Functions, a private Dart "shopping allocation
+planner" microservice, and a read-only React/TypeScript admin web console.
+
+| | |
+|---|---|
+| Mobile app | `lib/` — Flutter (iOS/Android/macOS/Linux/Windows/Web) |
+| Backend | `functions/` — TypeScript Firebase Cloud Functions |
+| Planner microservice | `services/shopping_allocation_planner/` — Dart HTTP service |
+| Admin web console | `apps/admin-web/` — React 19 + TypeScript + Vite |
 
 ## Setup
 
@@ -25,13 +34,33 @@ Household kitchen-management app — Flutter + Firebase.
 - `make test` — unit + widget tests
 - `make cov` — with coverage at `coverage/lcov.info`
 
-## Project layout
+## Repository layout
 
 ```
-lib/
-  app/        # MaterialApp, router, theme
-  core/       # Cross-cutting utilities, Firebase init, session stub
-  features/   # Feature-vertical modules (clean architecture)
+lib/                              # Flutter app (Riverpod, go_router, Freezed)
+  app/                            #   MaterialApp, router, theme
+  core/                           #   Cross-cutting utilities, Firebase init, session
+  features/                       #   Feature-vertical modules (clean architecture)
+functions/                        # TypeScript Firebase Cloud Functions
+services/shopping_allocation_planner/   # Dart planner microservice (OIDC-authed)
+apps/admin-web/                   # React 19 + TS staff console
+tools/                            # Seed builder/uploader, security-rules tests
+docs/                             # See docs/README.md for the index
 ```
+
+`lib/firebase_options_dev.dart` / `lib/firebase_options_prod.dart` are gitignored
+and regenerated locally (see [setup](#setup)). See [tools/README.md](tools/README.md)
+for the one-time Firebase configuration.
+
+## Documentation
+
+- [User manual](docs/manual/USER_MANUAL.md)
+- [Design overview](DESIGN.md)
+- [Documentation index](docs/README.md)
+- [Authentication setup](docs/authentication-development.md)
+- [Integration test harness](docs/integration-test-harness.md)
+- [Admin dashboard docs](docs/) — release manifest, deployment runbook, implementation progress
+- [Backend](functions/) — Firebase Functions
+- [Planner service](services/shopping_allocation_planner/)
 
 Specs and plans live under `docs/superpowers/`.

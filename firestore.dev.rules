@@ -2,19 +2,38 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() {
-      // Firebase always stamps real Auth tokens with this provider claim.
-      // Keep the missing-claim fallback for rules-unit-testing custom tokens,
-      // but reject every actual anonymous Firebase identity at the data
-      // boundary. Emulator fixtures use disposable email identities instead.
+      // Consumer data is available only to the providers deployed for the
+      // product. Missing claims and custom-token identities fail closed.
       return request.auth != null
+        && 'firebase' in request.auth.token
+        && request.auth.token.firebase is map
+        && 'sign_in_provider' in request.auth.token.firebase
+        && request.auth.token.firebase.sign_in_provider in [
+          'password',
+          'google.com',
+          'apple.com',
+        ];
+    }
+    function isAccountFrozen(uid) {
+      return (
+        exists(userRef(uid))
+        && get(userRef(uid)).data.get('accountLifecycleStatus', 'active') == 'frozen'
+      ) || (
+        exists(/databases/$(database)/documents/accountLifecycleQuarantine/$(uid))
         && (
-          !('firebase' in request.auth.token)
-          || !('sign_in_provider' in request.auth.token.firebase)
-          || request.auth.token.firebase.sign_in_provider != 'anonymous'
-        );
+          get(/databases/$(database)/documents/accountLifecycleQuarantine/$(uid)).data.get('status', '') == 'frozen'
+          || (
+            get(/databases/$(database)/documents/accountLifecycleQuarantine/$(uid)).data.get('status', '') == 'quarantined'
+            && get(/databases/$(database)/documents/accountLifecycleQuarantine/$(uid)).data.get('quarantineUntil', request.time) > request.time
+          )
+        )
+      );
+    }
+    function isActiveConsumer() {
+      return isSignedIn() && !isAccountFrozen(request.auth.uid);
     }
     function isHouseholdMember(hid) {
-      return isSignedIn()
+      return isActiveConsumer()
         && exists(/databases/$(database)/documents/households/$(hid)/members/$(request.auth.uid));
     }
     function householdRole(hid) {
@@ -491,10 +510,7 @@ service cloud.firestore {
       return id.matches('^custom-.*') && isValidCustomIngredientData(hid);
     }
     function isSelf(uid) {
-      return isSignedIn() && request.auth.uid == uid;
-    }
-    function inviteDoc(code) {
-      return get(/databases/$(database)/documents/householdInvites/$(code));
+      return isActiveConsumer() && request.auth.uid == uid;
     }
     function userRef(uid) {
       return /databases/$(database)/documents/users/$(uid);
@@ -528,24 +544,14 @@ service cloud.firestore {
         && getAfter(householdRef(hid)).data.hasPremium == false
         && getAfter(householdRef(hid)).data.maxMembers == 1
         && getAfter(householdRef(hid)).data.memberCount == 1
-        && getAfter(householdMemberRef(hid, uid)).data.role == 'admin';
+        && getAfter(householdMemberRef(hid, uid)).data.role == 'admin'
+        ;
     }
     function hasReservedJointHouseholdCreation(uid, hid) {
-      return hid is string
-        && hid.size() > 0
-        && !hid.matches('^solo-.*')
-        && hasActivePremiumUser(uid)
-        && existsAfter(userRef(uid))
-        && existsAfter(householdRef(hid))
-        && existsAfter(householdMemberRef(hid, uid))
-        && hasAfterHouseholdContext(uid, hid)
-        && getAfter(userRef(uid)).data.get('createdJointHouseholdId', null) == hid
-        && getAfter(householdRef(hid)).data.creatorUserId == uid
-        && getAfter(householdRef(hid)).data.isJoint == true
-        && getAfter(householdRef(hid)).data.hasPremium == true
-        && getAfter(householdRef(hid)).data.maxMembers == 6
-        && getAfter(householdRef(hid)).data.memberCount == 1
-        && getAfter(householdMemberRef(hid, uid)).data.role == 'admin';
+      // Joint Premium creation moves a subscription and denormalized profile
+      // ownership atomically. Rules cannot safely express that cross-household
+      // transfer, so the client path is server-callable-only.
+      return false;
     }
     function userCreationReservationsAreValid(uid) {
       let soloId = request.resource.data.get('createdSoloHouseholdId', null);
@@ -585,6 +591,34 @@ service cloud.firestore {
           || hasReservedJointHouseholdCreation(uid, hid)
         );
     }
+    function isModernMembershipCreate(hid, uid) {
+      return request.resource.data.keys().hasOnly([
+          'role',
+          'userId',
+          'householdId',
+          'schemaVersion',
+          'joinedAt',
+          'updatedAt',
+        ])
+        && request.resource.data.keys().hasAll([
+          'role',
+          'userId',
+          'householdId',
+          'schemaVersion',
+        ])
+        && request.resource.data.role == 'admin'
+        && request.resource.data.userId == uid
+        && request.resource.data.householdId == hid
+        && request.resource.data.schemaVersion == 1;
+    }
+    function hasModernInitialProvisioningOwnership(hid, uid) {
+      let household = getAfter(householdRef(hid)).data;
+      return household.ownerUserId == uid
+        && (
+          (household.isJoint == false && household.hasPremium == false)
+          || (household.isJoint == true && household.premiumOwnerUserId == uid)
+        );
+    }
     function canUserJoinPremiumHousehold(uid, hid) {
       let userBefore = get(userRef(uid)).data;
       let userAfter = getAfter(userRef(uid)).data;
@@ -593,45 +627,6 @@ service cloud.firestore {
         && userAfter.get('householdIds', []).hasAny([hid])
         && userAfter.get('joinedPremiumHouseholdIds', []).hasAny([hid])
         && (hasActivePremiumUser(uid) || joinedBefore.size() == 0);
-    }
-    function isValidInviteJoin(hid, uid) {
-      let code = request.resource.data.inviteCode;
-      let invite = inviteDoc(code).data;
-      let household = get(householdRef(hid)).data;
-      return request.auth.uid == uid
-        && code is string
-        && invite.active == true
-        && invite.householdId == hid
-        && invite.role == request.resource.data.role
-        && request.resource.data.role in ['member', 'shopper', 'cook']
-        && household.isJoint == true
-        && hasActiveHouseholdPremium(hid)
-        && household.memberCount is int
-        && getAfter(householdRef(hid)).data.memberCount == household.memberCount + 1
-        && getAfter(householdRef(hid)).data.memberCount <= household.maxMembers
-        && canUserJoinPremiumHousehold(uid, hid);
-    }
-    function isValidJoinCapacityUpdate(hid) {
-      let memberAfter = getAfter(householdMemberRef(hid, request.auth.uid)).data;
-      let code = memberAfter.inviteCode;
-      let invite = inviteDoc(code).data;
-      return isSignedIn()
-        && !exists(householdMemberRef(hid, request.auth.uid))
-        && existsAfter(householdMemberRef(hid, request.auth.uid))
-        && resource.data.isJoint == true
-        && hasActiveHouseholdPremium(hid)
-        && resource.data.memberCount is int
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'memberCount',
-          'updatedAt',
-        ])
-        && request.resource.data.memberCount == resource.data.memberCount + 1
-        && request.resource.data.memberCount <= resource.data.maxMembers
-        && code is string
-        && invite.active == true
-        && invite.householdId == hid
-        && invite.role == memberAfter.role
-        && canUserJoinPremiumHousehold(request.auth.uid, hid);
     }
     function isValidMemberRoleUpdate(hid, uid) {
       let nextRole = request.resource.data.role;
@@ -677,7 +672,13 @@ service cloud.firestore {
         && request.resource.data.updatedAt is timestamp
         && request.resource.data.updatedByUserId is string
         && request.resource.data.updatedByUserId.size() > 0
-        && request.resource.data.updatedByUserId == request.auth.uid;
+        && (
+          request.resource.data.updatedByUserId == request.auth.uid
+          || (
+            request.resource.data.updatedByUserId == 'anonymous'
+            && resource.data.get('updatedByUserId', 'anonymous') == 'anonymous'
+          )
+        );
     }
     function isValidNotificationPreferences(hid) {
       return request.resource.data.keys().hasOnly([
@@ -711,6 +712,24 @@ service cloud.firestore {
         'premiumTrialEndsAt',
       ]);
     }
+    function isValidUserPresentationUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return changed.hasOnly([
+          'displayName',
+          'updatedAt',
+          'activeHouseholdId',
+          'householdIds',
+          'joinedPremiumHouseholdIds',
+          'createdSoloHouseholdId',
+          'createdJointHouseholdId',
+        ])
+        && (!changed.hasAny(['displayName']) || (
+          request.resource.data.displayName is string
+          && request.resource.data.displayName.size() >= 2
+          && request.resource.data.displayName.size() <= 80
+        ))
+        && (!changed.hasAny(['updatedAt']) || request.resource.data.updatedAt is timestamp);
+    }
     function joinedPremiumHouseholdHistoryIsValid() {
       let joinedBefore = resource.data.get('joinedPremiumHouseholdIds', []);
       let joinedAfter = request.resource.data.get('joinedPremiumHouseholdIds', []);
@@ -728,25 +747,38 @@ service cloud.firestore {
         'householdIds',
         'joinedPremiumHouseholdIds',
       ]);
+      let householdIdsChanged = request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'householdIds',
+      ]);
       let joinedPremiumHouseholdIdsChanged = request.resource.data.diff(resource.data).affectedKeys().hasAny([
         'joinedPremiumHouseholdIds',
       ]);
       let activeHouseholdId = request.resource.data.get('activeHouseholdId', null);
+      let householdIdsBefore = resource.data.get('householdIds', []);
+      let householdIdsAfter = request.resource.data.get('householdIds', []);
       return (
           !contextChanged || (
             activeHouseholdId is string
             && activeHouseholdId.size() > 0
-            && request.resource.data.get('householdIds', []).hasAny([activeHouseholdId])
+            && householdIdsAfter is list
+            && householdIdsAfter.hasAny([activeHouseholdId])
             && existsAfter(householdMemberRef(activeHouseholdId, uid))
           )
         )
+        && (!householdIdsChanged || (
+          householdIdsBefore is list
+          && householdIdsAfter is list
+          && householdIdsAfter.hasAll(householdIdsBefore)
+          && householdIdsAfter.size() == householdIdsBefore.size() + 1
+          && !householdIdsBefore.hasAny([activeHouseholdId])
+          && householdIdsAfter.hasAny([activeHouseholdId])
+        ))
         && (!joinedPremiumHouseholdIdsChanged || joinedPremiumHouseholdHistoryIsValid());
     }
     function isValidAdminHouseholdUpdate(hid) {
-      // Household topology and entitlement fields are established by trusted
-      // provisioning/callables. Admins may edit only the user-facing name;
-      // the separate invite-join rule below is the sole client path that may
-      // increment memberCount.
+      // Household topology, entitlement, and membership counts are established
+      // by trusted provisioning/callables. Admins may edit only the
+      // user-facing name.
       return isHouseholdAdmin(hid)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'name',
@@ -760,20 +792,95 @@ service cloud.firestore {
     }
     function isValidUserCreate(uid) {
       return isSelf(uid)
+        && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly([
+          'isPremium',
+          'email',
+          'displayName',
+          'photoUrl',
+          'providerIds',
+          'createdAt',
+          'updatedAt',
+          'activeHouseholdId',
+          'householdIds',
+          'joinedPremiumHouseholdIds',
+          'createdSoloHouseholdId',
+          'createdJointHouseholdId',
+        ])
+        && request.resource.data.keys().hasAll([
+          'isPremium',
+          'providerIds',
+          'createdAt',
+          'updatedAt',
+          'activeHouseholdId',
+          'householdIds',
+        ])
         && request.resource.data.isPremium == false
-        && userCreationReservationsAreValid(uid)
-        && !request.resource.data.keys().hasAny([
-          'premiumPlan',
-          'premiumTrialStartedAt',
-          'premiumTrialEndsAt',
-        ]);
+        && request.resource.data.providerIds is list
+        && request.resource.data.providerIds.size() > 0
+        && request.resource.data.providerIds.hasOnly([
+          'password',
+          'google.com',
+          'apple.com',
+        ])
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.activeHouseholdId is string
+        && request.resource.data.activeHouseholdId.size() > 0
+        && request.resource.data.householdIds is list
+        && request.resource.data.householdIds.size() > 0
+        && request.resource.data.householdIds.hasAny([
+          request.resource.data.activeHouseholdId,
+        ])
+        && (
+          !('email' in request.resource.data)
+          || request.resource.data.email is string
+        )
+        && (
+          !('displayName' in request.resource.data)
+          || (
+            request.resource.data.displayName is string
+            && request.resource.data.displayName.size() <= 80
+          )
+        )
+        && (
+          !('photoUrl' in request.resource.data)
+          || request.resource.data.photoUrl is string
+        )
+        && (
+          !('joinedPremiumHouseholdIds' in request.resource.data)
+          || request.resource.data.joinedPremiumHouseholdIds is list
+        )
+        && (
+          (
+            request.resource.data.get('createdSoloHouseholdId', null) is string
+            && request.resource.data.get('createdJointHouseholdId', null) == null
+            && request.resource.data.activeHouseholdId == request.resource.data.createdSoloHouseholdId
+            && hasReservedSoloHouseholdCreation(
+              uid,
+              request.resource.data.createdSoloHouseholdId
+            )
+          ) || (
+            request.resource.data.get('createdSoloHouseholdId', null) == null
+            && request.resource.data.get('createdJointHouseholdId', null) is string
+            && request.resource.data.activeHouseholdId == request.resource.data.createdJointHouseholdId
+            && hasReservedJointHouseholdCreation(
+              uid,
+              request.resource.data.createdJointHouseholdId
+            )
+          )
+        )
+        && hasAfterHouseholdContext(uid, request.resource.data.activeHouseholdId);
     }
     function isValidHouseholdCreate(hid) {
-      return isSignedIn()
+      return isActiveConsumer()
+        && request.auth.token.email_verified == true
         && request.resource.data.creatorUserId == request.auth.uid
         && request.resource.data.name is string
         && request.resource.data.isJoint is bool
         && request.resource.data.hasPremium is bool
+        && (!('ownerUserId' in request.resource.data)
+          || request.resource.data.ownerUserId == request.auth.uid)
         && request.resource.data.maxMembers in [1, 6]
         && request.resource.data.memberCount == 1
         && (
@@ -785,7 +892,6 @@ service cloud.firestore {
             request.resource.data.isJoint == true
             && request.resource.data.hasPremium == true
             && request.resource.data.maxMembers == 6
-            && hasReservedJointHouseholdCreation(request.auth.uid, hid)
           )
         )
         && (
@@ -803,10 +909,115 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Invite issuance, redemption, revocation, and rate-limit state are
+    // callable-only. Firebase Admin SDK operations bypass these Rules.
+    // Legacy KS-* records remain explicitly inaccessible while the client
+    // migrates to the trusted callable flow.
+    match /householdInvites/{inviteId} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteTokens/{tokenLookupHmac} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteManagement/{inviteId} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteIssueReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteRedemptionReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /householdInviteRevocationReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /inviteRateLimitBuckets/{bucketId} {
+      allow read, write: if false;
+    }
+
+    match /serverInviteTerminalCleanupCursors/{cursorId} {
+      allow read, write: if false;
+    }
+
+    // Control-plane records are callable- and backend-only. Firebase Admin SDK
+    // operations bypass these Rules; browser clients never receive access.
+    match /platform_staff/{staffUid} {
+      allow read, write: if false;
+    }
+
+    match /admin_audit_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /admin_rate_limit_buckets/{bucketId} {
+      allow read, write: if false;
+    }
+
+    // Reserve future control-plane roots as server-only before their schemas
+    // and trusted operation handlers are introduced.
+    match /moderation_cases/{caseId} {
+      allow read, write: if false;
+    }
+
+    match /privacy_requests/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /repair_jobs/{jobId} {
+      allow read, write: if false;
+    }
+
+    match /privacyRequests/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /privacyJobs/{jobId} {
+      allow read, write: if false;
+    }
+
+    match /privacyRequestReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /accountLifecycleCommandReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /accountLifecycleState/{uid} {
+      allow read, write: if false;
+    }
+
+    match /accountLifecycleQuarantine/{uid} {
+      allow read, write: if false;
+    }
+
+    match /accountLifecycleMigrations/{migrationId} {
+      allow read, write: if false;
+    }
+
+    match /privacyTombstones/{tombstoneId} {
+      allow read, write: if false;
+    }
+
+    match /retainedHouseholds/{retainedHouseholdId}/{path=**} {
+      allow read, write: if false;
+    }
+
+    match /retainedHouseholds/{retainedHouseholdId} {
+      allow read, write: if false;
+    }
+
     match /users/{uid} {
-      allow read: if isSelf(uid);
+      allow read: if isSelf(uid) && !isAccountFrozen(uid);
       allow create: if isValidUserCreate(uid);
-      allow update: if isSelf(uid)
+      allow update: if isSelf(uid) && !isAccountFrozen(uid)
+        && isValidUserPresentationUpdate()
         && userUpdateDoesNotChangePremium()
         && userReservationChangesAreValid(uid)
         && userHouseholdContextIsValid(uid);
@@ -822,57 +1033,25 @@ service cloud.firestore {
     }
 
     match /ingredients/{ingredientId} {
-      allow read: if isSignedIn();
+      allow read: if isActiveConsumer();
       allow write: if false;
-    }
-
-    match /householdInvites/{code} {
-      // Invite codes are bearer-style secrets. Permit lookup of a known active
-      // code, but never collection queries that could enumerate usable codes.
-      allow get: if isSignedIn() && resource.data.active == true;
-      allow list: if false;
-      allow create: if isSignedIn()
-        && request.resource.data.householdId is string
-        && request.resource.data.active is bool
-        && request.resource.data.role in ['member', 'shopper', 'cook']
-        && (
-          isHouseholdAdmin(request.resource.data.householdId)
-          // The initial joint onboarding transaction creates the household,
-          // its first Admin membership, and the first invite together. After
-          // that transaction, only a current Admin can manage invites.
-          || (
-            request.resource.data.createdBy == request.auth.uid
-            && hasReservedJointHouseholdCreation(
-              request.auth.uid,
-              request.resource.data.householdId
-            )
-          )
-        );
-      allow update: if isSignedIn()
-        && request.resource.data.householdId is string
-        && request.resource.data.householdId == resource.data.householdId
-        && request.resource.data.active is bool
-        && request.resource.data.role in ['member', 'shopper', 'cook']
-        && isHouseholdAdmin(resource.data.householdId);
-      allow delete: if false;
     }
 
     match /households/{hid} {
       allow read: if isHouseholdMember(hid);
       allow create: if isValidHouseholdCreate(hid);
-      allow update: if isValidAdminHouseholdUpdate(hid)
-        || isValidJoinCapacityUpdate(hid);
+      allow update: if isValidAdminHouseholdUpdate(hid);
       // Firestore does not cascade parent deletes. Teardown must use trusted
       // code that removes memberships, child data, and user context together.
       allow delete: if false;
 
       match /members/{uid} {
         allow read: if isHouseholdMember(hid) || isSelf(uid);
-        allow create: if isSignedIn()
-          && (
-            isReservedInitialAdminMembership(hid, uid) ||
-            isValidInviteJoin(hid, uid)
-          );
+        allow create: if isActiveConsumer()
+          && request.auth.token.email_verified == true
+          && isModernMembershipCreate(hid, uid)
+          && isReservedInitialAdminMembership(hid, uid)
+          && hasModernInitialProvisioningOwnership(hid, uid);
         allow update: if isValidMemberRoleUpdate(hid, uid);
         // Membership removal is a trusted callable-only operation because it
         // must also update the household count and the removed user's context.
@@ -897,11 +1076,11 @@ service cloud.firestore {
     }
 
     match /recipes/{recipeId} {
-      allow read: if isSignedIn() && (
+      allow read: if isActiveConsumer() && (
         resource.data.visibility == 'public' ||
         isHouseholdMember(resource.data.householdId)
       );
-      allow create: if isSignedIn()
+      allow create: if isActiveConsumer()
         && (
           isHouseholdCook(recipeHouseholdId()) ||
           isExactSavedRecipeCopy(recipeId)
@@ -910,7 +1089,7 @@ service cloud.firestore {
         && request.resource.data.visibility in ['private', 'public']
         && isValidRecipeMonetization()
         && request.resource.data.householdId is string;
-      allow update: if isSignedIn()
+      allow update: if isActiveConsumer()
         // A recipe cannot be moved to a household where the caller happens to
         // be a Cook. Authorization is bound to the existing resource and the
         // household id itself is immutable after creation.
@@ -921,18 +1100,18 @@ service cloud.firestore {
         && request.resource.data.visibility in ['private', 'public']
         && isValidRecipeMonetization()
         && request.resource.data.householdId is string;
-      allow delete: if isSignedIn()
+      allow delete: if isActiveConsumer()
         && (
           isHouseholdCook(resource.data.householdId) ||
           isSavedLocalRecipeOwner(recipeId)
         );
 
       match /ingredients/{ingredientLineId} {
-        allow read: if isSignedIn() && (
+        allow read: if isActiveConsumer() && (
           get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public' ||
           isHouseholdMember(get(/databases/$(database)/documents/recipes/$(recipeId)).data.householdId)
         );
-        allow create: if isSignedIn()
+        allow create: if isActiveConsumer()
           && (
             isHouseholdCook(getAfter(recipeRef(recipeId)).data.householdId) ||
             isExactSavedRecipeIngredient(recipeId, ingredientLineId)
@@ -943,7 +1122,7 @@ service cloud.firestore {
             request.resource.data.ingredientId,
             request.resource.data.unit
           );
-        allow update: if isSignedIn()
+        allow update: if isActiveConsumer()
           && isHouseholdCook(getAfter(recipeRef(recipeId)).data.householdId)
           && request.resource.data.recipeId == recipeId
           && isValidIngredientReference(
@@ -951,7 +1130,7 @@ service cloud.firestore {
             request.resource.data.ingredientId,
             request.resource.data.unit
           );
-        allow delete: if isSignedIn()
+        allow delete: if isActiveConsumer()
           && (
             isHouseholdCook(get(recipeRef(recipeId)).data.householdId) ||
             canDeleteSavedRecipeIngredient(recipeId)
@@ -959,21 +1138,21 @@ service cloud.firestore {
       }
 
       match /likes/{userId} {
-        allow read: if isSignedIn()
+        allow read: if isActiveConsumer()
           && get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public';
-        allow create, update: if isSignedIn()
+        allow create, update: if isActiveConsumer()
           && userId == request.auth.uid
           && get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public'
           && request.resource.data.keys().hasOnly(['userId', 'createdAt'])
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.createdAt is timestamp;
-        allow delete: if isSignedIn() && userId == request.auth.uid;
+        allow delete: if isActiveConsumer() && userId == request.auth.uid;
       }
 
       match /comments/{commentId} {
-        allow read: if isSignedIn()
+        allow read: if isActiveConsumer()
           && get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public';
-        allow create: if isSignedIn()
+        allow create: if isActiveConsumer()
           && get(/databases/$(database)/documents/recipes/$(recipeId)).data.visibility == 'public'
           && request.resource.data.keys().hasOnly([
             'recipeId',
@@ -989,7 +1168,7 @@ service cloud.firestore {
           && request.resource.data.body.size() <= 1000
           && request.resource.data.createdAt is timestamp
           && request.resource.data.updatedAt == request.resource.data.createdAt;
-        allow update: if isSignedIn()
+        allow update: if isActiveConsumer()
           && resource.data.authorUserId == request.auth.uid
           && request.resource.data.recipeId == resource.data.recipeId
           && request.resource.data.authorUserId == resource.data.authorUserId
@@ -998,7 +1177,7 @@ service cloud.firestore {
           && request.resource.data.body.size() > 0
           && request.resource.data.body.size() <= 1000
           && request.resource.data.updatedAt is timestamp;
-        allow delete: if isSignedIn()
+        allow delete: if isActiveConsumer()
           && resource.data.authorUserId == request.auth.uid;
       }
     }

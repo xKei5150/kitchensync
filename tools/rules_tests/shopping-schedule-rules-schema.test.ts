@@ -14,6 +14,7 @@ import {
   seedScheduleHouseholds,
   weeklySchedule,
 } from "./shopping-schedule-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 for (const profile of scheduleRuleProfiles) {
   describe(`${profile.name} weekly shopping schedule schema rules`, () => {
@@ -35,7 +36,7 @@ for (const profile of scheduleRuleProfiles) {
     const assertAdminScheduleWriteFails = async (
       changes: Readonly<Record<string, unknown>>,
     ): Promise<void> => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertFails(
         setDoc(
@@ -68,7 +69,7 @@ for (const profile of scheduleRuleProfiles) {
     });
 
     test("allows a leap-day effective date in a leap year", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertSucceeds(
         setDoc(
@@ -113,7 +114,7 @@ for (const profile of scheduleRuleProfiles) {
         "joint-household",
         "admin",
       );
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertFails(
         setDoc(doc(db, jointWeeklySchedulePath), missingUpdatedAt),
@@ -136,7 +137,7 @@ for (const profile of scheduleRuleProfiles) {
     });
 
     test("rejects a non-weekly schedule document ID", async () => {
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertFails(
         setDoc(
@@ -148,7 +149,7 @@ for (const profile of scheduleRuleProfiles) {
 
     test("rejects updates that alter the creation timestamp", async () => {
       await seedJointWeeklySchedule(env);
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertFails(
         setDoc(

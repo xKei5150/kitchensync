@@ -9,6 +9,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { doc, setDoc, updateDoc } from "firebase/firestore";
 import { afterEach, beforeEach, describe, test } from "vitest";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
@@ -122,7 +123,7 @@ for (const profile of profiles) {
     });
 
     test("denies a free Cook paid authoring even in a Premium household", async () => {
-      const db = env.authenticatedContext(freeCookId).firestore();
+      const db = authenticatedContext(env, freeCookId).firestore();
       await assertFails(
         setDoc(
           doc(db, "recipes/free-cook-paid-create"),
@@ -132,7 +133,7 @@ for (const profile of profiles) {
     });
 
     test("allows an entitled Cook to author a paid recipe", async () => {
-      const db = env.authenticatedContext(premiumCookId).firestore();
+      const db = authenticatedContext(env, premiumCookId).firestore();
       await assertSucceeds(
         setDoc(
           doc(db, "recipes/premium-cook-paid-create"),
@@ -142,7 +143,7 @@ for (const profile of profiles) {
     });
 
     test("denies paid authoring after an otherwise-stale Premium trial expires", async () => {
-      const db = env.authenticatedContext(expiredPremiumCookId).firestore();
+      const db = authenticatedContext(env, expiredPremiumCookId).firestore();
       await assertFails(
         setDoc(
           doc(db, "recipes/expired-premium-cook-paid-create"),
@@ -152,14 +153,14 @@ for (const profile of profiles) {
     });
 
     test("keeps ordinary free recipe authoring available to a free Cook", async () => {
-      const db = env.authenticatedContext(freeCookId).firestore();
+      const db = authenticatedContext(env, freeCookId).firestore();
       await assertSucceeds(
         setDoc(doc(db, "recipes/free-cook-free-create"), recipe()),
       );
     });
 
     test("denies a free Cook converting a free recipe to paid", async () => {
-      const db = env.authenticatedContext(freeCookId).firestore();
+      const db = authenticatedContext(env, freeCookId).firestore();
       await assertFails(
         updateDoc(doc(db, "recipes/free-recipe"), {
           monetization: "paid",
@@ -169,7 +170,7 @@ for (const profile of profiles) {
     });
 
     test("denies author spoofing on paid recipe creation", async () => {
-      const db = env.authenticatedContext(premiumCookId).firestore();
+      const db = authenticatedContext(env, premiumCookId).firestore();
       await assertFails(
         setDoc(
           doc(db, "recipes/spoofed-paid-create"),
@@ -179,7 +180,7 @@ for (const profile of profiles) {
     });
 
     test("denies mutating an existing recipe author", async () => {
-      const db = env.authenticatedContext(premiumCookId).firestore();
+      const db = authenticatedContext(env, premiumCookId).firestore();
       await assertFails(
         updateDoc(doc(db, "recipes/premium-recipe"), {
           authorUserId: anotherUserId,

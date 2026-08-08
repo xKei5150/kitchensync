@@ -28,6 +28,7 @@ import {
   soloItemPath,
   soloListPath,
 } from "./shopping-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const directWriteRoles = ["admin", "shopper", "solo-member"] as const;
 
@@ -60,7 +61,7 @@ for (const profile of shoppingRuleProfiles) {
         } else {
           await seedPendingList(env);
         }
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         // When / Then
         await assertFails(setDoc(doc(db, path), shoppingItem(listId)));
@@ -76,7 +77,7 @@ for (const profile of shoppingRuleProfiles) {
         } else {
           await seedPendingList(env, {}, {});
         }
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         // When / Then
         await assertFails(
@@ -97,7 +98,7 @@ for (const profile of shoppingRuleProfiles) {
         } else {
           await seedPendingList(env, {}, {});
         }
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         // When / Then
         await assertFails(deleteDoc(doc(db, path)));
@@ -108,7 +109,7 @@ for (const profile of shoppingRuleProfiles) {
         const listPath = isSolo ? soloListPath : pendingListPath;
         const itemPath = isSolo ? soloItemPath : pendingItemPath;
         const listId = isSolo ? "solo-list" : "pending-list";
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
         const batch = writeBatch(db);
         batch.set(
           doc(db, listPath),
@@ -125,7 +126,7 @@ for (const profile of shoppingRuleProfiles) {
     for (const role of ["admin", "shopper", "cook", "member"] as const) {
       test(`${role} can still read a shopping item with an existing parent`, async () => {
         await seedPendingList(env, {}, {});
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         await assertSucceeds(getDoc(doc(db, pendingItemPath)));
       });
@@ -133,28 +134,28 @@ for (const profile of shoppingRuleProfiles) {
 
     test("solo member can still read a shopping item with an existing parent", async () => {
       await seedSoloPendingList(env, {});
-      const db = env.authenticatedContext("solo-member").firestore();
+      const db = authenticatedContext(env, "solo-member").firestore();
 
       await assertSucceeds(getDoc(doc(db, soloItemPath)));
     });
 
     test("outsider cannot read a shopping item", async () => {
       await seedPendingList(env, {}, {});
-      const db = env.authenticatedContext("outsider").firestore();
+      const db = authenticatedContext(env, "outsider").firestore();
 
       await assertFails(getDoc(doc(db, pendingItemPath)));
     });
 
     test("member cannot read an Admin-SDK-seeded orphan item", async () => {
       await seedOrphanItem(env);
-      const db = env.authenticatedContext("member").firestore();
+      const db = authenticatedContext(env, "member").firestore();
 
       await assertFails(getDoc(doc(db, orphanItemPath)));
     });
 
     test("denied update preserves the Admin-SDK-seeded item", async () => {
       await seedPendingList(env, {}, {});
-      const db = env.authenticatedContext("shopper").firestore();
+      const db = authenticatedContext(env, "shopper").firestore();
 
       await assertFails(
         updateDoc(doc(db, pendingItemPath), {

@@ -14,6 +14,7 @@ import {
   shoppingItem,
   shoppingRuleProfiles,
 } from "./shopping-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const malformedSourceLinkArrays = [
   [null],
@@ -63,7 +64,7 @@ for (const profile of shoppingRuleProfiles) {
           shoppingItem("pending-list"),
         );
       });
-      const db = env.authenticatedContext("member").firestore();
+      const db = authenticatedContext(env, "member").firestore();
 
       await assertSucceeds(getDoc(doc(db, pendingItemPath)));
     });
@@ -79,14 +80,14 @@ for (const profile of shoppingRuleProfiles) {
       await env.withSecurityRulesDisabled(async (context) => {
         await setDoc(doc(context.firestore(), pendingItemPath), legacyItem);
       });
-      const db = env.authenticatedContext("member").firestore();
+      const db = authenticatedContext(env, "member").firestore();
 
       await assertSucceeds(getDoc(doc(db, pendingItemPath)));
     });
 
     for (const sourceMealLinks of malformedSourceLinkArrays) {
       test("direct item create with malformed source links is denied", async () => {
-        const db = env.authenticatedContext("shopper").firestore();
+        const db = authenticatedContext(env, "shopper").firestore();
 
         await assertFails(
           setDoc(
@@ -103,7 +104,7 @@ for (const profile of shoppingRuleProfiles) {
             shoppingItem("pending-list", { sourceMealLinks }),
           );
         });
-        const db = env.authenticatedContext("member").firestore();
+        const db = authenticatedContext(env, "member").firestore();
 
         await assertSucceeds(getDoc(doc(db, pendingItemPath)));
       });
@@ -116,7 +117,7 @@ for (const profile of shoppingRuleProfiles) {
         date: "2026-07-10",
         quantity: 0.001,
       }));
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertFails(
         setDoc(
@@ -145,7 +146,7 @@ for (const profile of shoppingRuleProfiles) {
           }),
         );
       });
-      const db = env.authenticatedContext("member").firestore();
+      const db = authenticatedContext(env, "member").firestore();
 
       await assertSucceeds(getDoc(doc(db, pendingItemPath)));
     });

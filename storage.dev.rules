@@ -3,14 +3,46 @@ service firebase.storage {
   match /b/{bucket}/o {
     function isSignedIn() {
       return request.auth != null
-        && (
-          !('firebase' in request.auth.token)
-          || !('sign_in_provider' in request.auth.token.firebase)
-          || request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && 'firebase' in request.auth.token
+        && request.auth.token.firebase is map
+        && 'sign_in_provider' in request.auth.token.firebase
+        && request.auth.token.firebase.sign_in_provider in [
+          'password',
+          'google.com',
+          'apple.com',
+        ];
+    }
+    function isAccountFrozen(uid) {
+      return (
+          firestore.exists(/databases/(default)/documents/users/$(uid))
+          && firestore.get(
+            /databases/(default)/documents/users/$(uid)
+          ).data.get('accountLifecycleStatus', 'active') == 'frozen'
+        )
+        || (
+          firestore.exists(
+            /databases/(default)/documents/accountLifecycleQuarantine/$(uid)
+          )
+          && (
+            firestore.get(
+              /databases/(default)/documents/accountLifecycleQuarantine/$(uid)
+            ).data.get('status', '') == 'frozen'
+            || (
+              firestore.get(
+                /databases/(default)/documents/accountLifecycleQuarantine/$(uid)
+              ).data.get('status', '') == 'quarantined'
+              && firestore.get(
+                /databases/(default)/documents/accountLifecycleQuarantine/$(uid)
+              ).data.get('quarantineUntil', request.time) > request.time
+            )
+          )
         );
     }
+    function isActiveConsumer() {
+      return isSignedIn() && !isAccountFrozen(request.auth.uid);
+    }
     function isHouseholdMember(hid) {
-      return isSignedIn()
+      return isActiveConsumer()
         && firestore.exists(
           /databases/(default)/documents/households/$(hid)/members/$(request.auth.uid)
         );
@@ -30,7 +62,7 @@ service firebase.storage {
     }
 
     match /ingredients/{path=**} {
-      allow read: if isSignedIn();
+      allow read: if isActiveConsumer();
       allow write: if false;
     }
 

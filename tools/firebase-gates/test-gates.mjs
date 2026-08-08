@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
 import {
+  cpSync,
   existsSync,
+  mkdtempSync,
+  mkdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
@@ -33,13 +38,27 @@ function run(command, args, options = {}) {
 const requiredFunctions = [
   "shoppingSmoke",
   "startPremiumTrial",
+  "createJointHouseholdWithTrialTransfer",
+  "accountDeletionPreflight",
+  "requestAccountDeletion",
+  "leaveJointHousehold",
+  "transferJointHouseholdOwnership",
   "removeHouseholdMember",
   "transferHouseholdAdmin",
+  "issueHouseholdInvite",
+  "redeemHouseholdInvite",
+  "revokeHouseholdInvite",
   "completeShoppingList",
   "cancelShoppingList",
   "deleteShoppingList",
   "planShoppingAllocation",
   "mutateShoppingListItem",
+  "adminHealthGet",
+  "adminUserGet",
+  "adminHouseholdGet",
+  "adminEntitlementGet",
+  "cleanupTerminalInviteMetadataDaily",
+  "processAccountDeletionRequestsEveryFifteenMinutes",
 ]
 
 function assertReadinessBlocks(extra, label) {
@@ -51,7 +70,7 @@ function assertReadinessBlocks(extra, label) {
     assert(result.status !== 0, `${label} unexpectedly succeeded`)
     const log = readFileSync(fixture.log, "utf8")
     assert(!log.includes("smoke:before-rules"), `${label} reached client smoke:\n${log}`)
-    assert(!log.includes("--only firestore:rules"), `${label} deployed rules:\n${log}`)
+    assert(!log.includes("--only firestore:rules,storage:rules"), `${label} deployed rules:\n${log}`)
   } finally {
     removeFixture(fixture)
   }
@@ -89,13 +108,150 @@ function testVerifierContract() {
   assert(result.status === 0, `verifier exited ${result.status}: ${result.stderr}`)
   const output = `${result.stdout}\n${result.stderr}`
   for (const label of [
+    "PASS Firebase JSON, aliases, and admin Hosting target prerequisite",
     "PASS exact Todo 9 composite indexes",
+    "PASS account-deletion worker collection-group inventory indexes",
+    "PASS current Functions exports use Node 22 and us-central1",
+    "PASS admin web Hosting boundary",
     "PASS CI uses Node 22 and Functions gates",
     "PASS Make exposes reproducible Firebase gates",
     "PASS rollout script is fail closed",
   ]) {
     assert(output.includes(label), `verifier did not prove: ${label}`)
   }
+}
+
+function verifierFixture() {
+  const root = mkdtempSync(resolve(tmpdir(), "kitchensync-verifier-contract-"))
+  const requiredPaths = [
+    ".firebaserc",
+    "firebase.json",
+    "firebase.dev.json",
+    "firebase.prod.json",
+    "firestore.indexes.json",
+    "functions/package.json",
+    "functions/src/index.ts",
+    "functions/src/callableSecurity.ts",
+    "functions/src/accountDeletionWorker.ts",
+    "functions/src/admin/callables.ts",
+    ".github/workflows/ci.yml",
+    "Makefile",
+    "tools/firebase-gates/rollout-dev.sh",
+    "tools/firebase-gates/firebase.sh",
+    "apps/admin-web/package.json",
+    "apps/admin-web/src",
+  ]
+  for (const path of requiredPaths) {
+    const destination = resolve(root, path)
+    mkdirSync(dirname(destination), { recursive: true })
+    cpSync(resolve(repoRoot, path), destination, { recursive: true })
+  }
+  return root
+}
+
+function assertVerifierRejects(mutator, label, expectedFailure) {
+  const fixture = verifierFixture()
+  try {
+    mutator(fixture)
+    const result = run(node, ["tools/verify-firebase-gates.mjs"], {
+      env: { FIREBASE_GATE_REPO_ROOT: fixture },
+    })
+    assert(result.status !== 0, `${label} unexpectedly passed the verifier`)
+    assert(
+      `${result.stdout}\n${result.stderr}`.includes(expectedFailure),
+      `${label} did not fail for the expected contract: ${result.stderr}`,
+    )
+  } finally {
+    rmSync(fixture, { recursive: true, force: true })
+  }
+}
+
+function testVerifierRejectsStaleCallableAndHostingContracts() {
+  assertVerifierRejects(
+    (fixture) => {
+      const index = resolve(fixture, "functions/src/index.ts")
+      writeFileSync(
+        index,
+        readFileSync(index, "utf8").replace(
+          /export\s*\{[\s\S]*?\}\s*from\s*["']\.\/admin\/callables\.js["']\s*;?/,
+          "",
+        ),
+      )
+    },
+    "legacy callable set without admin exports",
+    "Functions human-callable exports must match exactly",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const index = resolve(fixture, "functions/src/index.ts")
+      writeFileSync(
+        index,
+        readFileSync(index, "utf8").replace("export const issueHouseholdInvite", "const issueHouseholdInvite"),
+      )
+    },
+    "missing invite callable",
+    "Functions human-callable exports must match exactly",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const configPath = resolve(fixture, "firebase.dev.json")
+      const config = JSON.parse(readFileSync(configPath, "utf8"))
+      config.hosting.rewrites = []
+      writeFileSync(configPath, JSON.stringify(config))
+    },
+    "malformed admin Hosting configuration",
+    "firebase.dev.json Hosting must configure the SPA rewrite to /index.html",
+  )
+  assertVerifierRejects(
+    (fixture) => rmSync(resolve(fixture, "firebase.prod.json")),
+    "missing production Firebase configuration",
+    "firebase.prod.json is not valid JSON",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const configPath = resolve(fixture, "firebase.dev.json")
+      const config = JSON.parse(readFileSync(configPath, "utf8"))
+      const csp = config.hosting.headers[0].headers.find(
+        (header) => header.key === "Content-Security-Policy",
+      )
+      csp.value += " https://us-central1-kitchensync-prod-8d6fd.cloudfunctions.net"
+      writeFileSync(configPath, JSON.stringify(config))
+    },
+    "cross-environment CSP origin leakage",
+    "firebase.dev.json Hosting CSP must not include prod origins",
+  )
+  assertVerifierRejects(
+    (fixture) => {
+      const configPath = resolve(fixture, "firebase.prod.json")
+      const config = JSON.parse(readFileSync(configPath, "utf8"))
+      config.hosting.headers[0].headers = config.hosting.headers[0].headers.filter(
+        (header) => header.key !== "X-Content-Type-Options",
+      )
+      writeFileSync(configPath, JSON.stringify(config))
+    },
+    "malformed production Hosting headers",
+    "firebase.prod.json Hosting must set X-Content-Type-Options",
+  )
+}
+
+function testWorkerCollectionGroupIndexGateRejectsOmissions() {
+  assertVerifierRejects(
+    (fixture) => {
+      const indexesPath = resolve(fixture, "firestore.indexes.json")
+      const indexes = JSON.parse(readFileSync(indexesPath, "utf8"))
+      indexes.indexes = indexes.indexes.filter(
+        (index) =>
+          !(
+            index.collectionGroup === "comments" &&
+            index.queryScope === "COLLECTION_GROUP" &&
+            index.fields?.some((field) => field.fieldPath === "authorUserId")
+          ),
+      )
+      writeFileSync(indexesPath, JSON.stringify(indexes))
+    },
+    "missing worker collection-group inventory index",
+    "missing collection-group index for comments.authorUserId",
+  )
 }
 
 function testRolloutOrdering() {
@@ -111,15 +267,36 @@ function testRolloutOrdering() {
     const log = readFileSync(fixture.log, "utf8")
     const functionsDeploy = log.indexOf("--only functions,firestore:indexes")
     const beforeSmoke = log.indexOf("smoke:before-rules")
-    const rulesDeploy = log.indexOf("--only firestore:rules")
+    const rulesDeploy = log.indexOf("--only firestore:rules,storage:rules")
     const afterSmoke = log.indexOf("smoke:after-rules")
     assert(
       functionsDeploy >= 0 && functionsDeploy < beforeSmoke && beforeSmoke < rulesDeploy && rulesDeploy < afterSmoke,
       `unsafe rollout order:\n${log}`,
     )
+    const rulesDeployments = log
+      .split("\n")
+      .filter((line) => line.startsWith("deploy ") && line.includes("rules"))
+    assert(
+      rulesDeployments.length === 1 &&
+        rulesDeployments[0] ===
+          "deploy --project kitchensync-dev-da503 --only firestore:rules,storage:rules",
+      `rules must deploy together without a weaker separate path:\n${log}`,
+    )
   } finally {
     removeFixture(fixture)
   }
+}
+
+function testRulesDeploymentIncludesStorageAndNoWeakerPath() {
+  const rollout = readFileSync(resolve(repoRoot, "tools/firebase-gates/rollout-dev.sh"), "utf8")
+  assert(
+    rollout.includes("--only firestore:rules,storage:rules"),
+    "rollout must deploy Firestore Rules and Storage Rules together",
+  )
+  assert(
+    !/--only\s+firestore:rules(?:[\s"']|$)/.test(rollout),
+    "rollout must not retain a Firestore-only Rules deployment path",
+  )
 }
 
 function testBackendDeployIsNoninteractive() {
@@ -137,7 +314,7 @@ function testBackendDeployIsNoninteractive() {
       `backend deploy must use --force for noninteractive cleanup-policy creation:\n${invocations.join("\n")}`,
     )
     assert(
-      invocations.includes("deploy --project kitchensync-dev-da503 --only firestore:rules"),
+      invocations.includes("deploy --project kitchensync-dev-da503 --only firestore:rules,storage:rules"),
       `rules deploy arguments changed unexpectedly:\n${invocations.join("\n")}`,
     )
   } finally {
@@ -169,7 +346,7 @@ function testSmokeFailureBlocksRules() {
     })
     assert(result.status !== 0, "pre-rules semantic smoke failure unexpectedly succeeded")
     const log = readFileSync(fixture.log, "utf8")
-    assert(!log.includes("--only firestore:rules"), `rules deployed after failed smoke:\n${log}`)
+    assert(!log.includes("--only firestore:rules,storage:rules"), `rules deployed after failed smoke:\n${log}`)
   } finally {
     removeFixture(fixture)
   }
@@ -242,7 +419,10 @@ function testDebugBuildDisablesProductionTelemetry() {
 
 const tests = [
   ["verifier contract", testVerifierContract],
+  ["verifier rejects stale callable and Hosting contracts", testVerifierRejectsStaleCallableAndHostingContracts],
+  ["worker collection-group index gate rejects omissions", testWorkerCollectionGroupIndexGateRejectsOmissions],
   ["rollout ordering", testRolloutOrdering],
+  ["rules deployment includes Storage Rules", testRulesDeploymentIncludesStorageAndNoWeakerPath],
   ["backend deploy is noninteractive", testBackendDeployIsNoninteractive],
   ["generated stubs are POSIX sh", testGeneratedStubsArePosix],
   ["readiness rejects incomplete deployment", testReadinessRejectsIncompleteDeployment],

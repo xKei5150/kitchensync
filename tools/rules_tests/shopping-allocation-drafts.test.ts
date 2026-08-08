@@ -17,6 +17,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore"
+import { authenticatedContext } from "./authenticated-context.js"
 
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:23081"
 const [host, port] = firestoreHost.split(":")
@@ -74,7 +75,7 @@ for (const [profile, rulesFile] of [
     })
 
     test("household members cannot directly get, list, or write drafts", async () => {
-      const db = env.authenticatedContext("member").firestore()
+      const db = authenticatedContext(env, "member").firestore()
 
       await assertFails(getDoc(doc(db, draftPath)))
       await assertFails(getDocs(collection(db, `households/${householdId}/shoppingAllocationDrafts`)))
@@ -84,7 +85,7 @@ for (const [profile, rulesFile] of [
     })
 
     test("household admins cannot directly get, list, or write drafts", async () => {
-      const db = env.authenticatedContext("admin").firestore()
+      const db = authenticatedContext(env, "admin").firestore()
 
       await assertFails(getDoc(doc(db, draftPath)))
       await assertFails(getDocs(collection(db, `households/${householdId}/shoppingAllocationDrafts`)))
@@ -94,7 +95,7 @@ for (const [profile, rulesFile] of [
     })
 
     test("members retain direct shopping-list reads", async () => {
-      const db = env.authenticatedContext("member").firestore()
+      const db = authenticatedContext(env, "member").firestore()
 
       await assertSucceeds(getDoc(doc(db, shoppingListPath)))
       await assertSucceeds(getDocs(collection(db, `households/${householdId}/shoppingLists`)))

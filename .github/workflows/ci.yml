@@ -7,10 +7,52 @@ on:
     branches: [main]
 
 jobs:
+  admin-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/admin-web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Test
+        run: npm test
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser end-to-end tests
+        run: npm run test:e2e
+      - name: Upload browser test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-web-playwright-artifacts
+          path: apps/admin-web/test-results
+          if-no-files-found: ignore
+
   flutter:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Restore Firebase configuration
+        env:
+          KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV: ${{ secrets.KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV }}
+          KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD: ${{ secrets.KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD }}
+        run: bash .github/scripts/restore-firebase-config.sh flutter-only
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -74,6 +116,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Restore Firebase configuration
+        env:
+          KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV: ${{ secrets.KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV }}
+          KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD: ${{ secrets.KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD }}
+          KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_DEV: ${{ secrets.KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_DEV }}
+        run: bash .github/scripts/restore-firebase-config.sh android-integration
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable

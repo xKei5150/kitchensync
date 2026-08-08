@@ -18,6 +18,7 @@ import {
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
+import { authenticatedContext } from "./authenticated-context.js";
 
 let env: RulesTestEnvironment;
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
@@ -49,6 +50,16 @@ beforeAll(async () => {
     });
     await setDoc(doc(db, "households/solo-household/members/u1"), {
       role: "admin",
+    });
+    await setDoc(doc(db, "users/u1"), {
+      isPremium: false,
+      providerIds: ["password"],
+      email: "u1@example.com",
+      activeHouseholdId: "solo-household",
+      householdIds: ["solo-household"],
+      createdSoloHouseholdId: "solo-household",
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
     await setDoc(doc(db, "households/joinable-household"), {
       name: "Joinable kitchen",
@@ -143,12 +154,12 @@ afterAll(async () => {
 
 describe("/ingredients global dictionary", () => {
   test("signed-in users can read", async () => {
-    const db = env.authenticatedContext("u1").firestore();
+    const db = authenticatedContext(env, "u1").firestore();
     await assertSucceeds(getDoc(doc(db, "ingredients/onion")));
   });
 
   test("signed-in users cannot write (prod profile)", async () => {
-    const db = env.authenticatedContext("u1").firestore();
+    const db = authenticatedContext(env, "u1").firestore();
     await assertFails(
       setDoc(doc(db, "ingredients/banana"), { name: "banana" }),
     );
@@ -162,15 +173,9 @@ describe("/ingredients global dictionary", () => {
 
 describe("/users session documents", () => {
   test("users can read and update only their own active household", async () => {
-    const db = env.authenticatedContext("u1").firestore();
-    const outsiderDb = env.authenticatedContext("outsider").firestore();
+    const db = authenticatedContext(env, "u1").firestore();
+    const outsiderDb = authenticatedContext(env, "outsider").firestore();
 
-    await assertSucceeds(
-      setDoc(doc(db, "users/u1"), {
-        activeHouseholdId: "solo-household",
-        isPremium: false,
-      }),
-    );
     await assertSucceeds(getDoc(doc(db, "users/u1")));
     await assertSucceeds(
       updateDoc(doc(db, "users/u1"), { displayName: "Kitchen owner" }),
@@ -198,6 +203,23 @@ describe("/users session documents", () => {
       }),
     );
     await assertFails(
+      updateDoc(doc(db, "users/u1"), { email: "attacker@example.com" }),
+    );
+    await assertFails(
+      updateDoc(doc(db, "users/u1"), { providerIds: ["custom"] }),
+    );
+    await assertFails(
+      updateDoc(doc(db, "users/u1"), { createdAt: new Date() }),
+    );
+    await assertFails(
+      updateDoc(doc(db, "users/u1"), { arbitraryClientField: true }),
+    );
+    await assertFails(
+      updateDoc(doc(db, "users/u1"), {
+        householdIds: ["solo-household", "forged-household"],
+      }),
+    );
+    await assertFails(
       setDoc(doc(db, "users/forged-premium"), {
         isPremium: true,
         premiumPlan: "annual",
@@ -205,9 +227,50 @@ describe("/users session documents", () => {
     );
   });
 
+  test("unverified identities cannot provision a profile, household, or membership", async () => {
+    const db = env
+      .authenticatedContext("unverified-provisioner", {
+        email_verified: false,
+        firebase: { sign_in_provider: "password" },
+      })
+      .firestore();
+    const householdId = "solo-unverified-provisioner";
+    const now = new Date();
+    const onboarding = writeBatch(db);
+    onboarding.set(doc(db, "users/unverified-provisioner"), {
+      isPremium: false,
+      providerIds: ["password"],
+      activeHouseholdId: householdId,
+      householdIds: [householdId],
+      createdSoloHouseholdId: householdId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    onboarding.set(doc(db, `households/${householdId}`), {
+      name: "Unverified kitchen",
+      creatorUserId: "unverified-provisioner",
+      isJoint: false,
+      hasPremium: false,
+      maxMembers: 1,
+      memberCount: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    onboarding.set(doc(db, `households/${householdId}/members/unverified-provisioner`), {
+      role: "admin",
+      joinedAt: now,
+      updatedAt: now,
+    });
+
+    await assertFails(onboarding.commit());
+    await assertFails(getDoc(doc(db, `households/${householdId}`)));
+    const profile = await assertSucceeds(getDoc(doc(db, "users/unverified-provisioner")));
+    expect(profile.exists()).toBe(false);
+  });
+
   test("users manage only their own valid household notification preferences", async () => {
-    const shopperDb = env.authenticatedContext("shopper").firestore();
-    const cookDb = env.authenticatedContext("cook").firestore();
+    const shopperDb = authenticatedContext(env, "shopper").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
     const preferences = {
       householdId: "joinable-household",
       emergencyShopping: true,
@@ -266,8 +329,8 @@ describe("/users session documents", () => {
 
 describe("household notifications", () => {
   test("recipients can read their notifications but other members cannot", async () => {
-    const shopperDb = env.authenticatedContext("shopper").firestore();
-    const cookDb = env.authenticatedContext("cook").firestore();
+    const shopperDb = authenticatedContext(env, "shopper").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
     const shopperNotice = doc(
       shopperDb,
       "households/joinable-household/notifications/notice-shopper",
@@ -293,7 +356,7 @@ describe("household notifications", () => {
   });
 
   test("recipients can update only read state and clients cannot create or delete", async () => {
-    const shopperDb = env.authenticatedContext("shopper").firestore();
+    const shopperDb = authenticatedContext(env, "shopper").firestore();
     const notice = doc(
       shopperDb,
       "households/joinable-household/notifications/notice-shopper",
@@ -325,8 +388,8 @@ describe("household notifications", () => {
 
 describe("/households and memberships", () => {
   test("members can read household docs and outsiders cannot", async () => {
-    const memberDb = env.authenticatedContext("u1").firestore();
-    const outsiderDb = env.authenticatedContext("outsider").firestore();
+    const memberDb = authenticatedContext(env, "u1").firestore();
+    const outsiderDb = authenticatedContext(env, "outsider").firestore();
 
     await assertSucceeds(getDoc(doc(memberDb, "households/solo-household")));
     await assertSucceeds(
@@ -341,8 +404,8 @@ describe("/households and memberships", () => {
   });
 
   test("household creation requires an atomic, reserved solo or joint onboarding write", async () => {
-    const db = env.authenticatedContext("new-user").firestore();
-    const outsiderDb = env.authenticatedContext("outsider").firestore();
+    const db = authenticatedContext(env, "new-user").firestore();
+    const outsiderDb = authenticatedContext(env, "outsider").firestore();
     const soloHouseholdId = "solo-new-user";
     const now = new Date();
 
@@ -354,6 +417,7 @@ describe("/households and memberships", () => {
       activeHouseholdId: soloHouseholdId,
       householdIds: [soloHouseholdId],
       isPremium: false,
+      providerIds: ["password"],
       createdSoloHouseholdId: soloHouseholdId,
       createdAt: now,
       updatedAt: now,
@@ -361,6 +425,7 @@ describe("/households and memberships", () => {
     soloOnboarding.set(doc(db, `households/${soloHouseholdId}`), {
       name: "New kitchen",
       creatorUserId: "new-user",
+      ownerUserId: "new-user",
       isJoint: false,
       hasPremium: false,
       maxMembers: 1,
@@ -370,7 +435,14 @@ describe("/households and memberships", () => {
     });
     soloOnboarding.set(
       doc(db, `households/${soloHouseholdId}/members/new-user`),
-      { role: "admin", joinedAt: now, updatedAt: now },
+      {
+        role: "admin",
+        userId: "new-user",
+        householdId: soloHouseholdId,
+        schemaVersion: 1,
+        joinedAt: now,
+        updatedAt: now,
+      },
     );
     await assertSucceeds(
       soloOnboarding.commit(),
@@ -422,7 +494,7 @@ describe("/households and memberships", () => {
     );
     await assertFails(secondSoloAttempt.commit());
     await assertFails(
-      setDoc(doc(env.authenticatedContext("reservation-attacker").firestore(), "users/reservation-attacker"), {
+      setDoc(doc(authenticatedContext(env, "reservation-attacker").firestore(), "users/reservation-attacker"), {
         activeHouseholdId: "solo-reservation-attacker",
         householdIds: ["solo-reservation-attacker"],
         isPremium: false,
@@ -442,7 +514,7 @@ describe("/households and memberships", () => {
         memberCount: 1,
       }),
     );
-    const premiumDb = env.authenticatedContext("premium-creator").firestore();
+    const premiumDb = authenticatedContext(env, "premium-creator").firestore();
     const jointHouseholdId = "premium-household";
     const jointOnboarding = writeBatch(premiumDb);
     jointOnboarding.set(
@@ -458,6 +530,8 @@ describe("/households and memberships", () => {
     jointOnboarding.set(doc(premiumDb, `households/${jointHouseholdId}`), {
       name: "Premium kitchen",
       creatorUserId: "premium-creator",
+      ownerUserId: "premium-creator",
+      premiumOwnerUserId: "premium-creator",
       isJoint: true,
       hasPremium: true,
       maxMembers: 6,
@@ -470,11 +544,16 @@ describe("/households and memberships", () => {
         premiumDb,
         `households/${jointHouseholdId}/members/premium-creator`,
       ),
-      { role: "admin", joinedAt: now, updatedAt: now },
+      {
+        role: "admin",
+        userId: "premium-creator",
+        householdId: jointHouseholdId,
+        schemaVersion: 1,
+        joinedAt: now,
+        updatedAt: now,
+      },
     );
-    await assertSucceeds(
-      jointOnboarding.commit(),
-    );
+    await assertFails(jointOnboarding.commit());
     await assertFails(
       updateDoc(doc(premiumDb, "users/premium-creator"), {
         createdJointHouseholdId: "second-premium-household",
@@ -512,7 +591,7 @@ describe("/households and memberships", () => {
   });
 
   test("onboarding batch can create a solo household and active context", async () => {
-    const db = env.authenticatedContext("fresh-user").firestore();
+    const db = authenticatedContext(env, "fresh-user").firestore();
     const householdId = "solo-fresh-user";
     const now = new Date();
     const onboarding = writeBatch(db);
@@ -521,6 +600,7 @@ describe("/households and memberships", () => {
       activeHouseholdId: householdId,
       householdIds: [householdId],
       isPremium: false,
+      providerIds: ["password"],
       createdSoloHouseholdId: householdId,
       createdAt: now,
       updatedAt: now,
@@ -528,6 +608,7 @@ describe("/households and memberships", () => {
     onboarding.set(doc(db, `households/${householdId}`), {
       name: "My kitchen",
       creatorUserId: "fresh-user",
+      ownerUserId: "fresh-user",
       isJoint: false,
       hasPremium: false,
       maxMembers: 1,
@@ -537,17 +618,23 @@ describe("/households and memberships", () => {
     });
     onboarding.set(
       doc(db, `households/${householdId}/members/fresh-user`),
-      { role: "admin", joinedAt: now, updatedAt: now },
+      {
+        role: "admin",
+        userId: "fresh-user",
+        householdId,
+        schemaVersion: 1,
+        joinedAt: now,
+        updatedAt: now,
+      },
     );
     await assertSucceeds(
       onboarding.commit(),
     );
   });
 
-  test("joint onboarding can atomically create its first invite", async () => {
+  test("client joint onboarding is denied because Premium transfer is callable-only", async () => {
     const userId = "joint-invite-creator";
     const householdId = "joint-invite-bootstrap";
-    const inviteCode = "KS-JOINT-BOOTSTRAP";
     await env.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), `users/${userId}`), {
         isPremium: true,
@@ -556,7 +643,7 @@ describe("/households and memberships", () => {
       });
     });
 
-    const db = env.authenticatedContext(userId).firestore();
+    const db = authenticatedContext(env, userId).firestore();
     const now = new Date();
     const onboarding = writeBatch(db);
     onboarding.set(
@@ -572,6 +659,8 @@ describe("/households and memberships", () => {
     onboarding.set(doc(db, `households/${householdId}`), {
       name: "Shared kitchen",
       creatorUserId: userId,
+      ownerUserId: userId,
+      premiumOwnerUserId: userId,
       isJoint: true,
       hasPremium: true,
       maxMembers: 6,
@@ -581,21 +670,16 @@ describe("/households and memberships", () => {
     });
     onboarding.set(doc(db, `households/${householdId}/members/${userId}`), {
       role: "admin",
+      userId,
+      householdId,
+      schemaVersion: 1,
       joinedAt: now,
       updatedAt: now,
     });
-    onboarding.set(doc(db, `householdInvites/${inviteCode}`), {
-      householdId,
-      createdBy: userId,
-      role: "member",
-      active: true,
-      createdAt: now,
-      updatedAt: now,
-    });
-    await assertSucceeds(onboarding.commit());
+    await assertFails(onboarding.commit());
   });
 
-  test("removed creators cannot mint or reactivate household invites", async () => {
+  test("no client, including a household Admin, can mint or reactivate household invites", async () => {
     const householdId = "removed-creator-household";
     const formerCreatorId = "former-creator";
     const currentAdminId = "current-invite-admin";
@@ -623,8 +707,8 @@ describe("/households and memberships", () => {
       ]);
     });
 
-    const formerCreatorDb = env.authenticatedContext(formerCreatorId).firestore();
-    const currentAdminDb = env.authenticatedContext(currentAdminId).firestore();
+    const formerCreatorDb = authenticatedContext(env, formerCreatorId).firestore();
+    const currentAdminDb = authenticatedContext(env, currentAdminId).firestore();
     const now = new Date();
     await assertFails(
       setDoc(doc(formerCreatorDb, "householdInvites/KS-FORMER-CREATOR-NEW"), {
@@ -642,7 +726,7 @@ describe("/households and memberships", () => {
         updatedAt: now,
       }),
     );
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(currentAdminDb, "householdInvites/KS-CURRENT-ADMIN-NEW"), {
         householdId,
         createdBy: currentAdminId,
@@ -654,7 +738,7 @@ describe("/households and memberships", () => {
     );
   });
 
-  test("invite updates remain bound to their existing household", async () => {
+  test("household Admins cannot update legacy invites", async () => {
     const sourceHouseholdId = "source-invite-household";
     const sourceAdminId = "source-invite-admin";
     const foreignHouseholdId = "foreign-invite-household";
@@ -699,10 +783,10 @@ describe("/households and memberships", () => {
       ]);
     });
 
-    const sourceAdminDb = env.authenticatedContext(sourceAdminId).firestore();
-    const foreignAdminDb = env.authenticatedContext(foreignAdminId).firestore();
+    const sourceAdminDb = authenticatedContext(env, sourceAdminId).firestore();
+    const foreignAdminDb = authenticatedContext(env, foreignAdminId).firestore();
     const now = new Date();
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(sourceAdminDb, `householdInvites/${inviteCode}`), {
         active: true,
         role: "cook",
@@ -720,7 +804,7 @@ describe("/households and memberships", () => {
   });
 
   test("Admins cannot rewrite household topology or capacity", async () => {
-    const db = env.authenticatedContext("admin").firestore();
+    const db = authenticatedContext(env, "admin").firestore();
     const household = doc(db, "households/joinable-household");
     const now = new Date();
 
@@ -744,11 +828,11 @@ describe("/households and memberships", () => {
     );
   });
 
-  test("invite codes allow self-joining the invited household role only", async () => {
-    const inviteeDb = env.authenticatedContext("invitee").firestore();
-    const outsiderDb = env.authenticatedContext("outsider").firestore();
+  test("legacy invite codes cannot be read or used for direct membership creation", async () => {
+    const inviteeDb = authenticatedContext(env, "invitee").firestore();
+    const outsiderDb = authenticatedContext(env, "outsider").firestore();
 
-    await assertSucceeds(
+    await assertFails(
       getDoc(doc(inviteeDb, "householdInvites/KS-JOIN1")),
     );
     await assertFails(getDocs(collection(inviteeDb, "householdInvites")));
@@ -777,7 +861,7 @@ describe("/households and memberships", () => {
       memberCount: 5,
       updatedAt: now,
     });
-    await assertSucceeds(joinBatch.commit());
+    await assertFails(joinBatch.commit());
 
     await assertFails(
       setDoc(doc(outsiderDb, "households/joinable-household/members/other"), {
@@ -799,8 +883,8 @@ describe("/households and memberships", () => {
         memberCount: 1,
       });
     });
-    const inviteeDb = env.authenticatedContext("prospective-user").firestore();
-    const outsiderDb = env.authenticatedContext("outsider").firestore();
+    const inviteeDb = authenticatedContext(env, "prospective-user").firestore();
+    const outsiderDb = authenticatedContext(env, "outsider").firestore();
     const ownMembership = await assertSucceeds(
       getDoc(
         doc(
@@ -844,7 +928,7 @@ describe("/households and memberships", () => {
       });
     });
 
-    const db = env.authenticatedContext("capacity-user").firestore();
+    const db = authenticatedContext(env, "capacity-user").firestore();
     const now = new Date();
     const batch = writeBatch(db);
     batch.set(doc(db, "households/full-household/members/capacity-user"), {
@@ -895,7 +979,7 @@ describe("/households and memberships", () => {
       });
     });
 
-    const db = env.authenticatedContext("free-second-user").firestore();
+    const db = authenticatedContext(env, "free-second-user").firestore();
     const now = new Date();
     const batch = writeBatch(db);
     batch.set(doc(db, "households/second-household/members/free-second-user"), {
@@ -967,7 +1051,7 @@ describe("/households and memberships", () => {
       ]);
     });
 
-    const db = env.authenticatedContext(userId).firestore();
+    const db = authenticatedContext(env, userId).firestore();
     const now = new Date();
     await assertFails(
       updateDoc(doc(db, `users/${userId}`), {
@@ -1006,7 +1090,7 @@ describe("/households and memberships", () => {
     await assertFails(secondJoin.commit());
   });
 
-  test("premium users can join additional premium households", async () => {
+  test("premium users cannot bypass backend redemption for additional premium households", async () => {
     await env.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
       await setDoc(doc(db, "households/additional-household"), {
@@ -1030,7 +1114,7 @@ describe("/households and memberships", () => {
       });
     });
 
-    const db = env.authenticatedContext("premium-joiner").firestore();
+    const db = authenticatedContext(env, "premium-joiner").firestore();
     const now = new Date();
     const batch = writeBatch(db);
     batch.set(
@@ -1060,12 +1144,12 @@ describe("/households and memberships", () => {
       updatedAt: now,
     });
 
-    await assertSucceeds(batch.commit());
+    await assertFails(batch.commit());
   });
 
   test("household premium subscription records are server-owned", async () => {
-    const adminDb = env.authenticatedContext("admin").firestore();
-    const inviteeDb = env.authenticatedContext("invitee").firestore();
+    const adminDb = authenticatedContext(env, "admin").firestore();
+    const inviteeDb = authenticatedContext(env, "invitee").firestore();
     const payload = {
       status: "trialing",
       plan: "annual",
@@ -1099,7 +1183,7 @@ describe("/households and memberships", () => {
 
 describe("/households/{hid}/pantryItems", () => {
   test("solo-household member can write", async () => {
-    const db = env.authenticatedContext("u1").firestore();
+    const db = authenticatedContext(env, "u1").firestore();
     await assertSucceeds(
       setDoc(doc(db, "households/solo-household/pantryItems/p1"), {
         householdId: "solo-household",
@@ -1114,7 +1198,7 @@ describe("/households/{hid}/pantryItems", () => {
   });
 
   test("admin has full access", async () => {
-    const db = env.authenticatedContext("admin").firestore();
+    const db = authenticatedContext(env, "admin").firestore();
     await assertSucceeds(
       updateDoc(doc(db, "households/joinable-household/pantryItems/shared"), {
         note: "Admin correction",
@@ -1139,7 +1223,7 @@ describe("/households/{hid}/pantryItems", () => {
       });
     });
     for (const role of ["cook", "shopper"] as const) {
-      const db = env.authenticatedContext(role).firestore();
+      const db = authenticatedContext(env, role).firestore();
       await assertSucceeds(
         updateDoc(doc(db, "households/joinable-household/pantryItems/shared"), {
           quantity: role === "cook" ? 4 : 4.5,
@@ -1156,7 +1240,7 @@ describe("/households/{hid}/pantryItems", () => {
   });
 
   test("member is read-only", async () => {
-    const db = env.authenticatedContext("member").firestore();
+    const db = authenticatedContext(env, "member").firestore();
     await assertSucceeds(
       getDoc(doc(db, "households/joinable-household/pantryItems/shared")),
     );
@@ -1169,7 +1253,7 @@ describe("/households/{hid}/pantryItems", () => {
   });
 
   test("write with mismatching householdId rejected", async () => {
-    const db = env.authenticatedContext("u1").firestore();
+    const db = authenticatedContext(env, "u1").firestore();
     await assertFails(
       setDoc(doc(db, "households/solo-household/pantryItems/p2"), {
         householdId: "another-household",
@@ -1184,8 +1268,8 @@ describe("/households/{hid}/pantryItems", () => {
   });
 
   test("valid leftovers require lifecycle metadata and a three-day shelf life", async () => {
-    const cookDb = env.authenticatedContext("cook").firestore();
-    const adminDb = env.authenticatedContext("admin").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
+    const adminDb = authenticatedContext(env, "admin").firestore();
     const createdAt = new Date("2026-07-17T00:00:00.000Z");
     const valid = {
       householdId: "joinable-household",
@@ -1218,8 +1302,8 @@ describe("/households/{hid}/pantryItems", () => {
   });
 
   test("ordinary items cannot be edited into leftovers and leftovers only allow depletion", async () => {
-    const adminDb = env.authenticatedContext("admin").firestore();
-    const cookDb = env.authenticatedContext("cook").firestore();
+    const adminDb = authenticatedContext(env, "admin").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
     await assertFails(
       updateDoc(doc(adminDb, "households/joinable-household/pantryItems/shared"), {
         section: "leftover",
@@ -1246,7 +1330,7 @@ describe("/households/{hid}/pantryItems", () => {
 
 describe("/households/{hid}/wasteEvents append-only", () => {
   test("create succeeds, update fails", async () => {
-    const db = env.authenticatedContext("u1").firestore();
+    const db = authenticatedContext(env, "u1").firestore();
     await assertSucceeds(
       setDoc(doc(db, "households/solo-household/wasteEvents/w1"), {
         householdId: "solo-household",
@@ -1283,8 +1367,8 @@ describe("manual inventory audit events", () => {
   };
 
   test("shopper corrections and admin restocks are append-only", async () => {
-    const shopperDb = env.authenticatedContext("shopper").firestore();
-    const adminDb = env.authenticatedContext("admin").firestore();
+    const shopperDb = authenticatedContext(env, "shopper").firestore();
+    const adminDb = authenticatedContext(env, "admin").firestore();
     await assertSucceeds(
       setDoc(
         doc(shopperDb, "households/joinable-household/inventoryAdjustmentEvents/correction"),
@@ -1307,7 +1391,7 @@ describe("manual inventory audit events", () => {
 
   test("cook and member cannot forge correction events", async () => {
     for (const role of ["cook", "member"] as const) {
-      const db = env.authenticatedContext(role).firestore();
+      const db = authenticatedContext(env, role).firestore();
       await assertFails(
         setDoc(
           doc(db, `households/joinable-household/inventoryAdjustmentEvents/${role}`),
@@ -1320,7 +1404,7 @@ describe("manual inventory audit events", () => {
 
 describe("/households/{hid}/customIngredients", () => {
   test("create succeeds when scope and householdId match", async () => {
-    const db = env.authenticatedContext("u1").firestore();
+    const db = authenticatedContext(env, "u1").firestore();
     await assertSucceeds(
       setDoc(doc(db, "households/solo-household/customIngredients/custom-bWFuZ29zdGVlbg"), {
         name: "mangosteen",
@@ -1341,7 +1425,7 @@ describe("/households/{hid}/customIngredients", () => {
   });
 
   test("create rejected with wrong scope", async () => {
-    const db = env.authenticatedContext("u1").firestore();
+    const db = authenticatedContext(env, "u1").firestore();
     await assertFails(
       setDoc(doc(db, "households/solo-household/customIngredients/custom-eA"), {
         scope: "global",
@@ -1432,8 +1516,8 @@ describe("household role-gated feature collections", () => {
   });
 
   test("public recipes are readable but private recipes require membership", async () => {
-    const outsider = env.authenticatedContext("outsider").firestore();
-    const member = env.authenticatedContext("member").firestore();
+    const outsider = authenticatedContext(env, "outsider").firestore();
+    const member = authenticatedContext(env, "member").firestore();
 
     await assertSucceeds(getDoc(doc(outsider, "recipes/public-recipe")));
     await assertFails(getDoc(doc(outsider, "recipes/private-recipe")));
@@ -1441,8 +1525,8 @@ describe("household role-gated feature collections", () => {
   });
 
   test("cook can write recipes and member cannot", async () => {
-    const cookDb = env.authenticatedContext("cook").firestore();
-    const memberDb = env.authenticatedContext("member").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
+    const memberDb = authenticatedContext(env, "member").firestore();
     const payload = {
       authorUserId: "cook",
       householdId: "joint-household",
@@ -1459,7 +1543,7 @@ describe("household role-gated feature collections", () => {
   });
 
   test("signed-in users can like only public recipes as themselves", async () => {
-    const outsider = env.authenticatedContext("outsider").firestore();
+    const outsider = authenticatedContext(env, "outsider").firestore();
     const unsigned = env.unauthenticatedContext().firestore();
     const like = {
       userId: "outsider",
@@ -1484,8 +1568,8 @@ describe("household role-gated feature collections", () => {
   });
 
   test("public recipe comments enforce identity, content, and ownership", async () => {
-    const outsider = env.authenticatedContext("outsider").firestore();
-    const admin = env.authenticatedContext("admin").firestore();
+    const outsider = authenticatedContext(env, "outsider").firestore();
+    const admin = authenticatedContext(env, "admin").firestore();
     const commentPath = "recipes/public-recipe/comments/comment-1";
     const now = new Date();
     const comment = {
@@ -1514,8 +1598,8 @@ describe("household role-gated feature collections", () => {
   });
 
   test("calendar entries are cook-writable and reject household mismatch", async () => {
-    const cookDb = env.authenticatedContext("cook").firestore();
-    const memberDb = env.authenticatedContext("member").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
+    const memberDb = authenticatedContext(env, "member").firestore();
 
     await assertSucceeds(
       setDoc(
@@ -1562,8 +1646,8 @@ describe("household role-gated feature collections", () => {
   });
 
   test("calendar meal merges require Premium and exact recipe scaling", async () => {
-    const cookDb = env.authenticatedContext("cook").firestore();
-    const freeAdminDb = env.authenticatedContext("u1").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
+    const freeAdminDb = authenticatedContext(env, "u1").firestore();
     const premiumMerge = {
       householdId: "joint-household",
       date: "2026-07-06",
@@ -1605,8 +1689,8 @@ describe("household role-gated feature collections", () => {
   });
 
   test("direct shopping list and item writes are denied", async () => {
-    const shopperDb = env.authenticatedContext("shopper").firestore();
-    const cookDb = env.authenticatedContext("cook").firestore();
+    const shopperDb = authenticatedContext(env, "shopper").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
     const payload = {
       householdId: "joint-household",
       type: "scheduled",
@@ -1639,10 +1723,10 @@ describe("household role-gated feature collections", () => {
   });
 
   test("menu sets follow admin cook shopper and member permissions", async () => {
-    const adminDb = env.authenticatedContext("admin").firestore();
-    const cookDb = env.authenticatedContext("cook").firestore();
-    const shopperDb = env.authenticatedContext("shopper").firestore();
-    const memberDb = env.authenticatedContext("member").firestore();
+    const adminDb = authenticatedContext(env, "admin").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
+    const shopperDb = authenticatedContext(env, "shopper").firestore();
+    const memberDb = authenticatedContext(env, "member").firestore();
 
     await assertSucceeds(
       setDoc(doc(adminDb, "households/joint-household/daySettings/ds-1"), {

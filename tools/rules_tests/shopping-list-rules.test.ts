@@ -16,6 +16,7 @@ import {
   shoppingRuleProfiles,
   soloListPath,
 } from "./shopping-rules-test-helpers.js";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const directWriteRoles = ["admin", "shopper", "solo-member"] as const;
 
@@ -41,7 +42,7 @@ for (const profile of shoppingRuleProfiles) {
         const isSolo = role === "solo-member";
         const path = isSolo ? soloListPath : pendingListPath;
         const listId = isSolo ? "solo-list" : "pending-list";
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         await assertFails(
           setDoc(
@@ -63,7 +64,7 @@ for (const profile of shoppingRuleProfiles) {
         } else {
           await seedPendingList(env);
         }
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         // When / Then
         await assertFails(
@@ -83,7 +84,7 @@ for (const profile of shoppingRuleProfiles) {
         } else {
           await seedPendingList(env);
         }
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         // When / Then
         await assertFails(deleteDoc(doc(db, path)));
@@ -93,7 +94,7 @@ for (const profile of shoppingRuleProfiles) {
     for (const role of ["admin", "shopper", "cook", "member"] as const) {
       test(`${role} can still read a shopping list`, async () => {
         await seedPendingList(env);
-        const db = env.authenticatedContext(role).firestore();
+        const db = authenticatedContext(env, role).firestore();
 
         await assertSucceeds(getDoc(doc(db, pendingListPath)));
       });
@@ -101,21 +102,21 @@ for (const profile of shoppingRuleProfiles) {
 
     test("solo member can still read a shopping list", async () => {
       await seedSoloPendingList(env);
-      const db = env.authenticatedContext("solo-member").firestore();
+      const db = authenticatedContext(env, "solo-member").firestore();
 
       await assertSucceeds(getDoc(doc(db, soloListPath)));
     });
 
     test("outsider cannot read a shopping list", async () => {
       await seedPendingList(env);
-      const db = env.authenticatedContext("outsider").firestore();
+      const db = authenticatedContext(env, "outsider").firestore();
 
       await assertFails(getDoc(doc(db, pendingListPath)));
     });
 
     test("denied update preserves the Admin-SDK-seeded parent", async () => {
       await seedPendingList(env, { revision: 3 });
-      const db = env.authenticatedContext("admin").firestore();
+      const db = authenticatedContext(env, "admin").firestore();
 
       await assertFails(
         updateDoc(doc(db, pendingListPath), {

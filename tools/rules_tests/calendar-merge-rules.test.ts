@@ -9,6 +9,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { doc, setDoc } from "firebase/firestore";
 import { test } from "vitest";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
@@ -51,7 +52,7 @@ test("meal merge rules require Premium and exact recipe scaling", async () => {
         });
       });
 
-      const premium = env.authenticatedContext("cook").firestore();
+      const premium = authenticatedContext(env, "cook").firestore();
       const mergedMeal = {
         householdId: "premium-household",
         date: "2026-07-06",
@@ -91,7 +92,7 @@ test("meal merge rules require Premium and exact recipe scaling", async () => {
         ),
       );
 
-      const free = env.authenticatedContext("cook").firestore();
+      const free = authenticatedContext(env, "cook").firestore();
       await assertFails(
         setDoc(
           doc(free, "households/free-household/mealScheduleEntries/forbidden"),

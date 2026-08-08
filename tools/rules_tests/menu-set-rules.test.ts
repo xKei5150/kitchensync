@@ -9,6 +9,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deleteDoc, doc, setDoc } from "firebase/firestore";
 import { test } from "vitest";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
@@ -70,10 +71,10 @@ for (const profile of profiles) {
         }
       });
 
-      const admin = env.authenticatedContext("admin").firestore();
-      const cook = env.authenticatedContext("cook").firestore();
-      const shopper = env.authenticatedContext("shopper").firestore();
-      const member = env.authenticatedContext("member").firestore();
+      const admin = authenticatedContext(env, "admin").firestore();
+      const cook = authenticatedContext(env, "cook").firestore();
+      const shopper = authenticatedContext(env, "shopper").firestore();
+      const member = authenticatedContext(env, "member").firestore();
 
       await assertSucceeds(
         setDoc(doc(admin, "households/premium/menuSets/admin-set"), menuSet("premium", "admin")),

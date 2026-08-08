@@ -9,6 +9,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deleteDoc, doc, setDoc, writeBatch } from "firebase/firestore";
 import { test } from "vitest";
+import { authenticatedContext } from "./authenticated-context.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:18080";
@@ -81,7 +82,7 @@ async function saveBatch(
   localRecipeId: string,
   changes: Readonly<Record<string, unknown>> = {},
 ) {
-  const db = env.authenticatedContext(userId).firestore();
+  const db = authenticatedContext(env, userId).firestore();
   const batch = writeBatch(db);
   batch.set(doc(db, `recipes/${localRecipeId}`), {
     ...localCopy(userId),
@@ -165,7 +166,7 @@ test("recipe library rules allow only exact member-owned save copies", async () 
       );
       await assertFails(saveBatch(env, "outsider", "outsider-copy"));
 
-      const memberDb = env.authenticatedContext("member").firestore();
+      const memberDb = authenticatedContext(env, "member").firestore();
       await assertFails(
         setDoc(doc(memberDb, "recipes/arbitrary-member-recipe"), {
           ...localCopy("member"),
@@ -192,9 +193,8 @@ test("recipe library rules allow only exact member-owned save copies", async () 
       // Recipe edits are authorized against the existing household. A Cook in
       // a different household must not be able to claim that household in the
       // update payload and take over a recipe they do not own.
-      const ownerDb = env.authenticatedContext("recipe-owner").firestore();
-      const attackerDb = env
-        .authenticatedContext("recipe-attacker")
+      const ownerDb = authenticatedContext(env, "recipe-owner").firestore();
+      const attackerDb = authenticatedContext(env, "recipe-attacker")
         .firestore();
       await assertSucceeds(
         setDoc(

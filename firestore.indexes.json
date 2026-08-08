@@ -127,7 +127,228 @@
         {"fieldPath": "menuSetDayId", "order": "ASCENDING"},
         {"fieldPath": "orderInSlot", "order": "ASCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"},
+        {"fieldPath": "householdId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "privacyRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "requestedAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "privacyJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "leaseExpiresAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "menuSets",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "createdByUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "shoppingSchedules",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "updatedByUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "shoppingLists",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "completedByUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "shoppingAllocationDrafts",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "consumedByUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "subscriptions",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "ownerUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "subscriptions",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "premiumOwnership.ownerUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "shoppingLists",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "cancelledByUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "purchases",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "purchasedByUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "wasteEvents",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "createdByUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "consumptionEvents",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "createdByUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "inventoryAdjustmentEvents",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "createdByUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "authorUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "likes",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "savedRecipes",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "recipientUserId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"}
+      ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "privacyRequests",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "privacyJobs",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "privacyRequestReceipts",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "accountLifecycleCommandReceipts",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "householdCommandReceipts",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "householdInviteTokens",
+      "fieldPath": "terminalCleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "householdInviteManagement",
+      "fieldPath": "terminalCleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "householdInviteIssueReceipts",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "householdInviteRedemptionReceipts",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "householdInviteRevocationReceipts",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "inviteRateLimitBuckets",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "privacyTombstones",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "accountLifecycleQuarantine",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "accountLifecycleMigrations",
+      "fieldPath": "cleanupEligibleAt",
+      "ttl": true,
+      "indexes": []
+    }
+  ]
 }
