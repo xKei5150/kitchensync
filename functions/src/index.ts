@@ -1,8 +1,29 @@
 import { randomUUID } from "node:crypto"
+import { getAuth } from "firebase-admin/auth"
 import { defineString } from "firebase-functions/params"
 import { onCall } from "firebase-functions/v2/https"
 import { onSchedule } from "firebase-functions/v2/scheduler"
-import { callableSecurityOptions, nonAnonymousCallableUid } from "./callableSecurity.js"
+import {
+  accountDeletionWorkerSchedule,
+  processAccountDeletionRequests,
+} from "./accountDeletionWorker.js"
+import {
+  accountDeletionPreflightHandler,
+  accountLifecycleReceiptHmacKeyFromRuntimeSecret,
+  accountLifecycleReceiptHmacKeySecret,
+  leaveJointHouseholdHandler,
+  requestAccountDeletionHandler,
+  transferJointHouseholdOwnershipHandler,
+} from "./accountLifecycle.js"
+import {
+  callableEmailVerified,
+  callableRawToken,
+  callableSecurityOptions,
+  nonAnonymousCallableUid,
+  recentRevocationCheckedCallableUid,
+  revocationCheckedCallableUid,
+  type VerifyConsumerIdToken,
+} from "./callableSecurity.js"
 import { firestore } from "./firebase.js"
 import {
   type HouseholdCommandCallableRequest,
@@ -25,7 +46,11 @@ import {
   cleanupTerminalInviteMetadata,
   inviteCleanupSchedule,
 } from "./invites/inviteTerminalCleanup.js"
-import { startPremiumTrialHandler } from "./premium.js"
+import {
+  createJointHouseholdWithTrialTransferHandler,
+  type PremiumTrialCallableRequest,
+  startPremiumTrialHandler,
+} from "./premium.js"
 import {
   cancelShoppingListHandler,
   completeShoppingListHandler,
@@ -46,11 +71,22 @@ export {
 } from "./admin/callables.js"
 
 const callableSecurity = callableSecurityOptions(process.env)
+const accountLifecycleCallableSecurity = {
+  ...callableSecurity,
+  secrets: [accountLifecycleReceiptHmacKeySecret],
+}
+const householdCallableSecurity = {
+  ...callableSecurity,
+  secrets: [accountLifecycleReceiptHmacKeySecret],
+}
 export const inviteRuntimeServiceAccount = defineString("INVITE_RUNTIME_SERVICE_ACCOUNT")
+export const privacyWorkerRuntimeServiceAccount = defineString("PRIVACY_WORKER_SERVICE_ACCOUNT")
 const inviteCallableSecurity = {
   ...callableSecurity,
   serviceAccount: inviteRuntimeServiceAccount,
 }
+const verifyConsumerIdToken: VerifyConsumerIdToken = (rawToken, checkRevoked) =>
+  getAuth().verifyIdToken(rawToken, checkRevoked)
 
 export const shoppingSmoke = onCall(callableSecurity, (request) =>
   shoppingSmokeHandler(
@@ -209,41 +245,36 @@ export const requestAccountDeletion = onCall(accountLifecycleCallableSecurity, a
   ),
 )
 
-export const issueHouseholdInvite = onCall(
-  { ...inviteCallableSecurity, secrets: [inviteTokenHmacKeySecret, inviteRateLimitKeySecret] },
-  (request) =>
-    issueHouseholdInviteHandler(
-      householdRequest(nonAnonymousCallableUid(request.auth), request.data),
-      firestore,
-      {
-        hmacKey: () => inviteHmacKeyFromRuntimeSecret(inviteTokenHmacKeySecret.value()),
-        rateLimitKey: () => inviteRateLimitKeyFromRuntimeSecret(inviteRateLimitKeySecret.value()),
-        requestId: randomUUID,
-      },
+export const leaveJointHousehold = onCall(accountLifecycleCallableSecurity, async (request) =>
+  leaveJointHouseholdHandler(
+    lifecycleRequest(
+      await revocationCheckedCallableUid(
+        request.auth,
+        callableRawToken(request.rawRequest),
+        verifyConsumerIdToken,
+      ),
+      request.data,
     ),
-)
-
-export const redeemHouseholdInvite = onCall(
-  { ...inviteCallableSecurity, secrets: [inviteTokenHmacKeySecret, inviteRateLimitKeySecret] },
-  (request) =>
-    redeemHouseholdInviteHandler(
-      householdRequest(nonAnonymousCallableUid(request.auth), request.data),
-      firestore,
-      {
-        hmacKey: () => inviteHmacKeyFromRuntimeSecret(inviteTokenHmacKeySecret.value()),
-        rateLimitKey: () => inviteRateLimitKeyFromRuntimeSecret(inviteRateLimitKeySecret.value()),
-        sourceIp: trustedCallableSourceIp(request.rawRequest),
-        requestId: randomUUID,
-      },
-    ),
-)
-
-export const revokeHouseholdInvite = onCall(inviteCallableSecurity, (request) =>
-  revokeHouseholdInviteHandler(
-    householdRequest(nonAnonymousCallableUid(request.auth), request.data),
     firestore,
-    { requestId: randomUUID },
+    accountLifecycleDependencies(),
   ),
+)
+
+export const transferJointHouseholdOwnership = onCall(
+  accountLifecycleCallableSecurity,
+  async (request) =>
+    transferJointHouseholdOwnershipHandler(
+      lifecycleRequest(
+        await recentRevocationCheckedCallableUid(
+          request.auth,
+          callableRawToken(request.rawRequest),
+          verifyConsumerIdToken,
+        ),
+        request.data,
+      ),
+      firestore,
+      accountLifecycleDependencies(),
+    ),
 )
 
 // This has no browser/callable entrypoint. The deployed Function identity is
@@ -259,6 +290,24 @@ export const cleanupTerminalInviteMetadataDaily = onSchedule(
     const summary = await cleanupTerminalInviteMetadata(firestore)
     // Count-only summary; never include household IDs, user IDs, tokens, or HMACs.
     console.info("terminal invite metadata cleanup completed", summary)
+  },
+)
+
+export const processAccountDeletionRequestsEveryFifteenMinutes = onSchedule(
+  {
+    schedule: accountDeletionWorkerSchedule,
+    timeZone: "Etc/UTC",
+    serviceAccount: privacyWorkerRuntimeServiceAccount,
+    secrets: [accountLifecycleReceiptHmacKeySecret],
+  },
+  async () => {
+    const summary = await processAccountDeletionRequests(firestore, {
+      receiptHmacKey: () =>
+        accountLifecycleReceiptHmacKeyFromRuntimeSecret(
+          accountLifecycleReceiptHmacKeySecret.value(),
+        ),
+    })
+    console.info("account deletion worker completed", summary)
   },
 )
 

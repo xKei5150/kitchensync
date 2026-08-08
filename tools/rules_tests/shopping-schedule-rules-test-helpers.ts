@@ -25,7 +25,7 @@ export const jointDaySettingsPath =
 export const forgedInvitePath = "householdInvites/FORGED-OUTSIDER";
 export const creatorHouseholdPath = "households/solo-debug-creator";
 export const creatorMemberPath =
-  "households/debug-creator-household/members/debug-creator";
+  "households/solo-debug-creator/members/debug-creator";
 export const creatorWeeklySchedulePath =
   "households/solo-debug-creator/shoppingSchedules/weekly";
 export const creatorUserPath = "users/debug-creator";

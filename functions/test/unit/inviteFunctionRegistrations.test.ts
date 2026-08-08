@@ -56,7 +56,9 @@ describe("invite Function registrations", () => {
   })
 
   it("uses the dedicated identity for terminal metadata cleanup without secret bindings", () => {
-    expect(capturedScheduleOptions).toEqual([
+    expect(
+      capturedScheduleOptions.filter((value) => hasSchedule(value, inviteCleanupSchedule)),
+    ).toEqual([
       {
         schedule: inviteCleanupSchedule,
         timeZone: "Etc/UTC",
@@ -75,5 +77,14 @@ function hasInviteServiceAccount(
     value !== null &&
     "serviceAccount" in value &&
     value.serviceAccount === serviceAccount
+  )
+}
+
+function hasSchedule(value: unknown, schedule: string): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "schedule" in value &&
+    value.schedule === schedule
   )
 }

@@ -137,7 +137,12 @@ export const securityScenarios: readonly SecurityScenario[] = [
         maxMembers: 1,
         memberCount: 1,
       });
-      batch.set(doc(db, creatorMemberPath), { role: "admin" });
+      batch.set(doc(db, creatorMemberPath), {
+        role: "admin",
+        userId: "debug-creator",
+        householdId: "solo-debug-creator",
+        schemaVersion: 1,
+      });
 
       await assertSucceeds(batch.commit());
       await assertSucceeds(

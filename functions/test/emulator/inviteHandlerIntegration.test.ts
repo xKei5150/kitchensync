@@ -109,6 +109,7 @@ describe("opaque invite handlers against the Firestore emulator", () => {
     const first = await redeemHouseholdInviteHandler(
       {
         authUid: joinerUid,
+        emailVerified: true,
         data: { inviteToken: invite.inviteToken, commandId: redemptionCommandId },
       },
       harness.db,
@@ -117,6 +118,7 @@ describe("opaque invite handlers against the Firestore emulator", () => {
     const replay = await redeemHouseholdInviteHandler(
       {
         authUid: joinerUid,
+        emailVerified: true,
         data: { inviteToken: invite.inviteToken, commandId: redemptionCommandId },
       },
       harness.db,
@@ -159,6 +161,7 @@ describe("opaque invite handlers against the Firestore emulator", () => {
       redeemHouseholdInviteHandler(
         {
           authUid: joinerUid,
+          emailVerified: true,
           data: { inviteToken: "KS-DERIVED", commandId: randomId("legacy-command") },
         },
         harness.db,
@@ -204,6 +207,7 @@ describe("opaque invite handlers against the Firestore emulator", () => {
       redeemHouseholdInviteHandler(
         {
           authUid: firstJoiner,
+          emailVerified: true,
           data: { inviteToken: firstInvite.inviteToken, commandId: randomId("redeem-command") },
         },
         harness.db,
@@ -212,6 +216,7 @@ describe("opaque invite handlers against the Firestore emulator", () => {
       redeemHouseholdInviteHandler(
         {
           authUid: secondJoiner,
+          emailVerified: true,
           data: { inviteToken: secondInvite.inviteToken, commandId: randomId("redeem-command") },
         },
         harness.db,
@@ -248,6 +253,7 @@ describe("opaque invite handlers against the Firestore emulator", () => {
     await redeemHouseholdInviteHandler(
       {
         authUid: joinerUid,
+        emailVerified: true,
         data: { inviteToken: invite.inviteToken, commandId: randomId("redeem-command") },
       },
       harness.db,

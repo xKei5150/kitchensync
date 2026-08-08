@@ -510,7 +510,7 @@ service cloud.firestore {
       return id.matches('^custom-.*') && isValidCustomIngredientData(hid);
     }
     function isSelf(uid) {
-      return isSignedIn() && request.auth.uid == uid;
+      return isActiveConsumer() && request.auth.uid == uid;
     }
     function userRef(uid) {
       return /databases/$(database)/documents/users/$(uid);
@@ -973,6 +973,46 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /privacyRequests/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /privacyJobs/{jobId} {
+      allow read, write: if false;
+    }
+
+    match /privacyRequestReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /accountLifecycleCommandReceipts/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /accountLifecycleState/{uid} {
+      allow read, write: if false;
+    }
+
+    match /accountLifecycleQuarantine/{uid} {
+      allow read, write: if false;
+    }
+
+    match /accountLifecycleMigrations/{migrationId} {
+      allow read, write: if false;
+    }
+
+    match /privacyTombstones/{tombstoneId} {
+      allow read, write: if false;
+    }
+
+    match /retainedHouseholds/{retainedHouseholdId}/{path=**} {
+      allow read, write: if false;
+    }
+
+    match /retainedHouseholds/{retainedHouseholdId} {
+      allow read, write: if false;
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid) && !isAccountFrozen(uid);
       allow create: if isValidUserCreate(uid);
@@ -1007,8 +1047,11 @@ service cloud.firestore {
 
       match /members/{uid} {
         allow read: if isHouseholdMember(hid) || isSelf(uid);
-        allow create: if isSignedIn()
-          && isReservedInitialAdminMembership(hid, uid);
+        allow create: if isActiveConsumer()
+          && request.auth.token.email_verified == true
+          && isModernMembershipCreate(hid, uid)
+          && isReservedInitialAdminMembership(hid, uid)
+          && hasModernInitialProvisioningOwnership(hid, uid);
         allow update: if isValidMemberRoleUpdate(hid, uid);
         // Membership removal is a trusted callable-only operation because it
         // must also update the household count and the removed user's context.

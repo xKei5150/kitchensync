@@ -7,10 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
 import 'package:kitchensync/core/utils/id_generator.dart';
-import 'package:kitchensync/core/utils/result.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
-import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
-import 'package:kitchensync/features/household/domain/services/household_policy.dart';
 import 'package:kitchensync/features/household/presentation/controllers/household_invite_command_controller.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
@@ -154,6 +151,9 @@ final householdOnboardingControllerProvider =
       return HouseholdOnboardingController(
         db: auth == null ? null : ref.watch(firestoreProvider),
         auth: auth,
+        functions: auth == null
+            ? null
+            : FirebaseFunctions.instanceFor(region: 'us-central1'),
         inviteCommands: ref.watch(householdInviteCommandControllerProvider),
         idGenerator: ref.watch(idGeneratorProvider),
       );
@@ -208,15 +208,16 @@ class HouseholdOnboardingController {
   const HouseholdOnboardingController({
     required this.db,
     required this.auth,
+    this.functions,
     this.inviteCommands,
     this.idGenerator = const UuidV4IdGenerator(),
   });
 
   final FirebaseFirestore? db;
   final FirebaseAuth? auth;
+  final FirebaseFunctions? functions;
   final HouseholdInviteCommandController? inviteCommands;
   final IdGenerator idGenerator;
-  static const _policy = HouseholdPolicy();
 
   Future<HouseholdPickerState> loadPickerState() async {
     final auth = this.auth;
@@ -435,63 +436,25 @@ class HouseholdOnboardingController {
       throw StateError('Firebase is unavailable for household setup.');
     }
     final user = _requireSignedInUser(auth);
-    final userDoc = db.collection('users').doc(user.uid);
-    // Allocate the ID once. If two callers race, Firestore retries the second
-    // transaction and the persisted `createdJointHouseholdId` makes policy
-    // reject it before this unused ID is ever written.
-    final householdDoc = db.collection('households').doc();
-    final householdId = householdDoc.id;
-    final memberDoc = householdDoc.collection('members').doc(user.uid);
-
-    return db.runTransaction((transaction) async {
-      final userSnapshot = await transaction.get(userDoc);
-      final userData = userSnapshot.data() ?? const <String, dynamic>{};
-      final userIsPremium = userData['isPremium'] as bool? ?? false;
-      final hasCreatedJoint =
-          (userData['createdJointHouseholdId'] as String?)?.isNotEmpty ?? false;
-      final hasCreatedSolo =
-          (userData['createdSoloHouseholdId'] as String?)?.isNotEmpty ?? false;
-      final specResult = _policy.creationSpec(
-        HouseholdCreationRequest(
-          userIsPremium: userIsPremium,
-          requestJointHousehold: true,
-          existingSoloHouseholds: hasCreatedSolo ? 1 : 0,
-          existingCreatedJointHouseholds: hasCreatedJoint ? 1 : 0,
-        ),
+    _requireVerifiedEmail(user);
+    if (functions == null) {
+      throw StateError('Firebase is unavailable for household setup.');
+    }
+    final userSnapshot = await db.collection('users').doc(user.uid).get();
+    final userData = userSnapshot.data() ?? const <String, dynamic>{};
+    final sourceHouseholdId = userData['createdSoloHouseholdId'] as String?;
+    if (sourceHouseholdId == null || sourceHouseholdId.isEmpty) {
+      throw StateError(
+        'Start the Premium trial from your solo kitchen before creating a '
+        'joint household.',
       );
-      final spec = switch (specResult) {
-        Success(value: final value) => value,
-        ResultFailure(failure: final failure) => throw StateError(
-          failure.toString(),
-        ),
-      };
-      final now = FieldValue.serverTimestamp();
-      transaction
-        ..set(userDoc, {
-          ..._profileFieldsFor(
-            user: user,
-            now: now,
-            isNew: !userSnapshot.exists,
-          ),
-          'activeHouseholdId': householdId,
-          'householdIds': FieldValue.arrayUnion([householdId]),
-          'createdJointHouseholdId': householdId,
-          'updatedAt': now,
-        }, SetOptions(merge: true))
-        ..set(householdDoc, {
-          'name': 'Shared kitchen',
-          'creatorUserId': user.uid,
-          'isJoint': true,
-          'hasPremium': true,
-          'maxMembers': spec.maxMembers,
-          'memberCount': 1,
-          'createdAt': now,
-          'updatedAt': now,
-        })
-        ..set(memberDoc, {
-          'role': spec.initialRole.name,
-          'joinedAt': now,
-          'updatedAt': now,
+    }
+    final response = await functions
+        .httpsCallable('createJointHouseholdWithTrialTransfer')
+        .call<Object?>({
+          'commandId': idGenerator.newId(),
+          'policyVersion': 'account-lifecycle-v1',
+          'sourceHouseholdId': sourceHouseholdId,
         });
     final data = response.data;
     if (data is! Map || data['householdId'] is! String) {
@@ -514,7 +477,8 @@ class HouseholdOnboardingController {
     if (auth == null) {
       throw StateError('Secure household invites are unavailable right now.');
     }
-    _requireSignedInUser(auth);
+    final user = _requireSignedInUser(auth);
+    _requireVerifiedEmail(user);
     final commands = inviteCommands;
     if (commands == null) {
       throw StateError('Secure household invites are unavailable right now.');
@@ -897,8 +861,7 @@ class _JoinWithCodeState extends ConsumerState<_JoinWithCode> {
           .read(householdOnboardingControllerProvider)
           .joinHousehold(
             code: _controller.text,
-            commandId:
-                _joinCommandId ??= ref.read(idGeneratorProvider).newId(),
+            commandId: _joinCommandId ??= ref.read(idGeneratorProvider).newId(),
           );
     } catch (error) {
       if (!mounted) return;

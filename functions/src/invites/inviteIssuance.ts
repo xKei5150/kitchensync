@@ -4,6 +4,7 @@ import { Timestamp } from "firebase-admin/firestore"
 import { defineSecret } from "firebase-functions/params"
 import { HttpsError } from "firebase-functions/v2/https"
 import { z } from "zod"
+import { requireActiveAccountLifecycle } from "../accountLifecycleBarrier.js"
 import { requireCurrentHouseholdPremiumEntitlement } from "../shopping/commandContext.js"
 import { requireAuthUid } from "../shopping/errors.js"
 import { runRetryableTransaction } from "../shopping/transactionRetry.js"
@@ -205,6 +206,7 @@ async function reserveAndPersistInvite(
   onPersisted: (outcome: PersistedInviteOutcome) => void,
 ): Promise<boolean> {
   return runRetryableTransaction(db, async (transaction) => {
+    await requireActiveAccountLifecycle(transaction, db, authUid)
     const householdRef = db.collection("households").doc(command.householdId)
     const callerMemberRef = householdRef.collection("members").doc(authUid)
     const inviteRef = db.collection(opaqueInviteCollection).doc(storage.tokenLookupHmac)
