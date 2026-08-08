@@ -1,12 +1,21 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
+import 'package:kitchensync/core/notifications/push_notification_message.dart';
 import 'package:kitchensync/features/notifications/domain/entities/notification_models.dart';
 import 'package:kitchensync/features/notifications/domain/repositories/notification_repository.dart';
 
 class FirestoreNotificationRepository implements NotificationRepository {
-  const FirestoreNotificationRepository(this._refs);
+  FirestoreNotificationRepository(this._refs);
 
   final FirestoreRefs _refs;
+  final StreamController<HouseholdNotification> _foregroundController =
+      StreamController<HouseholdNotification>.broadcast();
+
+  @override
+  Stream<HouseholdNotification> get foregroundMessages =>
+      _foregroundController.stream;
 
   @override
   Stream<List<HouseholdNotification>> watchNotifications({
@@ -76,6 +85,14 @@ class FirestoreNotificationRepository implements NotificationRepository {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
+
+  @override
+  void onForegroundMessage(PushNotificationMessage message) {
+    final notification = _notificationFromMessage(message);
+    if (!_foregroundController.isClosed) {
+      _foregroundController.add(notification);
+    }
+  }
 }
 
 HouseholdNotification _notificationFromMap({
@@ -96,5 +113,24 @@ HouseholdNotification _notificationFromMap({
     route: map['route'] as String?,
     createdAt: (map['createdAt'] as Timestamp).toDate(),
     readAt: (map['readAt'] as Timestamp?)?.toDate(),
+  );
+}
+
+HouseholdNotification _notificationFromMessage(
+  PushNotificationMessage message,
+) {
+  return HouseholdNotification(
+    id: message.notificationId ??
+        DateTime.now().millisecondsSinceEpoch.toString(),
+    householdId: message.householdId,
+    recipientUserId: message.recipientUserId,
+    type: HouseholdNotificationType.values.firstWhere(
+      (type) => type.name == message.type,
+      orElse: () => HouseholdNotificationType.householdActivity,
+    ),
+    title: message.title,
+    body: message.body,
+    route: message.route,
+    createdAt: message.createdAt ?? DateTime.now(),
   );
 }

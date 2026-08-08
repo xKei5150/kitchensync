@@ -552,7 +552,11 @@ async function inventoryAccount(
     throw new WorkerRetryableError("user_missing", "Deletion user is missing")
   const userUpdateTime = inspectedUpdateTime(userSnapshot, userRef.path)
   const user = userSnapshot.data() ?? {}
-  await verifyNoUnknownCollections(userRef, new Set(["notificationPreferences"]), "user")
+  await verifyNoUnknownCollections(
+    userRef,
+    new Set(["notificationPreferences", "pushTokens"]),
+    "user",
+  )
   const membershipSnapshots = await db
     .collectionGroup("members")
     .where("userId", "==", userId)
@@ -893,12 +897,13 @@ async function inventoryActorMetadata(
       addSnapshots(await queryRootSnapshots(db, collectionName, "householdId", householdId))
     }
   }
-  const preferences = await db
-    .collection("users")
-    .doc(userId)
-    .collection("notificationPreferences")
-    .get()
+  const userRef = db.collection("users").doc(userId)
+  const [preferences, pushTokens] = await Promise.all([
+    userRef.collection("notificationPreferences").get(),
+    userRef.collection("pushTokens").get(),
+  ])
   addSnapshots(preferences.docs)
+  addSnapshots(pushTokens.docs)
   if (records.size > accountDeletionMaxInventoryRecords) {
     throw new WorkerBlockedError(
       "metadata_inventory_too_large",

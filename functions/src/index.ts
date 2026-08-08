@@ -69,6 +69,7 @@ export {
   adminHouseholdGet,
   adminUserGet,
 } from "./admin/callables.js"
+export { pushHouseholdNotification } from "./notifications.js"
 
 const callableSecurity = callableSecurityOptions(process.env)
 const accountLifecycleCallableSecurity = {

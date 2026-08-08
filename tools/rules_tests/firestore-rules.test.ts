@@ -325,6 +325,26 @@ describe("/users session documents", () => {
       ),
     );
   });
+
+  test("users manage only their own valid push-token documents", async () => {
+    const shopperDb = authenticatedContext(env, "shopper").firestore();
+    const cookDb = authenticatedContext(env, "cook").firestore();
+    const tokenPath = "users/shopper/pushTokens/c2hvcHBlci10b2tlbg";
+    const token = "fcm-token-abcdefghijklmnopqrstuvwxyz";
+    const valid = { token, updatedAt: new Date() };
+
+    await assertSucceeds(setDoc(doc(shopperDb, tokenPath), valid));
+    await assertSucceeds(getDoc(doc(shopperDb, tokenPath)));
+    await assertSucceeds(setDoc(doc(shopperDb, tokenPath), valid));
+    await assertSucceeds(deleteDoc(doc(shopperDb, tokenPath)));
+    await assertFails(setDoc(doc(cookDb, tokenPath), valid));
+    await assertFails(
+      setDoc(doc(shopperDb, tokenPath), { token: "too-short", updatedAt: new Date() }),
+    );
+    await assertFails(
+      setDoc(doc(shopperDb, tokenPath), { ...valid, unexpected: true }),
+    );
+  });
 });
 
 describe("household notifications", () => {

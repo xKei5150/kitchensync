@@ -22,6 +22,14 @@ class FirestoreRefs {
     String householdId,
   ) => notificationPreferences(uid).doc(householdId);
 
+  CollectionReference<Map<String, dynamic>> pushTokens(String uid) =>
+      user(uid).collection('pushTokens');
+
+  DocumentReference<Map<String, dynamic>> pushToken(
+    String uid,
+    String tokenId,
+  ) => pushTokens(uid).doc(tokenId);
+
   CollectionReference<Map<String, dynamic>> recipes() =>
       _db.collection('recipes');
 

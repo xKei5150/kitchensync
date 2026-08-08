@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/app/theme.dart';
+import 'package:kitchensync/core/notifications/push_notification_message.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
 import 'package:kitchensync/features/notifications/domain/entities/notification_models.dart';
 import 'package:kitchensync/features/notifications/domain/repositories/notification_repository.dart';
@@ -12,6 +14,15 @@ import 'package:kitchensync/features/notifications/presentation/screens/notifica
 class _FakeNotificationRepository implements NotificationRepository {
   final markedRead = <String>[];
   NotificationPreferences? savedPreferences;
+  final _foregroundController =
+      StreamController<HouseholdNotification>.broadcast();
+
+  @override
+  Stream<HouseholdNotification> get foregroundMessages =>
+      _foregroundController.stream;
+
+  @override
+  void onForegroundMessage(PushNotificationMessage message) {}
 
   @override
   Future<void> markRead({

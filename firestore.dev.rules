@@ -696,6 +696,14 @@ service cloud.firestore {
         && request.resource.data.householdActivity is bool
         && request.resource.data.updatedAt is timestamp;
     }
+    function isValidPushToken() {
+      return request.resource.data.keys().hasOnly(['token', 'updatedAt'])
+        && request.resource.data.keys().size() == 2
+        && request.resource.data.token is string
+        && request.resource.data.token.size() >= 20
+        && request.resource.data.token.size() <= 4096
+        && request.resource.data.updatedAt is timestamp;
+    }
     function isNotificationReadUpdate() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'readAt',
@@ -1029,6 +1037,18 @@ service cloud.firestore {
           && isHouseholdMember(hid)
           && isValidNotificationPreferences(hid);
         allow delete: if isSelf(uid) && isHouseholdMember(hid);
+      }
+
+      // A device can register only its owner account's FCM token. The token
+      // document ID is client-side base64url; the raw token remains server-read.
+      match /pushTokens/{tokenId} {
+        allow read: if isSelf(uid) && !isAccountFrozen(uid);
+        allow create: if isSelf(uid) && !isAccountFrozen(uid)
+          && isValidPushToken();
+        allow update: if isSelf(uid) && !isAccountFrozen(uid)
+          && isValidPushToken()
+          && request.resource.data.token == resource.data.token;
+        allow delete: if isSelf(uid) && !isAccountFrozen(uid);
       }
     }
 

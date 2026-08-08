@@ -4,6 +4,7 @@ import 'package:kitchensync/features/ingredient_dictionary/presentation/provider
 import 'package:kitchensync/features/notifications/data/repositories/firestore_notification_repository.dart';
 import 'package:kitchensync/features/notifications/domain/entities/notification_models.dart';
 import 'package:kitchensync/features/notifications/domain/repositories/notification_repository.dart';
+import 'package:rxdart/rxdart.dart';
 
 final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
   return FirestoreNotificationRepository(ref.watch(firestoreRefsProvider));
@@ -14,9 +15,19 @@ final activeNotificationsProvider = StreamProvider<List<HouseholdNotification>>(
     final household = ref.watch(activeHouseholdContextProvider);
     final userId = ref.watch(activeUserIdProvider);
     if (household == null) return Stream.value(const []);
-    return ref
-        .watch(notificationRepositoryProvider)
-        .watchNotifications(householdId: household.id, userId: userId);
+    final repository = ref.watch(notificationRepositoryProvider);
+    return Rx.combineLatest2<List<HouseholdNotification>,
+        HouseholdNotification?, List<HouseholdNotification>>(
+      repository.watchNotifications(
+        householdId: household.id,
+        userId: userId,
+      ),
+      repository.foregroundMessages
+          .cast<HouseholdNotification?>()
+          .startWith(null),
+      (notifications, foreground) =>
+          foreground == null ? notifications : [foreground, ...notifications],
+    );
   },
 );
 
