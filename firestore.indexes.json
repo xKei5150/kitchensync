@@ -4,264 +4,416 @@
       "collectionGroup": "pantryItems",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "section", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "section",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "pantryItems",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "section", "order": "ASCENDING"},
-        {"fieldPath": "ingredientId", "order": "ASCENDING"}
+        {
+          "fieldPath": "section",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "ingredientId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "purchases",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "ingredientId", "order": "ASCENDING"},
-        {"fieldPath": "purchaseDate", "order": "DESCENDING"}
+        {
+          "fieldPath": "ingredientId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "purchaseDate",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "ingredients",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "scope", "order": "ASCENDING"},
-        {"fieldPath": "name", "order": "ASCENDING"}
+        {
+          "fieldPath": "scope",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "name",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "recipes",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "visibility", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "visibility",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "recipes",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "householdId", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "householdId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "savedRecipes",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "householdId", "order": "ASCENDING"},
-        {"fieldPath": "userId", "order": "ASCENDING"}
+        {
+          "fieldPath": "householdId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "mealScheduleEntries",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "date", "order": "ASCENDING"},
-        {"fieldPath": "mealSlot", "order": "ASCENDING"}
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "mealSlot",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "daySettings",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "isActive", "order": "ASCENDING"},
-        {"fieldPath": "dateRangeStart", "order": "ASCENDING"}
+        {
+          "fieldPath": "isActive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dateRangeStart",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "shoppingLists",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "shoppingDate", "order": "ASCENDING"}
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "shoppingDate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "shoppingLists",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "type", "order": "ASCENDING"},
-        {"fieldPath": "status", "order": "ASCENDING"}
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "shoppingLists",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "notifications",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "recipientUserId", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "recipientUserId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "menuSets",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "householdId", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "householdId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "days",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "menuSetId", "order": "ASCENDING"},
-        {"fieldPath": "dayIndex", "order": "ASCENDING"}
+        {
+          "fieldPath": "menuSetId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dayIndex",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "entries",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "menuSetDayId", "order": "ASCENDING"},
-        {"fieldPath": "orderInSlot", "order": "ASCENDING"}
+        {
+          "fieldPath": "menuSetDayId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "orderInSlot",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "members",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "userId", "order": "ASCENDING"},
-        {"fieldPath": "householdId", "order": "ASCENDING"}
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "householdId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "privacyRequests",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "requestedAt", "order": "ASCENDING"}
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestedAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "privacyJobs",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "leaseExpiresAt", "order": "ASCENDING"}
-      ]
-    },
-    {
-      "collectionGroup": "menuSets",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {"fieldPath": "createdByUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "leaseExpiresAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "shoppingSchedules",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "updatedByUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "updatedByUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "shoppingLists",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "completedByUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "completedByUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "shoppingAllocationDrafts",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "consumedByUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "consumedByUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "subscriptions",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "ownerUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "ownerUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "subscriptions",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "premiumOwnership.ownerUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "premiumOwnership.ownerUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "shoppingLists",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "cancelledByUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "cancelledByUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "purchases",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "purchasedByUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "purchasedByUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "wasteEvents",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "createdByUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "createdByUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "consumptionEvents",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "createdByUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "createdByUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "inventoryAdjustmentEvents",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "createdByUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "createdByUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "comments",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "authorUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "authorUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "likes",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "userId", "order": "ASCENDING"}
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "savedRecipes",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "userId", "order": "ASCENDING"}
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "notifications",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "recipientUserId", "order": "ASCENDING"}
+        {
+          "fieldPath": "recipientUserId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "members",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "userId", "order": "ASCENDING"}
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],
