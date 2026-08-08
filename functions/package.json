@@ -10,6 +10,8 @@
     "build": "tsc --noEmit && tsc -p tsconfig.build.json",
     "lint": "biome check .",
     "test": "vitest run test/unit",
+    "account-lifecycle:backfill": "npm run build && node scripts/account-lifecycle-backfill.mjs",
+    "household-command-receipts:migrate": "npm run build && node scripts/household-command-receipt-migration.mjs",
     "test:emulator": "vitest run --pool=forks --testTimeout=30000"
   },
   "dependencies": {

@@ -1,4 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore"
+import { requireActiveAccountLifecycle } from "../accountLifecycleBarrier.js"
 import {
   type AllocationPlannerFactory,
   type PlanShoppingAllocationCallableRequest,
@@ -63,7 +64,9 @@ export async function upsertShoppingListHandler(
   const command = parseUpsertShoppingListRequest(request.data)
   return mapFirestoreErrors(() =>
     runRetryableTransaction(db, (transaction) =>
-      upsertShoppingListTransaction({ transaction, db, authUid, command }),
+      requireActiveAccountLifecycle(transaction, db, authUid).then(() =>
+        upsertShoppingListTransaction({ transaction, db, authUid, command }),
+      ),
     ),
   )
 }
@@ -76,7 +79,9 @@ export async function mutateShoppingListItemHandler(
   const command = parseMutateShoppingListItemRequest(request.data)
   return mapFirestoreErrors(() =>
     runRetryableTransaction(db, (transaction) =>
-      mutateShoppingListItemTransaction({ transaction, db, authUid, command }),
+      requireActiveAccountLifecycle(transaction, db, authUid).then(() =>
+        mutateShoppingListItemTransaction({ transaction, db, authUid, command }),
+      ),
     ),
   )
 }
@@ -89,6 +94,9 @@ async function runShoppingCommand(
   const authUid = requireAuthUid(request.authUid)
   const command = parseShoppingCommandRequest(request.data)
   return mapFirestoreErrors(() =>
-    runRetryableTransaction(db, (transaction) => execute({ transaction, db, authUid, command })),
+    runRetryableTransaction(db, async (transaction) => {
+      await requireActiveAccountLifecycle(transaction, db, authUid)
+      return execute({ transaction, db, authUid, command })
+    }),
   )
 }

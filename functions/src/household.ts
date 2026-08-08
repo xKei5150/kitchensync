@@ -2,6 +2,14 @@ import type { DocumentData, Firestore, Transaction } from "firebase-admin/firest
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { HttpsError } from "firebase-functions/v2/https"
 import { z } from "zod"
+import { requireActiveAccountLifecycle } from "./accountLifecycleBarrier.js"
+import {
+  assertHouseholdCommandReceipt,
+  type HouseholdCommandReceiptDependencies,
+  type HouseholdCommandType,
+  householdCommandReceiptData,
+  householdCommandReceiptDocumentId,
+} from "./householdCommandReceipt.js"
 import { mapFirestoreErrors, requireAuthUid } from "./shopping/errors.js"
 import { runRetryableTransaction } from "./shopping/transactionRetry.js"
 
@@ -13,24 +21,13 @@ const commandSchema = z
   })
   .strict()
 
-const receiptSchema = z
-  .object({
-    householdId: z.string(),
-    targetUserId: z.string(),
-    commandType: z.enum(["removeHouseholdMember", "transferHouseholdAdmin"]),
-    appliedByUserId: z.string(),
-    activeHouseholdId: z.string().nullable().optional(),
-  })
-  .passthrough()
-
 export type HouseholdCommandCallableRequest = Readonly<{
   readonly authUid?: string
   readonly data: unknown
 }>
 
 type HouseholdCommand = Readonly<z.infer<typeof commandSchema>>
-type HouseholdCommandType = "removeHouseholdMember" | "transferHouseholdAdmin"
-type HouseholdRecord = Readonly<{ memberCount?: unknown }>
+type HouseholdRecord = Readonly<{ memberCount?: unknown; ownerUserId?: unknown }>
 type MemberRecord = Readonly<{ role?: unknown }>
 type UserRecord = Readonly<{
   isPremium?: unknown
@@ -47,18 +44,22 @@ export type HouseholdCommandResponse = Readonly<{
   activeHouseholdId?: string | null
 }>
 
+export type HouseholdCommandDependencies = HouseholdCommandReceiptDependencies
+
 export async function removeHouseholdMemberHandler(
   request: HouseholdCommandCallableRequest,
   db: Firestore,
+  dependencies: HouseholdCommandDependencies,
 ): Promise<HouseholdCommandResponse> {
-  return runHouseholdCommand(request, db, "removeHouseholdMember", removeMember)
+  return runHouseholdCommand(request, db, "removeHouseholdMember", removeMember, dependencies)
 }
 
 export async function transferHouseholdAdminHandler(
   request: HouseholdCommandCallableRequest,
   db: Firestore,
+  dependencies: HouseholdCommandDependencies,
 ): Promise<HouseholdCommandResponse> {
-  return runHouseholdCommand(request, db, "transferHouseholdAdmin", transferAdmin)
+  return runHouseholdCommand(request, db, "transferHouseholdAdmin", transferAdmin, dependencies)
 }
 
 async function runHouseholdCommand(
@@ -66,6 +67,7 @@ async function runHouseholdCommand(
   db: Firestore,
   commandType: HouseholdCommandType,
   apply: (input: HouseholdTransactionInput) => Promise<HouseholdCommandResponse>,
+  dependencies: HouseholdCommandDependencies,
 ): Promise<HouseholdCommandResponse> {
   const authUid = requireAuthUid(request.authUid)
   const parsed = commandSchema.safeParse(request.data)
@@ -77,9 +79,21 @@ async function runHouseholdCommand(
   }
   return mapFirestoreErrors(() =>
     runRetryableTransaction(db, (transaction) =>
-      apply({ transaction, db, authUid, command: parsed.data, commandType }),
+      runWithLifecycleBarrier(transaction, db, authUid, () =>
+        apply({ transaction, db, authUid, command: parsed.data, commandType, dependencies }),
+      ),
     ),
   )
+}
+
+async function runWithLifecycleBarrier<T>(
+  transaction: Transaction,
+  db: Firestore,
+  authUid: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  await requireActiveAccountLifecycle(transaction, db, authUid)
+  return operation()
 }
 
 type HouseholdTransactionInput = Readonly<{
@@ -88,6 +102,7 @@ type HouseholdTransactionInput = Readonly<{
   authUid: string
   command: HouseholdCommand
   commandType: HouseholdCommandType
+  dependencies: HouseholdCommandDependencies
 }>
 
 async function removeMember(input: HouseholdTransactionInput): Promise<HouseholdCommandResponse> {
@@ -99,7 +114,9 @@ async function removeMember(input: HouseholdTransactionInput): Promise<Household
     input.transaction.get(context.targetMemberRef),
     input.transaction.get(context.targetUserRef),
   ])
-  if (receipt.exists) return replay(receipt.data(), input)
+  if (receipt.exists) {
+    return replay(receipt.data(), input, nullableString(targetUser.data()?.["activeHouseholdId"]))
+  }
   requireAdmin(household.exists, callerMember.data())
   if (!targetMember.exists) {
     throw new HttpsError("not-found", "Household member not found")
@@ -107,8 +124,18 @@ async function removeMember(input: HouseholdTransactionInput): Promise<Household
   if (!targetUser.exists) {
     throw new HttpsError("failed-precondition", "Household member profile is missing")
   }
+  await requireActiveAccountLifecycle(input.transaction, input.db, input.command.targetUserId)
 
   const householdData = (household.data() ?? {}) as HouseholdRecord
+  if (typeof householdData.ownerUserId !== "string" || householdData.ownerUserId.length === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Household ownership migration is required before member removal",
+    )
+  }
+  if (householdData.ownerUserId === input.command.targetUserId) {
+    throw new HttpsError("failed-precondition", "Household ownership must be transferred first")
+  }
   const memberCount = householdData.memberCount
   if (typeof memberCount !== "number" || !Number.isInteger(memberCount) || memberCount <= 1) {
     throw new HttpsError("failed-precondition", "Household member count is invalid")
@@ -155,9 +182,24 @@ async function transferAdmin(input: HouseholdTransactionInput): Promise<Househol
   ])
   if (receipt.exists) return replay(receipt.data(), input)
   requireAdmin(household.exists, callerMember.data())
+  const householdData = household.data() as Record<string, unknown> | undefined
+  const ownerUserId = householdData?.["ownerUserId"]
+  if (typeof ownerUserId !== "string" || ownerUserId.length === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Household ownership migration is required before Admin transfer",
+    )
+  }
+  if (ownerUserId === input.authUid || ownerUserId === input.command.targetUserId) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Use transferJointHouseholdOwnership for the household owner",
+    )
+  }
   if (!targetMember.exists || !targetUser.exists) {
     throw new HttpsError("not-found", "Household member not found")
   }
+  await requireActiveAccountLifecycle(input.transaction, input.db, input.command.targetUserId)
   if (!hasActivePremiumEntitlement(targetUser.data() as UserRecord, Timestamp.now())) {
     throw new HttpsError("failed-precondition", "Admin can only be transferred to a Premium member")
   }
@@ -187,7 +229,14 @@ function commandContext(input: HouseholdTransactionInput) {
       .doc(input.command.targetUserId)
       .collection("notificationPreferences")
       .doc(input.command.householdId),
-    receiptRef: input.db.collection("householdCommandReceipts").doc(input.command.commandId),
+    receiptRef: input.db
+      .collection("householdCommandReceipts")
+      .doc(
+        householdCommandReceiptDocumentId(
+          input.command.commandId,
+          input.dependencies.receiptHmacKey(),
+        ),
+      ),
   }
 }
 
@@ -233,29 +282,41 @@ function receiptData(
   input: HouseholdTransactionInput,
   activeHouseholdId: string | null | undefined,
 ): Readonly<Record<string, unknown>> {
-  return {
-    householdId: input.command.householdId,
-    targetUserId: input.command.targetUserId,
-    commandType: input.commandType,
-    appliedByUserId: input.authUid,
-    appliedAt: FieldValue.serverTimestamp(),
-    ...(activeHouseholdId === undefined ? {} : { activeHouseholdId }),
-  }
+  return householdCommandReceiptData(
+    {
+      commandId: input.command.commandId,
+      commandType: input.commandType,
+      actorUserId: input.authUid,
+      targetUserId: input.command.targetUserId,
+      householdId: input.command.householdId,
+    },
+    input.dependencies,
+    activeHouseholdId,
+  )
 }
 
-function replay(data: DocumentData | undefined, input: HouseholdTransactionInput) {
-  const parsed = receiptSchema.safeParse(data)
-  if (
-    !parsed.success ||
-    parsed.data.householdId !== input.command.householdId ||
-    parsed.data.targetUserId !== input.command.targetUserId ||
-    parsed.data.commandType !== input.commandType ||
-    parsed.data.appliedByUserId !== input.authUid
-  ) {
-    throw new HttpsError("failed-precondition", "Command id was already used")
-  }
-  const activeHouseholdId = parsed.data.activeHouseholdId
+function replay(
+  data: DocumentData | undefined,
+  input: HouseholdTransactionInput,
+  expectedActiveHouseholdId?: string | null,
+) {
+  const activeHouseholdId = assertHouseholdCommandReceipt(
+    data,
+    {
+      commandId: input.command.commandId,
+      commandType: input.commandType,
+      actorUserId: input.authUid,
+      targetUserId: input.command.targetUserId,
+      householdId: input.command.householdId,
+    },
+    input.dependencies.receiptHmacKey(),
+    expectedActiveHouseholdId,
+  )
   return response(input, true, activeHouseholdId)
+}
+
+function nullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null
 }
 
 function response(

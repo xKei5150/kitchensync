@@ -6,6 +6,7 @@ import {
   deleteApp as deleteAdminApp,
   initializeApp as initializeAdminApp,
 } from "firebase-admin/app"
+import { getAuth as getAdminAuth } from "firebase-admin/auth"
 import { getFirestore } from "firebase-admin/firestore"
 import { afterEach, describe, expect, it } from "vitest"
 import {
@@ -54,6 +55,7 @@ describe("household membership callables", () => {
     const callerUserId = (await signInWithEmulatorEmailIdentity(current.auth)).uid
     await current.db.doc(`households/${householdId}`).set({
       isJoint: true,
+      ownerUserId: callerUserId,
       memberCount: 2,
     })
     await current.db.doc(`households/${householdId}/members/${callerUserId}`).set({
@@ -88,6 +90,7 @@ describe("household membership callables", () => {
 
     await current.db.doc(`households/${householdId}`).set({
       isJoint: true,
+      ownerUserId: randomId("owner"),
       memberCount: 2,
       maxMembers: 6,
     })
@@ -135,15 +138,27 @@ describe("household membership callables", () => {
       (await current.db.doc(`users/${targetUserId}/notificationPreferences/${householdId}`).get())
         .exists,
     ).toBe(false)
-    const receiptRef = current.db.doc(`householdCommandReceipts/${commandId}`)
+    const receiptSnapshot = await current.db.collection("householdCommandReceipts").limit(10).get()
+    const receiptRef = receiptSnapshot.docs.find(
+      (snapshot) =>
+        snapshot.get("commandType") === "removeHouseholdMember" &&
+        snapshot.get("activeHouseholdDigest") !== null,
+    )?.ref
+    if (receiptRef === undefined) throw new Error("Expected migrated household receipt")
     const receipt = await receiptRef.get()
     expect(receipt.data()).toMatchObject({
-      householdId,
-      targetUserId,
       commandType: "removeHouseholdMember",
-      appliedByUserId: callerUserId,
-      activeHouseholdId: fallbackHouseholdId,
+      activeHouseholdDigest: expect.any(String),
     })
+    for (const field of ["householdId", "targetUserId", "appliedByUserId"]) {
+      expect(receipt.data()).not.toHaveProperty(field)
+    }
+    expect(receipt.data()).not.toHaveProperty("activeHouseholdId")
+    expect(receipt.data()).toHaveProperty("actorDigest")
+    expect(receipt.data()).toHaveProperty("targetDigest")
+    expect(receipt.data()).toHaveProperty("householdDigest")
+    expect(receipt.data()).toHaveProperty("commandDigest")
+    expect(receipt.data()).toHaveProperty("cleanupEligibleAt")
     const receiptUpdateTime = receipt.updateTime?.toMillis()
 
     const retry = await current.removeMember(request)
@@ -167,6 +182,68 @@ describe("household membership callables", () => {
     )
   })
 
+  it("rejects a disabled consumer before a destructive household mutation", async () => {
+    const current = createHarness()
+    disposals.push(current.dispose)
+    const householdId = randomId("disabled-household")
+    const targetUserId = randomId("disabled-target")
+    const callerUserId = (await signInWithEmulatorEmailIdentity(current.auth)).uid
+    const request = {
+      householdId,
+      targetUserId,
+      commandId: randomId("disabled-command"),
+    }
+
+    await current.db.doc(`households/${householdId}`).set({ isJoint: true, memberCount: 2 })
+    await current.db.doc(`households/${householdId}/members/${callerUserId}`).set({ role: "admin" })
+    await current.db
+      .doc(`households/${householdId}/members/${targetUserId}`)
+      .set({ role: "member" })
+    await current.db.doc(`users/${targetUserId}`).set({
+      activeHouseholdId: householdId,
+      householdIds: [householdId],
+      joinedPremiumHouseholdIds: [householdId],
+    })
+    await current.adminAuth.updateUser(callerUserId, { disabled: true })
+
+    await expectCallableCode(() => current.removeMember(request), "unauthenticated")
+    expect((await current.db.doc(`households/${householdId}`).get()).get("memberCount")).toBe(2)
+    expect(
+      (await current.db.doc(`households/${householdId}/members/${targetUserId}`).get()).exists,
+    ).toBe(true)
+  })
+
+  it("rejects a revoked consumer before an Admin transfer", async () => {
+    const current = createHarness()
+    disposals.push(current.dispose)
+    const householdId = randomId("revoked-household")
+    const targetUserId = randomId("revoked-target")
+    const callerUserId = (await signInWithEmulatorEmailIdentity(current.auth)).uid
+    const request = {
+      householdId,
+      targetUserId,
+      commandId: randomId("revoked-command"),
+    }
+
+    await current.db.doc(`households/${householdId}`).set({ isJoint: true, memberCount: 2 })
+    await current.db.doc(`households/${householdId}/members/${callerUserId}`).set({ role: "admin" })
+    await current.db.doc(`households/${householdId}/members/${targetUserId}`).set({ role: "cook" })
+    await current.db.doc(`users/${targetUserId}`).set({ isPremium: true })
+    await current.auth.currentUser?.getIdToken()
+    // Auth revocation compares whole-second auth_time values. Move the
+    // revocation into the next second so the pre-revocation token is stale.
+    await new Promise((resolve) => setTimeout(resolve, 1100))
+    await current.adminAuth.revokeRefreshTokens(callerUserId)
+
+    await expectCallableCode(() => current.transferAdmin(request), "unauthenticated")
+    expect(
+      (await current.db.doc(`households/${householdId}/members/${callerUserId}`).get()).get("role"),
+    ).toBe("admin")
+    expect(
+      (await current.db.doc(`households/${householdId}/members/${targetUserId}`).get()).get("role"),
+    ).toBe("cook")
+  })
+
   it("transfers Admin only to a Premium member and replays after caller demotion", async () => {
     const current = createHarness()
     disposals.push(current.dispose)
@@ -180,6 +257,7 @@ describe("household membership callables", () => {
     }
     await current.db.doc(`households/${householdId}`).set({
       isJoint: true,
+      ownerUserId: randomId("owner"),
       memberCount: 2,
       maxMembers: 6,
     })
@@ -251,6 +329,7 @@ function createHarness() {
   return {
     auth,
     db,
+    adminAuth: getAdminAuth(adminApp),
     removeMember: httpsCallable<HouseholdCommandRequest, HouseholdCommandResponse>(
       functions,
       "removeHouseholdMember",

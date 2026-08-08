@@ -1,6 +1,7 @@
 import type { DocumentReference, Firestore, Transaction } from "firebase-admin/firestore"
 import { FieldValue } from "firebase-admin/firestore"
 import { HttpsError } from "firebase-functions/v2/https"
+import { requireActiveAccountLifecycle } from "../accountLifecycleBarrier.js"
 import { parsePlanShoppingAllocationRequest } from "./allocationDraftContracts.js"
 import {
   readyDraftData,
@@ -64,6 +65,7 @@ async function authorizePlanning(
   input: Omit<DraftOperationInput, "planned" | "draftId">,
 ): Promise<void> {
   await runRetryableTransaction(input.db, async (transaction) => {
+    await requireActiveAccountLifecycle(transaction, input.db, input.authUid)
     const context = await authorizeHouseholdShoppingRole({
       transaction,
       db: input.db,
@@ -90,6 +92,7 @@ type DraftOperationInput = Readonly<{
 
 async function persistReadyDraft(input: DraftOperationInput): Promise<void> {
   await runRetryableTransaction(input.db, async (transaction) => {
+    await requireActiveAccountLifecycle(transaction, input.db, input.authUid)
     const context = await contextFor(transaction, input)
     const receipt = await transaction.get(context.receiptRef)
     if (receipt.exists) return
@@ -104,6 +107,7 @@ async function consumeReadyDraft(
   input: DraftOperationInput & Readonly<{ readonly payloadHash: string }>,
 ): Promise<ShoppingWriteResponse> {
   return runRetryableTransaction(input.db, async (transaction) => {
+    await requireActiveAccountLifecycle(transaction, input.db, input.authUid)
     const context = await contextFor(transaction, input)
     const receipt = await transaction.get(context.receiptRef)
     if (receipt.exists) return replayResponse(receipt.data(), input, context.listRef)

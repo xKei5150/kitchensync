@@ -1,3 +1,4 @@
+import type { Firestore } from "firebase-admin/firestore"
 import { HttpsError } from "firebase-functions/v2/https"
 import { describe, expect, it } from "vitest"
 import {
@@ -21,12 +22,12 @@ async function expectHttpsCode(action: () => unknown, code: string): Promise<voi
 }
 
 describe("shopping callable contracts", () => {
-  it("returns ok when shoppingSmoke receives an authenticated empty request", () => {
+  it("returns ok when shoppingSmoke receives an authenticated empty request", async () => {
     // Given: an authenticated caller and the exact empty request shape.
     const request = { authUid: "uid-1", data: {} }
 
     // When: the smoke callable handler is invoked.
-    const response = shoppingSmokeHandler(request)
+    const response = await shoppingSmokeHandler(request, activeDb())
 
     // Then: the observable callable payload is the smoke response.
     expect(response).toEqual({ ok: true })
@@ -37,7 +38,7 @@ describe("shopping callable contracts", () => {
     const request = { data: {} }
 
     // When/Then: one invocation reports the Firebase callable error code.
-    await expectHttpsCode(() => shoppingSmokeHandler(request), "unauthenticated")
+    await expectHttpsCode(() => shoppingSmokeHandler(request, activeDb()), "unauthenticated")
   })
 
   it("throws invalid-argument when shoppingSmoke receives extra fields", async () => {
@@ -45,7 +46,7 @@ describe("shopping callable contracts", () => {
     const request = { authUid: "uid-1", data: { extra: true } }
 
     // When/Then: one invocation rejects before any side effects.
-    await expectHttpsCode(() => shoppingSmokeHandler(request), "invalid-argument")
+    await expectHttpsCode(() => shoppingSmokeHandler(request, activeDb()), "invalid-argument")
   })
 
   it("parses exact shopping command requests", () => {
@@ -102,3 +103,13 @@ describe("shopping callable contracts", () => {
     expect(parsed).toEqual({})
   })
 })
+
+function activeDb(): Firestore {
+  return {
+    collection: () => ({
+      doc: () => ({
+        get: async () => ({ exists: true, data: () => ({}) }),
+      }),
+    }),
+  } as unknown as Firestore
+}

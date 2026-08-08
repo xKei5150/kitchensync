@@ -77,6 +77,7 @@ tools/seed_uploader/node_modules/
 
 # Local agent / session tooling state (not project source)
 .entire/
+.slim/deepwork/
 .omo/
 .superpowers/
 .firecrawl/
@@ -99,3 +100,9 @@ screenshots/
 
 # Firebase CLI debug output
 firepit-log.txt
+.prime/
+.oh-my-opencode.json
+.ignore
+explore_report.md
+review_notes.md
+README_DRAFT.md

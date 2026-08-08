@@ -6,6 +6,7 @@ import {
   deleteApp as deleteAdminApp,
   initializeApp as initializeAdminApp,
 } from "firebase-admin/app"
+import { getAuth as getAdminAuth } from "firebase-admin/auth"
 import { getFirestore, Timestamp } from "firebase-admin/firestore"
 import { afterEach, describe, expect, it } from "vitest"
 import {
@@ -23,6 +24,12 @@ type PremiumTrialRequest = {
 type PremiumTrialResponse = {
   readonly status: "trialing" | "active"
   readonly plan: "annual" | "monthly"
+}
+
+type JointTrialTransferRequest = {
+  readonly commandId: string
+  readonly policyVersion: string
+  readonly sourceHouseholdId: string
 }
 
 const gcloudProjectEnvKey = "GCLOUD_PROJECT"
@@ -51,7 +58,16 @@ describe("Premium trial callable", () => {
 
     await expectCallableCode(
       () => current.startTrial({ householdId, plan: "annual" }),
-      "permission-denied",
+      "failed-precondition",
+    )
+    await expectCallableCode(
+      () =>
+        current.createJointTransfer({
+          commandId: randomUUID(),
+          policyVersion: "account-lifecycle-v1",
+          sourceHouseholdId: householdId,
+        }),
+      "failed-precondition",
     )
     expect(
       (await current.db.doc(`households/${householdId}/subscriptions/premium`).get()).exists,
@@ -63,13 +79,27 @@ describe("Premium trial callable", () => {
     disposals.push(current.dispose)
     const householdId = randomId("premium-household")
     const uid = (await signInWithEmulatorEmailIdentity(current.auth)).uid
-    await current.db.doc(`users/${uid}`).set({ displayName: "Trial owner" })
+    await current.verifyEmail(uid)
+    await current.db.doc(`users/${uid}`).set({
+      displayName: "Trial owner",
+      activeHouseholdId: householdId,
+      householdIds: [householdId],
+      joinedPremiumHouseholdIds: [],
+      createdSoloHouseholdId: householdId,
+    })
     await current.db.doc(`households/${householdId}`).set({
       name: "Premium kitchen",
       hasPremium: false,
+      isJoint: false,
+      ownerUserId: uid,
       maxMembers: 1,
     })
-    await current.db.doc(`households/${householdId}/members/${uid}`).set({ role: "admin" })
+    await current.db.doc(`households/${householdId}/members/${uid}`).set({
+      role: "admin",
+      userId: uid,
+      householdId,
+      schemaVersion: 1,
+    })
 
     const first = await current.startTrial({ householdId, plan: "annual" })
 
@@ -113,21 +143,42 @@ describe("Premium trial callable", () => {
     disposals.push(current.dispose)
     const householdId = randomId("expired-premium-household")
     const uid = (await signInWithEmulatorEmailIdentity(current.auth)).uid
+    await current.verifyEmail(uid)
+    const startedAt = Timestamp.fromMillis(Date.now() - 8 * 24 * 60 * 60 * 1000)
+    const trialEndsAt = Timestamp.fromMillis(Date.now() - 1_000)
     await current.db.doc(`users/${uid}`).set({
       isPremium: true,
-      premiumTrialEndsAt: Timestamp.fromMillis(Date.now() - 1_000),
+      premiumPlan: "annual",
+      premiumTrialStartedAt: startedAt,
+      premiumTrialEndsAt: trialEndsAt,
+      activeHouseholdId: householdId,
+      householdIds: [householdId],
+      joinedPremiumHouseholdIds: [householdId],
     })
     await current.db.doc(`households/${householdId}`).set({
+      isJoint: false,
       hasPremium: true,
+      ownerUserId: uid,
       premiumOwnerUserId: uid,
-      premiumTrialEndsAt: Timestamp.fromMillis(Date.now() - 1_000),
+      premiumOwnership: { type: "in_app_trial", ownerUserId: uid },
+      premiumPlan: "annual",
+      premiumTrialStartedAt: startedAt,
+      premiumTrialEndsAt: trialEndsAt,
     })
-    await current.db.doc(`households/${householdId}/members/${uid}`).set({ role: "admin" })
+    await current.db.doc(`households/${householdId}/members/${uid}`).set({
+      role: "admin",
+      userId: uid,
+      householdId,
+      schemaVersion: 1,
+    })
     await current.db.doc(`households/${householdId}/subscriptions/premium`).set({
       status: "trialing",
+      provider: "in_app_trial",
       plan: "annual",
       ownerUserId: uid,
-      trialEndsAt: Timestamp.fromMillis(Date.now() - 1_000),
+      premiumOwnership: { type: "in_app_trial", ownerUserId: uid },
+      startedAt,
+      trialEndsAt,
     })
 
     await expectCallableCode(
@@ -150,9 +201,18 @@ function createHarness() {
   connectFunctionsEmulator(functions, endpoint.host, endpoint.port)
   const adminApp = initializeAdminApp({ projectId }, `premium-admin-${randomUUID()}`)
   const db = getFirestore(adminApp)
+  const adminAuth = getAdminAuth(adminApp)
   return {
     auth,
     db,
+    createJointTransfer: httpsCallable<JointTrialTransferRequest, Record<string, unknown>>(
+      functions,
+      "createJointHouseholdWithTrialTransfer",
+    ),
+    async verifyEmail(uid: string): Promise<void> {
+      await adminAuth.updateUser(uid, { emailVerified: true })
+      await auth.currentUser?.getIdToken(true)
+    },
     startTrial: httpsCallable<PremiumTrialRequest, PremiumTrialResponse>(
       functions,
       "startPremiumTrial",
