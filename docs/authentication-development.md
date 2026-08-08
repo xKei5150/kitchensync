@@ -257,3 +257,43 @@ gh secret set --repo xKei5150/kitchensync KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_DE
 
 Rotate or update these secrets whenever the FlutterFire configuration changes.
 Keep the source files ignored; do not commit them.
+
+## Production Authentication Handoff (2026-08-08)
+
+The production Firebase project, Functions, Rules, Storage bucket, App Check
+configs, Hosting site, runtime identities, and Secret Manager values were
+provisioned and deployed on 2026-08-08. Firebase Authentication itself still
+returns `CONFIGURATION_NOT_FOUND` through the public Identity Toolkit API until
+an owner initializes it in the Firebase Console. This cannot be bootstrapped by
+the Firebase CLI or public REST API.
+
+Complete these actions with the production Firebase/Apple owner before inviting
+end users:
+
+1. In Firebase Console for `kitchensync-prod-8d6fd`, open **Authentication**
+   and select **Get started**. Enable Email/Password and Google, select the
+   production support email, and confirm the automatically created Google Web
+   OAuth client. The Android upload SHA-1/SHA-256 and debug SHA-1 were already
+   registered through Firebase CLI for Android app
+   `1:310529205684:android:070ee629e4a4a4c0763ee1`.
+2. In Apple Developer, enable Sign in with Apple and Push Notifications for
+   `com.example.kitchensync`, create the required Service ID and APNs key, then
+   configure the Apple provider and APNs credentials in Firebase Authentication
+   / Cloud Messaging. Add the real `DEVELOPMENT_TEAM` and distribution signing
+   identity to the iOS release configuration.
+3. Refresh the ignored prod mobile configs after Google/Apple setup, verify that
+   the Android config now contains OAuth clients, and update the CI secret:
+
+   ```sh
+   make firebase-native-config-prod
+   jq '[.client[].oauth_client[]?] | length' android/app/google-services.json
+   gh secret set --repo xKei5150/kitchensync \
+     KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_PROD < android/app/google-services.json
+   ```
+
+4. Execute real Google and Apple consent canaries on release-signed devices.
+   Then create a real production staff identity and run the App Check,
+   callable-origin, and revoked-token canaries in the admin deployment runbook.
+
+Do not mark Google/Apple authentication or iOS distribution verified before
+these external provider actions complete.
