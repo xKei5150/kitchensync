@@ -397,3 +397,49 @@ Repository-history purge is a separate risk decision and may be performed only
 through an explicitly approved, coordinated process. This runbook records the
 required response; it does not assert that inventory, rotation, revocation, or
 history rewriting has occurred.
+
+
+## Production rollout (rehearsed)
+
+The production deployment path is now wired end to end and rehearsed against
+`kitchensync-prod-8d6fd`. Billing, Secret Manager, runtime service accounts, the
+admin Hosting target, and the planner Cloud Run wiring were provisioned on
+**2026-08-08**. This section documents the exact commands; it is not itself a
+release record — a release still requires the target-environment verification
+and release-record steps above.
+
+Run the production Firebase rollout from the repository root. It requires an
+explicit confirmation flag (fail-closed: no flag, no deploy), prints each gate
+result, and deploys in order Firestore Rules, Firestore Indexes, Storage Rules,
+Functions, then the admin Hosting site:
+
+```sh
+tools/firebase-gates/rollout-prod.sh --confirm-prod
+```
+
+The equivalent Makefile target:
+
+```sh
+make firebase-rollout-prod
+```
+
+The backend-only subset (Functions + Firestore Rules/Indexes, no Hosting) is:
+
+```sh
+make firebase-deploy-prod-backend
+```
+
+The shopping allocation planner (Cloud Run service plus `planShoppingAllocation`
+wiring) has its own idempotent deploy script and Makefile target:
+
+```sh
+make deploy-planner-prod          # or: bash tools/deploy-planner-prod.sh
+```
+
+All production deploys pin `--project kitchensync-prod-8d6fd` and use
+`--config firebase.prod.json` so the production Hosting CSP and Rules sources are
+guaranteed. CI exposes a manual-only `deploy-prod` workflow (workflow_dispatch;
+requires the `FIREBASE_TOKEN` secret) that runs
+`tools/firebase-gates/rollout-prod.sh --confirm-prod` after the test jobs pass.
+The Makefile and verifier still reject accidental/default prod use: prod deploys
+are reachable only through the explicitly named prod targets.

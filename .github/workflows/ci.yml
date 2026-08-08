@@ -5,6 +5,10 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Manual-only trigger for the deploy-prod job (production rollout). Never
+  # auto-fires on push/PR; the deploy-prod job gates itself on
+  # github.event_name == 'workflow_dispatch'.
+  workflow_dispatch:
 
 jobs:
   admin-web:
@@ -141,3 +145,46 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: tools/firebase-gates/run-flutter-callable-android.sh emulator-5554
+
+
+  deploy-prod:
+    # Manual-only production rollout. Never runs on push/PR; it is triggered
+    # explicitly from the Actions UI / API (workflow_dispatch) and waits for all
+    # test jobs to pass first.
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    needs: [admin-web, flutter, rules-tests, integration]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Restore production deploy configuration
+        env:
+          KITCHENSYNC_CI_FUNCTIONS_ENV_PROD: ${{ secrets.KITCHENSYNC_CI_FUNCTIONS_ENV_PROD }}
+          KITCHENSYNC_CI_ADMIN_WEB_ENV_PROD: ${{ secrets.KITCHENSYNC_CI_ADMIN_WEB_ENV_PROD }}
+        run: |
+          set -eu
+          umask 077
+          printf '%s' "$KITCHENSYNC_CI_FUNCTIONS_ENV_PROD" > functions/.env.kitchensync-prod-8d6fd
+          printf '%s' "$KITCHENSYNC_CI_ADMIN_WEB_ENV_PROD" > apps/admin-web/.env.production
+      - name: Install Functions dependencies
+        run: npm --prefix functions ci
+      - name: Build Functions
+        run: npm --prefix functions run build
+      - name: Install admin web dependencies
+        run: npm --prefix apps/admin-web ci
+      - name: Build admin web (Hosting dist)
+        run: npm --prefix apps/admin-web run build
+      - name: Run production rollout
+        env:
+          # Credentials / configuration must be added in the repo settings
+          # (Settings > Secrets and variables > Actions) before first use:
+          #   - FIREBASE_TOKEN: a Firebase CLI CI token with deploy rights on
+          #     kitchensync-prod-8d6fd (used by tools/firebase-gates/firebase.sh).
+          #   - KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD: production Firebase options
+          #     (same secret already used by the flutter/integration jobs).
+          # The functions runtime env file (functions/.env.kitchensync-prod-8d6fd)
+          # must be present for the functions deploy to pick up prod env vars.
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: tools/firebase-gates/rollout-prod.sh --confirm-prod

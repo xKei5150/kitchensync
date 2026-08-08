@@ -11,6 +11,13 @@
           "kitchensync-admin-dev-da503"
         ]
       }
+    },
+    "kitchensync-prod-8d6fd": {
+      "hosting": {
+        "admin": [
+          "kitchensync-admin-prod-8d6fd"
+        ]
+      }
     }
   },
   "etags": {}

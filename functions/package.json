@@ -8,7 +8,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc --noEmit && tsc -p tsconfig.build.json",
-    "lint": "biome check .",
+    "lint": "biome check . --max-diagnostics=1000",
     "test": "vitest run test/unit",
     "account-lifecycle:backfill": "npm run build && node scripts/account-lifecycle-backfill.mjs",
     "household-command-receipts:migrate": "npm run build && node scripts/household-command-receipt-migration.mjs",

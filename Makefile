@@ -1,4 +1,4 @@
-.PHONY: get gen watch analyze test cov format clean run-dev run-prod build-dev build-prod functions-install functions-lint functions-build functions-test functions-test-emulator functions-gate rules-test integration-gate firebase-gates firebase-indexes-list firebase-deploy-dev-backend firebase-rollout-dev emulators-full emulator
+.PHONY: get gen watch analyze test cov format clean run-dev run-prod build-dev build-prod functions-install functions-lint functions-build functions-test functions-test-emulator functions-gate rules-test integration-gate firebase-gates firebase-indexes-list firebase-deploy-dev-backend firebase-rollout-dev firebase-deploy-prod-backend firebase-rollout-prod deploy-planner-dev deploy-planner-prod firebase-native-config-dev firebase-native-config-prod emulators-full emulator
 
 get:
 	flutter pub get
@@ -31,10 +31,16 @@ run-dev:
 run-prod:
 	flutter run --dart-define=ENV=prod
 
-build-dev:
+firebase-native-config-dev:
+	bash tools/sync-firebase-native-config.sh dev
+
+firebase-native-config-prod:
+	bash tools/sync-firebase-native-config.sh prod
+
+build-dev: firebase-native-config-dev
 	flutter build apk --dart-define=ENV=dev --debug
 
-build-prod:
+build-prod: firebase-native-config-prod
 	flutter build appbundle --dart-define=ENV=prod --release
 
 functions-install:
@@ -72,6 +78,18 @@ firebase-deploy-dev-backend:
 
 firebase-rollout-dev:
 	tools/firebase-gates/rollout-dev.sh
+
+firebase-deploy-prod-backend:
+	tools/firebase-gates/firebase.sh deploy --config firebase.prod.json --project kitchensync-prod-8d6fd --only functions,firestore:rules,firestore:indexes,storage:rules
+
+firebase-rollout-prod:
+	tools/firebase-gates/rollout-prod.sh --confirm-prod
+
+deploy-planner-dev:
+	bash tools/deploy-planner-dev.sh
+
+deploy-planner-prod:
+	bash tools/deploy-planner-prod.sh
 
 emulators-full:
 	tools/firebase-gates/firebase.sh --config firebase.dev.json emulators:start --only auth,firestore,functions,storage --project kitchensync-dev-da503

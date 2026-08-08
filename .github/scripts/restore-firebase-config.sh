@@ -5,7 +5,7 @@ set +x
 umask 077
 
 usage() {
-  printf 'Usage: %s <flutter-only|android-integration>\n' "$0" >&2
+  printf 'Usage: %s <flutter-only|android-integration|android-prod-release>\n' "$0" >&2
 }
 
 if [[ $# -ne 1 ]]; then
@@ -27,6 +27,13 @@ case "$mode" in
       KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV
       KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD
       KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_DEV
+    )
+    ;;
+  android-prod-release)
+    required_secrets=(
+      KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV
+      KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD
+      KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_PROD
     )
     ;;
   *)
@@ -63,4 +70,8 @@ write_secret KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD lib/firebase_options_prod.dart
 
 if [[ "$mode" == android-integration ]]; then
   write_secret KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_DEV android/app/google-services.json
+fi
+
+if [[ "$mode" == android-prod-release ]]; then
+  write_secret KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_PROD android/app/google-services.json
 fi

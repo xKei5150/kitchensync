@@ -24,13 +24,21 @@ const expectedHumanCallableNames = [
   "adminUserGet",
   "adminHouseholdGet",
   "adminEntitlementGet",
+  "accountDeletionPreflight",
+  "requestAccountDeletion",
+  "leaveJointHousehold",
+  "createJointHouseholdWithTrialTransfer",
+  "transferJointHouseholdOwnership",
 ]
 const expectedInviteCallableNames = [
   "issueHouseholdInvite",
   "redeemHouseholdInvite",
   "revokeHouseholdInvite",
 ]
-const expectedScheduledWorkerNames = ["cleanupTerminalInviteMetadataDaily"]
+const expectedScheduledWorkerNames = [
+  "cleanupTerminalInviteMetadataDaily",
+  "processAccountDeletionRequestsEveryFifteenMinutes",
+]
 const hostingEnvironments = {
   dev: {
     functionsOrigin: "https://us-central1-kitchensync-dev-da503.cloudfunctions.net",
@@ -69,6 +77,23 @@ function json(relativePath) {
     const message = error instanceof Error ? error.message : String(error)
     throw new Error(`${relativePath} is not valid JSON (${message})`)
   }
+}
+
+function makefileTargets(makefile) {
+  const targets = {}
+  let current = null
+  for (const line of makefile.split("\n")) {
+    const match = line.match(/^([A-Za-z0-9_.-]+):/)
+    if (match) {
+      current = match[1]
+      targets[current] = []
+      continue
+    }
+    if (current !== null && line.startsWith("\t")) {
+      targets[current].push(line.trim())
+    }
+  }
+  return targets
 }
 
 function exactIndex(collectionGroup, fields) {
@@ -382,17 +407,25 @@ check("current Functions exports use Node 22 and us-central1", () => {
   for (const name of expectedScheduledWorkerNames) {
     assert(!callables.has(name), `${name} must be a scheduled worker, not a callable`)
   }
+  // Every *CallableSecurity alias must itself derive from the shared callableSecurity.
+  for (const match of functionsSource.matchAll(
+    /const\s+(\w+CallableSecurity)\s*=\s*\{\s*\.\.\.([A-Za-z]+)\s*,/g,
+  )) {
+    assert(
+      match[2] === "callableSecurity",
+      `${match[1]} must spread the shared callableSecurity options`,
+    )
+  }
   for (const name of expectedHumanCallableNames.filter(
     (name) => !name.startsWith("admin") && !expectedInviteCallableNames.includes(name),
   )) {
     assert(
       new RegExp(
-        `export\\s+const\\s+${name}\\s*=\\s*onCall\\s*\\(\\s*(?:callableSecurity\\s*,|\\{\\s*\\.\\.\\.callableSecurity\\s*,)`,
+        `export\\s+const\\s+${name}\\s*=\\s*onCall\\s*\\(\\s*(?:\\w*[cC]allableSecurity\\w*\\s*,|\\{\\s*\\.\\.\\.callableSecurity\\s*,)`,
       ).test(functionsSource),
       `${name} must use the shared callable security options`,
     )
-  }
-  assert(
+  }  assert(
     /const\s+inviteCallableSecurity\s*=\s*\{\s*\.\.\.callableSecurity\s*,\s*serviceAccount\s*:\s*inviteRuntimeServiceAccount\s*,?\s*\}/.test(
       functionsSource,
     ),
@@ -485,6 +518,9 @@ check("Make exposes reproducible Firebase gates", () => {
     "firebase-indexes-list:",
     "firebase-deploy-dev-backend:",
     "firebase-rollout-dev:",
+    "firebase-deploy-prod-backend:",
+    "firebase-rollout-prod:",
+    "deploy-planner-prod:",
   ]) {
     assert(makefile.includes(target), `Makefile is missing ${target}`)
   }
@@ -497,7 +533,29 @@ check("Make exposes reproducible Firebase gates", () => {
     makefile.includes('tools/firebase-gates/run-flutter-callable-android.sh "$(ANDROID_DEVICE_ID)"'),
     "Make integration gate must require an explicit Android device",
   )
-  assert(!/firebase[^\n]*deploy[^\n]*(prod|kitchensync-prod)/.test(makefile), "Makefile must not deploy prod")
+  // Production deploys are permitted only through explicitly-named prod targets.
+  // Any other target that references the prod project in a deploy/rollout receipt
+  // is an accidental/default prod use and must be rejected.
+  const prodOnlyTargets = new Set([
+    "firebase-deploy-prod-backend",
+    "firebase-rollout-prod",
+    "deploy-planner-prod",
+  ])
+  const prodRef = /kitchensync-prod-8d6fd/
+  for (const [name, recipes] of Object.entries(makefileTargets(makefile))) {
+    const referencesProd = recipes.some((recipe) => prodRef.test(recipe))
+    assert(
+      !referencesProd || prodOnlyTargets.has(name),
+      `Make target ${name} must not deploy/rollout prod; use an explicit prod target`,
+    )
+  }
+  for (const name of ["firebase-deploy-dev-backend", "firebase-rollout-dev"]) {
+    const recipes = makefileTargets(makefile)[name] ?? []
+    assert(
+      !recipes.some((recipe) => prodRef.test(recipe)),
+      `Make dev target ${name} must not reference the prod project`,
+    )
+  }
 })
 
 check("rollout script is fail closed", () => {
@@ -526,6 +584,39 @@ check("rollout script is fail closed", () => {
   assert(
     source("tools/firebase-gates/firebase.sh").includes("firebase-tools@15.18.0"),
     "Firebase CLI wrapper must pin firebase-tools@15.18.0",
+  )
+})
+
+check("prod rollout script is fail closed and requires confirmation", () => {
+  const rollout = source("tools/firebase-gates/rollout-prod.sh")
+  assert(rollout.includes("set -eu"), "prod rollout must stop on errors")
+  assert(rollout.includes("kitchensync-prod-8d6fd"), "prod rollout must pin the prod project")
+  assert(rollout.includes("--confirm-prod"), "prod rollout must require --confirm-prod")
+  assert(rollout.includes("login:list --json"), "prod rollout must verify credentials")
+  assert(rollout.includes("firebase.prod.json"), "prod rollout must use the production Firebase config")
+  const rules = rollout.indexOf("--only firestore:rules")
+  const indexes = rollout.indexOf("--only firestore:indexes")
+  const storage = rollout.indexOf("--only storage:rules")
+  const functions = rollout.indexOf("--only functions")
+  const hosting = rollout.indexOf("--only hosting:admin")
+  assert(
+    rules >= 0 && rules < indexes && indexes < storage && storage < functions && functions < hosting,
+    "prod rollout order must be Firestore Rules, Indexes, Storage Rules, Functions, Hosting",
+  )
+})
+
+check("CI prod deploy is manual-only", () => {
+  const ci = source(".github/workflows/ci.yml")
+  const onBlock = ci.slice(ci.indexOf("on:"), ci.indexOf("jobs:"))
+  assert(
+    !/^\s{2}deploy-prod:/m.test(onBlock),
+    "deploy-prod must not be a workflow trigger key; it must be manual-only",
+  )
+  assert(ci.includes("workflow_dispatch"), "CI must enable workflow_dispatch for manual runs")
+  const deployJob = ci.slice(ci.indexOf("deploy-prod:"))
+  assert(
+    /github\.event_name\s*==\s*['"]workflow_dispatch['"]/.test(deployJob),
+    "deploy-prod job must gate on workflow_dispatch",
   )
 })
 
