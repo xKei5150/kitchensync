@@ -37,7 +37,7 @@ active_project=$("$FIREBASE_BIN" use --json | jq -er '
 # All public Functions must be active before client and Rules rollout proceeds.
 # `cleanupTerminalInviteMetadataDaily` is a scheduled worker, not a callable,
 # but its runtime metadata is subject to the same Node 22/region readiness gate.
-expected_functions='["shoppingSmoke","startPremiumTrial","removeHouseholdMember","transferHouseholdAdmin","issueHouseholdInvite","redeemHouseholdInvite","revokeHouseholdInvite","completeShoppingList","cancelShoppingList","deleteShoppingList","planShoppingAllocation","mutateShoppingListItem","adminHealthGet","adminUserGet","adminHouseholdGet","adminEntitlementGet","cleanupTerminalInviteMetadataDaily"]'
+expected_functions='["shoppingSmoke","startPremiumTrial","createJointHouseholdWithTrialTransfer","accountDeletionPreflight","requestAccountDeletion","leaveJointHousehold","transferJointHouseholdOwnership","removeHouseholdMember","transferHouseholdAdmin","issueHouseholdInvite","redeemHouseholdInvite","revokeHouseholdInvite","completeShoppingList","cancelShoppingList","deleteShoppingList","planShoppingAllocation","mutateShoppingListItem","adminHealthGet","adminUserGet","adminHouseholdGet","adminEntitlementGet","cleanupTerminalInviteMetadataDaily","processAccountDeletionRequestsEveryFifteenMinutes","pushHouseholdNotification"]'
 expected_indexes=$(jq -cer '
   select((.indexes | type) == "array" and (.indexes | length > 0)) |
   select(all(.indexes[];

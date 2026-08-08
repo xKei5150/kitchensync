@@ -34,7 +34,12 @@ case "$*" in
             "completeShoppingList", "cancelShoppingList", "deleteShoppingList",
             "planShoppingAllocation", "mutateShoppingListItem", "adminHealthGet",
             "adminUserGet", "adminHouseholdGet", "adminEntitlementGet",
-            "cleanupTerminalInviteMetadataDaily"] |
+            "createJointHouseholdWithTrialTransfer", "accountDeletionPreflight",
+            "requestAccountDeletion", "leaveJointHousehold",
+            "transferJointHouseholdOwnership",
+            "cleanupTerminalInviteMetadataDaily",
+            "processAccountDeletionRequestsEveryFifteenMinutes",
+            "pushHouseholdNotification"] |
           map(select(. != $missing) | {
             id: ., region: "us-central1", platform: "gcfv2",
             runtime: "nodejs22", state: "ACTIVE"

@@ -58,6 +58,8 @@ const requiredFunctions = [
   "adminHouseholdGet",
   "adminEntitlementGet",
   "cleanupTerminalInviteMetadataDaily",
+  "processAccountDeletionRequestsEveryFifteenMinutes",
+  "pushHouseholdNotification",
 ]
 
 function assertReadinessBlocks(extra, label) {
@@ -131,9 +133,11 @@ function verifierFixture() {
     "functions/src/index.ts",
     "functions/src/callableSecurity.ts",
     "functions/src/admin/callables.ts",
+    "functions/src/notifications.ts",
     ".github/workflows/ci.yml",
     "Makefile",
     "tools/firebase-gates/rollout-dev.sh",
+    "tools/firebase-gates/rollout-prod.sh",
     "tools/firebase-gates/firebase.sh",
     "apps/admin-web/package.json",
     "apps/admin-web/src",
@@ -194,7 +198,7 @@ function testVerifierRejectsStaleCallableAndHostingContracts() {
       const index = resolve(fixture, "functions/src/index.ts")
       writeFileSync(
         index,
-        readFileSync(index, "utf8").replace("  ...callableSecurity,\n", ""),
+        readFileSync(index, "utf8").replace("const inviteCallableSecurity = {\n  ...callableSecurity,\n", "const inviteCallableSecurity = {\n"),
       )
     },
     "invite wrapper without shared callable security inheritance",
