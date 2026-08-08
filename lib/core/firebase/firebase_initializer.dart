@@ -23,14 +23,25 @@ class AppCheckProviderSettings {
   final AppleProvider appleProvider;
 }
 
-class FirebaseInitializer {
-  const FirebaseInitializer();
+typedef FirebaseStartupTask = Future<void> Function();
 
-  /// Performs only the local setup required before Flutter renders.
+class FirebaseInitializer {
+  const FirebaseInitializer({
+    this.appCheckActivation,
+    this.crashlyticsSetup,
+    this.analyticsSetup,
+  });
+
+  final FirebaseStartupTask? appCheckActivation;
+  final FirebaseStartupTask? crashlyticsSetup;
+  final FirebaseStartupTask? analyticsSetup;
+
+  /// Performs setup required before Flutter renders.
   ///
-  /// Firebase telemetry and deferred authentication setup can wait on remote
-  /// services. They must not keep the native launch view on screen when a
-  /// Firebase project is unavailable or misconfigured.
+  /// App Check is part of this awaited security bootstrap. Firebase telemetry
+  /// and deferred authentication setup can wait on remote services. They must
+  /// not keep the native launch view on screen when a Firebase project is
+  /// unavailable or misconfigured.
   Future<void> bootstrap(AppEnv env) async {
     const requestedEmulator = bool.fromEnvironment('USE_EMULATOR');
     final useEmulator = shouldUseFirebaseEmulator(
@@ -54,6 +65,8 @@ class FirebaseInitializer {
       );
       rethrow;
     }
+
+    await bootstrapSecurity(useEmulator: useEmulator);
 
     if (!useEmulator) return;
 
@@ -80,6 +93,33 @@ class FirebaseInitializer {
     );
   }
 
+  /// Activates attested App Check before the app exposes Firebase services.
+  ///
+  /// Emulator builds deliberately skip activation because they use local
+  /// Firebase services and must not request a device attestation token.
+  @visibleForTesting
+  Future<void> bootstrapSecurity({required bool useEmulator}) async {
+    if (useEmulator) return;
+
+    try {
+      final appCheckActivation = this.appCheckActivation;
+      if (appCheckActivation != null) {
+        await appCheckActivation();
+      } else {
+        final appCheckProviders = appCheckProviderSettingsFor(
+          isDebugMode: kDebugMode,
+        );
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: appCheckProviders.androidProvider,
+          appleProvider: appCheckProviders.appleProvider,
+        );
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Firebase App Check startup failed: $error\n$stackTrace');
+      rethrow;
+    }
+  }
+
   /// Completes network-dependent startup after the first frame is available.
   Future<void> finishInitialization(AppEnv env) async {
     const requestedEmulator = bool.fromEnvironment('USE_EMULATOR');
@@ -88,8 +128,13 @@ class FirebaseInitializer {
       isDebugMode: kDebugMode,
     );
 
+    if (useEmulator) return;
+
     try {
-      if (!useEmulator) {
+      final crashlyticsSetup = this.crashlyticsSetup;
+      if (crashlyticsSetup != null) {
+        await crashlyticsSetup();
+      } else {
         await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
           !kDebugMode,
         );
@@ -105,23 +150,22 @@ class FirebaseInitializer {
           'app_check_provider',
           kDebugMode ? 'debug' : 'attested',
         );
+      }
+    } catch (error, stackTrace) {
+      // Crashlytics is deferred telemetry and must not block other startup.
+      debugPrint('Deferred Crashlytics startup failed: $error\n$stackTrace');
+    }
 
-        // The debug provider is useful for local device debugging, but it is
-        // never selected by a profile or release build. Production-like builds
-        // use Firebase's platform attestation providers instead.
-        final appCheckProviders = appCheckProviderSettingsFor(
-          isDebugMode: kDebugMode,
-        );
-        await FirebaseAppCheck.instance.activate(
-          androidProvider: appCheckProviders.androidProvider,
-          appleProvider: appCheckProviders.appleProvider,
-        );
-
+    try {
+      final analyticsSetup = this.analyticsSetup;
+      if (analyticsSetup != null) {
+        await analyticsSetup();
+      } else {
         await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
       }
     } catch (error, stackTrace) {
-      // A telemetry or Firebase configuration failure is recoverable at boot.
-      debugPrint('Deferred Firebase startup failed: $error\n$stackTrace');
+      // Analytics is deferred telemetry and must not block app startup.
+      debugPrint('Deferred Analytics startup failed: $error\n$stackTrace');
     }
   }
 

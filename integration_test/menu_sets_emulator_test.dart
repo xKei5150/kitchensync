@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,15 +41,17 @@ void main() {
       final db = FirebaseFirestore.instance;
       await withTimeout('clear menu set auth session', auth.signOut);
 
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1;
-      // The iOS Simulator's software keyboard reports a viewInsets bottom near
-      // the full viewport height, collapsing sheets and dropping their fields
-      // out of the widget tree entirely.
-      tester.view.viewInsets = FakeViewPadding.zero;
-      addTearDown(tester.view.resetViewInsets);
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      if (defaultTargetPlatform != TargetPlatform.android) {
+        tester.view.physicalSize = const Size(393, 852);
+        tester.view.devicePixelRatio = 1;
+        // The iOS Simulator's software keyboard reports a viewInsets bottom
+        // near the full viewport height, collapsing sheets and their fields.
+        tester.view.viewInsets = FakeViewPadding.zero;
+        addTearDown(tester.view.resetViewInsets);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+      }
+      await binding.convertFlutterSurfaceToImage();
 
       final suffix = DateTime.now().microsecondsSinceEpoch;
       const password = 'KitchenSync-123!';
@@ -460,6 +463,12 @@ Future<void> _tapRecipe(WidgetTester tester) async {
     await tester.pump(const Duration(milliseconds: 100));
   }
   expect(recipe, findsWidgets);
+  // The native Android IME remains visible after entering the draft fields and
+  // covers the recipe tray. Dismiss it before tapping the production control;
+  // this keeps the same user action rather than dispatching a missed pointer.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.ensureVisible(recipe.last);
   await tester.tap(recipe.last);
   await tester.pump();
 }

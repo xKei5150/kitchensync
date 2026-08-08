@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +10,25 @@ import 'package:kitchensync/core/firebase/firebase_emulator_settings.dart';
 import 'package:kitchensync/core/firebase/firebase_initializer.dart';
 import 'package:kitchensync/core/session/debug_household_session.dart';
 import 'package:kitchensync/features/ingredient_dictionary/domain/services/search_tokenizer.dart';
+
+/// Enables device coverage that invokes the secret-backed invite callables.
+///
+/// The checked-in mobile emulator runner deliberately does not inject the two
+/// Functions runtime secrets. Device App Check also cannot be attested by the
+/// local emulator, so this coverage is opt-in only when the Functions emulator
+/// is running under its emulator App Check exception with non-production local
+/// values for both secrets.
+const trustedInviteCallableDeviceTestsEnabled = bool.fromEnvironment(
+  'TRUSTED_INVITE_CALLABLE_DEVICE_TESTS',
+);
+
+const trustedInviteCallableDeviceTestPrerequisite =
+    'Requires a Functions emulator with non-production local '
+    'INVITE_TOKEN_HMAC_KEY and INVITE_RATE_LIMIT_KEY values injected. The '
+    'checked-in device harness deliberately does not provision those secrets, '
+    'and device App Check cannot be truthfully attested locally; run only '
+    "under the callable's emulator App Check exception with "
+    '--dart-define=TRUSTED_INVITE_CALLABLE_DEVICE_TESTS=true.';
 
 /// Runs `body`, throwing a labelled error if it does not complete within
 /// `seconds`. Integration tests that talk to the emulator must never hang
@@ -169,12 +187,18 @@ Future<void> seedEmulatorTestHouseholdThroughAdmin(String uid) async {
   if (!useEmulator || !kDebugMode) {
     throw StateError('Emulator test fixtures require a debug emulator build.');
   }
-  final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
-  final existingUser = await withTimeout(
-    'read emulator test profile',
-    userRef.get,
-  );
-  if (existingUser.data()?['createdSoloHouseholdId'] == householdId) return;
+  // Fixture arrangement must not depend on a first Firestore SDK request from
+  // the freshly launched iOS app. The emulator can accept its REST readiness
+  // probe before an iOS SDK channel completes its first gRPC request, which
+  // made the first target in a sweep intermittently fail with `unavailable`.
+  // The fixture itself is deliberately written through the trusted owner
+  // surface, so use that same surface for this idempotence check.
+  if (await withTimeout(
+    'read emulator test profile through emulator admin',
+    () => firestoreDocumentExistsThroughEmulatorAdmin('users/$uid'),
+  )) {
+    return;
+  }
 
   final now = DateTime.now().toUtc();
   await withTimeout(

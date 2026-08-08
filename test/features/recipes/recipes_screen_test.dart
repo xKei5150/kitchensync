@@ -393,6 +393,32 @@ List<Recipe> _publicRecipes() {
   ];
 }
 
+Recipe _publicRecipeForAuthor({
+  required String id,
+  required String authorUserId,
+  required String name,
+}) {
+  final now = DateTime(2026, 7, 5);
+  return Recipe(
+    id: id,
+    authorUserId: authorUserId,
+    householdId: 'creator-household',
+    name: name,
+    description: 'Public recipe',
+    defaultServingSize: 4,
+    mealTimeTags: const ['Dinner'],
+    recipeTags: const ['Test'],
+    priceEstimate: 200,
+    location: 'Manila',
+    visibility: RecipeVisibility.public,
+    monetization: RecipeMonetization.free,
+    createdAt: now,
+    updatedAt: now,
+    ingredients: const [],
+    instructions: const ['Cook.'],
+  );
+}
+
 void main() {
   test(
     'RecipeSearchController rejects premium filters for free households',
@@ -468,6 +494,44 @@ void main() {
     expect(find.text('Expensive Roast'), findsNothing);
     expect(find.byType(KsRecipeCard), findsNWidgets(2));
   });
+
+  testWidgets(
+    'Discover labels anonymized and known authors without leaking the sentinel',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final repo = _FakeRecipeRepository([
+        _publicRecipeForAuthor(
+          id: 'anonymous-recipe',
+          authorUserId: 'anonymous',
+          name: 'Anonymous Soup',
+        ),
+        _publicRecipeForAuthor(
+          id: 'named-recipe',
+          authorUserId: 'mira',
+          name: 'Mira Curry',
+        ),
+        _publicRecipeForAuthor(
+          id: 'current-user-recipe',
+          authorUserId: 'demo-user',
+          name: 'My Stew',
+        ),
+      ]);
+      addTearDown(repo.dispose);
+
+      await tester.pumpWidget(
+        await _wrap(const RecipesScreen(), recipeRepository: repo),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('by Anonymous Kitchen'), findsOneWidget);
+      expect(find.text('by anonymous'), findsNothing);
+      expect(find.text('by mira'), findsOneWidget);
+      expect(find.text('by You'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'RecipesScreen saves a public recipe as a local My Recipes copy',

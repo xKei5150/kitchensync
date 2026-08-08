@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,19 +32,15 @@ void main() {
       final db = FirebaseFirestore.instance;
       await withTimeout('clear day lifecycle auth session', auth.signOut);
 
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1;
-      // Pin the keyboard inset. Focusing a field makes the iOS Simulator raise
-      // its software keyboard, which reports a viewInsets bottom of 837-1000pt
-      // against an 852pt viewport; any sheet that pads by
-      // MediaQuery.viewInsets.bottom then collapses and its fields leave the
-      // widget tree entirely (observed: textFields=0). That depends on whether
-      // a hardware keyboard happens to be connected to the simulator, which is
-      // ambient machine state, not behaviour under test.
-      tester.view.viewInsets = FakeViewPadding.zero;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      addTearDown(tester.view.resetViewInsets);
+      if (defaultTargetPlatform != TargetPlatform.android) {
+        tester.view.physicalSize = const Size(393, 852);
+        tester.view.devicePixelRatio = 1;
+        tester.view.viewInsets = FakeViewPadding.zero;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewInsets);
+      }
+      await binding.convertFlutterSurfaceToImage();
 
       final suffix = DateTime.now().microsecondsSinceEpoch;
       const password = 'KitchenSync-123!';
@@ -182,11 +179,11 @@ void main() {
       await binding.takeScreenshot('day-lifecycle-merged');
 
       await tester.tap(find.text('Servings'));
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
       await tester.enterText(find.widgetWithText(TextField, 'Servings'), '6');
       await tester.tap(find.widgetWithText(FilledButton, 'Save'));
       await _waitForField(_mealRef(db, householdId, mealId), 'servingSize', 6);
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
 
       await tester.tap(find.text('Swap'));
       await _waitForText(tester, 'Change scheduled dish');
@@ -197,7 +194,7 @@ void main() {
         curryId,
       );
       await _waitForField(_mealRef(db, householdId, mealId), 'servingSize', 3);
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
 
       await tester.ensureVisible(find.text('Cook next'));
       await tester.tap(find.text('Cook next'));
@@ -238,7 +235,7 @@ void main() {
       await _waitForText(tester, 'Save leftovers');
 
       await tester.tap(find.text('Save leftovers'));
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
       await tester.enterText(
         find.widgetWithText(TextField, 'Leftover servings'),
         '2',
@@ -261,14 +258,14 @@ void main() {
       await binding.takeScreenshot('day-lifecycle-leftover-actions');
 
       await tester.tap(find.text('Schedule leftover'));
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
       await tester.tap(find.text('OK'));
       await _waitForField(
         _mealRef(db, householdId, 'leftover-meal-leftover-1'),
         'date',
         '2026-07-07',
       );
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
 
       await tester.tap(find.text('Mark eaten'));
       await _waitForField(leftoverRef, 'quantity', 0.0);
@@ -348,7 +345,7 @@ void main() {
       );
       await _waitForText(tester, 'Not now');
       await tester.tap(find.text('Not now'));
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
       expect(find.text('Missing pantry items'), findsNothing);
 
       final shoppingLists = await withTimeout(

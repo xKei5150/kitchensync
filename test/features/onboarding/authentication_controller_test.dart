@@ -1,6 +1,15 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/features/onboarding/presentation/controllers/authentication_controller.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockFirebaseAuth extends Mock implements FirebaseAuth {}
+
+class _MockUser extends Mock implements User {}
+
+class _MockUserInfo extends Mock implements UserInfo {}
 
 void main() {
   group('email validation', () {
@@ -26,13 +35,13 @@ void main() {
       );
     });
 
-    test('registration requires a long enough mixed password', () {
+    test('registration requires a 12-character mixed password', () {
       expect(
         validatePassword(value: 'short1', isRegistration: true),
-        'Use at least 8 characters.',
+        'Use at least 12 characters.',
       );
       expect(
-        validatePassword(value: 'onlyletters', isRegistration: true),
+        validatePassword(value: 'abcdefghijkl', isRegistration: true),
         'Include at least one letter and one number.',
       );
       expect(
@@ -55,10 +64,48 @@ void main() {
     );
   });
 
-  group('Firebase email and provider errors', () {
-    FirebaseAuthException firebaseError(String code) => FirebaseAuthException(
-      code: code,
+  test(
+    'waits for the authoritative Firebase signed-out stream event',
+    () async {
+      final auth = _MockFirebaseAuth();
+      final states = StreamController<User?>.broadcast();
+      addTearDown(states.close);
+      when(auth.authStateChanges).thenAnswer((_) => states.stream);
+
+      final wait = AuthenticationController(
+        auth: auth,
+        googleSignIn: null,
+      ).waitForSignedOut();
+      await Future<void>.delayed(Duration.zero);
+
+      states.add(null);
+      await wait;
+      verify(auth.authStateChanges).called(1);
+    },
+  );
+
+  test('provider reauthentication rejects an unlinked identity', () {
+    final auth = _MockFirebaseAuth();
+    final user = _MockUser();
+    final password = _MockUserInfo();
+    when(() => password.providerId).thenReturn('password');
+    when(() => auth.currentUser).thenReturn(user);
+    when(() => user.providerData).thenReturn([password]);
+    final controller = AuthenticationController(auth: auth, googleSignIn: null);
+
+    expect(
+      controller.reauthenticateWithGoogle(),
+      throwsA(isA<AuthenticationConfigurationException>()),
     );
+    expect(
+      controller.reauthenticateWithApple(),
+      throwsA(isA<AuthenticationConfigurationException>()),
+    );
+  });
+
+  group('Firebase email and provider errors', () {
+    FirebaseAuthException firebaseError(String code) =>
+        FirebaseAuthException(code: code);
 
     test('maps invalid credentials, duplicate emails, and weak passwords', () {
       expect(

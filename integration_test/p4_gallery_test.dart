@@ -20,13 +20,20 @@ import '_gallery_harness.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('P4 accessibility states render on-device', (tester) async {
-    final light = await bootGallery(tester, binding, theme: AppTheme.light());
+  Future<void> verifyP4(
+    WidgetTester tester, {
+    required ThemeData theme,
+    required String mode,
+    required bool includeFormStates,
+  }) async {
+    final light = await bootGallery(tester, binding, theme: theme);
     await light.visit(
       '/dev/a11y-states',
       expect: find.byType(AccessibilityStatesScreen),
-      screenshot: '01-a11y-states-light',
+      screenshot: '01-a11y-states-$mode',
     );
+
+    if (!includeFormStates) return;
 
     // Submitting an empty form is what surfaces the error summary, the
     // per-field danger treatment, and the inline messages this gallery exists
@@ -34,11 +41,11 @@ void main() {
     await light.visit(
       '/pantry/add',
       expect: find.byType(AddPantryItemScreen),
-      screenshot: '02-add-pantry-light',
+      screenshot: '02-add-pantry-$mode',
     );
     await light.tapAndCapture(
       find.widgetWithText(FilledButton, 'Add to pantry'),
-      screenshot: '03-add-pantry-errors-light',
+      screenshot: '03-add-pantry-errors-$mode',
       // Without this the shot is just the clean form again if the submit
       // button is disabled — the same vacuity this rewrite exists to remove.
       expectAfter: find.byType(KsErrorSummary),
@@ -47,19 +54,33 @@ void main() {
     await light.visit(
       '/ingredient/create',
       expect: find.byType(CreateCustomIngredientScreen),
-      screenshot: '04-create-ingredient-light',
+      screenshot: '04-create-ingredient-$mode',
     );
     await light.tapAndCapture(
       find.widgetWithText(FilledButton, 'Create ingredient'),
-      screenshot: '05-create-ingredient-errors-light',
+      screenshot: '05-create-ingredient-errors-$mode',
       expectAfter: find.byType(KsErrorSummary),
     );
+  }
 
-    final dark = await bootGallery(tester, binding, theme: AppTheme.dark());
-    await dark.visit(
-      '/dev/a11y-states',
-      expect: find.byType(AccessibilityStatesScreen),
-      screenshot: '06-a11y-states-dark',
+  // See P3/P5: the Android integration binding only allows one Flutter-surface
+  // image conversion per test process. Separate theme passes preserve all
+  // navigation and error-state assertions without a second conversion.
+  testWidgets('P4 accessibility states render in light mode', (tester) {
+    return verifyP4(
+      tester,
+      theme: AppTheme.light(),
+      mode: 'light',
+      includeFormStates: true,
+    );
+  });
+
+  testWidgets('P4 accessibility states render in dark mode', (tester) {
+    return verifyP4(
+      tester,
+      theme: AppTheme.dark(),
+      mode: 'dark',
+      includeFormStates: false,
     );
   });
 }

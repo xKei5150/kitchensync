@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:kitchensync/app/theme.dart';
@@ -19,36 +20,54 @@ import '_gallery_harness.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('P3 forms and accessibility surfaces render on-device', (
-    tester,
-  ) async {
-    final light = await bootGallery(tester, binding, theme: AppTheme.light());
+  Future<void> verifyP3(
+    WidgetTester tester, {
+    required ThemeData theme,
+    required String mode,
+    required bool includeAudit,
+  }) async {
+    final light = await bootGallery(tester, binding, theme: theme);
     await light.visit(
       '/pantry/add',
       expect: find.byType(AddPantryItemScreen),
-      screenshot: '01-add-pantry-light',
+      screenshot: '01-add-pantry-$mode',
     );
     await light.visit(
       '/ingredient/create',
       expect: find.byType(CreateCustomIngredientScreen),
-      screenshot: '02-create-ingredient-light',
+      screenshot: '02-create-ingredient-$mode',
     );
-    await light.visit(
-      '/dev/a11y',
-      expect: find.byType(AccessibilityAuditScreen),
-      screenshot: '03-accessibility-audit',
-    );
+    if (includeAudit) {
+      await light.visit(
+        '/dev/a11y',
+        expect: find.byType(AccessibilityAuditScreen),
+        screenshot: '03-accessibility-audit',
+      );
+    }
+  }
 
-    final dark = await bootGallery(tester, binding, theme: AppTheme.dark());
-    await dark.visit(
-      '/pantry/add',
-      expect: find.byType(AddPantryItemScreen),
-      screenshot: '04-add-pantry-dark',
+  // Android's IntegrationTest binding permits converting its surface to an
+  // image once per process. A gallery boot owns that conversion and a live
+  // Firebase ProviderContainer, so theme passes must be independent widget
+  // tests rather than two boots in the same test body. This retains every
+  // destination assertion while making the target portable to Android.
+  testWidgets('P3 forms and accessibility surfaces render in light mode', (
+    tester,
+  ) {
+    return verifyP3(
+      tester,
+      theme: AppTheme.light(),
+      mode: 'light',
+      includeAudit: true,
     );
-    await dark.visit(
-      '/ingredient/create',
-      expect: find.byType(CreateCustomIngredientScreen),
-      screenshot: '05-create-ingredient-dark',
+  });
+
+  testWidgets('P3 forms render in dark mode', (tester) {
+    return verifyP3(
+      tester,
+      theme: AppTheme.dark(),
+      mode: 'dark',
+      includeAudit: false,
     );
   });
 }

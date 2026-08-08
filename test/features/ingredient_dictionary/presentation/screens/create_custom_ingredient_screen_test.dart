@@ -44,7 +44,6 @@ class _CapturingIngredientRepository implements IngredientRepository {
   @override
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       const Stream<List<Ingredient>>.empty();
-
 }
 
 void main() {
@@ -298,5 +297,101 @@ void main() {
     expect(repository.updated.single.id, ingredient.id);
     expect(repository.updated.single.defaultPurchaseIntervalDays, 14);
     expect(repository.updated.single.pricePerUnitHint, 2.25);
+  });
+
+  // The document id encodes the normalized name, and an edit reuses the id.
+  // Persisting a rename would strand the document under an id that decodes to
+  // the old name, which ResolveOrCreateIngredient then resolves to a permanent
+  // Failure.conflict.
+  testWidgets('refuses a rename and writes nothing', (tester) async {
+    final repository = _CapturingIngredientRepository();
+    final ingredient = Ingredient(
+      id: 'custom-dGVh',
+      name: 'tea',
+      displayNames: const {'en': 'Tea'},
+      category: IngredientCategory.beverage,
+      defaultUnit: UnitId.g,
+      allowedUnits: const [UnitId.g],
+      scope: IngredientScope.householdCustom,
+      householdId: 'household-1',
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    await pump(
+      tester,
+      AppTheme.light(),
+      repository: repository,
+      initialIngredient: ingredient,
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'e.g. Sweet potato'),
+      'coffee',
+    );
+    await tapVisible(
+      tester,
+      find.widgetWithText(FilledButton, 'Create ingredient'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.updated, isEmpty);
+    expect(repository.created, isEmpty);
+
+    // The alert is the last child of a lazy ListView, so it has to be
+    // scrolled into existence before it can be found.
+    final alert = find.textContaining(
+      'Renaming an ingredient is not supported yet',
+    );
+    await tester.scrollUntilVisible(
+      alert,
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(alert, findsOneWidget);
+  });
+
+  // Case and punctuation normalize to the same identity, so they are not
+  // renames and must still save.
+  testWidgets('allows an edit that normalizes to the same name', (
+    tester,
+  ) async {
+    final repository = _CapturingIngredientRepository();
+    final ingredient = Ingredient(
+      id: 'custom-Z3JlZW4gdGVh',
+      name: 'green tea',
+      displayNames: const {'en': 'green tea'},
+      category: IngredientCategory.beverage,
+      defaultUnit: UnitId.g,
+      allowedUnits: const [UnitId.g],
+      scope: IngredientScope.householdCustom,
+      householdId: 'household-1',
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    await pump(
+      tester,
+      AppTheme.light(),
+      repository: repository,
+      initialIngredient: ingredient,
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'e.g. Sweet potato'),
+      'Green Tea',
+    );
+    await tapVisible(
+      tester,
+      find.widgetWithText(FilledButton, 'Create ingredient'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.updated.single.id, ingredient.id);
+    expect(repository.updated.single.name, 'green tea');
+    expect(repository.updated.single.displayNames['en'], 'Green Tea');
   });
 }

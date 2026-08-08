@@ -98,6 +98,7 @@ void main() {
     expect(find.text('Household & roles'), findsOneWidget);
     expect(find.text('Switch kitchen'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
+    expect(find.text('Delete account'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
   });
 

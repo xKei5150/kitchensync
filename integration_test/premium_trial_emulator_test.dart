@@ -86,11 +86,11 @@ void main() {
       ),
     );
     unawaited(router.push('/premium'));
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
 
     expect(find.text('KitchenSync Premium'), findsOneWidget);
     await tester.tap(find.text('Monthly'));
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     expect(find.textContaining('then £3.99/month'), findsOneWidget);
     await binding.takeScreenshot('premium-trial-monthly');
 
@@ -117,7 +117,7 @@ void main() {
     expect(entitlement[2].data(), containsPair('status', 'trialing'));
     expect(entitlement[2].data(), containsPair('plan', 'monthly'));
     expect(entitlement[2].data()?['trialEndsAt'], isA<Timestamp>());
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     expect(find.text('Premium trial returned to Settings'), findsOneWidget);
     await binding.takeScreenshot('premium-trial-activated');
   });

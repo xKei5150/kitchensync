@@ -61,11 +61,11 @@ class IngredientRepositoryImpl implements IngredientRepository {
 
   @override
   Future<void> createCustom(Ingredient ingredient) =>
-      _remote.writeCustom(ingredient);
+      _remote.createCustom(ingredient);
 
   @override
   Future<void> updateCustom(Ingredient ingredient) =>
-      _remote.writeCustom(ingredient);
+      _remote.updateCustom(ingredient);
 
   @override
   Future<int> upsertSeed(List<Ingredient> seed) =>

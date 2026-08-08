@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchensync/core/firebase/firestore_refs.dart';
@@ -161,6 +162,102 @@ void main() {
       expect(snapshot.docs.single.id, first.id);
     },
   );
+
+  test(
+    'updateCustom persists edits to an existing custom ingredient',
+    () async {
+      final original = _ing(
+        'custom-c3RyYXdiZXJyeQ',
+        'strawberry',
+        scope: IngredientScope.householdCustom,
+        hid: 'h1',
+      );
+      await repo.createCustom(original);
+
+      // The identity name is deliberately unchanged: the document id encodes
+      // it, and CreateCustomIngredientScreen refuses a rename for that reason.
+      final edited = original.copyWith(
+        displayNames: const {'en': 'Strawberry'},
+        category: IngredientCategory.other,
+        defaultShelfLifeDays: 5,
+        updatedAt: DateTime.utc(2026, 7, 27),
+      );
+      await repo.updateCustom(edited);
+
+      final back = await repo.getById(original.id, householdId: 'h1');
+      expect(back, isNotNull);
+      expect(back!.name, 'strawberry');
+      expect(back.displayNames['en'], 'Strawberry');
+      expect(back.category, IngredientCategory.other);
+      expect(back.defaultShelfLifeDays, 5);
+    },
+  );
+
+  // firestore.rules only permits a customIngredients update when
+  // `request.resource.data.createdAt == resource.data.createdAt`, so a write
+  // that re-stamps createdAt would be rejected by the real backend while
+  // passing against a fake.
+  test('updateCustom preserves createdAt', () async {
+    final original = _ing(
+      'custom-c3RyYXdiZXJyeQ',
+      'strawberry',
+      scope: IngredientScope.householdCustom,
+      hid: 'h1',
+    );
+    await repo.createCustom(original);
+
+    await repo.updateCustom(
+      original.copyWith(defaultShelfLifeDays: 9, updatedAt: DateTime.utc(2027)),
+    );
+
+    final raw = await db
+        .collection('households')
+        .doc('h1')
+        .collection('customIngredients')
+        .doc(original.id)
+        .get();
+    expect(
+      (raw.data()!['createdAt'] as Timestamp).toDate().toUtc(),
+      original.createdAt,
+    );
+    expect(
+      (raw.data()!['updatedAt'] as Timestamp).toDate().toUtc(),
+      DateTime.utc(2027),
+    );
+  });
+
+  test('updateCustom refuses to resurrect a deleted ingredient', () async {
+    final missing = _ing(
+      'custom-Z29uZQ',
+      'gone',
+      scope: IngredientScope.householdCustom,
+      hid: 'h1',
+    );
+
+    await expectLater(repo.updateCustom(missing), throwsStateError);
+
+    final back = await db
+        .collection('households')
+        .doc('h1')
+        .collection('customIngredients')
+        .doc(missing.id)
+        .get();
+    expect(back.exists, isFalse);
+  });
+
+  test('createCustom leaves an existing document untouched', () async {
+    final original = _ing(
+      'custom-c3RyYXdiZXJyeQ',
+      'strawberry',
+      scope: IngredientScope.householdCustom,
+      hid: 'h1',
+    );
+    await repo.createCustom(original);
+    await repo.createCustom(original.copyWith(name: 'clobbered'));
+
+    final back = await repo.getById(original.id, householdId: 'h1');
+    expect(back!.name, 'strawberry');
+  });
 
   test('upsertSeed writes all entries', () async {
     final seed = [_ing('s1', 'salt'), _ing('s2', 'pepper')];

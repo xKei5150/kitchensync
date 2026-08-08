@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:kitchensync/app/theme.dart';
@@ -21,41 +22,41 @@ import '_helpers.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('P5 system states render on-device', (tester) async {
+  Future<void> verifyP5(
+    WidgetTester tester, {
+    required ThemeData theme,
+    required String mode,
+  }) async {
     final light = await bootGallery(
       tester,
       binding,
-      theme: AppTheme.light(),
+      theme: theme,
       settle: settleFrames,
       grantPremium: true,
     );
     await light.visit(
       '/dev/system-states',
       expect: find.byType(SystemStatesScreen),
-      screenshot: '01-system-states-light',
+      screenshot: '01-system-states-$mode',
     );
     await light.visit(
       '/insights',
       expect: find.byType(InsightsScreen),
-      screenshot: '02-insights-light',
+      screenshot: '02-insights-$mode',
     );
+  }
 
-    final dark = await bootGallery(
-      tester,
-      binding,
-      theme: AppTheme.dark(),
-      settle: settleFrames,
-      grantPremium: true,
-    );
-    await dark.visit(
-      '/dev/system-states',
-      expect: find.byType(SystemStatesScreen),
-      screenshot: '03-system-states-dark',
-    );
-    await dark.visit(
-      '/insights',
-      expect: find.byType(InsightsScreen),
-      screenshot: '04-insights-dark',
-    );
+  // Each gallery owns a ProviderContainer with live Firebase streams. Keep
+  // light and dark capture in separate widget tests so Flutter tears down the
+  // first MaterialApp before the next container starts listening. Replacing a
+  // live router tree in the same build phase can otherwise synchronously notify
+  // the outgoing screen and throw `setState() or markNeedsBuild() called during
+  // build` — a gallery harness artefact, not a route being photographed.
+  testWidgets('P5 system states render on-device in light mode', (tester) {
+    return verifyP5(tester, theme: AppTheme.light(), mode: 'light');
+  });
+
+  testWidgets('P5 system states render on-device in dark mode', (tester) {
+    return verifyP5(tester, theme: AppTheme.dark(), mode: 'dark');
   });
 }

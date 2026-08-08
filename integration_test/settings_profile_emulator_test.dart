@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,8 +25,10 @@ void main() {
     // its software keyboard, reporting a viewInsets bottom of 837-1000pt, which
     // can collapse the edit form and drop "Save profile" out of the widget tree
     // before it is tapped. Whether that happens is ambient machine state.
-    tester.view.viewInsets = FakeViewPadding.zero;
-    addTearDown(tester.view.resetViewInsets);
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      tester.view.viewInsets = FakeViewPadding.zero;
+      addTearDown(tester.view.resetViewInsets);
+    }
 
     final auth = FirebaseAuth.instance;
     final user = auth.currentUser;
@@ -72,11 +75,11 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
 
     expect(find.text('Initial kitchen owner'), findsOneWidget);
     await tester.tap(find.byTooltip('Edit profile'));
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     await tester.enterText(find.byType(TextField), 'Kitchen owner');
     await tester.tap(find.text('Save profile'));
     final updated = await withTimeout(
@@ -86,12 +89,12 @@ void main() {
       ),
     );
     expect(updated.data()?['displayName'], 'Kitchen owner');
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     expect(find.text('Kitchen owner'), findsOneWidget);
     await binding.takeScreenshot('settings-live-profile');
 
     await tester.tap(find.text('Sign out'));
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     expect(auth.currentUser, isNull);
     expect(find.text('Signed out locally'), findsOneWidget);
   });

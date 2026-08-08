@@ -138,6 +138,11 @@ class SettingsScreen extends ConsumerWidget {
                   trailingText: locale.summary,
                   onTap: () => _showUnitsLocalePicker(context),
                 ),
+                _SettingsRow(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete account',
+                  onTap: () => context.push('/settings/account-deletion'),
+                ),
               ],
             ),
             const SizedBox(height: KsTokens.space20),

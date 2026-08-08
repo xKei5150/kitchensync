@@ -192,6 +192,25 @@ class _CreateCustomIngredientScreenState
       setState(() => _error = 'The default unit must be an allowed unit.');
       return;
     }
+    // A custom ingredient's document id encodes its normalized name
+    // (IngredientIdentity.customDocumentId), and an edit reuses the existing
+    // id. Persisting a rename would therefore leave a document whose id
+    // decodes to the old name — and ResolveOrCreateIngredient, which derives
+    // the id from the name it is looking for, would find that document, fail
+    // IngredientIdentity.matches, and return Failure.conflict for ever after.
+    // Renaming needs re-identification plus reference migration; until that
+    // exists, refuse rather than corrupt the identity.
+    final editing = widget.initialIngredient;
+    if (editing != null &&
+        IngredientIdentity.normalize(name) !=
+            IngredientIdentity.normalize(editing.name)) {
+      setState(
+        () => _error =
+            'Renaming an ingredient is not supported yet. Create a new '
+            'ingredient instead.',
+      );
+      return;
+    }
     setState(() {
       _submitting = true;
       _validated = true;

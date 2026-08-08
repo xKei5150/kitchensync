@@ -523,11 +523,11 @@ Future<void> _exerciseSuggestionHome(
   await binding.takeScreenshot('$platform-suggestion-accepted');
 
   router.pop();
-  await tester.pumpAndSettle();
+  await settleOrAdvance(tester);
   final ignoreSuggestion = find.byTooltip('Ignore suggestion');
   await _waitForSettledState(tester, ignoreSuggestion);
   await tester.ensureVisible(ignoreSuggestion);
-  await tester.pumpAndSettle();
+  await settleOrAdvance(tester);
   await tester.tap(ignoreSuggestion);
   await _waitForSettledState(tester, find.text('Suggested list ignored'));
   expect(find.text('Suggested list ignored'), findsOneWidget);

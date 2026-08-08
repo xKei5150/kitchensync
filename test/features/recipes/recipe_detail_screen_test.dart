@@ -469,6 +469,49 @@ void main() {
   );
 
   testWidgets(
+    'public detail renders the anonymized author as a neutral byline',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final recipe = Recipe(
+        id: 'anonymous-soup',
+        authorUserId: 'anonymous',
+        householdId: 'deleted-author-household',
+        name: 'Anonymous Soup',
+        description: 'A recipe with an anonymized author.',
+        defaultServingSize: 4,
+        mealTimeTags: const ['Dinner'],
+        recipeTags: const ['Soup'],
+        location: 'Manila',
+        visibility: RecipeVisibility.public,
+        monetization: RecipeMonetization.free,
+        createdAt: DateTime(2026, 7, 5),
+        updatedAt: DateTime(2026, 7, 5),
+        ingredients: const [],
+        instructions: const ['Simmer.'],
+      );
+
+      await tester.pumpWidget(
+        await _wrap(
+          const RecipeDetailScreen(recipeId: 'anonymous-soup'),
+          overrides: [
+            activeHouseholdContextProvider.overrideWithValue(_memberHousehold),
+            recipeRecordProvider(
+              'anonymous-soup',
+            ).overrideWith((ref) => Stream.value(recipe)),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('by Anonymous Kitchen · Manila'), findsOneWidget);
+      expect(find.text('by anonymous · Manila'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'cook detail exposes household edit delete and schedule actions',
     (tester) async {
       tester.view.physicalSize = const Size(400, 1600);

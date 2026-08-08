@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -534,10 +535,12 @@ class _AuthSession {
 }
 
 Future<_AuthSession> _createAuthSession() async {
-  const authHost = String.fromEnvironment(
-    'AUTH_EMULATOR_HOST',
-    defaultValue: '127.0.0.1',
-  );
+  const configuredAuthHost = String.fromEnvironment('AUTH_EMULATOR_HOST');
+  final authHost = configuredAuthHost.isNotEmpty
+      ? configuredAuthHost
+      : defaultTargetPlatform == TargetPlatform.android
+      ? '10.0.2.2'
+      : '127.0.0.1';
   const authPort = int.fromEnvironment(
     'AUTH_EMULATOR_PORT',
     defaultValue: 9099,

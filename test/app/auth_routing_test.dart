@@ -17,12 +17,15 @@ void main() {
     String path, {
     bool operationInProgress = false,
     bool allowHouseholdPicker = false,
+    bool allowDeletionConfirmationDuringSignOut = false,
   }) {
     return appSessionRedirect(
       session: session,
       authenticationOperationInProgress: operationInProgress,
       path: path,
       allowHouseholdPicker: allowHouseholdPicker,
+      allowDeletionConfirmationDuringSignOut:
+          allowDeletionConfirmationDuringSignOut,
     );
   }
 
@@ -63,6 +66,89 @@ void main() {
     },
   );
 
+  test(
+    'routes an unverified household-less identity to email verification',
+    () {
+      const session = AppSessionState(
+        phase: AppSessionPhase.needsEmailVerification,
+      );
+      expect(redirect(session, '/today'), '/auth/email-verification');
+      expect(redirect(session, '/onboarding'), '/auth/email-verification');
+      expect(redirect(session, '/auth/email-verification'), isNull);
+    },
+  );
+
+  test(
+    'only signed-out or accepted sign-out loading users may remain on deletion '
+    'confirmation',
+    () {
+      expect(
+        redirect(const AppSessionState.signedOut(), '/auth/deletion-requested'),
+        isNull,
+      );
+      expect(
+        redirect(
+          const AppSessionState.signedOut(),
+          '/settings/account-deletion',
+        ),
+        '/onboarding',
+      );
+      expect(
+        redirect(
+          const AppSessionState(phase: AppSessionPhase.ready),
+          '/auth/deletion-requested',
+        ),
+        '/today',
+      );
+      expect(
+        redirect(
+          const AppSessionState(phase: AppSessionPhase.needsHouseholdSetup),
+          '/auth/deletion-requested',
+        ),
+        '/onboarding',
+      );
+      expect(
+        redirect(
+          const AppSessionState.loadingAuth(),
+          '/auth/deletion-requested',
+        ),
+        '/auth/loading',
+      );
+      expect(
+        redirect(
+          const AppSessionState.loadingAuth(),
+          '/auth/deletion-requested',
+          allowDeletionConfirmationDuringSignOut: true,
+        ),
+        isNull,
+      );
+      expect(
+        redirect(
+          const AppSessionState(phase: AppSessionPhase.loadingHousehold),
+          '/auth/deletion-requested',
+          allowDeletionConfirmationDuringSignOut: true,
+        ),
+        '/auth/loading',
+      );
+      expect(
+        redirect(
+          const AppSessionState(phase: AppSessionPhase.needsEmailVerification),
+          '/auth/deletion-requested',
+          allowDeletionConfirmationDuringSignOut: true,
+        ),
+        '/auth/email-verification',
+      );
+      expect(
+        redirect(
+          const AppSessionState(phase: AppSessionPhase.ready),
+          '/auth/deletion-requested',
+          allowDeletionConfirmationDuringSignOut: true,
+        ),
+        '/today',
+      );
+    },
+  );
+
   test('only a confirmed membership can leave onboarding', () {
     const session = AppSessionState(
       phase: AppSessionPhase.ready,
@@ -99,11 +185,7 @@ void main() {
       '/auth/loading',
     );
     expect(
-      redirect(
-        recoverySession,
-        '/auth/loading',
-        operationInProgress: true,
-      ),
+      redirect(recoverySession, '/auth/loading', operationInProgress: true),
       isNull,
     );
   });

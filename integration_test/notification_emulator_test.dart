@@ -114,14 +114,22 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await waitForFinder(
+        tester,
+        find.text('A meal needs an emergency shop'),
+        describing: 'the persisted emergency notification',
+      );
 
       expect(find.text('A meal needs an emergency shop'), findsOneWidget);
       expect(find.textContaining('missing ingredient'), findsOneWidget);
       await binding.takeScreenshot('notification-emergency-unread');
 
       await tester.tap(find.byTooltip('Notification preferences'));
-      await tester.pumpAndSettle();
+      await waitForFinder(
+        tester,
+        find.text('Bulk reminders'),
+        describing: 'notification preferences',
+      );
       await tester.tap(find.text('Bulk reminders'));
       final preferenceDoc = FirebaseFirestore.instance
           .collection('users')
@@ -135,19 +143,31 @@ void main() {
         ),
       );
       expect(savedPreferences.data()?['emergencyShopping'], isTrue);
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
       await binding.takeScreenshot('notification-preferences');
 
       await tester.tap(find.byTooltip('Back'));
-      await tester.pumpAndSettle();
+      await waitForFinder(
+        tester,
+        find.byTooltip('Notification preferences'),
+        describing: 'the notifications inbox after returning from preferences',
+      );
       await tester.tap(find.byTooltip('Notification preferences'));
-      await tester.pumpAndSettle();
+      await waitForFinder(
+        tester,
+        find.text('Bulk reminders'),
+        describing: 'reloaded notification preferences',
+      );
       final bulkToggle = tester.widget<SwitchListTile>(
         find.widgetWithText(SwitchListTile, 'Bulk reminders'),
       );
       expect(bulkToggle.value, isFalse);
       await tester.tap(find.byTooltip('Back'));
-      await tester.pumpAndSettle();
+      await waitForFinder(
+        tester,
+        find.text('A meal needs an emergency shop'),
+        describing: 'the notifications inbox before opening the emergency list',
+      );
 
       await tester.tap(find.text('A meal needs an emergency shop'));
       final readNotification = await withTimeout(
@@ -157,11 +177,19 @@ void main() {
         ),
       );
       expect(readNotification.data()?['recipientUserId'], uid);
-      await tester.pumpAndSettle();
+      await waitForFinder(
+        tester,
+        find.text('Opened emergency list $listId'),
+        describing: 'the routed emergency shopping list',
+      );
       expect(find.text('Opened emergency list $listId'), findsOneWidget);
 
       router.pop();
-      await tester.pumpAndSettle();
+      await waitForFinder(
+        tester,
+        find.text('A meal needs an emergency shop'),
+        describing: 'the inbox with the read emergency notification',
+      );
       expect(find.text('A meal needs an emergency shop'), findsOneWidget);
       await binding.takeScreenshot('notification-emergency-read');
     },

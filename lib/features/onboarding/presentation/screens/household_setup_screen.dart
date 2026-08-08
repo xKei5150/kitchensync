@@ -1,14 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kitchensync/app/design_tokens.dart';
 import 'package:kitchensync/core/session/active_household_id_provider.dart';
-import 'package:kitchensync/core/utils/result.dart';
+import 'package:kitchensync/core/utils/id_generator.dart';
 import 'package:kitchensync/core/widgets/widgets.dart';
-import 'package:kitchensync/features/household/domain/entities/household_policy_models.dart';
-import 'package:kitchensync/features/household/domain/services/household_policy.dart';
+import 'package:kitchensync/features/household/presentation/controllers/household_invite_command_controller.dart';
 import 'package:kitchensync/features/ingredient_dictionary/presentation/providers/ingredient_providers.dart';
 
 /// Screen 13 (step 2) · Onboarding — set up your kitchen.
@@ -151,6 +151,11 @@ final householdOnboardingControllerProvider =
       return HouseholdOnboardingController(
         db: auth == null ? null : ref.watch(firestoreProvider),
         auth: auth,
+        functions: auth == null
+            ? null
+            : FirebaseFunctions.instanceFor(region: 'us-central1'),
+        inviteCommands: ref.watch(householdInviteCommandControllerProvider),
+        idGenerator: ref.watch(idGeneratorProvider),
       );
     });
 
@@ -200,11 +205,19 @@ class HouseholdPickerState {
 }
 
 class HouseholdOnboardingController {
-  const HouseholdOnboardingController({required this.db, required this.auth});
+  const HouseholdOnboardingController({
+    required this.db,
+    required this.auth,
+    this.functions,
+    this.inviteCommands,
+    this.idGenerator = const UuidV4IdGenerator(),
+  });
 
   final FirebaseFirestore? db;
   final FirebaseAuth? auth;
-  static const _policy = HouseholdPolicy();
+  final FirebaseFunctions? functions;
+  final HouseholdInviteCommandController? inviteCommands;
+  final IdGenerator idGenerator;
 
   Future<HouseholdPickerState> loadPickerState() async {
     final auth = this.auth;
@@ -310,6 +323,7 @@ class HouseholdOnboardingController {
       throw StateError('Firebase is unavailable for household setup.');
     }
     final user = _requireSignedInUser(auth);
+    _requireVerifiedEmail(user);
     return !(await db.collection('users').doc(user.uid).get()).exists;
   }
 
@@ -327,6 +341,7 @@ class HouseholdOnboardingController {
       throw StateError('Firebase is unavailable for household setup.');
     }
     final user = _requireSignedInUser(auth);
+    _requireVerifiedEmail(user);
     final userDoc = db.collection('users').doc(user.uid);
     final householdId = soloHouseholdIdForUser(user.uid);
     final householdDoc = db.collection('households').doc(householdId);
@@ -384,6 +399,7 @@ class HouseholdOnboardingController {
         ..set(targetHousehold, {
           'name': 'My kitchen',
           'creatorUserId': user.uid,
+          'ownerUserId': user.uid,
           'isJoint': false,
           'hasPremium': false,
           'maxMembers': 1,
@@ -393,6 +409,9 @@ class HouseholdOnboardingController {
         })
         ..set(targetMember, {
           'role': HouseholdRole.admin.name,
+          'userId': user.uid,
+          'householdId': targetId,
+          'schemaVersion': 1,
           'joinedAt': now,
           'updatedAt': now,
         });
@@ -412,168 +431,62 @@ class HouseholdOnboardingController {
   Future<String> _createJointHousehold() async {
     final auth = this.auth;
     final db = this.db;
+    final functions = this.functions;
     if (auth == null || db == null) {
       throw StateError('Firebase is unavailable for household setup.');
     }
     final user = _requireSignedInUser(auth);
-    final userDoc = db.collection('users').doc(user.uid);
-    // Allocate the ID once. If two callers race, Firestore retries the second
-    // transaction and the persisted `createdJointHouseholdId` makes policy
-    // reject it before this unused ID is ever written.
-    final householdDoc = db.collection('households').doc();
-    final householdId = householdDoc.id;
-    final memberDoc = householdDoc.collection('members').doc(user.uid);
-    final inviteCode = _inviteCodeFor(householdId);
-    final inviteDoc = db.collection('householdInvites').doc(inviteCode);
-
-    return db.runTransaction((transaction) async {
-      final userSnapshot = await transaction.get(userDoc);
-      final userData = userSnapshot.data() ?? const <String, dynamic>{};
-      final userIsPremium = userData['isPremium'] as bool? ?? false;
-      final hasCreatedJoint =
-          (userData['createdJointHouseholdId'] as String?)?.isNotEmpty ?? false;
-      final hasCreatedSolo =
-          (userData['createdSoloHouseholdId'] as String?)?.isNotEmpty ?? false;
-      final specResult = _policy.creationSpec(
-        HouseholdCreationRequest(
-          userIsPremium: userIsPremium,
-          requestJointHousehold: true,
-          existingSoloHouseholds: hasCreatedSolo ? 1 : 0,
-          existingCreatedJointHouseholds: hasCreatedJoint ? 1 : 0,
-        ),
+    _requireVerifiedEmail(user);
+    if (functions == null) {
+      throw StateError('Firebase is unavailable for household setup.');
+    }
+    final userSnapshot = await db.collection('users').doc(user.uid).get();
+    final userData = userSnapshot.data() ?? const <String, dynamic>{};
+    final sourceHouseholdId = userData['createdSoloHouseholdId'] as String?;
+    if (sourceHouseholdId == null || sourceHouseholdId.isEmpty) {
+      throw StateError(
+        'Start the Premium trial from your solo kitchen before creating a '
+        'joint household.',
       );
-      final spec = switch (specResult) {
-        Success(value: final value) => value,
-        ResultFailure(failure: final failure) => throw StateError(
-          failure.toString(),
-        ),
-      };
-      final now = FieldValue.serverTimestamp();
-      transaction
-        ..set(userDoc, {
-          ..._profileFieldsFor(
-            user: user,
-            now: now,
-            isNew: !userSnapshot.exists,
-          ),
-          'activeHouseholdId': householdId,
-          'householdIds': FieldValue.arrayUnion([householdId]),
-          'createdJointHouseholdId': householdId,
-          'updatedAt': now,
-        }, SetOptions(merge: true))
-        ..set(householdDoc, {
-          'name': 'Shared kitchen',
-          'creatorUserId': user.uid,
-          'isJoint': true,
-          'hasPremium': true,
-          'maxMembers': spec.maxMembers,
-          'memberCount': 1,
-          'inviteCode': inviteCode,
-          'createdAt': now,
-          'updatedAt': now,
-        })
-        ..set(memberDoc, {
-          'role': spec.initialRole.name,
-          'joinedAt': now,
-          'updatedAt': now,
-        })
-        ..set(inviteDoc, {
-          'householdId': householdId,
-          'createdBy': user.uid,
-          'role': HouseholdRole.member.name,
-          'active': true,
-          'createdAt': now,
-          'updatedAt': now,
+    }
+    final response = await functions
+        .httpsCallable('createJointHouseholdWithTrialTransfer')
+        .call<Object?>({
+          'commandId': idGenerator.newId(),
+          'policyVersion': 'account-lifecycle-v1',
+          'sourceHouseholdId': sourceHouseholdId,
         });
-      return householdId;
-    });
+    final data = response.data;
+    if (data is! Map || data['householdId'] is! String) {
+      throw StateError('The joint household transfer response was malformed.');
+    }
+    return data['householdId'] as String;
   }
 
-  Future<void> joinHousehold({required String code}) async {
-    final auth = this.auth;
-    final db = this.db;
-    if (auth == null || db == null) {
-      throw StateError('Firebase is unavailable for household setup.');
-    }
-    final user = _requireSignedInUser(auth);
-    final normalizedCode = _normalizeInviteCode(code);
-    if (normalizedCode.isEmpty) {
+  Future<void> joinHousehold({required String code, String? commandId}) async {
+    final inviteToken = normalizeInviteToken(code);
+    if (inviteToken.isEmpty) {
       throw StateError('Enter an invite code.');
     }
-
-    final inviteDoc = db.collection('householdInvites').doc(normalizedCode);
-    final initialInvite = (await inviteDoc.get()).data();
-    final initialHouseholdId = initialInvite?['householdId'] as String?;
-    if (initialInvite == null ||
-        initialInvite['active'] != true ||
-        initialHouseholdId == null ||
-        initialHouseholdId.isEmpty) {
-      throw StateError('Invite code not found.');
+    if (inviteToken.toUpperCase().startsWith('KS-')) {
+      throw StateError(
+        'This invite cannot be used. Ask the household Admin for a new invite.',
+      );
     }
-    final householdDoc = db.collection('households').doc(initialHouseholdId);
-    final userDoc = db.collection('users').doc(user.uid);
-    final memberDoc = householdDoc.collection('members').doc(user.uid);
-
-    await db.runTransaction((transaction) async {
-      final inviteSnap = await transaction.get(inviteDoc);
-      final invite = inviteSnap.data();
-      if (invite == null || invite['active'] != true) {
-        throw StateError('Invite code not found.');
-      }
-      final householdId = invite['householdId'] as String?;
-      if (householdId != initialHouseholdId) {
-        throw StateError('Invite code changed. Retry joining.');
-      }
-      final userSnap = await transaction.get(userDoc);
-      final userData = userSnap.data() ?? const <String, dynamic>{};
-      final existingMember = await transaction.get(memberDoc);
-      final now = FieldValue.serverTimestamp();
-
-      if (existingMember.exists) {
-        transaction.set(userDoc, {
-          'activeHouseholdId': householdId,
-          'householdIds': FieldValue.arrayUnion([householdId]),
-          'updatedAt': now,
-        }, SetOptions(merge: true));
-        return;
-      }
-
-      final invitedRole = switch (invite['role']) {
-        'member' => HouseholdRole.member,
-        'shopper' => HouseholdRole.shopper,
-        'cook' => HouseholdRole.cook,
-        _ => throw StateError('Invite code has an invalid household role.'),
-      };
-      final joinedPremiumHouseholds =
-          (userData['joinedPremiumHouseholdIds'] as List<dynamic>?) ?? const [];
-      final existingJoinedPremiumHouseholds = joinedPremiumHouseholds
-          .whereType<String>()
-          .where((id) => id != householdId)
-          .length;
-      if (userData['isPremium'] != true &&
-          existingJoinedPremiumHouseholds > 0) {
-        throw StateError('Free users can only join one premium household.');
-      }
-
-      transaction
-        ..set(memberDoc, {
-          'role': invitedRole.name,
-          'inviteCode': normalizedCode,
-          'joinedAt': now,
-          'updatedAt': now,
-        })
-        ..set(userDoc, {
-          ..._profileFieldsFor(user: user, now: now, isNew: !userSnap.exists),
-          'activeHouseholdId': householdId,
-          'householdIds': FieldValue.arrayUnion([householdId]),
-          'joinedPremiumHouseholdIds': FieldValue.arrayUnion([householdId]),
-          'updatedAt': now,
-        }, SetOptions(merge: true))
-        ..update(householdDoc, {
-          'memberCount': FieldValue.increment(1),
-          'updatedAt': now,
-        });
-    });
+    final auth = this.auth;
+    if (auth == null) {
+      throw StateError('Secure household invites are unavailable right now.');
+    }
+    final user = _requireSignedInUser(auth);
+    _requireVerifiedEmail(user);
+    final commands = inviteCommands;
+    if (commands == null) {
+      throw StateError('Secure household invites are unavailable right now.');
+    }
+    await commands.redeem(
+      inviteToken: inviteToken,
+      commandId: commandId ?? idGenerator.newId(),
+    );
   }
 
   User _requireSignedInUser(FirebaseAuth auth) {
@@ -582,6 +495,14 @@ class HouseholdOnboardingController {
       throw StateError('Sign in before setting up a household.');
     }
     return user;
+  }
+
+  void _requireVerifiedEmail(User user) {
+    if (!user.emailVerified) {
+      throw StateError(
+        'Verify your email before creating or joining a household.',
+      );
+    }
   }
 
   /// A UID is stable across app restarts and provider callbacks, making this
@@ -597,6 +518,7 @@ class HouseholdOnboardingController {
     if (!isNew) return const <String, Object?>{};
     return <String, Object?>{
       'isPremium': false,
+      'joinedPremiumHouseholdIds': const <String>[],
       if (user.email != null) 'email': user.email,
       if (user.displayName != null) 'displayName': user.displayName,
       if (user.photoURL != null) 'photoUrl': user.photoURL,
@@ -608,16 +530,9 @@ class HouseholdOnboardingController {
     };
   }
 
-  static String _inviteCodeFor(String householdId) {
-    final normalized = householdId
-        .replaceAll(RegExp('[^A-Za-z0-9]'), '')
-        .toUpperCase();
-    final suffix = normalized.padRight(6, '0').substring(0, 6);
-    return 'KS-$suffix';
-  }
-
-  static String _normalizeInviteCode(String code) =>
-      code.trim().replaceAll(RegExp(r'\s+'), '').toUpperCase();
+  @visibleForTesting
+  static String normalizeInviteToken(String token) =>
+      token.trim().replaceAll(RegExp(r'\s+'), '');
 }
 
 class _HouseholdPickerBody extends StatelessWidget {
@@ -928,6 +843,7 @@ class _JoinWithCodeState extends ConsumerState<_JoinWithCode> {
   final _controller = TextEditingController();
   bool _joining = false;
   String? _joinError;
+  String? _joinCommandId;
 
   @override
   void dispose() {
@@ -943,10 +859,17 @@ class _JoinWithCodeState extends ConsumerState<_JoinWithCode> {
     try {
       await ref
           .read(householdOnboardingControllerProvider)
-          .joinHousehold(code: _controller.text);
+          .joinHousehold(
+            code: _controller.text,
+            commandId: _joinCommandId ??= ref.read(idGeneratorProvider).newId(),
+          );
     } catch (error) {
       if (!mounted) return;
-      final message = 'Could not join household: $error';
+      final reason = error is StateError
+          ? error.message
+          : 'This invite cannot be used. Ask the household Admin for a new '
+                'invite.';
+      final message = 'Could not join household: $reason';
       setState(() {
         _joining = false;
         _joinError = message;
@@ -957,6 +880,9 @@ class _JoinWithCodeState extends ConsumerState<_JoinWithCode> {
       return;
     }
     if (!mounted) return;
+    ref
+      ..invalidate(householdPickerProvider)
+      ..invalidate(activeHouseholdContextStreamProvider);
     context.go('/today');
   }
 
@@ -1019,10 +945,10 @@ class _JoinWithCodeState extends ConsumerState<_JoinWithCode> {
               Expanded(
                 child: TextField(
                   controller: _controller,
-                  textCapitalization: TextCapitalization.characters,
+                  onChanged: (_) => _joinCommandId = null,
                   autocorrect: false,
                   decoration: InputDecoration(
-                    hintText: 'SAGE-417',
+                    hintText: 'Paste invite token',
                     filled: true,
                     fillColor: ks.surfaceBase,
                     contentPadding: const EdgeInsets.all(11),

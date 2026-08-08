@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,19 +40,17 @@ void main() {
       final db = FirebaseFirestore.instance;
       await withTimeout('clear calendar defaults auth session', auth.signOut);
 
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1;
-      // Pin the keyboard inset. Focusing a field makes the iOS Simulator raise
-      // its software keyboard, which reports a viewInsets bottom of 837-1000pt
-      // against an 852pt viewport; any sheet that pads by
-      // MediaQuery.viewInsets.bottom then collapses and its fields leave the
-      // widget tree entirely (observed: textFields=0). That depends on whether
-      // a hardware keyboard happens to be connected to the simulator, which is
-      // ambient machine state, not behaviour under test.
-      tester.view.viewInsets = FakeViewPadding.zero;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      addTearDown(tester.view.resetViewInsets);
+      if (defaultTargetPlatform != TargetPlatform.android) {
+        tester.view.physicalSize = const Size(393, 852);
+        tester.view.devicePixelRatio = 1;
+        // Pin the iOS software-keyboard inset. Android uses its native viewport
+        // so its platform screenshot bridge sees the actual device dimensions.
+        tester.view.viewInsets = FakeViewPadding.zero;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewInsets);
+      }
+      await binding.convertFlutterSurfaceToImage();
 
       final suffix = DateTime.now().microsecondsSinceEpoch;
       const password = 'KitchenSync-123!';
@@ -254,7 +253,7 @@ void main() {
       _expectFieldText('Meal mode', 'Specific day');
       await binding.takeScreenshot('calendar-defaults-reloaded-specific');
       Navigator.of(tester.element(find.text('Calendar defaults').last)).pop();
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
 
       await withTimeout(
         'save weekly schedule for overlap date',
@@ -281,13 +280,13 @@ void main() {
       expect(find.text('Serves 8'), findsOneWidget);
 
       await tester.tap(find.text('Today · 2026-07-05'));
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
       expect(find.text('Serves 6'), findsOneWidget);
       await tester.tap(find.text('Next week · 2026-07-12'));
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
       expect(find.text('Serves 4'), findsOneWidget);
       await tester.tap(find.text('Tomorrow · 2026-07-06'));
-      await tester.pumpAndSettle();
+      await settleOrAdvance(tester);
       expect(find.text('Serves 8'), findsOneWidget);
       await binding.takeScreenshot('calendar-defaults-schedule-resolution');
 
@@ -570,7 +569,7 @@ Future<void> _saveDefaults(
   final save = find.text('Save defaults');
   await tester.ensureVisible(save);
   await tester.tap(save);
-  await tester.pumpAndSettle();
+  await settleOrAdvance(tester);
   expect(find.text('Calendar defaults'), findsNothing);
 }
 

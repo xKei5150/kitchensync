@@ -8,6 +8,31 @@ List<RouteBase> _fullscreenRoutes() => [
     pageBuilder: (context, state) =>
         _authPage(state, const AuthLoadingScreen()),
   ),
+  GoRoute(
+    path: '/auth/email-verification',
+    name: 'emailVerification',
+    parentNavigatorKey: _rootNavigatorKey,
+    pageBuilder: (context, state) =>
+        _authPage(state, const EmailVerificationRouteScreen()),
+  ),
+  GoRoute(
+    path: '/auth/reauthentication',
+    name: 'reauthentication',
+    parentNavigatorKey: _rootNavigatorKey,
+    pageBuilder: (context, state) =>
+        _authPage(state, const ReauthenticationRouteScreen()),
+  ),
+  GoRoute(
+    path: '/auth/deletion-requested',
+    name: 'accountDeletionRequested',
+    parentNavigatorKey: _rootNavigatorKey,
+    pageBuilder: (context, state) => _authPage(
+      state,
+      AccountDeletionRequestedScreen(
+        onContinue: () => context.go('/onboarding'),
+      ),
+    ),
+  ),
   // Full-screen routes pushed over the shell (no bottom nav), each using
   // the shared reduced-motion-aware [_page] transition.
   GoRoute(
@@ -49,7 +74,13 @@ List<RouteBase> _fullscreenRoutes() => [
     path: '/household',
     name: 'household',
     parentNavigatorKey: _rootNavigatorKey,
-    pageBuilder: (context, state) => _page(state, const HouseholdScreen()),
+    pageBuilder: (context, state) => _page(
+      state,
+      HouseholdScreen(
+        lifecycleTransferHouseholdId:
+            state.uri.queryParameters['accountLifecycleTransfer'],
+      ),
+    ),
   ),
   // P5 · the premium Insights surface (Screen 30), pushed full-screen over
   // the shell. Real charts over the live pantry, behind the premium veil.
@@ -82,6 +113,13 @@ List<RouteBase> _fullscreenRoutes() => [
         showHouseholdPicker: state.uri.queryParameters['switch'] == 'household',
       ),
     ),
+  ),
+  GoRoute(
+    path: '/settings/account-deletion',
+    name: 'accountDeletion',
+    parentNavigatorKey: _rootNavigatorKey,
+    pageBuilder: (context, state) =>
+        _authPage(state, const AccountDeletionRouteScreen()),
   ),
   GoRoute(
     path: '/ingredient/pick',

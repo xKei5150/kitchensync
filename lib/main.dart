@@ -11,6 +11,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final env = FirebaseInitializer.envFromDartDefine();
   const firebaseInitializer = FirebaseInitializer();
+  // Firebase bootstrap includes App Check activation before the UI can expose
+  // Firebase-backed repositories or callable functions.
   await firebaseInitializer.bootstrap(env);
   final prefs = await SharedPreferences.getInstance();
 

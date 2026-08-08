@@ -95,6 +95,49 @@ void main() {
     });
 
     test(
+      'bootstraps App Check before independently deferred telemetry',
+      () async {
+        final events = <String>[];
+        final initializer = FirebaseInitializer(
+          appCheckActivation: () async => events.add('app_check'),
+          crashlyticsSetup: () async {
+            events.add('crashlytics');
+            throw StateError('Crashlytics unavailable');
+          },
+          analyticsSetup: () async => events.add('analytics'),
+        );
+
+        await initializer.bootstrapSecurity(useEmulator: false);
+        await initializer.finishInitialization(AppEnv.prod);
+
+        expect(events, ['app_check', 'crashlytics', 'analytics']);
+      },
+    );
+
+    test('emulator bootstrap skips App Check activation', () async {
+      var appCheckActivated = false;
+      final initializer = FirebaseInitializer(
+        appCheckActivation: () async => appCheckActivated = true,
+      );
+
+      await initializer.bootstrapSecurity(useEmulator: true);
+
+      expect(appCheckActivated, isFalse);
+    });
+
+    test('App Check bootstrap failures remain startup failures', () async {
+      final failure = StateError('App Check unavailable');
+      final initializer = FirebaseInitializer(
+        appCheckActivation: () async => throw failure,
+      );
+
+      await expectLater(
+        initializer.bootstrapSecurity(useEmulator: false),
+        throwsA(same(failure)),
+      );
+    });
+
+    test(
       'debug configuration selects Firebase emulators only when requested',
       () {
         expect(

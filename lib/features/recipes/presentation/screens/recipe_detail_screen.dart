@@ -46,6 +46,8 @@ class RecipeDetailScreen extends ConsumerWidget {
   static const _intro =
       'weeknight braise that tastes like a Sunday — soft beans, blistered '
       'tomatoes, a slick of good oil. Forgiving, and better the next day.';
+  static const _anonymizedAuthorSentinel = 'anonymous';
+  static const _anonymizedAuthorLabel = 'Anonymous Kitchen';
 
   static const _ingredients = [
     KsScalableIngredient(name: 'White beans', baseAmount: 2, unit: 'tins'),
@@ -336,7 +338,12 @@ class RecipeDetailScreen extends ConsumerWidget {
 
   /// A friendly byline: your own recipes read "You"; an opaque uid author with
   /// no resolvable display name reads "A KitchenSync cook" rather than a uid.
+  /// The public recipe deletion sentinel gets a deliberate neutral label
+  /// instead of leaking the storage value into the byline.
   static String authorLabel(String authorUserId, String currentUserId) {
+    if (authorUserId == _anonymizedAuthorSentinel) {
+      return _anonymizedAuthorLabel;
+    }
     if (authorUserId == currentUserId) return 'You';
     final looksLikeUid =
         authorUserId.length >= 20 && !authorUserId.contains(' ');

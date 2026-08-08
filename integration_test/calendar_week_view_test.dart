@@ -17,6 +17,8 @@ import 'package:kitchensync/features/recipes/domain/entities/recipe_models.dart'
 import 'package:kitchensync/features/recipes/domain/repositories/recipe_repository.dart';
 import 'package:kitchensync/features/recipes/presentation/providers/recipe_repository_providers.dart';
 
+import '_helpers.dart';
+
 const _household = ActiveHouseholdContext(
   id: 'calendar-week-household',
   name: 'Calendar week kitchen',
@@ -173,22 +175,22 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
 
     expect(find.text('July 2026'), findsOneWidget);
     await tester.tap(find.text('Week'));
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     expect(find.text('29 June-5 July 2026'), findsOneWidget);
     await binding.takeScreenshot('calendar-week-cross-month');
 
     await tester.tap(find.byTooltip('Next week'));
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     expect(find.text('6-12 July 2026'), findsOneWidget);
     expect(find.text('Wednesday vegetable bake'), findsOneWidget);
     await binding.takeScreenshot('calendar-week-next');
 
     await tester.tap(find.widgetWithText(InkWell, '8').first);
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     expect(find.text('Opened 2026-07-08'), findsOneWidget);
   });
 }

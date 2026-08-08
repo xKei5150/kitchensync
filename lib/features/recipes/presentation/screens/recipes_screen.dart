@@ -408,6 +408,9 @@ class _PublicRecipeTile extends ConsumerWidget {
     required this.priceUnit,
   });
 
+  static const _anonymizedAuthorSentinel = 'anonymous';
+  static const _anonymizedAuthorLabel = 'Anonymous Kitchen';
+
   final Recipe recipe;
   final String price;
   final String priceUnit;
@@ -440,10 +443,14 @@ class _PublicRecipeTile extends ConsumerWidget {
     );
   }
 
-  /// A friendly byline: your own recipes read "You"; other authors whose id is
-  /// an opaque uid (no display name available) read "A KitchenSync cook"
-  /// rather than exposing a raw uid.
+  /// A friendly byline: your own recipes read "You"; anonymized public authors
+  /// read "Anonymous Kitchen"; other authors whose id is an opaque uid (no
+  /// display name available) read "A KitchenSync cook" rather than exposing a
+  /// raw uid.
   String _authorLabel(String authorUserId, String currentUserId) {
+    if (authorUserId == _anonymizedAuthorSentinel) {
+      return _anonymizedAuthorLabel;
+    }
     if (authorUserId == currentUserId) return 'You';
     final looksLikeUid =
         authorUserId.length >= 20 && !authorUserId.contains(' ');

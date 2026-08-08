@@ -65,6 +65,9 @@ GoRouter _buildRouter(Ref ref) {
   final authenticationOperationInProgress = ref.watch(
     authenticationOperationInProgressProvider,
   );
+  final accountDeletionSignOutInProgress = ref.watch(
+    accountDeletionSignOutInProgressProvider,
+  );
   const householdPolicy = HouseholdPolicy();
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -76,6 +79,8 @@ GoRouter _buildRouter(Ref ref) {
         path: state.uri.path,
         allowHouseholdPicker:
             state.uri.queryParameters['switch'] == 'household',
+        allowDeletionConfirmationDuringSignOut:
+            accountDeletionSignOutInProgress,
       );
       if (sessionRedirect != null) return sessionRedirect;
 
@@ -133,12 +138,16 @@ String? appSessionRedirect({
   required bool authenticationOperationInProgress,
   required String path,
   bool allowHouseholdPicker = false,
+  bool allowDeletionConfirmationDuringSignOut = false,
 }) {
   final isLoadingRoute = path == '/auth/loading';
+  final isEmailVerificationRoute = path == '/auth/email-verification';
+  final isDeletionRequestedRoute = path == '/auth/deletion-requested';
   final isSignInRoute = path == '/onboarding';
 
   final signedInSession = switch (session.phase) {
     AppSessionPhase.loadingHousehold ||
+    AppSessionPhase.needsEmailVerification ||
     AppSessionPhase.needsHouseholdSetup ||
     AppSessionPhase.ready => true,
     AppSessionPhase.error => session.user != null,
@@ -153,17 +162,27 @@ String? appSessionRedirect({
   }
 
   return switch (session.phase) {
-    AppSessionPhase.loadingAuth ||
+    AppSessionPhase.loadingAuth =>
+      (isLoadingRoute ||
+              (isDeletionRequestedRoute &&
+                  allowDeletionConfirmationDuringSignOut))
+          ? null
+          : '/auth/loading',
     AppSessionPhase.loadingHousehold => isLoadingRoute ? null : '/auth/loading',
     AppSessionPhase.error => isLoadingRoute ? null : '/auth/loading',
     // Firebase bootstrap occurs before runApp. This is only reachable in an
     // intentionally isolated widget test or when setup failed, so the only
     // honest place to send someone is the auth entry point.
-    AppSessionPhase.unavailable ||
-    AppSessionPhase.signedOut => isSignInRoute ? null : '/onboarding',
+    AppSessionPhase.unavailable => isSignInRoute ? null : '/onboarding',
+    AppSessionPhase.signedOut =>
+      (isSignInRoute || isDeletionRequestedRoute) ? null : '/onboarding',
+    AppSessionPhase.needsEmailVerification =>
+      isEmailVerificationRoute ? null : '/auth/email-verification',
     AppSessionPhase.needsHouseholdSetup => isSignInRoute ? null : '/onboarding',
     AppSessionPhase.ready =>
-      (isLoadingRoute || (isSignInRoute && !allowHouseholdPicker))
+      (isLoadingRoute ||
+              isDeletionRequestedRoute ||
+              (isSignInRoute && !allowHouseholdPicker))
           ? '/today'
           : null,
   };

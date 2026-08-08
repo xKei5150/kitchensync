@@ -135,6 +135,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         _pendingLinkCredential = null;
         _pendingLinkProvider = null;
       }
+      if (registrationRequested) {
+        // Keep the identity signed in so the verification route can own
+        // resend/reload/sign-out, but do not provision a household yet.
+        await ref
+            .read(authenticationControllerProvider)
+            .sendEmailVerification();
+      }
       await _finishAuthentication(
         credential,
         onboarding: onboarding,
@@ -212,6 +219,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     required HouseholdOnboardingController onboarding,
     required bool registrationRequested,
   }) async {
+    final user = credential.user;
+    if (user == null) {
+      throw StateError('The authenticated account could not be restored.');
+    }
+    // Existing confirmed-household users can continue using the app while an
+    // email claim is pending. This guard only prevents new provisioning.
+    if (!user.emailVerified) return;
     final shouldProvision =
         registrationRequested ||
         (credential.additionalUserInfo?.isNewUser ?? false) ||
@@ -598,7 +612,7 @@ class _PasswordField extends StatelessWidget {
       autofillHints: const [AutofillHints.password],
       style: KsTokens.bodyMedium.copyWith(color: ks.textPrimary),
       decoration: InputDecoration(
-        hintText: isRegistration ? 'Password (8+ characters)' : 'Password',
+        hintText: isRegistration ? 'Password (12+ characters)' : 'Password',
         errorText: errorText,
         filled: true,
         fillColor: ks.surfaceRaised,

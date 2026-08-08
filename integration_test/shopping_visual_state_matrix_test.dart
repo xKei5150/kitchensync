@@ -31,6 +31,8 @@ import 'package:kitchensync/features/shopping/presentation/screens/shopping_list
 import 'package:kitchensync/features/shopping/presentation/screens/shopping_screen.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '_helpers.dart';
+
 class _VisualPlanningController extends Mock
     implements ShoppingPlanningController {}
 
@@ -87,7 +89,6 @@ class _VisualIngredientRepository implements IngredientRepository {
   @override
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       Stream.value(ingredient.barcode == barcode ? [ingredient] : const []);
-
 }
 
 class _VisualScheduleRepository implements ShoppingScheduleRepository {
@@ -245,7 +246,7 @@ void main() {
     );
     expect(find.textContaining('Could not generate this list'), findsOneWidget);
     await tester.tap(find.text('Retry'));
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     verify(() => generationFailure.persistShopNowPreview(preview)).called(2);
 
     final saveGate = Completer<void>();
@@ -355,11 +356,11 @@ Future<void> _captureShopNow(
       locale: locale,
     ),
   );
-  await tester.pumpAndSettle();
+  await settleOrAdvance(tester);
   await tester.tap(find.text('Start a shop'));
   await tester.pump();
   if (tapGenerate) {
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     await tester.tap(find.text('Generate list'));
     await tester.pump();
   }
@@ -413,7 +414,7 @@ Future<void> _captureCjkDictionaryShoppingList(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  await settleOrAdvance(tester);
   expect(find.text(label), findsOneWidget);
   expect(find.byType(KsChecklistRow), findsOneWidget);
   await _capture(tester, binding, surface, find.text(label));
@@ -437,7 +438,7 @@ Future<void> _captureSchedule(
       child: const ShoppingScheduleScreen(),
     ),
   );
-  await tester.pumpAndSettle();
+  await settleOrAdvance(tester);
   if (tapSave) {
     await tester.tap(find.byKey(const ValueKey('shopping-schedule-save')));
     await tester.pump();

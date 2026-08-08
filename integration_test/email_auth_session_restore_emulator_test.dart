@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -15,7 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '_helpers.dart';
 
-/// Run this target twice inside the same Auth/Firestore emulator job:
+/// Run both phases inside the same Auth/Firestore emulator job:
 ///
 /// ```sh
 /// auth_session_run_id="$(date +%s%N)"
@@ -27,33 +28,56 @@ import '_helpers.dart';
 ///   --dart-define=AUTH_SESSION_RUN_ID="$auth_session_run_id"
 /// ```
 ///
-/// The second invocation starts a new iOS application process. Native Firebase
-/// Auth must retain its credential between those invocations. The non-secret
-/// run ID identifies the dynamic account across the two drivers because a
-/// separate `flutter drive` invocation resets iOS UserDefaults. The restore
-/// phase itself never creates or provisions an account.
+/// iOS starts each phase through a separate `flutter drive` invocation. Android
+/// installs one target APK, then starts each phase through a separate native
+/// process without replacing or clearing the package between phases. Native
+/// Firebase Auth must retain its credential across either lifecycle. The
+/// non-secret run ID identifies the dynamic account; the restore phase itself
+/// never creates or provisions an account.
 const _sessionPhase = String.fromEnvironment('AUTH_SESSION_PHASE');
 const _sessionRunId = String.fromEnvironment('AUTH_SESSION_RUN_ID');
+const _androidIntentPhase = bool.fromEnvironment(
+  'AUTH_SESSION_ANDROID_INTENT_PHASE',
+);
+const _androidSessionControl = MethodChannel(
+  'kitchensync.integration/session_restore',
+);
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets(
-    'email session survives a fresh iOS app process ($_sessionPhase)',
-    (tester) async {
-      switch (_sessionPhase) {
-        case 'create':
-          await _createPersistedEmailSession(tester);
-        case 'restore':
-          await _restorePersistedEmailSession(tester);
-        default:
-          fail(
-            'Set AUTH_SESSION_PHASE to create or restore. This target must not '
-            'run without an explicit phase because create intentionally leaves '
-            'a Firebase session in place for the second process.',
-          );
-      }
-    },
+  testWidgets('email session survives a fresh native app process', (
+    tester,
+  ) async {
+    switch (await _effectiveSessionPhase()) {
+      case 'create':
+        await _createPersistedEmailSession(tester);
+      case 'restore':
+        await _restorePersistedEmailSession(tester);
+      default:
+        fail(
+          'Set AUTH_SESSION_PHASE to create or restore. This target must not '
+          'run without an explicit phase because create intentionally leaves '
+          'a Firebase session in place for the second process.',
+        );
+    }
+  });
+}
+
+Future<String> _effectiveSessionPhase() async {
+  if (!_androidIntentPhase) {
+    return _sessionPhase;
+  }
+
+  // The Android harness compiles and installs this target once. It selects the
+  // phase through a non-persistent Android Intent extra so restore can begin in
+  // a newly spawned app process without a second Flutter install replacing
+  // package state. The channel reads only the current Activity Intent.
+  final phase = await _androidSessionControl.invokeMethod<String>('phase');
+  if (phase == 'create' || phase == 'restore') return phase!;
+  throw StateError(
+    'Android session restore requires create or restore launch phase; '
+    'received "$phase".',
   );
 }
 

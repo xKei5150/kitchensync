@@ -34,11 +34,13 @@ class ActiveHouseholdContext {
 ///
 /// In particular, [loadingAuth] and [loadingHousehold] are deliberately not
 /// represented by a fabricated household. A data screen must wait for one of
-/// [signedOut], [needsHouseholdSetup], or [ready] instead.
+/// [signedOut], [needsEmailVerification], [needsHouseholdSetup], or [ready]
+/// instead.
 enum AppSessionPhase {
   loadingAuth,
   signedOut,
   loadingHousehold,
+  needsEmailVerification,
   needsHouseholdSetup,
   ready,
   error,
@@ -60,6 +62,8 @@ class AppSessionState {
     : this(phase: AppSessionPhase.loadingHousehold, user: user);
   const AppSessionState.needsHouseholdSetup(User user)
     : this(phase: AppSessionPhase.needsHouseholdSetup, user: user);
+  const AppSessionState.needsEmailVerification(User user)
+    : this(phase: AppSessionPhase.needsEmailVerification, user: user);
   const AppSessionState.ready({
     required User user,
     required ActiveHouseholdContext household,
@@ -91,7 +95,7 @@ final firebaseAuthProvider = Provider<FirebaseAuth?>(
 final activeFirebaseUserProvider = StreamProvider<User?>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
   if (auth == null) return Stream.value(null);
-  return auth.authStateChanges();
+  return auth.idTokenChanges();
 });
 
 final activeHouseholdContextStreamProvider =
@@ -99,7 +103,7 @@ final activeHouseholdContextStreamProvider =
       final auth = ref.watch(firebaseAuthProvider);
       if (auth == null) return Stream.value(null);
       final refs = ref.watch(firestoreRefsProvider);
-      return auth.authStateChanges().switchMap((user) {
+      return auth.idTokenChanges().switchMap((user) {
         if (user == null) {
           return Stream.value(null);
         }
@@ -138,9 +142,14 @@ final appSessionStateProvider = Provider<AppSessionState>((ref) {
       return householdState.when(
         loading: () => AppSessionState.loadingHousehold(user),
         error: (error, _) => AppSessionState.error(user: user, error: error),
-        data: (household) => household == null
-            ? AppSessionState.needsHouseholdSetup(user)
-            : AppSessionState.ready(user: user, household: household),
+        data: (household) {
+          if (household != null) {
+            return AppSessionState.ready(user: user, household: household);
+          }
+          return user.emailVerified
+              ? AppSessionState.needsHouseholdSetup(user)
+              : AppSessionState.needsEmailVerification(user);
+        },
       );
     },
   );

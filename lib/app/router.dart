@@ -24,7 +24,9 @@ import 'package:kitchensync/features/menu_sets/presentation/screens/menu_sets_sc
 import 'package:kitchensync/features/notifications/presentation/screens/notification_preferences_screen.dart';
 import 'package:kitchensync/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:kitchensync/features/onboarding/presentation/controllers/authentication_controller.dart';
+import 'package:kitchensync/features/onboarding/presentation/screens/account_deletion_requested_screen.dart';
 import 'package:kitchensync/features/onboarding/presentation/screens/auth_loading_screen.dart';
+import 'package:kitchensync/features/onboarding/presentation/screens/email_verification_route_screen.dart';
 import 'package:kitchensync/features/onboarding/presentation/screens/sign_in_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/add_pantry_item_screen.dart';
 import 'package:kitchensync/features/pantry/presentation/screens/bulk_purchase_screen.dart';
@@ -34,7 +36,9 @@ import 'package:kitchensync/features/pantry/presentation/screens/pantry_item_det
 import 'package:kitchensync/features/pantry/presentation/screens/waste_log_screen.dart';
 import 'package:kitchensync/features/recipes/presentation/screens/recipe_detail_screen.dart';
 import 'package:kitchensync/features/recipes/presentation/screens/recipes_screen.dart';
+import 'package:kitchensync/features/settings/presentation/screens/account_deletion_route_screen.dart';
 import 'package:kitchensync/features/settings/presentation/screens/premium_screen.dart';
+import 'package:kitchensync/features/settings/presentation/screens/reauthentication_route_screen.dart';
 import 'package:kitchensync/features/settings/presentation/screens/settings_screen.dart';
 import 'package:kitchensync/features/shopping/presentation/screens/shopping_history_screen.dart';
 import 'package:kitchensync/features/shopping/presentation/screens/shopping_list_screen.dart';

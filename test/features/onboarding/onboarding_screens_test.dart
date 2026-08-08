@@ -96,6 +96,10 @@ void main() {
     await tester.pump();
 
     expect(find.widgetWithText(FilledButton, 'Create account'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextField, 'Password (12+ characters)'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('HouseholdSetupScreen lets you pick a kitchen kind', (
@@ -179,6 +183,32 @@ void main() {
 
     expect(find.text('Skip for now'), findsNothing);
   });
+
+  testWidgets('HouseholdSetupScreen rejects a legacy invite locally without '
+      'a fallback', (tester) async {
+    await tester.pumpWidget(_wrap(const HouseholdSetupScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Paste invite token'),
+      'KS-HOUSEH',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Join'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('This invite cannot be used'), findsWidgets);
+    expect(find.textContaining('Invite code not found'), findsNothing);
+  });
+
+  test(
+    'opaque invite normalization removes whitespace without changing case',
+    () {
+      expect(
+        HouseholdOnboardingController.normalizeInviteToken(' AbC_d-12 3\n'),
+        'AbC_d-123',
+      );
+    },
+  );
 
   testWidgets('Onboarding screens render in dark theme without error', (
     tester,

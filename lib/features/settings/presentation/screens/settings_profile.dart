@@ -42,7 +42,7 @@ final settingsProfileProvider = StreamProvider<SettingsProfile>((ref) {
   }
 
   final db = ref.watch(firestoreProvider);
-  return auth.authStateChanges().switchMap((user) {
+  return auth.idTokenChanges().switchMap((user) {
     if (user == null) {
       return Stream.value(
         SettingsProfile(

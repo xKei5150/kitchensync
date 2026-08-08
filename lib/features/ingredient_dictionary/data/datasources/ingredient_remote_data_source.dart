@@ -66,17 +66,48 @@ class IngredientRemoteDataSource {
         .toList();
   }
 
-  Future<void> writeCustom(Ingredient ingredient) async {
-    final hid = ingredient.householdId;
-    if (hid == null) {
-      throw ArgumentError('Custom ingredient must have a householdId.');
-    }
-    final reference = _refs.customIngredients(hid).doc(ingredient.id);
+  /// Creates a custom ingredient, leaving an existing document untouched.
+  ///
+  /// Custom ingredient ids are deterministic, so two callers resolving the
+  /// same name race for the same document. First write wins; the loser is a
+  /// no-op rather than an overwrite. Use [updateCustom] to change one.
+  Future<void> createCustom(Ingredient ingredient) async {
+    final reference = _customDoc(ingredient);
     await reference.firestore.runTransaction((transaction) async {
       final existing = await transaction.get(reference);
       if (existing.exists) return;
       transaction.set(reference, IngredientMapper.toMap(ingredient));
     });
+  }
+
+  /// Overwrites an existing custom ingredient.
+  ///
+  /// Throws a [StateError] when the document is absent rather than creating
+  /// it: an edit of something that no longer exists is a caller error, and
+  /// silently recreating it would resurrect a deleted ingredient.
+  ///
+  /// The write carries [Ingredient.createdAt] through unchanged, which
+  /// `firestore.rules` requires of every customIngredients update.
+  Future<void> updateCustom(Ingredient ingredient) async {
+    final reference = _customDoc(ingredient);
+    await reference.firestore.runTransaction((transaction) async {
+      final existing = await transaction.get(reference);
+      if (!existing.exists) {
+        throw StateError(
+          'Custom ingredient ${ingredient.id} does not exist and cannot be '
+          'updated.',
+        );
+      }
+      transaction.set(reference, IngredientMapper.toMap(ingredient));
+    });
+  }
+
+  DocumentReference<Map<String, dynamic>> _customDoc(Ingredient ingredient) {
+    final hid = ingredient.householdId;
+    if (hid == null) {
+      throw ArgumentError('Custom ingredient must have a householdId.');
+    }
+    return _refs.customIngredients(hid).doc(ingredient.id);
   }
 
   Future<int> upsertSeedBatched(List<Ingredient> seed) async {

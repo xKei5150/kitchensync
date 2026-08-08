@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show PlatformException;
@@ -117,6 +119,16 @@ final authenticationOperationInProgressProvider = StateProvider<bool>(
   (ref) => false,
 );
 
+/// True only for the short interval after a deletion request is durably
+/// accepted and while Firebase publishes the resulting signed-out state.
+///
+/// The router uses this marker to keep the public confirmation location from
+/// being bounced to the generic loading page during that one transition. It
+/// never grants a signed-in session access to the confirmation route.
+final accountDeletionSignOutInProgressProvider = StateProvider<bool>(
+  (ref) => false,
+);
+
 final googleSignInProvider = Provider<GoogleSignIn?>((ref) {
   final available = ref.watch(authenticationProviderAvailabilityProvider);
   if (!available.google) return null;
@@ -231,6 +243,114 @@ class AuthenticationController {
     return _requiredAuth.sendPasswordResetEmail(email: email);
   }
 
+  Future<void> sendEmailVerification() async {
+    final user = _requiredAuth.currentUser;
+    if (user == null) {
+      throw StateError('Sign in before verifying your email.');
+    }
+    await user.sendEmailVerification();
+  }
+
+  Future<void> reloadAndRefreshEmailVerification() async {
+    final auth = _requiredAuth;
+    final user = auth.currentUser;
+    if (user == null) {
+      throw StateError('Sign in before checking your email verification.');
+    }
+    await user.reload();
+    await auth.currentUser?.getIdToken(true);
+  }
+
+  Future<void> reauthenticateWithEmailPassword({
+    required String password,
+  }) async {
+    final auth = _requiredAuth;
+    final user = auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null || email.isEmpty) {
+      throw const AuthenticationConfigurationException(
+        'Email/password reauthentication is unavailable for this account.',
+      );
+    }
+    _requireLinkedProvider(user, 'password', 'Email/password');
+    await user.reauthenticateWithCredential(
+      EmailAuthProvider.credential(email: email, password: password),
+    );
+  }
+
+  Future<void> reauthenticateWithGoogle() async {
+    final auth = _requiredAuth;
+    final user = auth.currentUser;
+    if (user == null) throw StateError('Sign in before reauthenticating.');
+    try {
+      _requireLinkedProvider(user, 'google.com', 'Google');
+      if (kIsWeb) {
+        await user.reauthenticateWithProvider(GoogleAuthProvider());
+        return;
+      }
+      final google = googleSignIn;
+      if (google == null) {
+        throw const AuthenticationConfigurationException(
+          'Google reauthentication is not configured for this build.',
+        );
+      }
+      GoogleSignInAccount? account;
+      try {
+        account = await google.signIn();
+      } on PlatformException catch (error) {
+        if (error.code == 'sign_in_canceled' ||
+            error.code == 'canceled' ||
+            error.code == 'cancelled') {
+          throw const AuthenticationCancelled();
+        }
+        rethrow;
+      }
+      if (account == null) throw const AuthenticationCancelled();
+      final tokens = await account.authentication;
+      final idToken = tokens.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw const AuthenticationConfigurationException(
+          'Google did not return an identity token. Retry the identity check.',
+        );
+      }
+      await user.reauthenticateWithCredential(
+        GoogleAuthProvider.credential(
+          idToken: idToken,
+          accessToken: tokens.accessToken,
+        ),
+      );
+    } on FirebaseAuthException catch (error) {
+      if (_isProviderCancellation(error)) {
+        throw const AuthenticationCancelled();
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> reauthenticateWithApple() async {
+    final auth = _requiredAuth;
+    final user = auth.currentUser;
+    if (user == null) throw StateError('Sign in before reauthenticating.');
+    try {
+      _requireLinkedProvider(user, 'apple.com', 'Apple');
+      if (!kIsWeb && defaultTargetPlatform != TargetPlatform.iOS) {
+        throw const AuthenticationConfigurationException(
+          'Apple reauthentication is only available on configured Apple '
+          'devices.',
+        );
+      }
+      final provider = AppleAuthProvider()
+        ..addScope('email')
+        ..addScope('name');
+      await user.reauthenticateWithProvider(provider);
+    } on FirebaseAuthException catch (error) {
+      if (_isProviderCancellation(error)) {
+        throw const AuthenticationCancelled();
+      }
+      rethrow;
+    }
+  }
+
   Future<void> signOut() async {
     // Firebase sign-out is authoritative. A best-effort native Google sign-out
     // prevents a stale account picker selection on the next explicit sign-in,
@@ -246,6 +366,32 @@ class AuthenticationController {
       }
     }
   }
+
+  /// Waits for Firebase Auth to publish the authoritative signed-out event.
+  ///
+  /// `FirebaseAuth.signOut()` completing is not enough for routing: the
+  /// session stream can still expose the previous identity for a frame. The
+  /// null event is the boundary at which it is safe to enter a public route.
+  Future<void> waitForSignedOut() async {
+    final auth = this.auth;
+    if (auth == null) return;
+    await auth.authStateChanges().firstWhere((user) => user == null);
+  }
+
+  void _requireLinkedProvider(User user, String providerId, String label) {
+    if (!user.providerData.any(
+      (provider) => provider.providerId == providerId,
+    )) {
+      throw AuthenticationConfigurationException(
+        '$label reauthentication is unavailable for this account.',
+      );
+    }
+  }
+
+  bool _isProviderCancellation(FirebaseAuthException error) =>
+      error.code == 'popup-closed-by-user' ||
+      error.code == 'canceled' ||
+      error.code == 'cancelled';
 }
 
 String? validateEmailAddress(String value) {
@@ -265,9 +411,11 @@ String? validatePassword({
   required bool isRegistration,
 }) {
   if (value.isEmpty) return 'Enter your password.';
-  if (value.length < 6) return 'Password must be at least 6 characters.';
+  if (!isRegistration && value.length < 6) {
+    return 'Password must be at least 6 characters.';
+  }
   if (!isRegistration) return null;
-  if (value.length < 8) return 'Use at least 8 characters.';
+  if (value.length < 12) return 'Use at least 12 characters.';
   if (!RegExp('[A-Za-z]').hasMatch(value) || !RegExp('[0-9]').hasMatch(value)) {
     return 'Include at least one letter and one number.';
   }
@@ -307,4 +455,44 @@ String authenticationErrorMessage(Object error) {
     };
   }
   return 'Could not authenticate. Please try again.';
+}
+
+String emailVerificationErrorMessage(Object error) {
+  if (error is AuthenticationConfigurationException) return error.message;
+  if (error is StateError) return error.message;
+  if (error is FirebaseAuthException) {
+    return switch (error.code) {
+      'too-many-requests' =>
+        'Too many verification requests. Wait a moment and try again.',
+      'network-request-failed' =>
+        'Could not reach authentication. Check your connection and retry.',
+      'user-token-expired' ||
+      'invalid-user-token' => 'Your session expired. Sign in again.',
+      'user-disabled' =>
+        'This account has been disabled. Contact support for help.',
+      _ => 'Could not update email verification. Please try again.',
+    };
+  }
+  return 'Could not update email verification. Please try again.';
+}
+
+String reauthenticationErrorMessage(Object error) {
+  if (error is AuthenticationCancelled) return '';
+  if (error is AuthenticationConfigurationException) return error.message;
+  if (error is FirebaseAuthException) {
+    return switch (error.code) {
+      'wrong-password' ||
+      'invalid-credential' => 'That password was not accepted.',
+      'user-mismatch' => 'That sign-in account does not match this account.',
+      'too-many-requests' => 'Too many attempts. Wait a moment and try again.',
+      'network-request-failed' =>
+        'Could not reach authentication. Check your connection and retry.',
+      'user-disabled' =>
+        'This account has been disabled. Contact support for help.',
+      'popup-closed-by-user' || 'canceled' || 'cancelled' => '',
+      _ => 'We could not confirm your identity. Please try again.',
+    };
+  }
+  if (error is StateError) return error.message;
+  return 'We could not confirm your identity. Please try again.';
 }

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,10 +31,12 @@ void main() {
     final db = FirebaseFirestore.instance;
     await withTimeout('clear household Admin auth session', auth.signOut);
 
-    tester.view.physicalSize = const Size(393, 852);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+    }
 
     final suffix = DateTime.now().microsecondsSinceEpoch;
     const password = 'KitchenSync-123!';
@@ -94,7 +97,6 @@ void main() {
           'hasPremium': true,
           'maxMembers': 6,
           'memberCount': 3,
-          'inviteCode': 'KS-ADMIN',
           'createdAt': now,
           'updatedAt': now,
         },
@@ -126,7 +128,6 @@ void main() {
           'hasPremium': false,
           'maxMembers': 1,
           'memberCount': 1,
-          'inviteCode': 'KS-FALLBACK',
           'createdAt': now,
           'updatedAt': now,
         },
@@ -162,6 +163,7 @@ void main() {
       ],
     );
     addTearDown(router.dispose);
+    await binding.convertFlutterSurfaceToImage();
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     await tester.pumpWidget(
@@ -175,7 +177,8 @@ void main() {
     );
     await _waitForText(tester, 'Premium Successor');
     expect(find.byType(KsMemberRow), findsNWidgets(3));
-    expect(find.byType(KsInviteCode), findsOneWidget);
+    expect(find.byType(KsInviteCode), findsNothing);
+    await _waitForText(tester, 'Create invite');
 
     await tester.tap(find.text('Premium Successor'));
     await _waitForText(tester, 'Transfer Admin');
@@ -213,7 +216,8 @@ void main() {
         password: password,
       ),
     );
-    await _waitForFinder(tester, find.byType(KsInviteCode));
+    await _waitForText(tester, 'Create invite');
+    expect(find.byType(KsInviteCode), findsNothing);
     await tester.tap(find.text('Leaving Member'));
     await _waitForText(tester, 'Remove member');
     await tester.tap(find.text('Remove member'));
@@ -291,7 +295,7 @@ Future<void> _waitForFinder(WidgetTester tester, Finder finder) async {
   while (finder.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
     await tester.pump(const Duration(milliseconds: 100));
   }
-  await tester.pumpAndSettle();
+  await settleOrAdvance(tester);
   if (finder.evaluate().isEmpty) {
     final visibleText = tester
         .widgetList<Text>(find.byType(Text))
@@ -311,6 +315,6 @@ Future<void> _waitForAbsent(WidgetTester tester, Finder finder) async {
   while (finder.evaluate().isNotEmpty && DateTime.now().isBefore(deadline)) {
     await tester.pump(const Duration(milliseconds: 100));
   }
-  await tester.pumpAndSettle();
+  await settleOrAdvance(tester);
   expect(finder, findsNothing);
 }

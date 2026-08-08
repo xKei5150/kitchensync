@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,8 +35,10 @@ void main() {
     // not depend on whether a hardware keyboard is connected. The viewport size
     // is deliberately left native: this screen's hero overflows a forced
     // 393x852 logical viewport.
-    tester.view.viewInsets = FakeViewPadding.zero;
-    addTearDown(tester.view.resetViewInsets);
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      tester.view.viewInsets = FakeViewPadding.zero;
+      addTearDown(tester.view.resetViewInsets);
+    }
     final user = FirebaseAuth.instance.currentUser;
     expect(user, isNotNull);
     final uid = user!.uid;
@@ -102,12 +105,12 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     await binding.convertFlutterSurfaceToImage();
 
     await tester.ensureVisible(find.text('Community'));
     await tester.tap(find.byTooltip('Like recipe'));
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     final like = await withTimeout(
       'read persisted recipe like',
       () => FirebaseFirestore.instance
@@ -146,7 +149,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
     });
-    await tester.pumpAndSettle();
+    await settleOrAdvance(tester);
     expect(find.text('Clear steps and a useful serving size.'), findsOneWidget);
 
     await binding.takeScreenshot('recipe-social-public');
