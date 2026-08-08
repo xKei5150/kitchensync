@@ -69,7 +69,7 @@ function assertReadinessBlocks(extra, label) {
     assert(result.status !== 0, `${label} unexpectedly succeeded`)
     const log = readFileSync(fixture.log, "utf8")
     assert(!log.includes("smoke:before-rules"), `${label} reached client smoke:\n${log}`)
-    assert(!log.includes("--only firestore:rules,storage:rules"), `${label} deployed rules:\n${log}`)
+    assert(!log.includes("--only firestore:rules,storage"), `${label} deployed rules:\n${log}`)
   } finally {
     removeFixture(fixture)
   }
@@ -269,7 +269,7 @@ function testRolloutOrdering() {
     const log = readFileSync(fixture.log, "utf8")
     const functionsDeploy = log.indexOf("--only functions,firestore:indexes")
     const beforeSmoke = log.indexOf("smoke:before-rules")
-    const rulesDeploy = log.indexOf("--only firestore:rules,storage:rules")
+    const rulesDeploy = log.indexOf("--only firestore:rules,storage")
     const afterSmoke = log.indexOf("smoke:after-rules")
     assert(
       functionsDeploy >= 0 && functionsDeploy < beforeSmoke && beforeSmoke < rulesDeploy && rulesDeploy < afterSmoke,
@@ -281,7 +281,7 @@ function testRolloutOrdering() {
     assert(
       rulesDeployments.length === 1 &&
         rulesDeployments[0] ===
-          "deploy --project kitchensync-dev-da503 --only firestore:rules,storage:rules",
+          "deploy --project kitchensync-dev-da503 --only firestore:rules,storage",
       `rules must deploy together without a weaker separate path:\n${log}`,
     )
   } finally {
@@ -292,7 +292,7 @@ function testRolloutOrdering() {
 function testRulesDeploymentIncludesStorageAndNoWeakerPath() {
   const rollout = readFileSync(resolve(repoRoot, "tools/firebase-gates/rollout-dev.sh"), "utf8")
   assert(
-    rollout.includes("--only firestore:rules,storage:rules"),
+    rollout.includes("--only firestore:rules,storage"),
     "rollout must deploy Firestore Rules and Storage Rules together",
   )
   assert(
@@ -316,7 +316,7 @@ function testBackendDeployIsNoninteractive() {
       `backend deploy must use --force for noninteractive cleanup-policy creation:\n${invocations.join("\n")}`,
     )
     assert(
-      invocations.includes("deploy --project kitchensync-dev-da503 --only firestore:rules,storage:rules"),
+      invocations.includes("deploy --project kitchensync-dev-da503 --only firestore:rules,storage"),
       `rules deploy arguments changed unexpectedly:\n${invocations.join("\n")}`,
     )
   } finally {
@@ -348,7 +348,7 @@ function testSmokeFailureBlocksRules() {
     })
     assert(result.status !== 0, "pre-rules semantic smoke failure unexpectedly succeeded")
     const log = readFileSync(fixture.log, "utf8")
-    assert(!log.includes("--only firestore:rules,storage:rules"), `rules deployed after failed smoke:\n${log}`)
+    assert(!log.includes("--only firestore:rules,storage"), `rules deployed after failed smoke:\n${log}`)
   } finally {
     removeFixture(fixture)
   }

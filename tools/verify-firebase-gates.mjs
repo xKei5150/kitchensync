@@ -562,7 +562,7 @@ check("rollout script is fail closed", () => {
   const rollout = source("tools/firebase-gates/rollout-dev.sh")
   const backend = rollout.indexOf("functions,firestore:indexes")
   const beforeSmoke = rollout.indexOf("before-rules")
-  const rules = rollout.indexOf("firestore:rules,storage:rules")
+  const rules = rollout.indexOf("firestore:rules,storage")
   const afterSmoke = rollout.indexOf("after-rules")
   assert(rollout.includes("set -eu"), "rollout must stop on errors")
   assert(rollout.includes(devProject), "rollout must pin the dev project")
@@ -571,7 +571,7 @@ check("rollout script is fail closed", () => {
     "rollout order must be backend, pre-rules smoke, combined Rules, post-rules smoke",
   )
   assert(
-    rollout.includes("--only firestore:rules,storage:rules"),
+    rollout.includes("--only firestore:rules,storage"),
     "rollout must deploy Firestore Rules and Storage Rules together",
   )
   assert(
@@ -596,7 +596,7 @@ check("prod rollout script is fail closed and requires confirmation", () => {
   assert(rollout.includes("firebase.prod.json"), "prod rollout must use the production Firebase config")
   const rules = rollout.indexOf("--only firestore:rules")
   const indexes = rollout.indexOf("--only firestore:indexes")
-  const storage = rollout.indexOf("--only storage:rules")
+  const storage = rollout.indexOf("--only storage")
   const functions = rollout.indexOf("--only functions")
   const hosting = rollout.indexOf("--only hosting:admin")
   assert(

@@ -108,7 +108,7 @@ while [ "$attempt" -le "$WAIT_ATTEMPTS" ]; do
 done
 
 "$SMOKE_COMMAND" before-rules
-"$FIREBASE_BIN" deploy --project "$DEV_PROJECT" --only firestore:rules,storage:rules
+"$FIREBASE_BIN" deploy --project "$DEV_PROJECT" --only firestore:rules,storage
 "$SMOKE_COMMAND" after-rules
 
 printf 'Firebase dev rollout completed safely for %s\n' "$DEV_PROJECT"

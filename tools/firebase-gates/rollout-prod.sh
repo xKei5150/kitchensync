@@ -46,7 +46,7 @@ echo "==> [2/5] Deploying Firestore Indexes to $PROD_PROJECT"
 echo "    OK Firestore Indexes"
 
 echo "==> [3/5] Deploying Storage Rules to $PROD_PROJECT"
-"$FIREBASE_BIN" deploy --config firebase.prod.json --project "$PROD_PROJECT" --only storage:rules --force
+"$FIREBASE_BIN" deploy --config firebase.prod.json --project "$PROD_PROJECT" --only storage --force
 echo "    OK Storage Rules"
 
 echo "==> [4/5] Deploying Functions to $PROD_PROJECT"

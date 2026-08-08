@@ -80,7 +80,7 @@ firebase-rollout-dev:
 	tools/firebase-gates/rollout-dev.sh
 
 firebase-deploy-prod-backend:
-	tools/firebase-gates/firebase.sh deploy --config firebase.prod.json --project kitchensync-prod-8d6fd --only functions,firestore:rules,firestore:indexes,storage:rules
+	tools/firebase-gates/firebase.sh deploy --config firebase.prod.json --project kitchensync-prod-8d6fd --only functions,firestore:rules,firestore:indexes,storage
 
 firebase-rollout-prod:
 	tools/firebase-gates/rollout-prod.sh --confirm-prod
