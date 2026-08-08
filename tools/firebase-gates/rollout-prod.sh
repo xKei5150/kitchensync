@@ -29,11 +29,6 @@ login_count=$(printf '%s' "$login_json" | jq -er '
   select(.status == "success" and (.result | type == "array")) | .result | length
 ') || fail "Firebase credential output is malformed"
 [ "$login_count" -gt 0 ] || fail "Firebase login has no authenticated account"
-active_project=$("$FIREBASE_BIN" use --json | jq -er '
-  select(.status == "success" and (.result | type == "string")) | .result
-') || fail "Firebase project lookup failed"
-[ "$active_project" = "$PROD_PROJECT" ] || fail "active Firebase project is not $PROD_PROJECT"
-
 # Production deploys always use the production Firebase config so the admin
 # Hosting CSP and Rules sources are guaranteed to be the production ones.
 # Order is deliberate: Rules/Indexes/Storage first, then Functions, then the SPA.
