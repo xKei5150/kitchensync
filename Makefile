@@ -1,4 +1,10 @@
-.PHONY: get gen watch analyze test cov format clean run-dev run-prod build-dev build-prod functions-install functions-lint functions-build functions-test functions-test-emulator functions-gate rules-test integration-gate firebase-gates firebase-indexes-list firebase-deploy-dev-backend firebase-rollout-dev firebase-deploy-prod-backend firebase-rollout-prod deploy-planner-dev deploy-planner-prod firebase-native-config-dev firebase-native-config-prod emulators-full emulator
+.PHONY: get gen watch analyze test cov format clean run-dev run-prod build-dev build-prod functions-install functions-lint functions-build functions-test functions-test-emulator functions-gate rules-test integration-gate firebase-gates firebase-indexes-list firebase-deploy-dev-backend firebase-rollout-dev firebase-deploy-prod-backend firebase-rollout-prod deploy-planner-dev deploy-planner-prod firebase-native-config-dev firebase-native-config-prod assert-prod-auth-config emulators-full emulator
+
+
+# OAuth client IDs are public, but environment-specific. Dev remains usable on
+# a fresh clone; prod artifacts must not be built without its verified config.
+AUTH_DEV_DEFINE := $(if $(wildcard tool/auth/auth.dev.json),--dart-define-from-file=tool/auth/auth.dev.json,)
+AUTH_PROD_DEFINE := --dart-define-from-file=tool/auth/auth.prod.json
 
 get:
 	flutter pub get
@@ -26,10 +32,13 @@ clean:
 	flutter clean
 
 run-dev:
-	flutter run --dart-define=ENV=dev
+	flutter run --dart-define=ENV=dev $(AUTH_DEV_DEFINE)
 
-run-prod:
-	flutter run --dart-define=ENV=prod
+assert-prod-auth-config:
+	@test -f tool/auth/auth.prod.json || (echo "Missing tool/auth/auth.prod.json; run Firebase OAuth config sync first." >&2; exit 1)
+
+run-prod: assert-prod-auth-config
+	flutter run --dart-define=ENV=prod $(AUTH_PROD_DEFINE)
 
 firebase-native-config-dev:
 	bash tools/sync-firebase-native-config.sh dev
@@ -38,10 +47,10 @@ firebase-native-config-prod:
 	bash tools/sync-firebase-native-config.sh prod
 
 build-dev: firebase-native-config-dev
-	flutter build apk --dart-define=ENV=dev --debug
+	flutter build apk --dart-define=ENV=dev --debug $(AUTH_DEV_DEFINE)
 
-build-prod: firebase-native-config-prod
-	flutter build appbundle --dart-define=ENV=prod --release
+build-prod: firebase-native-config-prod assert-prod-auth-config
+	flutter build appbundle --dart-define=ENV=prod --release $(AUTH_PROD_DEFINE)
 
 functions-install:
 	npm --prefix functions ci

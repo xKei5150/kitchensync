@@ -34,6 +34,7 @@ case "$mode" in
       KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV
       KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD
       KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_PROD
+      KITCHENSYNC_CI_AUTH_DEFINES_PROD
     )
     ;;
   *)
@@ -74,4 +75,5 @@ fi
 
 if [[ "$mode" == android-prod-release ]]; then
   write_secret KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_PROD android/app/google-services.json
+  write_secret KITCHENSYNC_CI_AUTH_DEFINES_PROD tool/auth/auth.prod.json
 fi

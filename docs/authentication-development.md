@@ -42,17 +42,10 @@ production project as part of local testing.
    SHA-256: 7B:1B:2A:8D:DF:2D:96:DC:CE:74:AB:4D:04:79:E8:7D:9B:48:C2:55:B2:D4:59:5F:D4:3C:3D:15:60:C3:74:11
    ```
 
-   Both fingerprints are already registered for Android app
-   `1:733234753301:android:d390bfa8a5323514f7c31c`. The current downloaded
-   Android configuration has zero OAuth client entries, so the remaining
-   action is to enable/configure Google and create the associated OAuth
-   clients; re-registering these hashes alone will not make Google sign-in
-   available.
-
-   The development project has the current local debug SHA-1/SHA-256
-   registered, but Google cannot be enabled until a valid Google OAuth
-   `client_id` exists. This is a console-side action, not a value to invent in
-   source code.
+   Google is enabled in both Firebase projects as of 2026-08-09. The refreshed
+   development config contains the generated Web and iOS OAuth clients. Keep
+   the fingerprints registered: re-registering them is not a substitute for
+   the generated clients or the environment-specific Dart defines.
 3. After the provider and clients exist, refresh—not hand edit—the ignored
    native Firebase files. The current development app IDs are recorded in
    `firebase.json`:
@@ -261,39 +254,38 @@ Keep the source files ignored; do not commit them.
 ## Production Authentication Handoff (2026-08-08)
 
 The production Firebase project, Functions, Rules, Storage bucket, App Check
-configs, Hosting site, runtime identities, and Secret Manager values were
-provisioned and deployed on 2026-08-08. Firebase Authentication itself still
-returns `CONFIGURATION_NOT_FOUND` through the public Identity Toolkit API until
-an owner initializes it in the Firebase Console. This cannot be bootstrapped by
-the Firebase CLI or public REST API.
+configs, Hosting site, runtime identities, Secret Manager values, Email/Password
+Auth, and Google Auth were provisioned and deployed by 2026-08-09. The generated
+Google provider is enabled in production and has the registered Android debug
+and upload SHA-1s plus the matching Web and iOS OAuth clients.
 
-Complete these actions with the production Firebase/Apple owner before inviting
-end users:
+The following external steps remain before inviting all end users:
 
-1. In Firebase Console for `kitchensync-prod-8d6fd`, open **Authentication**
-   and select **Get started**. Enable Email/Password and Google, select the
-   production support email, and confirm the automatically created Google Web
-   OAuth client. The Android upload SHA-1/SHA-256 and debug SHA-1 were already
-   registered through Firebase CLI for Android app
-   `1:310529205684:android:070ee629e4a4a4c0763ee1`.
+1. Execute a real Google consent/login canary on a release-signed Android device
+   and an iOS device. The signed AAB now carries the generated prod Android
+   config and `GOOGLE_WEB_CLIENT_ID`; its build remains reproducible through
+   `make build-prod`.
 2. In Apple Developer, enable Sign in with Apple and Push Notifications for
    `com.example.kitchensync`, create the required Service ID and APNs key, then
    configure the Apple provider and APNs credentials in Firebase Authentication
    / Cloud Messaging. Add the real `DEVELOPMENT_TEAM` and distribution signing
    identity to the iOS release configuration.
-3. Refresh the ignored prod mobile configs after Google/Apple setup, verify that
-   the Android config now contains OAuth clients, and update the CI secret:
+3. The refreshed production Android config and public Dart define file are
+   already stored as `KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_PROD` and
+   `KITCHENSYNC_CI_AUTH_DEFINES_PROD`. Refresh both after any future OAuth
+   client change:
 
    ```sh
    make firebase-native-config-prod
-   jq '[.client[].oauth_client[]?] | length' android/app/google-services.json
    gh secret set --repo xKei5150/kitchensync \
      KITCHENSYNC_CI_GOOGLE_SERVICES_JSON_PROD < android/app/google-services.json
+   gh secret set --repo xKei5150/kitchensync \
+     KITCHENSYNC_CI_AUTH_DEFINES_PROD < tool/auth/auth.prod.json
    ```
 
-4. Execute real Google and Apple consent canaries on release-signed devices.
-   Then create a real production staff identity and run the App Check,
+4. Create a real production staff identity and run the App Check,
    callable-origin, and revoked-token canaries in the admin deployment runbook.
 
-Do not mark Google/Apple authentication or iOS distribution verified before
-these external provider actions complete.
+Do not mark Apple authentication or iOS distribution verified before the
+remaining Apple Developer actions complete. Google is provisioned but still
+needs the real device consent canary.
