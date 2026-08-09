@@ -121,7 +121,19 @@ jobs:
         working-directory: tools/rules_tests
         run: npm test
       - name: Run Functions emulator tests
-        run: tools/firebase-gates/firebase.sh --config firebase.dev.json emulators:exec --only auth,firestore,functions,storage --project kitchensync-dev-da503 "npm --prefix functions run test:emulator"
+        run: |
+          set -eu
+          umask 077
+          token() { node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))'; }
+          {
+            printf 'ADMIN_RATE_LIMIT_KEY=%s\n' "$(token)"
+            printf 'ADMIN_AUDIT_HMAC_KEY=%s\n' "$(token)"
+            printf 'INVITE_TOKEN_HMAC_KEY=%s\n' "$(token)"
+            printf 'INVITE_RATE_LIMIT_KEY=%s\n' "$(token)"
+            printf 'ACCOUNT_LIFECYCLE_RECEIPT_HMAC_KEY=%s\n' "$(token)"
+          } > functions/.secret.local
+          trap 'rm -f functions/.secret.local' EXIT
+          tools/firebase-gates/firebase.sh --config firebase.dev.json emulators:exec --only auth,firestore,functions,storage --project kitchensync-dev-da503 "npm --prefix functions run test:emulator"
 
   integration:
     runs-on: ubuntu-latest

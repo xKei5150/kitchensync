@@ -591,14 +591,18 @@ async function seedJoint(db: Firestore, householdId: string) {
 }
 
 async function seedAdditionalPremiumHousehold(db: Firestore, householdId: string, ownerId: string) {
+  // Invite issuance validates entitlement against Timestamp.now(), so this
+  // fixture must be active relative to the test execution, not a fixed date.
+  const trialStartedAt = Timestamp.now()
+  const trialEndsAt = Timestamp.fromMillis(trialStartedAt.toMillis() + 24 * 60 * 60 * 1000)
   await db.doc(`users/${ownerId}`).set({
     householdIds: [householdId],
     activeHouseholdId: householdId,
     joinedPremiumHouseholdIds: [householdId],
     isPremium: true,
     premiumPlan: "monthly",
-    premiumTrialStartedAt: now,
-    premiumTrialEndsAt: Timestamp.fromMillis(now.toMillis() + 24 * 60 * 60 * 1000),
+    premiumTrialStartedAt: trialStartedAt,
+    premiumTrialEndsAt: trialEndsAt,
   })
   await db.doc(`households/${householdId}`).set({
     isJoint: true,
@@ -607,8 +611,8 @@ async function seedAdditionalPremiumHousehold(db: Firestore, householdId: string
     premiumOwnerUserId: ownerId,
     premiumOwnership: { type: "in_app_trial", ownerUserId: ownerId },
     premiumPlan: "monthly",
-    premiumTrialStartedAt: now,
-    premiumTrialEndsAt: Timestamp.fromMillis(now.toMillis() + 24 * 60 * 60 * 1000),
+    premiumTrialStartedAt: trialStartedAt,
+    premiumTrialEndsAt: trialEndsAt,
     maxMembers: 6,
     memberCount: 1,
   })
@@ -624,8 +628,8 @@ async function seedAdditionalPremiumHousehold(db: Firestore, householdId: string
     plan: "monthly",
     ownerUserId: ownerId,
     premiumOwnership: { type: "in_app_trial", ownerUserId: ownerId },
-    startedAt: now,
-    trialEndsAt: Timestamp.fromMillis(now.toMillis() + 24 * 60 * 60 * 1000),
+    startedAt: trialStartedAt,
+    trialEndsAt,
   })
 }
 
