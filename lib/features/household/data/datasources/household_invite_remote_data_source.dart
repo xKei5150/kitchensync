@@ -63,8 +63,7 @@ class HouseholdInviteRemoteDataSource implements HouseholdInviteDataSource {
 
   HouseholdInviteRemoteDataSource.forTesting(
     HouseholdInviteCallableInvoker invoke,
-  )
-    : _invoke = invoke;
+  ) : _invoke = invoke;
 
   final HouseholdInviteCallableInvoker _invoke;
 

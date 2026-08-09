@@ -473,7 +473,6 @@ class _IngredientRepositoryFake implements IngredientRepository {
   @override
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       Stream.value(const []);
-
 }
 
 class _PantryRepositoryFake

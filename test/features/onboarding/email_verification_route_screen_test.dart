@@ -129,22 +129,19 @@ void main() {
     },
   );
 
-  test(
-    'email verification error mapping keeps configuration and auth failures '
-        'clear',
-    () {
-      expect(
-        emailVerificationErrorMessage(
-          const AuthenticationConfigurationException('Auth is unavailable.'),
-        ),
-        'Auth is unavailable.',
-      );
-      expect(
-        emailVerificationErrorMessage(
-          FirebaseAuthException(code: 'network-request-failed'),
-        ),
-        'Could not reach authentication. Check your connection and retry.',
-      );
-    },
-  );
+  test('email verification error mapping keeps configuration and auth failures '
+      'clear', () {
+    expect(
+      emailVerificationErrorMessage(
+        const AuthenticationConfigurationException('Auth is unavailable.'),
+      ),
+      'Auth is unavailable.',
+    );
+    expect(
+      emailVerificationErrorMessage(
+        FirebaseAuthException(code: 'network-request-failed'),
+      ),
+      'Could not reach authentication. Check your connection and retry.',
+    );
+  });
 }

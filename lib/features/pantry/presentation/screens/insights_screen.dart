@@ -550,9 +550,7 @@ class _WasteTrendCard extends ConsumerWidget {
                               : KsTokens.expired.withValues(
                                   alpha: 0.35 + 0.65 * (weeks[i] / peak),
                                 ),
-                          borderRadius: BorderRadius.circular(
-                            KsTokens.radius4,
-                          ),
+                          borderRadius: BorderRadius.circular(KsTokens.radius4),
                         ),
                       ),
                       const SizedBox(height: KsTokens.space6),

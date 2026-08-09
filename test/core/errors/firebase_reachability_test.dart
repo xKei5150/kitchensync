@@ -59,10 +59,7 @@ void main() {
     });
 
     test('does not classify a null message on an unknown code', () {
-      expect(
-        isFirebaseBackendUnreachable(code: 'unknown'),
-        isFalse,
-      );
+      expect(isFirebaseBackendUnreachable(code: 'unknown'), isFalse);
     });
 
     // A transport phrase must not launder a real authorization or server

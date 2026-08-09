@@ -94,6 +94,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup JDK 21 for Firebase Local Emulator Suite
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -120,6 +125,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup JDK 21 for Firebase Local Emulator Suite
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
 
       - name: Restore Firebase configuration
         env:

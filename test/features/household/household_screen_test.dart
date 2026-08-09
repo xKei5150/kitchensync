@@ -74,9 +74,7 @@ Widget _wrap({
 
 void main() {
   testWidgets('Admin issues an invite through the trusted callable '
-      'controller', (
-    tester,
-  ) async {
+      'controller', (tester) async {
     tester.view.physicalSize = const Size(400, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -109,20 +107,14 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Create invite'));
     await tester.pumpAndSettle();
     expect(inviteDataSource.issueCalls, [
-      (
-        'joint-household',
-        HouseholdInviteRole.member,
-        'issue-command-1',
-      ),
+      ('joint-household', HouseholdInviteRole.member, 'issue-command-1'),
     ]);
     expect(find.byType(KsInviteCode), findsOneWidget);
     expect(find.text(_inviteToken), findsOneWidget);
   });
 
   testWidgets('token-free issuance replay prompts an Admin to create a new '
-      'invite', (
-    tester,
-  ) async {
+      'invite', (tester) async {
     final inviteDataSource = _FakeInviteDataSource(
       issueResult: const HouseholdInviteIssueResult(
         requestId: 'request-1',
@@ -153,9 +145,7 @@ void main() {
   });
 
   testWidgets('invite issue errors stay user-safe and leave no token on '
-      'screen', (
-    tester,
-  ) async {
+      'screen', (tester) async {
     final inviteDataSource = _FakeInviteDataSource(
       issueError: StateError('Invite service returned an invalid response.'),
     );

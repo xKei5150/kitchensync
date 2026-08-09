@@ -4,11 +4,14 @@ import 'package:kitchensync/features/household/data/datasources/household_invite
 void main() {
   const token = 'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE';
 
-  test('issue sends only the callable contract and returns a fresh token',
-      () async {
-    final calls = <(String, Map<String, Object?>)>[];
-    final dataSource = HouseholdInviteRemoteDataSource.forTesting(
-      (name, data) async {
+  test(
+    'issue sends only the callable contract and returns a fresh token',
+    () async {
+      final calls = <(String, Map<String, Object?>)>[];
+      final dataSource = HouseholdInviteRemoteDataSource.forTesting((
+        name,
+        data,
+      ) async {
         calls.add((name, data));
         return {
           'requestId': 'request-1',
@@ -18,32 +21,31 @@ void main() {
           'alreadyIssued': false,
           'inviteToken': token,
         };
-      },
-    );
+      });
 
-    final result = await dataSource.issue(
-      householdId: 'household-1',
-      role: HouseholdInviteRole.member,
-      commandId: 'issue-command-1',
-    );
+      final result = await dataSource.issue(
+        householdId: 'household-1',
+        role: HouseholdInviteRole.member,
+        commandId: 'issue-command-1',
+      );
 
-    expect(calls, hasLength(1));
-    expect(calls.single.$1, 'issueHouseholdInvite');
-    expect(calls.single.$2, <String, Object?>{
-      'householdId': 'household-1',
-      'role': 'member',
-      'commandId': 'issue-command-1',
-    });
-    expect(result.requestId, 'request-1');
-    expect(result.inviteId, 'MTIzNDU2Nzg5MDEyMzQ1Ng');
-    expect(result.inviteToken, token);
-    expect(result.alreadyIssued, isFalse);
-    expect(calls.single.$2.toString(), isNot(contains(token)));
-  });
+      expect(calls, hasLength(1));
+      expect(calls.single.$1, 'issueHouseholdInvite');
+      expect(calls.single.$2, <String, Object?>{
+        'householdId': 'household-1',
+        'role': 'member',
+        'commandId': 'issue-command-1',
+      });
+      expect(result.requestId, 'request-1');
+      expect(result.inviteId, 'MTIzNDU2Nzg5MDEyMzQ1Ng');
+      expect(result.inviteToken, token);
+      expect(result.alreadyIssued, isFalse);
+      expect(calls.single.$2.toString(), isNot(contains(token)));
+    },
+  );
 
   test('issue accepts a token-free exact replay but rejects malformed '
-      'token data',
-      () async {
+      'token data', () async {
     final replayDataSource = HouseholdInviteRemoteDataSource.forTesting(
       (_, _) async => {
         'requestId': 'request-1',
@@ -82,11 +84,14 @@ void main() {
     );
   });
 
-  test('redeem sends only the raw token and command ID then parses context',
-      () async {
-    final calls = <(String, Map<String, Object?>)>[];
-    final dataSource = HouseholdInviteRemoteDataSource.forTesting(
-      (name, data) async {
+  test(
+    'redeem sends only the raw token and command ID then parses context',
+    () async {
+      final calls = <(String, Map<String, Object?>)>[];
+      final dataSource = HouseholdInviteRemoteDataSource.forTesting((
+        name,
+        data,
+      ) async {
         calls.add((name, data));
         return {
           'requestId': 'request-2',
@@ -94,23 +99,23 @@ void main() {
           'role': 'shopper',
           'alreadyApplied': false,
         };
-      },
-    );
+      });
 
-    final result = await dataSource.redeem(
-      inviteToken: token,
-      commandId: 'redeem-command-1',
-    );
+      final result = await dataSource.redeem(
+        inviteToken: token,
+        commandId: 'redeem-command-1',
+      );
 
-    expect(calls, hasLength(1));
-    expect(calls.single.$1, 'redeemHouseholdInvite');
-    expect(calls.single.$2, <String, Object?>{
-      'inviteToken': token,
-      'commandId': 'redeem-command-1',
-    });
-    expect(result.requestId, 'request-2');
-    expect(result.householdId, 'household-1');
-    expect(result.role, HouseholdInviteRole.shopper);
-    expect(result.alreadyApplied, isFalse);
-  });
+      expect(calls, hasLength(1));
+      expect(calls.single.$1, 'redeemHouseholdInvite');
+      expect(calls.single.$2, <String, Object?>{
+        'inviteToken': token,
+        'commandId': 'redeem-command-1',
+      });
+      expect(result.requestId, 'request-2');
+      expect(result.householdId, 'household-1');
+      expect(result.role, HouseholdInviteRole.shopper);
+      expect(result.alreadyApplied, isFalse);
+    },
+  );
 }

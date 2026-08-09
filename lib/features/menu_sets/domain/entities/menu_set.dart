@@ -173,9 +173,7 @@ class MenuSetDraftFactory {
       createdAt: now,
       updatedAt: now,
       isPublicTemplate: source.isPublicTemplate,
-      days: [
-        for (final day in source.days) _duplicateDay(day, copyId, suffix),
-      ],
+      days: [for (final day in source.days) _duplicateDay(day, copyId, suffix)],
     );
   }
 

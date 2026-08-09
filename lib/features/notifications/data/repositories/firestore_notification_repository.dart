@@ -120,7 +120,8 @@ HouseholdNotification _notificationFromMessage(
   PushNotificationMessage message,
 ) {
   return HouseholdNotification(
-    id: message.notificationId ??
+    id:
+        message.notificationId ??
         DateTime.now().millisecondsSinceEpoch.toString(),
     householdId: message.householdId,
     recipientUserId: message.recipientUserId,

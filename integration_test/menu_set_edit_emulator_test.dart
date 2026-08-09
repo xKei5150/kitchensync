@@ -84,22 +84,22 @@ void main() {
   testWidgets(
     'menu set from past calendar normalizes days and drops cancelled',
     (tester) async {
-    await bootEmulatedApp();
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    final householdId = debugHouseholdIdForUser(uid);
-    await withTimeout(
-      'upgrade household to premium',
-      () => _upgradeHouseholdToPremium(
-        uid: uid,
-        householdId: householdId,
-        now: DateTime(2026, 7, 5),
-      ),
-    );
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    final calendar = container.read(calendarRepositoryProvider);
-    final day1 = DateTime(2026, 7, 6);
-    final day2 = DateTime(2026, 7, 7);
+      await bootEmulatedApp();
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final householdId = debugHouseholdIdForUser(uid);
+      await withTimeout(
+        'upgrade household to premium',
+        () => _upgradeHouseholdToPremium(
+          uid: uid,
+          householdId: householdId,
+          now: DateTime(2026, 7, 5),
+        ),
+      );
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final calendar = container.read(calendarRepositoryProvider);
+      final day1 = DateTime(2026, 7, 6);
+      final day2 = DateTime(2026, 7, 7);
 
       await withTimeout(
         'seed day1 dinner',
@@ -151,17 +151,17 @@ void main() {
         ),
       );
 
-    final editor = _editor(
-      container,
-      householdId: householdId,
-      userId: uid,
-      ids: List.generate(20, (i) => 'past-$i'),
-      clockNow: DateTime(2026, 7, 10, 9),
-    );
-    final created = await withTimeout(
-      'create menu set from past calendar',
-      () => editor.createFromPastCalendar(startDate: day1, endDate: day2),
-    );
+      final editor = _editor(
+        container,
+        householdId: householdId,
+        userId: uid,
+        ids: List.generate(20, (i) => 'past-$i'),
+        clockNow: DateTime(2026, 7, 10, 9),
+      );
+      final created = await withTimeout(
+        'create menu set from past calendar',
+        () => editor.createFromPastCalendar(startDate: day1, endDate: day2),
+      );
 
       final repo = container.read(menuSetRepositoryProvider);
       final loaded = await withTimeout(
@@ -259,39 +259,39 @@ void main() {
         clockNow: DateTime(2026, 7, 10, 9),
       );
 
-    // Persist a source set, then add a recipe so it has nested content.
-    var source = await withTimeout(
-      'save source set',
-      () => editor.saveDraft(name: 'Rotation', lengthInDays: 2),
-    );
-    source = await withTimeout(
-      'add recipe to source day 0',
-      () => editor.addRecipeToDraft(
-        draft: source,
-        recipeId: 'braise',
-        mealSlot: 'Dinner',
-        dayIndex: 0,
-      ),
-    );
+      // Persist a source set, then add a recipe so it has nested content.
+      var source = await withTimeout(
+        'save source set',
+        () => editor.saveDraft(name: 'Rotation', lengthInDays: 2),
+      );
+      source = await withTimeout(
+        'add recipe to source day 0',
+        () => editor.addRecipeToDraft(
+          draft: source,
+          recipeId: 'braise',
+          mealSlot: 'Dinner',
+          dayIndex: 0,
+        ),
+      );
 
-    // Duplicate through the real production path (screen delegates to this).
-    final copy = const MenuSetDraftFactory().duplicate(
-      source: source,
-      suffix: 99,
-      createdByUserId: uid,
-      now: DateTime(2026, 7, 10, 10),
-    );
-    await withTimeout('persist duplicate', () => repo.upsert(copy));
+      // Duplicate through the real production path (screen delegates to this).
+      final copy = const MenuSetDraftFactory().duplicate(
+        source: source,
+        suffix: 99,
+        createdByUserId: uid,
+        now: DateTime(2026, 7, 10, 10),
+      );
+      await withTimeout('persist duplicate', () => repo.upsert(copy));
 
-    final loadedCopy = await withTimeout(
-      'reload duplicate',
-      () => repo
-          .watchById(householdId: householdId, menuSetId: copy.id)
-          .firstWhere((m) => m != null),
-    );
-    expect(loadedCopy!.name, 'Rotation copy');
-    expect(loadedCopy.createdByUserId, uid);
-    expect(loadedCopy.dayAt(0)!.entries.single.recipeId, 'braise');
+      final loadedCopy = await withTimeout(
+        'reload duplicate',
+        () => repo
+            .watchById(householdId: householdId, menuSetId: copy.id)
+            .firstWhere((m) => m != null),
+      );
+      expect(loadedCopy!.name, 'Rotation copy');
+      expect(loadedCopy.createdByUserId, uid);
+      expect(loadedCopy.dayAt(0)!.entries.single.recipeId, 'braise');
 
       // Independence: rename the COPY's day; the SOURCE must be unaffected.
       await withTimeout(

@@ -90,7 +90,6 @@ class _Repository implements IngredientRepository {
   @override
   Stream<List<Ingredient>> watchByBarcode(String barcode) =>
       const Stream.empty();
-
 }
 
 void main() {

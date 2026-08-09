@@ -196,10 +196,9 @@ class _MenuSetEditorScreenState extends ConsumerState<MenuSetEditorScreen> {
   ) async {
     await _runEditorAction(
       context,
-      () =>
-          ref
-              .read(menuSetEditorControllerProvider)
-              .duplicateDay(draft: draft, dayIndex: dayIndex),
+      () => ref
+          .read(menuSetEditorControllerProvider)
+          .duplicateDay(draft: draft, dayIndex: dayIndex),
       successMessage: 'Duplicated Day ${dayIndex + 1}.',
       failureMessage: 'Could not duplicate day',
     );
@@ -213,10 +212,9 @@ class _MenuSetEditorScreenState extends ConsumerState<MenuSetEditorScreen> {
   ) async {
     await _runEditorAction(
       context,
-      () =>
-          ref
-              .read(menuSetEditorControllerProvider)
-              .clearDay(draft: draft, dayIndex: dayIndex),
+      () => ref
+          .read(menuSetEditorControllerProvider)
+          .clearDay(draft: draft, dayIndex: dayIndex),
       successMessage: 'Cleared Day ${dayIndex + 1}.',
       failureMessage: 'Could not clear day',
     );
@@ -249,14 +247,16 @@ class _MenuSetEditorScreenState extends ConsumerState<MenuSetEditorScreen> {
   ) async {
     await _runEditorAction(
       context,
-      () => ref.read(menuSetEditorControllerProvider).moveEntry(
-        draft: draft,
-        sourceDayId: sourceDayId,
-        entryId: entryId,
-        targetDayIndex: target.dayIndex,
-        targetMealSlot: target.mealSlot,
-        targetOrder: 0,
-      ),
+      () => ref
+          .read(menuSetEditorControllerProvider)
+          .moveEntry(
+            draft: draft,
+            sourceDayId: sourceDayId,
+            entryId: entryId,
+            targetDayIndex: target.dayIndex,
+            targetMealSlot: target.mealSlot,
+            targetOrder: 0,
+          ),
       successMessage: 'Moved recipe to Day ${target.dayIndex + 1}.',
       failureMessage: 'Could not move recipe',
     );
@@ -550,9 +550,7 @@ class _DayControlRow extends StatelessWidget {
                               recipeNames[entry.recipeId] ?? entry.recipeId,
                         )
                         .join(', '),
-                    style: KsTokens.bodySmall.copyWith(
-                      color: ks.textSecondary,
-                    ),
+                    style: KsTokens.bodySmall.copyWith(color: ks.textSecondary),
                   ),
               ],
             ),

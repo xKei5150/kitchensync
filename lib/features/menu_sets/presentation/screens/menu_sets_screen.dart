@@ -49,9 +49,7 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
     if (!mounted || created == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          'Created “${created.name}” — review and edit any day.',
-        ),
+        content: Text('Created “${created.name}” — review and edit any day.'),
       ),
     );
     ref.invalidate(activeHouseholdMenuSetsProvider);
@@ -289,7 +287,6 @@ class _MenuSetsScreenState extends ConsumerState<MenuSetsScreen> {
   }
 }
 
-
 class _Subhead extends StatelessWidget {
   const _Subhead(this.text);
 
@@ -436,8 +433,11 @@ class _PastCalendarSheetState extends ConsumerState<_PastCalendarSheet> {
 
   DateTime _yesterday() {
     final now = ref.read(clockProvider).now();
-    return DateTime(now.year, now.month, now.day)
-        .subtract(const Duration(days: 1));
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(const Duration(days: 1));
   }
 
   void _applyPreset(_PastRangePreset preset) {
@@ -487,11 +487,7 @@ class _PastCalendarSheetState extends ConsumerState<_PastCalendarSheet> {
     try {
       created = await ref
           .read(menuSetEditorControllerProvider)
-          .createFromPastCalendar(
-            startDate: _start,
-            endDate: _end,
-            name: name,
-          );
+          .createFromPastCalendar(startDate: _start, endDate: _end, name: name);
     } catch (error) {
       if (!mounted) return;
       setState(() => _isSaving = false);
@@ -602,8 +598,18 @@ class _PastCalendarSheetState extends ConsumerState<_PastCalendarSheet> {
 
   String _shortDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${date.day} ${months[date.month - 1]}';
   }

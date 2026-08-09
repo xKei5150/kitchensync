@@ -574,9 +574,7 @@ void _menuSetsTabGating() {
 
     test('branch indexes stay aligned with coreTabs in both states', () {
       for (final hasPremium in [false, true]) {
-        final indexes = KsAppShell.visibleBranchIndexes(
-          hasPremium: hasPremium,
-        );
+        final indexes = KsAppShell.visibleBranchIndexes(hasPremium: hasPremium);
         // Each retained index must still address its own destination, so the
         // shell's branch navigator cannot drift out of alignment.
         expect(indexes, equals(indexes.toList()..sort()));

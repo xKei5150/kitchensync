@@ -77,7 +77,6 @@ class _UnusedIngredientRepository implements IngredientRepository {
   Stream<List<Ingredient>> watchByBarcode(String barcode) {
     throw UnimplementedError();
   }
-
 }
 
 Future<void> _pump(WidgetTester tester, Result<List<Ingredient>> result) async {

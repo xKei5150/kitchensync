@@ -318,11 +318,7 @@ class MenuSetEditorController {
     days
       ..add(duplicate)
       ..sort((a, b) => a.dayIndex.compareTo(b.dayIndex));
-    return _persistDays(
-      draft,
-      days,
-      lengthInDays: draft.lengthInDays + 1,
-    );
+    return _persistDays(draft, days, lengthInDays: draft.lengthInDays + 1);
   }
 
   Future<MenuSet> _persistDays(

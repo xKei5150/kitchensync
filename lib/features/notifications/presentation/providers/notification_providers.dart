@@ -16,15 +16,15 @@ final activeNotificationsProvider = StreamProvider<List<HouseholdNotification>>(
     final userId = ref.watch(activeUserIdProvider);
     if (household == null) return Stream.value(const []);
     final repository = ref.watch(notificationRepositoryProvider);
-    return Rx.combineLatest2<List<HouseholdNotification>,
-        HouseholdNotification?, List<HouseholdNotification>>(
-      repository.watchNotifications(
-        householdId: household.id,
-        userId: userId,
+    return Rx.combineLatest2<
+      List<HouseholdNotification>,
+      HouseholdNotification?,
+      List<HouseholdNotification>
+    >(
+      repository.watchNotifications(householdId: household.id, userId: userId),
+      repository.foregroundMessages.cast<HouseholdNotification?>().startWith(
+        null,
       ),
-      repository.foregroundMessages
-          .cast<HouseholdNotification?>()
-          .startWith(null),
       (notifications, foreground) =>
           foreground == null ? notifications : [foreground, ...notifications],
     );

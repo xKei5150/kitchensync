@@ -84,8 +84,8 @@ class HouseholdInviteCommandController {
     'failed-precondition' || 'permission-denied' || 'not-found' =>
       'This invite cannot be used. Ask the household Admin for a new invite.',
     'resource-exhausted' => 'Too many invite attempts. Try again later.',
-    'unavailable' || 'aborted' =>
-      'Household invites are temporarily unavailable. Try again.',
+    'unavailable' ||
+    'aborted' => 'Household invites are temporarily unavailable. Try again.',
     _ => 'Could not complete the invite request. Try again.',
   };
 }
