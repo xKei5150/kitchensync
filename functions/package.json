@@ -12,7 +12,7 @@
     "test": "vitest run test/unit",
     "account-lifecycle:backfill": "npm run build && node scripts/account-lifecycle-backfill.mjs",
     "household-command-receipts:migrate": "npm run build && node scripts/household-command-receipt-migration.mjs",
-    "test:emulator": "vitest run test/emulator --pool=forks --no-file-parallelism --testTimeout=30000 --hookTimeout=30000"
+    "test:emulator": "vitest run test/emulator --pool=threads --no-file-parallelism --testTimeout=30000 --hookTimeout=30000 --teardownTimeout=30000"
   },
   "dependencies": {
     "firebase-admin": "^13.10.0",
