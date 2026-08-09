@@ -78,8 +78,8 @@ jobs:
       - name: Analyze Flutter app and test surface
         run: flutter analyze lib test integration_test
 
-      - name: Test
-        run: flutter test --coverage
+      - name: Test (excluding platform-specific goldens)
+        run: flutter test --coverage --exclude-tags=golden
 
       - name: Enforce 80% coverage
         run: |

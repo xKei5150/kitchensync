@@ -1,0 +1,4 @@
+tags:
+  golden:
+    # Pixel baselines are platform/font-renderer specific. Run explicitly on
+    # the baseline platform with: flutter test --tags=golden.
