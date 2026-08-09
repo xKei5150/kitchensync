@@ -3,6 +3,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 TEST_DIR="$ROOT_DIR/tools/rules_tests"
+FIREBASE_BIN="${FIREBASE_BIN:-$ROOT_DIR/tools/firebase-gates/firebase.sh}"
+[[ -x "$FIREBASE_BIN" ]] || {
+  echo "Pinned Firebase CLI wrapper is unavailable: $FIREBASE_BIN" >&2
+  exit 1
+}
 PROJECT_ID="${FIRESTORE_RULES_TEST_PROJECT:-kitchensync-rules-test}"
 EMULATOR_HOST="${FIRESTORE_EMULATOR_HOST:-127.0.0.1:18080}"
 EMULATOR_HOSTNAME="${EMULATOR_HOST%:*}"
@@ -43,7 +48,7 @@ fs.writeFileSync('$TMP_CONFIG', JSON.stringify(config));
 # creates another group, so cleanup also records and terminates descendants.
 set -m
 FIRESTORE_EMULATOR_HOST="$EMULATOR_HOST" \
-  firebase emulators:start --only firestore,storage --project="$PROJECT_ID" \
+  "$FIREBASE_BIN" emulators:start --only firestore,storage --project="$PROJECT_ID" \
   --config "$TMP_CONFIG" \
   >/tmp/kitchensync-firestore-emulator.log 2>&1 &
 EMULATOR_PID=$!
