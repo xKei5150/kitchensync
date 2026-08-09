@@ -52,12 +52,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Restore Firebase configuration
-        env:
-          KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV: ${{ secrets.KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV }}
-          KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD: ${{ secrets.KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD }}
-        run: bash .github/scripts/restore-firebase-config.sh flutter-only
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -70,8 +64,16 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Verify formatting
+      # Generated Firebase options are intentionally ignored and restored only
+      # after formatting. Their FlutterFire formatting may differ by SDK patch.
+      - name: Verify tracked Dart formatting
         run: dart format --set-exit-if-changed lib test integration_test
+
+      - name: Restore Firebase configuration
+        env:
+          KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV: ${{ secrets.KITCHENSYNC_CI_FIREBASE_OPTIONS_DEV }}
+          KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD: ${{ secrets.KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD }}
+        run: bash .github/scripts/restore-firebase-config.sh flutter-only
 
       - name: Analyze
         run: flutter analyze
