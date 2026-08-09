@@ -75,8 +75,8 @@ jobs:
           KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD: ${{ secrets.KITCHENSYNC_CI_FIREBASE_OPTIONS_PROD }}
         run: bash .github/scripts/restore-firebase-config.sh flutter-only
 
-      - name: Analyze
-        run: flutter analyze
+      - name: Analyze Flutter app and test surface
+        run: flutter analyze lib test integration_test
 
       - name: Test
         run: flutter test --coverage

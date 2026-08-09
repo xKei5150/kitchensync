@@ -16,7 +16,7 @@ watch:
 	dart run build_runner watch --delete-conflicting-outputs
 
 analyze:
-	flutter analyze
+	flutter analyze lib test integration_test
 
 test:
 	flutter test

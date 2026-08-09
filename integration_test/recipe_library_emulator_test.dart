@@ -137,9 +137,8 @@ void main() {
     expect(sourceAfterDelete!.name, 'Shared stew');
   });
 
-  testWidgets('budget and target-servings search filters by price per serving', (
-    tester,
-  ) async {
+  testWidgets('budget and target-servings search '
+      'filters by price per serving', (tester) async {
     await bootEmulatedApp();
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final householdId = debugHouseholdIdForUser(uid);
